@@ -2,6 +2,7 @@ import core
 import os
 import sys
 import time
+import json
 
 class Channel:
     """Base class for channels"""
@@ -26,12 +27,33 @@ class Channel:
             case "help":
                 return """
 /new            start a new session (clears context window)
+/models         list available models
+/model          switch model
+/tools          list tools
+/enable         enable a tool
+/disable        disable a tool
 /stop           stops a running task
 /restart        restarts the server
 /help           this help
 """.strip()
+            case "models":
+                return "not implemented yet"
+            case "model":
+                return "not implemented yet"
+            case "tools":
+                tool_list = []
+                for tool in self.manager.tools:
+                    tool_list.append(tool.get("function").get("name"))
+                return "\n".join(tool_list)
+            case "enable":
+                return "not implemented yet"
+            case "disable":
+                return "not implemented yet"
+            case "debug":
+                await self.announce_all("piiiinggg!")
+                return "sent a debug announcement to all channels!"
             case "restart":
-                await self.announce("restarting..")
+                await self.announce_all("restarting..")
                 time.sleep(0.5)
                 os.execv(sys.argv[0], sys.argv)
             case "stop":
@@ -61,3 +83,9 @@ class Channel:
     async def announce(self, message: str):
         """called externally to announce things in this channel, such as a reminder sent by the AI"""
         raise NotImplementedError
+
+    async def announce_all(self, message: str):
+        """announces a message across all channels. useful for very important notifications!"""
+        for channel_name, channel in self.manager.channels.items():
+            await channel.announce(message)
+        return
