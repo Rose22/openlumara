@@ -60,22 +60,30 @@ class Memory(core.storage.Storage):
         return found
 
     def search(self, query: str, search_in_content: bool = False):
-        found = []
+        results = []
+        query_lower = query.lower()
+
         for index, mem in enumerate(self):
-            # add ID to it.. ID = index in the list
             mem_copy = mem.copy()
             mem_copy["id"] = index
 
-            # search based on tags first
-            if mem.get("tags"):
-                if any(query.lower() in tag.lower() for tag in mem["tags"]):
-                    found.append(mem_copy)
-                    continue
+            # Check tags: split tags into words and check if any word is in the query
+            match_found = False
+            tags = mem.get("tags", [])
 
-            # search the content if requested
-            if search_in_content:
-                if query.lower() in mem.get("content").lower():
-                    found.append(mem_copy)
-                    continue
+            for tag in tags:
+                # Split tag into words and check if any word exists in the query
+                if any(word in query_lower for word in tag.lower().split()):
+                    match_found = True
+                    break
 
-        return found
+            # Check content only if no tag match found
+            if not match_found and search_in_content:
+                content = mem.get("content", "")
+                if content and query_lower in content.lower():
+                    match_found = True
+
+            if match_found:
+                results.append(mem_copy)
+
+        return results
