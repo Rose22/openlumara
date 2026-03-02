@@ -76,7 +76,7 @@ class Manager:
         else:
             core.log("init", "all modules disabled in config")
 
-        if core.config.get("context_window") != "on":
+        if not core.config.get("context_window"):
             core.log("init", "context window is disabled")
 
         # run everything

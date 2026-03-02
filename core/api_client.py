@@ -71,10 +71,7 @@ class APIClient():
             self.manager.channel = channel
 
         if use_context == None and use_context != False:
-            config_context = core.config.get("context_window")
-            if config_context:
-                # allow disabling context via the config file
-                use_context = True if core.config.get("context_window").lower() == "on" else False
+            use_context = core.config.get("context_window", True)
 
         context = []
         if use_context:
@@ -101,10 +98,7 @@ class APIClient():
             self.manager.channel = channel
 
         if use_context == None and use_context != False:
-            config_context = core.config.get("context_window")
-            if config_context:
-                # allow disabling context via the config file
-                use_context = True if core.config.get("context_window").lower() == "on" else False
+            use_context = core.config.get("context_window", True)
 
         context = []
         if use_context:
