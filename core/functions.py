@@ -20,6 +20,9 @@ def get_path(path: str = ""):
         path
     ))
 
+def get_data_path():
+    return get_path("data")
+
 def remove_duplicates(lst: list):
     # removes duplicates from a list
 
