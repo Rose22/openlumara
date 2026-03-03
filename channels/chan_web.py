@@ -374,8 +374,7 @@ HTML_TEMPLATE = '''
 
         #message {
             flex: 1;
-            min-width: 0;
-            padding: 14px 18px;
+            padding: 10px 18px;
             border: 1px solid #2a2a2a;
             border-radius: 24px;
             background: #161616;
@@ -383,6 +382,13 @@ HTML_TEMPLATE = '''
             font-size: 1rem;
             outline: none;
             transition: border-color 0.2s, box-shadow 0.2s;
+            resize: none;
+            height: 44px;
+            min-height: 36px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: inherit;
+            line-height: 1.4;
         }
 
         #message:focus {
@@ -566,7 +572,12 @@ HTML_TEMPLATE = '''
                 </svg>
             </button>
             <input type="file" id="file-input" onchange="handleFileUpload(event)">
-            <input type="text" id="message" placeholder="Type a message... (or /new for new chat)" onkeypress="if(event.key==='Enter')send()">
+            <textarea id="message" placeholder="Type a message... (or /new for new chat)" onkeydown="handleKeyDown(event)" rows=1></textarea>
+            <script>
+            document.getElementById('message').addEventListener('input', function() {
+                autoResize(this);
+            });
+            </script>
             <button id="send" onclick="send()">Send</button>
             <button id="stop" onclick="stopGeneration()">Stop</button>
         </div>
@@ -693,6 +704,18 @@ HTML_TEMPLATE = '''
                 sendBtn.classList.remove('hidden');
                 stopBtn.classList.remove('show');
             }
+        }
+
+        function handleKeyDown(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                send();
+            }
+        }
+
+        function autoResize(textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
         }
 
         async function stopGeneration() {
