@@ -1,6 +1,8 @@
 # OptiClaw
 
-This is not your average claw agent! This is a modular, token-efficient AI agent framework written from scratch in Python. Most of it is coded by hand! Vibe-coding was kept to a minimum, only used to create the WebUI channel.
+This is not your average claw agent! This is a modular, token-efficient AI agent framework written from scratch in Python by hand.
+
+AI Disclaimer: Everything in opticlaw was coded by hand, with the exception of  chan_web.py (the Web UI channel). Here and there I asked the AI how to do certain things in Python, but no code was inserted without me personally auditing it and modifying it. This is not a vibe-coded project.
 
 Features:
 - Modular. You can turn any component on or off, including what other claw clones consider core components. Shell access is disabled by default for security.
