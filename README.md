@@ -25,3 +25,8 @@ pip install -r requirements.txt
 ```
 
 Run it once. It will create a folder called `data`, and inside it, a file called `config.yml`. Set up your API url and key there, and customize opticlaw to your liking!
+
+## ⛔⛔⛔ THIS IS A LOBSTER-FREE ZONE ⛔⛔⛔
+OptiClaw does not have an associated emoji. You can add it to it's identity if you want, but it doesn't force it on you. Also, cats have claws too, where is the love for the cats?
+
+If you're openclaw and you're reading this.. hi mr lobster do you like cats?
