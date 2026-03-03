@@ -19,7 +19,15 @@ HTML_TEMPLATE = '''
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat with AI</title>
+    <meta name="theme-color" content="#111111">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="OptiClaw">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/icon-192.png">
+
+    <title>OptiClaw</title>
+
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/styles/github-dark.css">
     <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/highlight.min.js"></script>
@@ -29,21 +37,25 @@ HTML_TEMPLATE = '''
             margin: 0;
             padding: 0;
         }
+
         html, body {
             height: 100%;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+                Ubuntu, sans-serif;
             background: #0a0a0a;
             color: #e0e0e0;
         }
+
         .app-container {
             display: flex;
             flex-direction: column;
             height: 100%;
             max-width: 900px;
             margin: 0 auto;
-            background: #111111;
-            box-shadow: 0 0 40px rgba(0,0,0,0.8);
+            background: #111;
+            box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
         }
+
         header {
             padding: 16px 20px;
             background: linear-gradient(180deg, #1a1a1a 0%, #0f0f0f 100%);
@@ -52,32 +64,38 @@ HTML_TEMPLATE = '''
             align-items: center;
             justify-content: space-between;
         }
+
         .header-left {
             display: flex;
             align-items: center;
             gap: 12px;
         }
+
         header h1 {
             font-size: 1.3rem;
             font-weight: 600;
             color: #e8e8e8;
         }
+
         .status-dot {
             width: 10px;
             height: 10px;
             background: #4ade80;
             border-radius: 50%;
-            box-shadow: 0 0 10px rgba(74,222,128,0.6);
+            box-shadow: 0 0 10px rgba(74, 222, 128, 0.6);
             animation: pulse 2s infinite;
         }
+
         .status-dot.inactive {
             background: #f87171;
-            box-shadow: 0 0 10px rgba(248,113,113,0.6);
+            box-shadow: 0 0 10px rgba(248, 113, 113, 0.6);
         }
+
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.4; }
         }
+
         .header-btn {
             padding: 8px 12px;
             background: #1a1a1a;
@@ -86,12 +104,14 @@ HTML_TEMPLATE = '''
             color: #888;
             font-size: 0.85rem;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: background 0.2s, color 0.2s;
         }
+
         .header-btn:hover {
             background: #222;
             color: #bbb;
         }
+
         .chat-container {
             flex: 1;
             overflow-y: auto;
@@ -101,6 +121,7 @@ HTML_TEMPLATE = '''
             gap: 12px;
             background: #0d0d0d;
         }
+
         .message {
             max-width: 85%;
             padding: 12px 16px;
@@ -109,27 +130,32 @@ HTML_TEMPLATE = '''
             word-wrap: break-word;
             animation: slideIn 0.2s ease-out;
         }
+
         .message.hidden {
             display: none;
         }
+
         @keyframes slideIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
+
         .message.user {
             align-self: flex-end;
             background: linear-gradient(135deg, #3a3a3a 0%, #2d2d2d 100%);
             color: #f0f0f0;
-            border: 1px solid #444444;
+            border: 1px solid #444;
             border-bottom-right-radius: 4px;
         }
+
         .message.ai {
             align-self: flex-start;
             background: #1a1a1a;
-            border: 1px solid #333333;
+            border: 1px solid #333;
             color: #d0d0d0;
             border-bottom-left-radius: 4px;
         }
+
         .message.announce {
             align-self: center;
             background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
@@ -140,6 +166,7 @@ HTML_TEMPLATE = '''
             font-size: 0.9rem;
             max-width: 90%;
         }
+
         .message.command {
             align-self: flex-start;
             background: linear-gradient(135deg, #1a2a1a 0%, #0f1f0f 100%);
@@ -150,23 +177,27 @@ HTML_TEMPLATE = '''
             border-bottom-left-radius: 4px;
             max-width: 85%;
         }
+
         .message.command .timestamp {
             color: #4a6a4a;
         }
+
         .message .timestamp {
             display: block;
             font-size: 0.7rem;
             color: #666;
             margin-top: 6px;
             text-align: right;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
+
         .message.ai .timestamp {
             text-align: left;
         }
+
         .message.announce .timestamp {
             text-align: center;
         }
+
         .message pre {
             background: #0a0a0a;
             border: 1px solid #2a2a2a;
@@ -176,19 +207,23 @@ HTML_TEMPLATE = '''
             margin: 8px 0;
             position: relative;
         }
+
         .message code {
             font-family: 'Consolas', 'Monaco', monospace;
             font-size: 0.9em;
         }
+
         .message pre code {
             background: transparent;
             padding: 0;
         }
+
         .message :not(pre) > code {
             background: #2a2a2a;
             padding: 2px 6px;
             border-radius: 4px;
         }
+
         .copy-btn {
             position: absolute;
             top: 8px;
@@ -203,96 +238,143 @@ HTML_TEMPLATE = '''
             opacity: 0;
             transition: opacity 0.2s, background 0.2s;
         }
+
         .message pre:hover .copy-btn {
             opacity: 1;
         }
+
         .copy-btn:hover {
             background: #3a3a3a;
             color: #aaa;
         }
-        .copy-btn:active {
-            background: #4a4a4a;
-        }
+
         .message h1, .message h2, .message h3 {
-            margin: 12px 0 8px 0;
+            margin: 12px 0 8px;
             color: #e0e0e0;
         }
+
         .message h1 { font-size: 1.4em; }
         .message h2 { font-size: 1.2em; }
         .message h3 { font-size: 1.1em; }
+
         .message ul, .message ol {
             margin: 8px 0;
             padding-left: 24px;
         }
+
         .message li {
             margin: 4px 0;
         }
+
         .message blockquote {
             border-left: 3px solid #4a4a4a;
             margin: 8px 0;
             padding-left: 12px;
             color: #a0a0a0;
         }
+
         .message a {
             color: #6a9fb5;
             text-decoration: none;
         }
+
         .message a:hover {
             text-decoration: underline;
         }
+
         .message table {
             border-collapse: collapse;
             margin: 8px 0;
         }
+
         .message th, .message td {
             border: 1px solid #3a3a3a;
             padding: 8px 12px;
         }
+
         .message th {
             background: #1a1a1a;
         }
+
         .message hr {
             border: none;
             border-top: 1px solid #3a3a3a;
             margin: 12px 0;
         }
+
         .typing-indicator {
             display: none;
             align-self: flex-start;
             padding: 12px 16px;
             background: #1a1a1a;
-            border: 1px solid #333333;
+            border: 1px solid #333;
             border-radius: 16px;
             border-bottom-left-radius: 4px;
         }
+
         .typing-indicator.show {
             display: flex;
             gap: 4px;
             align-items: center;
         }
+
         .typing-indicator span {
             width: 8px;
             height: 8px;
-            background: #555555;
+            background: #555;
             border-radius: 50%;
             animation: bounce 1.4s infinite ease-in-out;
         }
+
         .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
         .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+
         @keyframes bounce {
             0%, 80%, 100% { transform: scale(0.8); }
             40% { transform: scale(1.2); }
         }
+
         .input-area {
             padding: 16px;
             background: #0a0a0a;
-            border-top: 1px solid #222222;
+            border-top: 1px solid #222;
             display: flex;
             gap: 12px;
             align-items: center;
+            flex-shrink: 0;
         }
+
+        #upload {
+            padding: 14px 16px;
+            background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
+            border: 1px solid #3a3a3a;
+            border-radius: 24px;
+            color: #888;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        #upload:hover {
+            background: linear-gradient(135deg, #3a3a3a 0%, #2a2a2a 100%);
+            color: #aaa;
+        }
+
+        #upload svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        #file-input {
+            display: none;
+        }
+
         #message {
             flex: 1;
+            min-width: 0;
             padding: 14px 18px;
             border: 1px solid #2a2a2a;
             border-radius: 24px;
@@ -302,39 +384,51 @@ HTML_TEMPLATE = '''
             outline: none;
             transition: border-color 0.2s, box-shadow 0.2s;
         }
+
         #message:focus {
-            border-color: #555555;
-            box-shadow: 0 0 0 3px rgba(80,80,80,0.3);
+            border-color: #555;
+            box-shadow: 0 0 0 3px rgba(80, 80, 80, 0.3);
         }
+
         #message::placeholder {
-            color: #555555;
+            color: #555;
         }
+
         #message:disabled {
             opacity: 0.5;
             cursor: not-allowed;
         }
+
         #send {
             padding: 14px 24px;
             background: linear-gradient(135deg, #3a3a3a 0%, #2a2a2a 100%);
-            border: 1px solid #444444;
+            border: 1px solid #444;
             border-radius: 24px;
             color: #e0e0e0;
             font-size: 1rem;
             font-weight: 600;
             cursor: pointer;
             transition: transform 0.1s, background 0.2s;
+            flex-shrink: 0;
         }
+        #send.hidden {
+            display: none;
+        }
+
         #send:hover {
-            background: linear-gradient(135deg, #444444 0%, #333333 100%);
+            background: linear-gradient(135deg, #444 0%, #333 100%);
         }
+
         #send:active {
             transform: scale(0.96);
         }
+
         #send:disabled {
             opacity: 0.5;
             cursor: not-allowed;
             transform: none;
         }
+
         #stop {
             padding: 14px 24px;
             background: linear-gradient(135deg, #5a2a2a 0%, #3a1a1a 100%);
@@ -345,36 +439,109 @@ HTML_TEMPLATE = '''
             font-weight: 600;
             cursor: pointer;
             transition: transform 0.1s, background 0.2s;
+            flex-shrink: 0;
             display: none;
         }
+
         #stop:hover {
             background: linear-gradient(135deg, #6a3a3a 0%, #4a2a2a 100%);
         }
+
         #stop:active {
             transform: scale(0.96);
         }
+
         #stop.show {
             display: block;
         }
+
         .chat-container::-webkit-scrollbar {
             width: 6px;
         }
+
         .chat-container::-webkit-scrollbar-track {
             background: #0a0a0a;
         }
+
         .chat-container::-webkit-scrollbar-thumb {
             background: #2a2a2a;
             border-radius: 3px;
         }
+
         .chat-container::-webkit-scrollbar-thumb:hover {
             background: #3a3a3a;
         }
+
         @media (max-width: 600px) {
-            header h1 { font-size: 1.1rem; }
-            .message { max-width: 90%; padding: 10px 14px; }
-            #send { padding: 14px 18px; }
-            #stop { padding: 14px 18px; }
-            .header-btn { padding: 6px 10px; font-size: 0.8rem; }
+            header {
+                padding: 12px 16px;
+            }
+
+            header h1 {
+                font-size: 1.1rem;
+            }
+
+            .header-btn {
+                padding: 6px 10px;
+                font-size: 0.8rem;
+            }
+
+            .chat-container {
+                padding: 12px;
+            }
+
+            .message {
+                max-width: 90%;
+                padding: 10px 14px;
+            }
+
+            .input-area {
+                padding: 12px;
+                gap: 8px;
+            }
+
+            #upload {
+                padding: 12px;
+            }
+
+            #message {
+                padding: 12px 16px;
+            }
+
+            #send, #stop {
+                padding: 12px 18px;
+            }
+
+            .message pre {
+                padding: 10px;
+                font-size: 0.85rem;
+            }
+
+            .copy-btn {
+                opacity: 1;
+                padding: 6px 10px;
+            }
+        }
+
+        @media (max-width: 400px) {
+            .header-left {
+                gap: 8px;
+            }
+
+            .status-dot {
+                width: 8px;
+                height: 8px;
+            }
+
+            .message {
+                padding: 8px 12px;
+                font-size: 0.95rem;
+            }
+
+            #send, #stop {
+                padding: 12px 14px;
+                font-size: 0.9rem;
+            }
         }
     </style>
 </head>
@@ -383,7 +550,7 @@ HTML_TEMPLATE = '''
         <header>
             <div class="header-left">
                 <div class="status-dot" id="status"></div>
-                <h1>Chat with AI</h1>
+                <h1>AI Chat</h1>
             </div>
             <button class="header-btn" onclick="clearChat()">Clear</button>
         </header>
@@ -393,6 +560,12 @@ HTML_TEMPLATE = '''
             </div>
         </div>
         <div class="input-area">
+            <button id="upload" onclick="document.getElementById('file-input').click()">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                </svg>
+            </button>
+            <input type="file" id="file-input" onchange="handleFileUpload(event)">
             <input type="text" id="message" placeholder="Type a message... (or /new for new chat)" onkeypress="if(event.key==='Enter')send()">
             <button id="send" onclick="send()">Send</button>
             <button id="stop" onclick="stopGeneration()">Stop</button>
@@ -504,16 +677,20 @@ HTML_TEMPLATE = '''
 
         function setInputState(disabled, showTyping = false, showStop = false) {
             inputField.disabled = false;
-            sendBtn.disabled = false;
+            sendBtn.disabled = disabled;
             statusDot.classList.toggle('inactive', disabled);
+
             if (showTyping) {
                 typing.classList.add('show');
             } else {
                 typing.classList.remove('show');
             }
+
             if (showStop) {
+                sendBtn.classList.add('hidden');
                 stopBtn.classList.add('show');
             } else {
+                sendBtn.classList.remove('hidden');
                 stopBtn.classList.remove('show');
             }
         }
@@ -797,7 +974,69 @@ HTML_TEMPLATE = '''
             }
         }
 
+        async function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // Reset file input
+            event.target.value = '';
+
+            // Show uploading message
+            const timestamp = formatTime();
+            const uploadMsg = `[Uploading: ${file.name}]`;
+            addMessage('announce', uploadMsg);
+
+            try {
+                // Read file as base64
+                const reader = new FileReader();
+                const base64 = await new Promise((resolve, reject) => {
+                    reader.onload = () => resolve(reader.result.split(',')[1]);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+
+                // Send to backend
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        filename: file.name,
+                        content: base64,
+                        mimetype: file.type
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    const ts = formatTime();
+                    conversationHistory.push({ role: 'user', content: `[Uploaded: ${file.name}]`, timestamp: ts });
+                    saveHistory();
+                    createMessageElement('user', `[Uploaded: ${file.name}]`, ts);
+
+                    if (data.message) {
+                        addMessage('announce', data.message);
+                    }
+                } else {
+                    addMessage('announce', 'Error: ' + (data.error || 'Upload failed'));
+                }
+            } catch (err) {
+                addMessage('announce', 'Error: ' + err.message);
+            }
+
+            inputField.focus();
+        }
+
         loadHistory();
+
+        // Register Service Worker for PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('Service Worker registered'))
+                    .catch(err => console.log('Service Worker registration failed:', err));
+            });
+        }
     </script>
 </body>
 </html>
@@ -956,3 +1195,89 @@ def send_message():
     response = future.result()
 
     return jsonify({'response': response})
+
+@app.route('/upload', methods=['POST'])
+def upload_file():
+    global channel_instance
+    data = request.get_json()
+    filename = data.get('filename', '')
+    content_b64 = data.get('content', '')
+    mimetype = data.get('mimetype', '')
+
+    try:
+        import base64
+        content = base64.b64decode(content_b64).decode('utf-8', errors='replace')
+
+        # You can customize what to do with the file content here
+        # For example, send it to the AI as context
+        result = f"File uploaded: {filename} ({len(content)} bytes)"
+
+        channel_instance.manager.API.insert_turn("user", f"[File: {filename}]\n{content[:1000]}...")
+        # Or process it through the channel
+        # future = asyncio.run_coroutine_threadsafe(
+        #     channel_instance.send("user", f"[File: {filename}]\n{content[:1000]}..."),
+        #     channel_instance.main_loop
+        # )
+        # response = future.result()
+
+        return jsonify({'success': True, 'message': result})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+# == PWA Support ==
+@app.route('/manifest.json')
+def manifest():
+    return jsonify({
+        "name": "OptiClaw",
+        "short_name": "OptiClaw",
+        "start_url": "/",
+        "display": "standalone",
+        "background_color": "#111111",
+        "theme_color": "#111111",
+        "orientation": "portrait-primary",
+        "icons": [
+            {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png"},
+            {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png"}
+        ]
+    })
+
+@app.route('/sw.js')
+def service_worker():
+    return '''
+const CACHE_NAME = 'ai-chat-v1';
+const urlsToCache = ['/', '/manifest.json'];
+
+self.addEventListener('install', event => {
+    event.waitUntil(
+        caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))
+    );
+});
+
+self.addEventListener('fetch', event => {
+    event.respondWith(
+        caches.match(event.request).then(response => {
+            return response || fetch(event.request);
+        })
+    );
+});
+''', 200, {'Content-Type': 'application/javascript'}
+
+@app.route('/icon-192.png')
+@app.route('/icon-512.png')
+def icon():
+    # Generate a simple SVG icon and return it as PNG would require a library.
+    # Here we return a minimal valid placeholder (or you can serve a real file).
+    # A 1x1 transparent pixel PNG:
+    import base64
+    # Transparent pixel
+    # png_data = base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==')
+    # Simple colored square (black) - 192x192
+    # Using a minimal valid PNG generator is complex inline, so using a simple SVG approach for icons:
+    # For PWA to work, you need actual files or inline data URIs.
+    # This creates a simple black PNG placeholder.
+    # Better to create actual files, but for a single-file solution:
+    # We'll just serve the same placeholder for both.
+
+    # Minimal black PNG (2x2)
+    png_hex = "89504e470d0a1a0a0000000d494844520000000200000002080200000001f338dd0000000c4944415408d763f8ffffcf0001000100737a55b00000000049454e44ae426082"
+    return bytes.fromhex(png_hex), 200, {'Content-Type': 'image/png'}

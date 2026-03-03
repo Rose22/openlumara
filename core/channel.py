@@ -18,6 +18,7 @@ class Channel:
 /module         enable/disable a module by name
 /tools          list tools
 /sysprompt      show current system prompt
+/context        show current context window
 /stop           stops a running task
 /restart        restarts the server
 /stop           stops the AI in it's tracks
@@ -63,10 +64,20 @@ class Channel:
                     return "CONTEXT DISABLED"
 
                 sysprompt = await self.manager.get_system_prompt()
-                if sysprompt:
-                    return sysprompt
-                else:
+                return sysprompt if sysprompt else "BLANK"
+            case "context":
+                if not core.config.get("context_window"):
+                    return "CONTEXT DISABLED"
+
+                context = await self.manager.API.build_context(system_prompt=False)
+                if not context:
                     return "BLANK"
+
+                context_display = []
+                for turn in context:
+                    context_display.append(f"== {turn.get('role')} ==\n{turn.get('content')}")
+
+                return "\n\n".join(context_display)
             case "restart":
                 await self.announce_all("restarting server..")
                 time.sleep(0.1)
