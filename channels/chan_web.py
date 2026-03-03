@@ -85,10 +85,18 @@ HTML_TEMPLATE = '''
             box-shadow: 0 0 10px rgba(74, 222, 128, 0.6);
             animation: pulse 2s infinite;
         }
-
-        .status-dot.inactive {
+        .status-dot.connecting {
+            background: #fbbf24;
+            box-shadow: 0 0 10px rgba(251,191,36,0.6);
+            animation: pulse 1s infinite;
+        }
+        .status-dot.connected {
+            background: #4ade80;
+            box-shadow: 0 0 10px rgba(74,222,128,0.6);
+        }
+        .status-dot.disconnected {
             background: #f87171;
-            box-shadow: 0 0 10px rgba(248, 113, 113, 0.6);
+            box-shadow: 0 0 10px rgba(248,113,113,0.6);
         }
 
         @keyframes pulse {
@@ -167,6 +175,14 @@ HTML_TEMPLATE = '''
             max-width: 90%;
         }
 
+        .message.announce.info {
+            background: linear-gradient(135deg, #1a2a3a 0%, #0a1a2a 100%);
+            border: 1px solid #2a4a6a;
+            color: #80b0d0;
+        }
+        .message.announce.info .timestamp {
+            color: #4a6a8a;
+        }
         .message.announce.important {
             background: linear-gradient(135deg, #3a3a1a 0%, #2a2a0a 100%);
             border: 1px solid #5a5a2a;
@@ -186,6 +202,10 @@ HTML_TEMPLATE = '''
         }
         .message.announce.important .timestamp {
             color: #8a8a4a;
+        }
+
+        .message.announce.reconnecting {
+            opacity: 0.7;
         }
 
         .message.command {
@@ -616,6 +636,99 @@ HTML_TEMPLATE = '''
         let currentController = null;
         let conversationHistory = [];
 
+        // == Connection Monitoring ==
+        let isConnected = false;
+        let reconnectAttempts = 0;
+        let reconnectTimer = null;
+        let connectionCheckInterval = null;
+        let hasShownReconnecting = false;
+        let reconnectingMsgEl = null;
+
+        function updateConnectionStatus(status) {
+            const statusDot = document.getElementById('status');
+            statusDot.className = 'status-dot ' + status;
+
+            if (status === 'disconnected') {
+                sendBtn.disabled = true;
+            } else if (status === 'connected') {
+                sendBtn.disabled = false;
+                reconnectAttempts = 0;
+            }
+        }
+
+        function removeReconnectingMessage() {
+            if (reconnectingMsgEl) {
+                reconnectingMsgEl.remove();
+                reconnectingMsgEl = null;
+            }
+            hasShownReconnecting = false;
+        }
+
+        async function checkConnection() {
+            try {
+                const response = await fetch('/poll?id=' + lastAnnouncementId, {
+                    method: 'GET',
+                    signal: AbortSignal.timeout(3000)
+                });
+
+                if (response.ok) {
+                    const wasReconnecting = hasShownReconnecting && !isConnected;
+
+                    if (!isConnected) {
+                        isConnected = true;
+                        updateConnectionStatus('connected');
+
+                        removeReconnectingMessage();
+
+                        // Show reconnected message only if we were actually reconnecting
+                        if (wasReconnecting || reconnectAttempts > 0) {
+                            addAnnouncement('Reconnected to server', false, false, true);
+                        }
+                    }
+                } else {
+                    throw new Error('Server error');
+                }
+            } catch (err) {
+                if (isConnected) {
+                    isConnected = false;
+                    updateConnectionStatus('disconnected');
+                    removeReconnectingMessage();
+                    addAnnouncement('Disconnected from server', false, false, true);
+                    scheduleReconnect();
+                }
+            }
+        }
+
+        function scheduleReconnect() {
+            if (reconnectTimer) clearTimeout(reconnectTimer);
+
+            reconnectAttempts++;
+            const delay = Math.min(1000 * Math.pow(1.5, Math.min(reconnectAttempts, 10)), 30000);
+
+            updateConnectionStatus('connecting');
+
+            // Show reconnecting message only once
+            if (!hasShownReconnecting) {
+                hasShownReconnecting = true;
+                reconnectingMsgEl = addAnnouncement('Reconnecting...', false, false, true);
+                if (reconnectingMsgEl) {
+                    reconnectingMsgEl.classList.add('reconnecting');
+                }
+            }
+
+            reconnectTimer = setTimeout(async () => {
+                await checkConnection();
+                if (!isConnected) {
+                    scheduleReconnect();
+                }
+            }, delay);
+        }
+
+        // Start connection monitoring
+        connectionCheckInterval = setInterval(checkConnection, 5000);
+        updateConnectionStatus('connecting');
+        checkConnection(); // Initial check
+
         marked.setOptions({
             breaks: true,
             gfm: true
@@ -875,26 +988,35 @@ HTML_TEMPLATE = '''
         }
 
         async function pollAnnouncements() {
+            if (!isConnected) return;
+
             try {
-                const response = await fetch('/poll?id=' + lastAnnouncementId);
+                const response = await fetch('/poll?id=' + lastAnnouncementId, {
+                    signal: AbortSignal.timeout(5000)
+                });
+
                 if (!response.ok) throw new Error('Poll failed');
+
                 const data = await response.json();
                 if (data.messages) {
                     for (const msg of data.messages) {
-                        addAnnouncement(msg.content, msg.important, msg.error);
+                        addAnnouncement(msg.content, msg.important, msg.error, msg.info);
                         lastAnnouncementId = msg.id;
                     }
                 }
             } catch (err) {
                 console.error('Poll error:', err);
+                isConnected = false;
+                updateConnectionStatus('disconnected');
+                addAnnouncement('Disconnected from server. Reconnecting...', false, false, true);
+                scheduleReconnect();
             }
         }
 
-        function addAnnouncement(content, important = false, error = false) {
+        function addAnnouncement(content, type = nil) {
             const div = document.createElement('div');
             div.className = 'message announce';
-            if (important) div.classList.add('important');
-            if (error) div.classList.add('error');
+            if (type) div.classList.add(type);
 
             const timeStr = formatTime();
             div.innerHTML = content + '<span class="timestamp">' + timeStr + '</span>';
@@ -907,11 +1029,19 @@ HTML_TEMPLATE = '''
             chat.scrollTop = chat.scrollHeight;
         }
 
-        setInterval(pollAnnouncements, 500);
+        setInterval(() => {
+            if (isConnected) pollAnnouncements();
+        }, 500);
 
         async function send() {
+            if (!isConnected) {
+                addAnnouncement('Cannot send message - not connected to server', false, true);
+                return;
+            }
+
             const message = inputField.value.trim();
             if (!message) return;
+
             if (message.startsWith('/')) {
                 clearInput();
                 await sendCommand(message);
@@ -1096,6 +1226,11 @@ HTML_TEMPLATE = '''
 
         loadHistory();
 
+        updateConnectionStatus('connecting');
+        checkConnection();
+
+        setInterval(pollAnnouncements, 500);
+
         // Register Service Worker for PWA
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
@@ -1157,7 +1292,7 @@ class Webui(core.channel.Channel):
         server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         server.serve_forever()
 
-    async def announce(self, message: str, important: bool = False, error: bool = False):
+    async def announce(self, message: str, type: str = None):
         """
         Handle announcements from the framework and push to web UI.
         """
@@ -1166,8 +1301,7 @@ class Webui(core.channel.Channel):
         self.announcement_queue.append({
             'id': self.announcement_id,
             'content': message.replace('\n', '<br>'),
-            'important': important,
-            'error': error
+            'type': type,
         })
 
 channel_instance = None

@@ -170,11 +170,11 @@ class Channel:
         async for token in self.manager.API.send_stream(role, message, channel=self, **kwargs):
             yield token
 
-    async def announce(self, message: str, important=False, error=False):
+    async def announce(self, message: str, type=None):
         """called externally to announce things in this channel, such as a reminder sent by the AI"""
         raise NotImplementedError
 
-    async def announce_all(self, message: str, important=False, error=False):
+    async def announce_all(self, message: str, type=None):
         """announces a message across all channels. useful for very important notifications!"""
         for channel_name, channel in self.manager.channels.items():
             await channel.announce(message)

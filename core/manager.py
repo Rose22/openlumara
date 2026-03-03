@@ -389,7 +389,7 @@ class Manager:
             prompt = self.API._turns+[{"role": "system", "content": "If the tool response provides sufficient answers, tell the user the results. If not, consider if you need to use another tool? If so, call it."}]
         else:
             if self.channel:
-                await self.channel.announce("toolcalling chain cancelled")
+                await self.channel.announce("toolcalling chain cancelled", "info")
             return None
 
         try:
@@ -401,4 +401,4 @@ class Manager:
         except Exception as e:
             core.log_error(f"error while processing tool results", e)
             if self.channel:
-                await self.channel.announce(f"error while processing tool results: {e}", error=True)
+                await self.channel.announce(f"error while processing tool results: {e}", "error")

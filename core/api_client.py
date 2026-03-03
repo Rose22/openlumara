@@ -38,7 +38,7 @@ class APIClient():
         while len(self._turns) > max_turns or len(str(self._turns)) > max_tokens:
             self._turns.pop(0)
         if len(str(self._turns)) > max_tokens and self.manager.channel:
-                await self.manager.channel.announce("input was too large! context size trimmed.", error=True)
+                await self.manager.channel.announce("input was too large! context size trimmed.", "error")
         return len(self._turns) <= max_turns
 
     def _request(self, context, debug=False, **kwargs):
@@ -119,7 +119,7 @@ class APIClient():
         except Exception as e:
             core.log_error("error while sending request to AI", e)
             if self.manager.channel:
-                await self.manager.channel.announce(f"error while sending request to AI: {e}", error=True)
+                await self.manager.channel.announce(f"error while sending request to AI: {e}", "error")
             return None
 
     async def send_stream(self, role: str, content: str, system_prompt=True, channel=None, use_context=None, use_tools=True, tools=None, add_turn=True, debug=False, **kwargs):
@@ -151,7 +151,7 @@ class APIClient():
         except Exception as e:
             core.log_error("error while sending request to AI", e)
             if self.manager.channel:
-                await self.manager.channel.announce(f"error while sending request to AI: {e}", error=True)
+                await self.manager.channel.announce(f"error while sending request to AI: {e}", "error")
 
     async def _recv(self, response, debug=False, **kwargs):
         """takes a response object and extracts the message from it, handling tool calls if needed"""
@@ -164,7 +164,7 @@ class APIClient():
         except Exception as e:
             core.log_error("error while receiving response from AI", e)
             if self.manager.channel:
-                await self.manager.channel.announce(f"error while receiving response from AI: {e}", error=True)
+                await self.manager.channel.announce(f"error while receiving response from AI: {e}", "error")
             return None
 
         # extract message content
@@ -242,7 +242,7 @@ class APIClient():
         except Exception as e:
             core.log_error("error while receiving response from AI", e)
             if self.manager.channel:
-                await self.manager.channel.announce(f"error while receiving response from AI: {e}", error=True)
+                await self.manager.channel.announce(f"error while receiving response from AI: {e}", "error")
 
     async def cancel(self):
         self.cancel_request = True
