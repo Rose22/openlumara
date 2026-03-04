@@ -4,13 +4,8 @@ import sys
 import time
 import json
 
-class Channel:
-    """Base class for channels"""
-
-    def __init__(self, manager):
-        self.name = self.__class__.__name__
-        self.manager = manager
-        self._help = """
+def get_help():
+    return """
 /new            start a new session (clears context window)
 /clear          same as /new
 /sysprompt      show current system prompt
@@ -28,7 +23,14 @@ class Channel:
 /restart        restarts the server
 /stop           stops the AI in it's tracks
 /help           this help
-""".strip()
+    """.strip()
+
+class Channel:
+    """Base class for channels"""
+
+    def __init__(self, manager):
+        self.name = self.__class__.__name__
+        self.manager = manager
 
 
     async def _process_input(self, message: str):
@@ -49,7 +51,7 @@ class Channel:
                 self.manager.API._turns = []
                 return "New session started."
             case "help":
-                return self._help
+                return get_help()
             case "status":
                 return "\n".join(await self.manager.get_status())
             case "models":
@@ -154,7 +156,7 @@ class Channel:
                 await self.manager.API.cancel()
                 return "stopped!"
             case _:
-                return self._help
+                return get_help()
 
     async def send(self, role: str, message: str, **kwargs):
         """sends a message to the AI from within the current channel"""

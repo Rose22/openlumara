@@ -97,7 +97,7 @@ class Manager:
             module_sysprompt = await module.on_system_prompt()
 
             if module_sysprompt and (module_name not in core.config.get("modules_disable_prompts", [])):
-                prompt_chunk = f"# {module_name.capitalize()}\n{str(module_sysprompt).strip()}"
+                prompt_chunk = f"# {' '.join(module_name.split('_')).capitalize()}\n{str(module_sysprompt).strip()}"
 
                 if module_name in ("memory", "identity"):
                     sysprompt_top.append(prompt_chunk)
