@@ -16,7 +16,7 @@ class APIClient():
         self._AI = openai.AsyncOpenAI(*args, **kwargs)
 
         self._model = model
-        self._turns = []
+        self._messages = []
 
         self.cancel_request = False
 
@@ -49,34 +49,39 @@ class APIClient():
         num_tokens += 2
         return num_tokens
 
-    async def insert_turn(self, role: str, content: str, num_tokens=None):
-        """inserts a turn (message with role and content) into context, trimming when needed"""
+    def get_messages(self):
+        return self._messages
+    def set_messages(self, messages: list):
+        self._messages = messages
 
-        await self.trim_turns(num_tokens=num_tokens)
-        return self._turns.append({"role": role, "content": content})
+    async def insert_message(self, role: str, content: str, num_tokens=None):
+        """inserts a message (dict with role and content) into context, trimming when needed"""
 
-    async def trim_turns(self, max_turns: int = None, max_tokens: int = None, num_tokens: int = None):
+        await self.trim_messages(num_tokens=num_tokens)
+        return self._messages.append({"role": role, "content": content})
+
+    async def trim_messages(self, max_messages: int = None, max_tokens: int = None, num_tokens: int = None):
         """trims context to keep token consumption low"""
 
-        if not max_turns:
-            max_turns = core.config.get("max_turns", 20)
+        if not max_messages:
+            max_messages = core.config.get("max_messages", 20)
         if not max_tokens:
             # TODO: find a way to get max tokens. also count tokens instead of words
             max_tokens = core.config.get("max_context", 8192)
 
         if not num_tokens:
             # default to character length if we couldn't get the token amount
-            num_tokens = len(str(self._turns))
+            num_tokens = len(str(self._messages))
 
         request_too_big = False
         context_trimmed = False
-        while len(self._turns) > max_turns or num_tokens > max_tokens:
+        while len(self._messages) > max_messages or num_tokens > max_tokens:
             context_trimmed = True
-            if not self._turns:
+            if not self._messages:
                 request_too_big = True
-                # we've exhausted all turns. handle it later in this function
+                # we've exhausted all messages. handle it later in this function
                 break
-            self._turns.pop(0)
+            self._messages.pop(0)
 
         if self.manager.channel:
             if request_too_big:
@@ -84,8 +89,7 @@ class APIClient():
                 await self.manager.channel.announce("Your request exceeds the max amount of tokens allowed. Please send a smaller request!", "error")
             elif context_trimmed:
                 await self.manager.channel.announce("Input was too large! context size trimmed.", "error")
-        return len(self._turns) <= max_turns
-
+        return len(self._messages) <= max_messages
 
     async def _request(self, context, debug=False, tools=None, stream=False):
         """send a request to the LLM and return the response object"""
@@ -113,15 +117,15 @@ class APIClient():
         return response
 
     async def build_context(self, system_prompt=True):
-        # context = system prompt + turn history
+        # context = system prompt + message history
         context = []
 
         # always insert system prompt at start of context
         if system_prompt:
             context = context+[{"role": "system", "content": await self.manager.get_system_prompt()}]
 
-        # insert turn history
-        context = context+self._turns
+        # insert message history
+        context = context+self._messages
 
         if system_prompt:
             histend = await self.manager.get_end_prompt()
@@ -132,27 +136,27 @@ class APIClient():
         return context
 
     async def get_context_size(self):
-        turn_history = await self.build_context(system_prompt=False)
+        message_history = await self.build_context(system_prompt=False)
         sysprompt = await self.manager.get_system_prompt()
         histend = await self.manager.get_end_prompt()
         sysprompt_size_chars = len(str(sysprompt))
         sysprompt_size_words = len(str(sysprompt).split())
-        turn_hist_size_chars = len(str(turn_history))
-        turn_hist_size_words = len(str(turn_history).split())
+        message_hist_size_chars = len(str(message_history))
+        message_hist_size_words = len(str(message_history).split())
         histend_size_chars = len(str(histend))
         histend_size_words = len(str(histend).split())
 
-        combined_size_chars = turn_hist_size_chars+sysprompt_size_chars+histend_size_chars
-        combined_size_words = turn_hist_size_words+sysprompt_size_words+histend_size_words
+        combined_size_chars = message_hist_size_chars+sysprompt_size_chars+histend_size_chars
+        combined_size_words = message_hist_size_words+sysprompt_size_words+histend_size_words
 
         return {
             "system prompt size": f"{sysprompt_size_chars} characters | {sysprompt_size_words} words",
-            "turn history size": f"{turn_hist_size_chars} characters | {turn_hist_size_words} words",
+            "message history size": f"{message_hist_size_chars} characters | {message_hist_size_words} words",
             "end prompt size": f"{histend_size_chars} characters | {histend_size_words} words",
             "total size": f"{combined_size_chars} characters | {combined_size_words} words"
         }
 
-    async def send(self, role: str, content: str, system_prompt=True, channel=None, use_context=None, use_tools=True, tools=None, add_turn=True, debug=False, **kwargs):
+    async def send(self, role: str, content: str, system_prompt=True, channel=None, use_context=None, use_tools=True, tools=None, add_message=True, debug=False, **kwargs):
         """send a message to the LLM. returns a string"""
 
         self.cancel_request = False
@@ -168,14 +172,14 @@ class APIClient():
 
         context = []
         if use_context:
-            if add_turn:
+            if add_message:
                 # try to check how big (in tokens) the request content is
                 # num_tokens = self._count_tokens_local({"role": role, "content": content})
                 # if num_tokens > core.config.get("max_tokens", 8192):
                 #     if self.manager.channel:
                 #         self.manager.channel.announce("error: request was too big!", False)
                 #     core.log("error", "request was too big!")
-                await self.insert_turn(role, content)
+                await self.insert_message(role, content)
             context = await self.build_context(system_prompt=system_prompt)
         else:
             context = [{"role": role, "content": content}]
@@ -185,14 +189,14 @@ class APIClient():
             tools = self.manager.tools
 
         try:
-            return await self._recv(await self._request(context, tools=(tools if use_tools else None)), system_prompt=system_prompt, use_context=use_context, context=context, use_tools=use_tools, add_turn=add_turn, debug=debug, **kwargs)
+            return await self._recv(await self._request(context, tools=(tools if use_tools else None)), system_prompt=system_prompt, use_context=use_context, context=context, use_tools=use_tools, add_message=add_message, debug=debug, **kwargs)
         except Exception as e:
             core.log_error("error while sending request to AI", e)
             if self.manager.channel:
                 await self.manager.channel.announce(f"error while sending request to AI: {e}", "error")
             return None
 
-    async def send_stream(self, role: str, content: str, system_prompt=True, channel=None, use_context=None, use_tools=True, tools=None, add_turn=True, debug=False, **kwargs):
+    async def send_stream(self, role: str, content: str, system_prompt=True, channel=None, use_context=None, use_tools=True, tools=None, add_message=True, debug=False, **kwargs):
         """send a message to the LLM. is an iterable async generator"""
 
         self.cancel_request = False
@@ -208,8 +212,8 @@ class APIClient():
 
         context = []
         if use_context:
-            if add_turn:
-                await self.insert_turn(role, content)
+            if add_message:
+                await self.insert_message(role, content)
             context = await self.build_context(system_prompt=system_prompt)
         else:
             context = [{"role": role, "content": content}]
@@ -251,18 +255,18 @@ class APIClient():
 
         # add it to context
         token_usage = None
-        if kwargs.get("add_turn"):
+        if kwargs.get("add_message"):
             if hasattr(response, 'usage') and response.usage:
                 token_usage = response.usage.prompt_tokens
             else:
                 # fall back to tokenizer counting if api didn't provide a token count
                 token_usage = self._count_tokens_local(context)
 
-            await self.insert_turn("assistant", final_content, num_tokens=token_usage)
+            await self.insert_message("assistant", final_content, num_tokens=token_usage)
 
         return final_content
 
-    async def _recv_stream(self, response, use_tools=True, add_turn=True, context=None, debug=False, **kwargs):
+    async def _recv_stream(self, response, use_tools=True, add_message=True, context=None, debug=False, **kwargs):
         """takes a response object and extracts the message from it, handling tool calls if needed. streaming version"""
         final_tool_calls = []
         tool_call_buffer = {}
@@ -327,9 +331,9 @@ class APIClient():
                 token_usage = self._count_tokens_local(context)
 
             # add it to context
-            if add_turn:
+            if add_message:
                 final_content = "".join(tokens)
-                await self.insert_turn("assistant", final_content, num_tokens=token_usage)
+                await self.insert_message("assistant", final_content, num_tokens=token_usage)
         except Exception as e:
             core.log_error("error while receiving response from AI", e)
             if self.manager.channel:

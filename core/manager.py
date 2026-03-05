@@ -357,7 +357,7 @@ class Manager:
             "role": "assistant",
             "tool_calls": [tool_call.to_dict() for tool_call in tool_calls]
         }
-        self.API._turns.append(tools_called)
+        self.API._messages.append(tools_called)
 
         # call any tool calls based on the stored tool call function
         for tool_call in tool_calls:
@@ -406,18 +406,18 @@ class Manager:
                     core.log("toolcall", f"error: {str(e)}")
                     tool_response = {"role": "tool", "tool_call_id": tool_call.id, "content": f"error: {str(e)}"}
 
-                self.API._turns.append(tool_response)
+                self.API._messages.append(tool_response)
             else:
                 core.log("toolcall", f"tried to call tool {tool_call.function.name} but couldnt find it?!")
 
-        # get user's last request from turns
-        user_last_turn = {}
-        for turn in self.API._turns:
-            if turn.get("role") == "user":
-                user_last_turn = turn
+        # get user's last request from messages
+        user_last_message = {}
+        for message in self.API._messages:
+            if message.get("role") == "user":
+                user_last_message = message
 
         if not self.API.cancel_request:
-            prompt = self.API._turns+[{"role": "system", "content": "If the tool response provides sufficient answers, tell the user the results. If not, consider if you need to use another tool? If so, call it."}]
+            prompt = self.API._messages+[{"role": "system", "content": "If the tool response provides sufficient answers, tell the user the results. If not, consider if you need to use another tool? If so, call it."}]
         else:
             if self.channel:
                 await self.channel.announce("toolcalling chain cancelled", "info")
@@ -427,7 +427,7 @@ class Manager:
             return await self.API._recv(
                 await self.API._request(prompt, tools=self.tools),
                 use_tools=True,
-                add_turn=False
+                add_message=False
             )
         except Exception as e:
             core.log_error(f"error while processing tool results", e)
