@@ -24,7 +24,7 @@ class Scheduler(core.module.Module):
                         action = job.get("action")
                         if self.manager.channel:
                             message = await self.manager.channel.send(
-                                "system",
+                                "user",
                                 f"# An event has triggered!\nPlease follow these instructions:\n{action}\nUse tools if needed. For simple reminders, do not use tools.",
                                 use_context=False,
                                 use_tools=True,
