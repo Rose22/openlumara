@@ -10,8 +10,8 @@ This module provides a Flask-based web interface with:
 - Markdown rendering with syntax highlighting
 - Message editing, deletion, search, and export
 - Keyboard shortcuts and accessibility features
-- Virtual scrolling for performance
-- CSRF and CSP security headers
+- Conversation history sidebar (desktop always visible, mobile swipe/button)
+- Persistent conversation storage
 """
 
 import asyncio
@@ -21,7 +21,9 @@ import uuid
 import base64
 import socket
 import secrets
-from flask import Flask, render_template_string, request, jsonify, Response, cli, session
+import time
+from datetime import datetime
+from flask import Flask, render_template_string, request, jsonify, Response, cli
 from threading import Thread
 from queue import Queue
 
@@ -68,7 +70,6 @@ def add_security_headers(response):
     response.headers['X-XSS-Protection'] = '1; mode=block'
 
     # Prevent caching of the main page and service worker
-    # This forces the browser to always check for updates
     if request.path == '/' or request.path == '/sw.js':
         response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
         response.headers['Pragma'] = 'no-cache'
@@ -114,9 +115,11 @@ HTML_TEMPLATE = r"""
             --bg-message-command: linear-gradient(135deg, #1a2a1a 0%, #0f1f0f 100%);
             --bg-input: #161616;
             --bg-code: #0a0a0a;
+            --bg-sidebar: #0d0d0d;
             --border-color: #2a2a2a;
             --border-message: #333333;
             --border-user: #444444;
+            --border-sidebar: #222222;
             --text-primary: #e0e0e0;
             --text-secondary: #a0a0a0;
             --text-muted: #666666;
@@ -144,6 +147,7 @@ HTML_TEMPLATE = r"""
             --radius-lg: 12px;
             --radius-xl: 16px;
             --radius-full: 24px;
+            --sidebar-width: 280px;
         }
 
         /* ==========================================================================
@@ -157,6 +161,7 @@ HTML_TEMPLATE = r"""
 
         html, body {
             height: 100%;
+            width: 100%;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
                          Oxygen, Ubuntu, Cantarell, sans-serif;
             background: var(--bg-primary);
@@ -164,6 +169,7 @@ HTML_TEMPLATE = r"""
             line-height: 1.5;
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
+            overflow: hidden;
         }
 
         /* Skip link for accessibility */
@@ -174,7 +180,7 @@ HTML_TEMPLATE = r"""
             padding: 8px 16px;
             background: var(--accent);
             color: var(--bg-primary);
-            z-index: 1000;
+            z-index: 2000;
             text-decoration: none;
             font-weight: 600;
             border-radius: 0 0 var(--radius-md) 0;
@@ -188,14 +194,213 @@ HTML_TEMPLATE = r"""
         /* ==========================================================================
            App Container
            ========================================================================== */
+        .app-wrapper {
+            display: flex;
+            height: 100%;
+            width: 100%;
+        }
+
+        /* ==========================================================================
+           Sidebar
+           ========================================================================== */
+        .sidebar {
+            width: var(--sidebar-width);
+            min-width: var(--sidebar-width);
+            height: 100%;
+            background: var(--bg-sidebar);
+            border-right: 1px solid var(--border-sidebar);
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            z-index: 100;
+        }
+
+        .sidebar.collapsed {
+            transform: translateX(-100%);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .sidebar-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--border-sidebar);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .sidebar-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        .sidebar-footer {
+            padding: 12px 16px;
+            border-top: 1px solid var(--border-sidebar);
+        }
+
+        /* New conversation button */
+        .new-conv-btn {
+            width: 100%;
+            padding: 12px 16px;
+            background: var(--accent);
+            border: none;
+            border-radius: var(--radius-md);
+            color: var(--bg-primary);
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .new-conv-btn:hover {
+            filter: brightness(1.1);
+            transform: translateY(-1px);
+        }
+
+        .new-conv-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        /* Conversation list */
+        .conv-list {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .conv-item {
+            padding: 12px 14px;
+            background: var(--bg-tertiary);
+            border: 1px solid transparent;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: all 0.15s;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .conv-item:hover {
+            background: var(--bg-secondary);
+            border-color: var(--border-color);
+        }
+
+        .conv-item.active {
+            background: var(--bg-secondary);
+            border-color: var(--accent);
+        }
+
+        .conv-item-title {
+            font-size: 0.9rem;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .conv-item-meta {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .conv-item-actions {
+            display: flex;
+            gap: 4px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .conv-item:hover .conv-item-actions {
+            opacity: 1;
+        }
+
+        .conv-action-btn {
+            padding: 4px 8px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            color: var(--text-secondary);
+            font-size: 0.7rem;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .conv-action-btn:hover {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border-color: var(--accent);
+        }
+
+        .conv-action-btn.delete:hover {
+            border-color: var(--error);
+            color: var(--error);
+        }
+
+        /* Sidebar scrollbar */
+        .sidebar-content::-webkit-scrollbar { width: 4px; }
+        .sidebar-content::-webkit-scrollbar-track { background: transparent; }
+        .sidebar-content::-webkit-scrollbar-thumb {
+            background: var(--scrollbar);
+            border-radius: 2px;
+        }
+
+        /* Mobile sidebar overlay */
+        .sidebar-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 99;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+        }
+
+        .sidebar-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* ==========================================================================
+           Main Content Area
+           ========================================================================== */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+            min-width: 0;
+            min-height: 0;
+        }
+
         .app-container {
             display: flex;
             flex-direction: column;
+            width: 100%;
             height: 100%;
             max-width: 900px;
             margin: 0 auto;
             background: var(--bg-secondary);
             box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
+            min-height: 0;
         }
 
         /* Drag and drop overlay */
@@ -258,6 +463,28 @@ HTML_TEMPLATE = r"""
             font-size: 1.3rem;
             font-weight: 600;
             letter-spacing: -0.02em;
+        }
+
+        /* Menu button for mobile */
+        .menu-btn {
+            display: none;
+            padding: 8px;
+            background: transparent;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .menu-btn:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .menu-btn svg {
+            width: 20px;
+            height: 20px;
         }
 
         /* Status indicator dot */
@@ -520,6 +747,7 @@ HTML_TEMPLATE = r"""
             flex-direction: column;
             gap: 16px;
             background: var(--bg-primary);
+            min-height: 0;
         }
 
         /* Drag over state */
@@ -570,7 +798,6 @@ HTML_TEMPLATE = r"""
             max-width: 85%;
             padding: 12px 16px;
             border-radius: var(--radius-xl);
-            /* line-height: 1.6; */
             word-wrap: break-word;
             position: relative;
         }
@@ -642,6 +869,7 @@ HTML_TEMPLATE = r"""
             font-size: 0.8rem;
             border-bottom-left-radius: var(--radius-sm);
             max-width: 85%;
+            white-space: pre-wrap;
         }
         .message.user_command {
             background: var(--bg-message-command);
@@ -649,6 +877,7 @@ HTML_TEMPLATE = r"""
             font-family: 'Consolas', 'Monaco', 'Menlo', monospace;
             font-size: 0.9rem;
             border-bottom-right-radius: var(--radius-sm);
+            white-space: pre-wrap;
         }
 
         /* Tool messages */
@@ -719,6 +948,17 @@ HTML_TEMPLATE = r"""
             font-size: 0.7rem;
             color: var(--text-muted);
             margin-left: 6px;
+        }
+
+        /* Backend index badge */
+        .message .index-badge {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            background: var(--bg-tertiary);
+            padding: 1px 4px;
+            border-radius: var(--radius-sm);
+            margin-left: 6px;
+            opacity: 0.6;
         }
 
         /* Code blocks */
@@ -1089,6 +1329,40 @@ HTML_TEMPLATE = r"""
         /* ==========================================================================
            Responsive Styles
            ========================================================================== */
+        @media (min-width: 769px) {
+            .sidebar {
+                position: relative;
+                transform: none;
+            }
+
+            .sidebar-overlay {
+                display: none;
+            }
+
+            .menu-btn {
+                display: none;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed;
+                left: 0;
+                top: 0;
+                height: 100%;
+                transform: translateX(-100%);
+                z-index: 1000;
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            .menu-btn {
+                display: flex;
+            }
+        }
+
         @media (max-width: 600px) {
             header { padding: 12px 16px; }
             header h1 { font-size: 1.1rem; }
@@ -1135,183 +1409,215 @@ HTML_TEMPLATE = r"""
 <body>
     <a href="#message" class="skip-link">Skip to input</a>
 
-    <div class="drop-overlay" id="drop-overlay" aria-hidden="true">
-        <div class="drop-overlay-content">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
-            </svg>
-            <div style="font-size: 1.2rem; font-weight: 600;">Drop file to upload</div>
-        </div>
-    </div>
+    <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
 
-    <div class="app-container">
-        <!-- Header -->
-        <header>
-            <div class="header-left">
-                <div class="status-dot" id="status" role="status" aria-label="Connection status"></div>
-                <h1>AI Chat</h1>
+    <div class="app-wrapper">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <span class="sidebar-title">Conversations</span>
             </div>
-            <div class="header-right">
-                <button class="header-btn" id="search-btn" onclick="toggleSearch()" title="Search messages (Ctrl+F)">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="11" cy="11" r="8"></circle>
-                        <path d="m21 21-4.35-4.35"></path>
-                    </svg>
-                </button>
-                <button class="header-btn" id="settings-btn" onclick="toggleModal('settings')" title="Settings (Ctrl+S)">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="3"></circle>
-                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-                    </svg>
-                </button>
-                <button class="header-btn" onclick="showExportModal()" title="Export chat">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                        <polyline points="7,10 12,15 17,10"></polyline>
-                        <line x1="12" y1="15" x2="12" y2="3"></line>
-                    </svg>
-                </button>
-                <button class="header-btn shortcuts-btn" onclick="showShortcutsModal()" title="Keyboard shortcuts (?)">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect>
-                        <path d="M6 8h.001M10 8h.001M14 8h.001M18 8h.001M8 12h.001M12 12h.001M16 12h.001M6 16h12"></path>
-                    </svg>
-                </button>
-                <button class="header-btn" onclick="clearChat()" title="Clear chat">Clear</button>
-            </div>
-        </header>
-
-        <!-- Search Bar -->
-        <div class="search-container" id="search-container">
-            <input type="text" class="search-input" id="search-input" placeholder="Search messages..." oninput="performSearch(this.value)">
-            <div class="search-count" id="search-count">0 results</div>
-            <button class="header-btn" onclick="clearSearch()">✕</button>
-        </div>
-
-        <!-- Settings Modal -->
-        <div class="modal-overlay" id="settings-overlay" onclick="closeModalOnOverlay(event, 'settings')"></div>
-        <div class="modal" id="settings-modal" role="dialog" aria-labelledby="settings-title">
-            <div class="modal-header">
-                <h2 id="settings-title">Settings</h2>
-                <button class="modal-close" onclick="toggleModal('settings')" aria-label="Close settings">×</button>
-            </div>
-            <div class="modal-content">
-                <h3>Theme</h3>
-                <div class="theme-grid" id="theme-grid"></div>
-            </div>
-        </div>
-
-        <!-- Export Modal -->
-        <div class="modal-overlay" id="export-overlay" onclick="closeModalOnOverlay(event, 'export')"></div>
-        <div class="modal" id="export-modal" role="dialog" aria-labelledby="export-title">
-            <div class="modal-header">
-                <h2 id="export-title">Export Chat</h2>
-                <button class="modal-close" onclick="toggleModal('export')" aria-label="Close export">×</button>
-            </div>
-            <div class="modal-content">
-                <div class="export-options">
-                    <button class="export-btn" onclick="exportChat('json')">
-                        <div class="export-btn-title">JSON</div>
-                        <div class="export-btn-desc">Full chat data with metadata</div>
-                    </button>
-                    <button class="export-btn" onclick="exportChat('markdown')">
-                        <div class="export-btn-title">Markdown</div>
-                        <div class="export-btn-desc">Formatted for reading and sharing</div>
-                    </button>
-                    <button class="export-btn" onclick="exportChat('txt')">
-                        <div class="export-btn-title">Plain Text</div>
-                        <div class="export-btn-desc">Simple text format</div>
-                    </button>
+            <div class="sidebar-content">
+                <div class="conv-list" id="conv-list">
+                    <!-- Conversations will be loaded here -->
                 </div>
             </div>
-        </div>
-
-        <!-- Shortcuts Modal -->
-        <div class="modal-overlay" id="shortcuts-overlay" onclick="closeModalOnOverlay(event, 'shortcuts')"></div>
-        <div class="modal" id="shortcuts-modal" role="dialog" aria-labelledby="shortcuts-title">
-            <div class="modal-header">
-                <h2 id="shortcuts-title">Keyboard Shortcuts</h2>
-                <button class="modal-close" onclick="toggleModal('shortcuts')" aria-label="Close shortcuts">×</button>
+            <div class="sidebar-footer">
+                <button class="new-conv-btn" onclick="newConversation()">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    New Conversation
+                </button>
             </div>
-            <div class="modal-content">
-                <div class="shortcuts-list">
-                    <div class="shortcut-item">
-                        <span class="shortcut-desc">Send message</span>
-                        <div class="shortcut-keys">
-                            <span class="shortcut-key">Ctrl</span>
-                            <span class="shortcut-key">Enter</span>
-                        </div>
+        </aside>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="drop-overlay" id="drop-overlay" aria-hidden="true">
+                <div class="drop-overlay-content">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                    </svg>
+                    <div style="font-size: 1.2rem; font-weight: 600;">Drop file to upload</div>
+                </div>
+            </div>
+
+            <div class="app-container">
+                <!-- Header -->
+                <header>
+                    <div class="header-left">
+                        <button class="menu-btn" onclick="toggleSidebar()" title="Toggle sidebar">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                            </svg>
+                        </button>
+                        <div class="status-dot" id="status" role="status" aria-label="Connection status"></div>
+                        <h1>AI Chat</h1>
                     </div>
-                    <div class="shortcut-item">
-                        <span class="shortcut-desc">New line</span>
-                        <div class="shortcut-keys">
-                            <span class="shortcut-key">Shift</span>
-                            <span class="shortcut-key">Enter</span>
-                        </div>
+                    <div class="header-right">
+                        <button class="header-btn" id="search-btn" onclick="toggleSearch()" title="Search messages (Ctrl+F)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <path d="m21 21-4.35-4.35"></path>
+                            </svg>
+                        </button>
+                        <button class="header-btn" id="settings-btn" onclick="toggleModal('settings')" title="Settings (Ctrl+S)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="3"></circle>
+                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                            </svg>
+                        </button>
+                        <button class="header-btn" onclick="showExportModal()" title="Export chat">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7,10 12,15 17,10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                        </button>
+                        <button class="header-btn shortcuts-btn" onclick="showShortcutsModal()" title="Keyboard shortcuts (?)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect>
+                                <path d="M6 8h.001M10 8h.001M14 8h.001M18 8h.001M8 12h.001M12 12h.001M16 12h.001M6 16h12"></path>
+                            </svg>
+                        </button>
+                        <button class="header-btn" onclick="clearChat()" title="Clear chat">Clear</button>
                     </div>
-                    <div class="shortcut-item">
-                        <span class="shortcut-desc">Clear chat</span>
-                        <div class="shortcut-keys">
-                            <span class="shortcut-key">Ctrl</span>
-                            <span class="shortcut-key">L</span>
-                        </div>
+                </header>
+
+                <!-- Search Bar -->
+                <div class="search-container" id="search-container">
+                    <input type="text" class="search-input" id="search-input" placeholder="Search messages..." oninput="performSearch(this.value)">
+                    <div class="search-count" id="search-count">0 results</div>
+                    <button class="header-btn" onclick="clearSearch()">✕</button>
+                </div>
+
+                <!-- Settings Modal -->
+                <div class="modal-overlay" id="settings-overlay" onclick="closeModalOnOverlay(event, 'settings')"></div>
+                <div class="modal" id="settings-modal" role="dialog" aria-labelledby="settings-title">
+                    <div class="modal-header">
+                        <h2 id="settings-title">Settings</h2>
+                        <button class="modal-close" onclick="toggleModal('settings')" aria-label="Close settings">×</button>
                     </div>
-                    <div class="shortcut-item">
-                        <span class="shortcut-desc">Settings</span>
-                        <div class="shortcut-keys">
-                            <span class="shortcut-key">Ctrl</span>
-                            <span class="shortcut-key">S</span>
-                        </div>
+                    <div class="modal-content">
+                        <h3>Theme</h3>
+                        <div class="theme-grid" id="theme-grid"></div>
                     </div>
-                    <div class="shortcut-item">
-                        <span class="shortcut-desc">Search</span>
-                        <div class="shortcut-keys">
-                            <span class="shortcut-key">Ctrl</span>
-                            <span class="shortcut-key">F</span>
-                        </div>
+                </div>
+
+                <!-- Export Modal -->
+                <div class="modal-overlay" id="export-overlay" onclick="closeModalOnOverlay(event, 'export')"></div>
+                <div class="modal" id="export-modal" role="dialog" aria-labelledby="export-title">
+                    <div class="modal-header">
+                        <h2 id="export-title">Export Chat</h2>
+                        <button class="modal-close" onclick="toggleModal('export')" aria-label="Close export">×</button>
                     </div>
-                    <div class="shortcut-item">
-                        <span class="shortcut-desc">Export</span>
-                        <div class="shortcut-keys">
-                            <span class="shortcut-key">Ctrl</span>
-                            <span class="shortcut-key">E</span>
-                        </div>
-                    </div>
-                    <div class="shortcut-item">
-                        <span class="shortcut-desc">Stop generation</span>
-                        <div class="shortcut-keys">
-                            <span class="shortcut-key">Escape</span>
-                        </div>
-                    </div>
-                    <div class="shortcut-item">
-                        <span class="shortcut-desc">Show shortcuts</span>
-                        <div class="shortcut-keys">
-                            <span class="shortcut-key">Ctrl</span>
-                            <span class="shortcut-key">/</span>
+                    <div class="modal-content">
+                        <div class="export-options">
+                            <button class="export-btn" onclick="exportChat('json')">
+                                <div class="export-btn-title">JSON</div>
+                                <div class="export-btn-desc">Full chat data with metadata</div>
+                            </button>
+                            <button class="export-btn" onclick="exportChat('markdown')">
+                                <div class="export-btn-title">Markdown</div>
+                                <div class="export-btn-desc">Formatted for reading and sharing</div>
+                            </button>
+                            <button class="export-btn" onclick="exportChat('txt')">
+                                <div class="export-btn-title">Plain Text</div>
+                                <div class="export-btn-desc">Simple text format</div>
+                            </button>
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
 
-        <!-- Chat Container -->
-        <div class="chat-container" id="chat" role="log" aria-live="polite" aria-label="Chat messages">
-            <div class="typing-indicator" id="typing" aria-label="AI is typing">
-                <span></span><span></span><span></span>
-            </div>
-        </div>
+                <!-- Shortcuts Modal -->
+                <div class="modal-overlay" id="shortcuts-overlay" onclick="closeModalOnOverlay(event, 'shortcuts')"></div>
+                <div class="modal" id="shortcuts-modal" role="dialog" aria-labelledby="shortcuts-title">
+                    <div class="modal-header">
+                        <h2 id="shortcuts-title">Keyboard Shortcuts</h2>
+                        <button class="modal-close" onclick="toggleModal('shortcuts')" aria-label="Close shortcuts">×</button>
+                    </div>
+                    <div class="modal-content">
+                        <div class="shortcuts-list">
+                            <div class="shortcut-item">
+                                <span class="shortcut-desc">Send message</span>
+                                <div class="shortcut-keys">
+                                    <span class="shortcut-key">Ctrl</span>
+                                    <span class="shortcut-key">Enter</span>
+                                </div>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-desc">New line</span>
+                                <div class="shortcut-keys">
+                                    <span class="shortcut-key">Shift</span>
+                                    <span class="shortcut-key">Enter</span>
+                                </div>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-desc">Clear chat</span>
+                                <div class="shortcut-keys">
+                                    <span class="shortcut-key">Ctrl</span>
+                                    <span class="shortcut-key">L</span>
+                                </div>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-desc">Settings</span>
+                                <div class="shortcut-keys">
+                                    <span class="shortcut-key">Ctrl</span>
+                                    <span class="shortcut-key">S</span>
+                                </div>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-desc">Search</span>
+                                <div class="shortcut-keys">
+                                    <span class="shortcut-key">Ctrl</span>
+                                    <span class="shortcut-key">F</span>
+                                </div>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-desc">Export</span>
+                                <div class="shortcut-keys">
+                                    <span class="shortcut-key">Ctrl</span>
+                                    <span class="shortcut-key">E</span>
+                                </div>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-desc">Stop generation</span>
+                                <div class="shortcut-keys">
+                                    <span class="shortcut-key">Escape</span>
+                                </div>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-desc">Show shortcuts</span>
+                                <div class="shortcut-keys">
+                                    <span class="shortcut-key">Ctrl</span>
+                                    <span class="shortcut-key">/</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-        <!-- Input Area -->
-        <div class="input-area">
-            <button id="upload" onclick="document.getElementById('file-input').click()" title="Upload file" aria-label="Upload file">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
-                </svg>
-            </button>
-            <input type="file" id="file-input" onchange="handleFileUpload(event)" aria-hidden="true">
-            <textarea id="message" placeholder="Type a message..." onkeydown="handleKeyDown(event)" rows="1" aria-label="Message input"></textarea>
-            <button id="send" onclick="send()" aria-label="Send message">Send</button>
-            <button id="stop" onclick="stopGeneration()" aria-label="Stop generation">Stop</button>
+                <!-- Chat Container -->
+                <div class="chat-container" id="chat" role="log" aria-live="polite" aria-label="Chat messages">
+                    <div class="typing-indicator" id="typing" aria-label="AI is typing">
+                        <span></span><span></span><span></span>
+                    </div>
+                </div>
+
+                <!-- Input Area -->
+                <div class="input-area">
+                    <button id="upload" onclick="document.getElementById('file-input').click()" title="Upload file" aria-label="Upload file">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                        </svg>
+                    </button>
+                    <input type="file" id="file-input" onchange="handleFileUpload(event)" aria-hidden="true">
+                    <textarea id="message" placeholder="Type a message..." onkeydown="handleKeyDown(event)" rows="1" aria-label="Message input"></textarea>
+                    <button id="send" onclick="send()" aria-label="Send message">Send</button>
+                    <button id="stop" onclick="stopGeneration()" aria-label="Stop generation">Stop</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -1321,10 +1627,10 @@ HTML_TEMPLATE = r"""
     // =============================================================================
 
     const ICONS = {
-        copy: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`,
-        edit: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>`,
-        trash: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`,
-        check: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`
+        copy:`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`,
+        edit:`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>`,
+        trash:`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`,
+        check:`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`
     };
 
     // =============================================================================
@@ -1337,15 +1643,20 @@ HTML_TEMPLATE = r"""
     let reconnectTimer = null;
     let hasShownReconnecting = false;
     let hasShownDisconnected = false;
-    let reconnectingMsgEl = null;
 
-    // Message state
+    // Message state - displayMessages is the source of truth for the UI
+    // It includes ALL messages: backend messages (with backendIndex), commands, and announcements
+    let displayMessages = [];
+
+    // Current conversation ID (null for new/unsaved conversations)
+    let currentConversationId = null;
+
+    // Stream state
     let lastAnnouncementId = 0;
     let isStreaming = false;
     let currentAiMsg = null;
     let currentController = null;
     let currentStreamId = null;
-    let conversationHistory = [];
     let editingIndex = null;
 
     // Search state
@@ -1361,6 +1672,8 @@ HTML_TEMPLATE = r"""
     const stopBtn = document.getElementById('stop');
     const statusDot = document.getElementById('status');
     const dropOverlay = document.getElementById('drop-overlay');
+    const sidebar = document.getElementById('sidebar');
+    const sidebarOverlay = document.getElementById('sidebar-overlay');
 
     // =============================================================================
     // Configuration
@@ -1372,33 +1685,7 @@ HTML_TEMPLATE = r"""
         RECONNECT_DELAY_FACTOR: 1.5,
         CONNECTION_TIMEOUT: 3000,
         POLL_INTERVAL: 500,
-        POLL_TIMEOUT: 5000,
-        VIRTUAL_SCROLL_BUFFER: 10,
-        MESSAGE_HEIGHT_ESTIMATE: 100
-    };
-
-    // =============================================================================
-    // Virtual Scrolling
-    // =============================================================================
-
-    const VirtualScroller = {
-        visibleStart: 0,
-        visibleEnd: 20,
-
-        updateRange() {
-            const scrollTop = chat.scrollTop;
-            const viewportHeight = chat.clientHeight;
-
-            this.visibleStart = Math.max(0, Math.floor(scrollTop / CONFIG.MESSAGE_HEIGHT_ESTIMATE) - CONFIG.VIRTUAL_SCROLL_BUFFER);
-            this.visibleEnd = Math.min(
-                conversationHistory.length,
-                Math.ceil((scrollTop + viewportHeight) / CONFIG.MESSAGE_HEIGHT_ESTIMATE) + CONFIG.VIRTUAL_SCROLL_BUFFER
-            );
-        },
-
-        isMessageVisible(index) {
-            return index >= this.visibleStart && index <= this.visibleEnd;
-        }
+        POLL_TIMEOUT: 5000
     };
 
     // =============================================================================
@@ -1443,49 +1730,297 @@ HTML_TEMPLATE = r"""
     }
 
     // =============================================================================
-    // History Management
+    // Sidebar Management
     // =============================================================================
 
-    let historyLoaded = false;
+    function toggleSidebar() {
+        sidebar.classList.toggle('open');
+        sidebarOverlay.classList.toggle('show');
+    }
 
-    async function loadHistory() {
-        try {
-            const response = await fetch('/history');
-            const data = await response.json();
+    function closeSidebar() {
+        sidebar.classList.remove('open');
+        sidebarOverlay.classList.remove('show');
+    }
 
-            if (data.messages) {
-                conversationHistory = data.messages;
-                conversationHistory.forEach((msg, index) => {
-                    createMessageElement(
-                        msg.role,
-                        msg.content,
-                        msg.timestamp || formatTime(),
-                        msg.edited || false,
-                        index
-                    );
-                });
-            }
-            historyLoaded = true;
-        } catch (e) {
-            console.error('Failed to load history:', e);
-            conversationHistory = [];
-            historyLoaded = true;
+    // Touch swipe handling for mobile sidebar
+    let touchStartX = 0;
+    let touchEndX = 0;
+
+    document.addEventListener('touchstart', (e) => {
+        touchStartX = e.changedTouches[0].screenX;
+    }, { passive: true });
+
+    document.addEventListener('touchend', (e) => {
+        touchEndX = e.changedTouches[0].screenX;
+        handleSwipe();
+    }, { passive: true });
+
+    function handleSwipe() {
+        const swipeThreshold = 50;
+        const diff = touchEndX - touchStartX;
+
+        // Swipe right to open sidebar (only if starting from left edge)
+        if (diff > swipeThreshold && touchStartX < 30) {
+            sidebar.classList.add('open');
+            sidebarOverlay.classList.add('show');
+        }
+        // Swipe left to close sidebar
+        else if (diff < -swipeThreshold && sidebar.classList.contains('open')) {
+            closeSidebar();
         }
     }
 
-    function saveHistory() {
-        // No longer saving to localStorage - backend is the source of truth
-        // This function is kept for compatibility but does nothing
+    // =============================================================================
+    // Conversation Management
+    // =============================================================================
+
+    async function loadConversations() {
+        try {
+            const response = await fetch('/conversations');
+            const data = await response.json();
+            renderConversationList(data.conversations || []);
+        } catch (e) {
+            console.error('Failed to load conversations:', e);
+        }
     }
 
-    function clearChatUI() {
-        conversationHistory = [];
-        saveHistory();
+    function renderConversationList(conversations) {
+        const list = document.getElementById('conv-list');
+        list.innerHTML = '';
+
+        conversations.forEach(conv => {
+            const item = document.createElement('div');
+            item.className = 'conv-item' + (conv.id === currentConversationId ? ' active' : '');
+            item.onclick = () => loadConversation(conv.id);
+
+            const title = document.createElement('div');
+            title.className = 'conv-item-title';
+            title.textContent = conv.title || 'New Conversation';
+
+            const meta = document.createElement('div');
+            meta.className = 'conv-item-meta';
+
+            const date = document.createElement('span');
+            date.textContent = formatDate(conv.updated || conv.created);
+
+            const actions = document.createElement('div');
+            actions.className = 'conv-item-actions';
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'conv-action-btn delete';
+            deleteBtn.textContent = 'Delete';
+            deleteBtn.onclick = (e) => {
+                e.stopPropagation();
+                deleteConversation(conv.id);
+            };
+
+            actions.appendChild(deleteBtn);
+            meta.appendChild(date);
+            meta.appendChild(actions);
+
+            item.appendChild(title);
+            item.appendChild(meta);
+            list.appendChild(item);
+        });
+    }
+
+    function formatDate(timestamp) {
+        if (!timestamp) return '';
+        const date = new Date(timestamp);
+        const now = new Date();
+        const diff = now - date;
+
+        if (diff < 60000) return 'Just now';
+        if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
+        if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
+        if (diff < 604800000) return Math.floor(diff / 86400000) + 'd ago';
+
+        return date.toLocaleDateString();
+    }
+
+    async function newConversation() {
+        // Save current conversation first if it has messages
+        if (displayMessages.length > 0) {
+            await saveCurrentConversation();
+        }
+
+        // Clear the UI and reset state
+        clearChatUI();
+        currentConversationId = null;
+
+        // Clear backend context
+        try {
+            await fetch('/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: '/new' })
+            });
+        } catch (e) {
+            console.error('Failed to clear backend:', e);
+        }
+
+        // Refresh conversation list
+        await loadConversations();
+        closeSidebar();
+    }
+
+    async function loadConversation(convId) {
+        if (isStreaming) {
+            await stopGeneration();
+        }
+
+        try {
+            const response = await fetch('/conversation/load?id=' + convId);
+            const data = await response.json();
+
+            if (data.success && data.conversation) {
+                currentConversationId = convId;
+                displayMessages = data.conversation.messages || [];
+                renderAllMessages();
+                await loadConversations();
+                closeSidebar();
+            }
+        } catch (e) {
+            console.error('Failed to load conversation:', e);
+        }
+    }
+
+    async function saveCurrentConversation() {
+        // Don't save empty conversations
+        if (displayMessages.length === 0) return;
+
+        try {
+            const response = await fetch('/conversation/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: currentConversationId,
+                    messages: displayMessages
+                })
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                currentConversationId = data.id;
+                // Update sidebar to show new/updated conversation
+                loadConversations();
+            }
+        } catch (e) {
+            console.error('Failed to save conversation:', e);
+        }
+    }
+
+    async function deleteConversation(convId) {
+        if (!confirm('Delete this conversation?')) return;
+
+        try {
+            const response = await fetch('/conversation/delete?id=' + convId, { method: 'POST' });
+            const data = await response.json();
+
+            if (data.success) {
+                if (currentConversationId === convId) {
+                    currentConversationId = null;
+                    clearChatUI();
+                }
+                await loadConversations();
+            }
+        } catch (e) {
+            console.error('Failed to delete conversation:', e);
+        }
+    }
+
+    // =============================================================================
+    // Message Rendering - Display messages from displayMessages array
+    // =============================================================================
+
+    function renderAllMessages() {
+        // Clear existing messages
         const wrappers = chat.querySelectorAll('.message-wrapper');
         wrappers.forEach(wrapper => wrapper.remove());
-        currentAiMsg = null;
-        editingIndex = null;
-        clearSearch();
+
+        // Render all messages from displayMessages
+        displayMessages.forEach((msg, index) => {
+            createMessageElement(msg, index);
+        });
+
+        scrollToBottom();
+    }
+
+    function createMessageElement(msg, index) {
+        const role = msg.role;
+        const content = msg.content || '';
+        const timestamp = msg.timestamp || formatTime();
+        const edited = msg.edited || false;
+        const backendIndex = msg.backendIndex; // null for commands/announcements
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'message-wrapper ' + role;
+        wrapper.setAttribute('role', 'article');
+        wrapper.dataset.displayIndex = index;
+
+        const msgDiv = document.createElement('div');
+        msgDiv.className = 'message ' + role;
+
+        if (role === 'ai' || role === 'user') {
+            msgDiv.innerHTML = renderMarkdown(content);
+            highlightCode(msgDiv);
+        } else {
+            msgDiv.innerHTML = content;
+        }
+
+        // Timestamp with optional edit indicator and backend index
+        const ts = document.createElement('span');
+        ts.className = 'timestamp';
+
+        if (role === 'user') ts.classList.add('timestamp-right');
+        else if (role === 'ai') ts.classList.add('timestamp-left');
+        else ts.classList.add('timestamp-center');
+
+        ts.textContent = timestamp;
+
+        if (edited) {
+            const editIndicator = document.createElement('span');
+            editIndicator.className = 'edit-indicator';
+            editIndicator.textContent = '(edited)';
+            ts.appendChild(editIndicator);
+        }
+
+        // Show backend index for debugging (optional, can be hidden in production)
+        if (backendIndex !== undefined && backendIndex !== null) {
+            const indexBadge = document.createElement('span');
+            indexBadge.className = 'index-badge';
+            indexBadge.textContent = '#' + backendIndex;
+            ts.appendChild(indexBadge);
+        }
+
+        msgDiv.appendChild(ts);
+        wrapper.appendChild(msgDiv);
+
+        // Add action buttons for editable messages (only those with backendIndex)
+        if (role === 'user' || role === 'ai') {
+            const actions = createActionButtons(role, index, content, backendIndex);
+            wrapper.appendChild(actions);
+        }
+
+        chat.insertBefore(wrapper, typing);
+        return wrapper;
+    }
+
+    function addMessage(msg) {
+        displayMessages.push(msg);
+        createMessageElement(msg, displayMessages.length - 1);
+        scrollToBottom();
+    }
+
+    function addAnnouncement(content, type = null) {
+        const msg = {
+            role: 'announce',
+            content: content,
+            timestamp: formatTime(),
+            type: type
+        };
+        addMessage(msg);
     }
 
     // =============================================================================
@@ -1525,6 +2060,15 @@ HTML_TEMPLATE = r"""
         autoResize(inputField);
     }
 
+    function clearChatUI() {
+        displayMessages = [];
+        const wrappers = chat.querySelectorAll('.message-wrapper');
+        wrappers.forEach(wrapper => wrapper.remove());
+        currentAiMsg = null;
+        editingIndex = null;
+        clearSearch();
+    }
+
     // =============================================================================
     // Connection Management
     // =============================================================================
@@ -1541,15 +2085,6 @@ HTML_TEMPLATE = r"""
         }
     }
 
-    function removeReconnectingMessage() {
-        if (reconnectingMsgEl) {
-            reconnectingMsgEl.remove();
-            reconnectingMsgEl = null;
-        }
-        hasShownReconnecting = false;
-        hasShownDisconnected = false;
-    }
-
     async function checkConnection() {
         try {
             const response = await fetch('/poll?id=' + lastAnnouncementId, {
@@ -1563,10 +2098,13 @@ HTML_TEMPLATE = r"""
                 if (!isConnected) {
                     isConnected = true;
                     updateConnectionStatus('connected');
-                    removeReconnectingMessage();
-                    lastAnnouncementId = 0;
-                    clearChatUI();
-                    await loadHistory();
+
+                    // Load conversations on first connect
+                    if (currentConversationId === null && displayMessages.length === 0) {
+                        // Load current backend messages as a starting point
+                        await loadBackendMessages();
+                        await loadConversations();
+                    }
 
                     if (wasReconnecting || reconnectAttempts > 0) {
                         addAnnouncement('Reconnected to server', 'info');
@@ -1580,13 +2118,26 @@ HTML_TEMPLATE = r"""
         }
     }
 
+    async function loadBackendMessages() {
+        try {
+            const response = await fetch('/history');
+            const data = await response.json();
+
+            if (data.messages) {
+                displayMessages = data.messages;
+                renderAllMessages();
+            }
+        } catch (e) {
+            console.error('Failed to load backend messages:', e);
+        }
+    }
+
     function handleConnectionError() {
         const wasConnected = isConnected;
 
         if (isConnected) {
             isConnected = false;
             updateConnectionStatus('disconnected');
-            removeReconnectingMessage();
             if (!hasShownDisconnected) {
                 addAnnouncement('Disconnected from server.', 'info');
                 hasShownDisconnected = true;
@@ -1600,17 +2151,12 @@ HTML_TEMPLATE = r"""
         if (reconnectTimer) clearTimeout(reconnectTimer);
 
         reconnectAttempts++;
-
-        // attempt reconnection every second
         const delay = 1000;
         updateConnectionStatus('connecting');
 
         if (!hasShownReconnecting) {
             hasShownReconnecting = true;
-            reconnectingMsgEl = addAnnouncement('Reconnecting...', 'info');
-            if (reconnectingMsgEl) {
-                reconnectingMsgEl.classList.add('reconnecting');
-            }
+            addAnnouncement('Reconnecting...', 'info');
         }
 
         reconnectTimer = setTimeout(async () => {
@@ -1625,10 +2171,11 @@ HTML_TEMPLATE = r"""
     // Message Action Buttons Helper
     // =============================================================================
 
-    function createActionButtons(role, index, content) {
+    function createActionButtons(role, displayIndex, content, backendIndex) {
         const actions = document.createElement('div');
         actions.className = 'message-actions';
 
+        // Copy button - always available
         const copyBtn = document.createElement('button');
         copyBtn.className = 'message-action-btn';
         copyBtn.innerHTML = ICONS.copy;
@@ -1646,332 +2193,52 @@ HTML_TEMPLATE = r"""
         };
         actions.appendChild(copyBtn);
 
-        if (role === 'user') {
+        // Edit button - only for user messages with backend index
+        if (role === 'user' && backendIndex !== undefined && backendIndex !== null) {
             const editBtn = document.createElement('button');
             editBtn.className = 'message-action-btn';
             editBtn.innerHTML = ICONS.edit;
             editBtn.setAttribute('aria-label', 'Edit message');
             editBtn.setAttribute('title', 'Edit');
-            editBtn.onclick = () => editMessage(index);
+            editBtn.onclick = () => editMessage(displayIndex, backendIndex);
             actions.appendChild(editBtn);
         }
 
-        const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'message-action-btn delete';
-        deleteBtn.innerHTML = ICONS.trash;
-        deleteBtn.setAttribute('aria-label', 'Delete message and all following');
-        deleteBtn.setAttribute('title', 'Delete');
-        deleteBtn.onclick = () => deleteMessage(index);
-        actions.appendChild(deleteBtn);
+        // Delete button - only for messages with backend index
+        if (backendIndex !== undefined && backendIndex !== null) {
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'message-action-btn delete';
+            deleteBtn.innerHTML = ICONS.trash;
+            deleteBtn.setAttribute('aria-label', 'Delete message and all following');
+            deleteBtn.setAttribute('title', 'Delete');
+            deleteBtn.onclick = () => deleteMessage(displayIndex, backendIndex);
+            actions.appendChild(deleteBtn);
+        }
 
         return actions;
     }
 
     // =============================================================================
-    // Message Creation
+    // Message Editing & Deletion - Use backend index directly
     // =============================================================================
 
-    function createMessageElement(role, content, timestamp, edited = false, index = null) {
-        const wrapper = document.createElement('div');
-        wrapper.className = 'message-wrapper ' + role;
-        wrapper.setAttribute('role', 'article');
-
-        if (index !== null) {
-            wrapper.dataset.index = index;
-        }
-
-        const timeStr = timestamp || formatTime();
-
-        const msgDiv = document.createElement('div');
-        msgDiv.className = 'message ' + role;
-
-        if (role === 'ai' || role === 'user') {
-            msgDiv.innerHTML = renderMarkdown(content);
-            highlightCode(msgDiv);
-        } else if (role === 'tool') {
-            // hide toolcalls
-            return;
-        } else {
-            msgDiv.innerText = content;
-        }
-
-        const ts = document.createElement('span');
-        ts.className = 'timestamp';
-
-        if (role === 'user') {
-            ts.classList.add('timestamp-right');
-        } else if (role === 'ai') {
-            ts.classList.add('timestamp-left');
-        } else {
-            ts.classList.add('timestamp-center');
-        }
-
-        ts.textContent = timeStr;
-
-        if (edited) {
-            const editIndicator = document.createElement('span');
-            editIndicator.className = 'edit-indicator';
-            editIndicator.textContent = '(edited)';
-            ts.appendChild(editIndicator);
-        }
-
-        msgDiv.appendChild(ts);
-        wrapper.appendChild(msgDiv);
-
-        // Add action buttons below message bubble (not inside)
-        if (role === 'user' || role === 'ai') {
-            const actions = createActionButtons(role, index, content);
-            wrapper.appendChild(actions);
-        }
-
-        chat.insertBefore(wrapper, typing);
-        scrollToBottomDelayed();
-        return wrapper;
-    }
-
-    function addMessage(role, content, withTimestamp = true, timestamp = null) {
-        const timeStr = timestamp || formatTime();
-        const msg = { role: role, content: content, timestamp: timeStr };
-        const index = conversationHistory.length;
-
-        if (isStreaming && currentAiMsg && role === 'announce') {
-            conversationHistory.push(msg);
-            saveHistory();
-            chat.insertBefore(createMessageElement(role, content, timeStr, false, index), currentAiMsg);
-        } else {
-            if (role !== 'announce') {
-                conversationHistory.push(msg);
-                saveHistory();
-            }
-            createMessageElement(role, content, timeStr, false, index);
-        }
-        scrollToBottom();
-    }
-
-    function addAnnouncement(content, type = null) {
-        const wrapper = document.createElement('div');
-        wrapper.className = 'message-wrapper announce';
-
-        const msgDiv = document.createElement('div');
-        msgDiv.className = 'message announce';
-        if (type) msgDiv.classList.add(type);
-
-        const timeStr = formatTime();
-        msgDiv.innerHTML = content + '<span class="timestamp timestamp-center">' + timeStr + '</span>';
-        wrapper.appendChild(msgDiv);
-
-        if (isStreaming && currentAiMsg) {
-            chat.insertBefore(wrapper, currentAiMsg);
-        } else {
-            chat.insertBefore(wrapper, typing);
-        }
-        scrollToBottom();
-        return wrapper;
-    }
-
-    // =============================================================================
-    // Message Editing & Deletion - Map frontend indices to backend indices
-    // =============================================================================
-
-    /**
-     * Map a frontend conversationHistory index to a backend _turns index.
-     * Returns -1 if the message doesn't exist in the backend (announcement, command, etc.)
-     * 
-     * KEY INSIGHT: The backend uses 'assistant' for AI messages, but the frontend uses 'ai'.
-     * Also, commands (/help, /new, etc.) and announcements are never added to _turns.
-     * 
-     * _turns is populated ONLY by:
-     *   - insert_turn("user", content) for user messages (not commands)
-     *   - insert_turn("assistant", content) for AI responses (including stopped ones)
-     * 
-     * _turns is NOT populated by:
-     *   - Commands (caught by Channel._process_input() which returns early)
-     *   - Command responses (returned by _process_input, never goes through API)
-     *   - Announcements (from manager.channel.announce(), never goes through API)
-     */
-    function frontendToBackendIndex(frontendIndex) {
-        let backendIndex = 0;
-
-        for (let i = 0; i < conversationHistory.length; i++) {
-            const msg = conversationHistory[i];
-            const content = msg.content || '';
-
-            // User messages that aren't commands go to the AI
-            if (msg.role === 'user' && !content.startsWith('/')) {
-                if (i === frontendIndex) return backendIndex;
-                backendIndex++;
-            }
-            // AI messages go to the AI (frontend uses 'ai', backend uses 'assistant')
-            // Stopped/cancelled messages are also added to _turns
-            else if (msg.role === 'ai' || msg.role === 'assistant') {
-                if (i === frontendIndex) return backendIndex;
-                backendIndex++;
-            }
-            // Everything else doesn't go to the AI:
-            // - Commands (role='user' but content starts with '/')
-            // - Command responses (role='command')
-            // - Announcements (role='announce')
-            // - Upload notifications (role='announce')
-            // Don't increment backendIndex for these
-        }
-
-        return -1;
-    }
-
-    /**
-     * Get the last backend index for a given frontend index.
-     * When deleting from frontend index N, we need to know how many backend
-     * messages exist after that point to delete correctly.
-     */
-    function getBackendIndexRangeFromFrontend(frontendFromIndex, frontendToIndex) {
-        let startBackendIndex = -1;
-        let endBackendIndex = -1;
-        let backendIndex = 0;
-
-        for (let i = 0; i < conversationHistory.length; i++) {
-            const msg = conversationHistory[i];
-            const content = msg.content || '';
-
-            let isBackendMessage = false;
-
-            if (msg.role === 'user' && !content.startsWith('/')) {
-                isBackendMessage = true;
-            } else if (msg.role === 'ai' || msg.role === 'assistant') {
-                isBackendMessage = true;
-            }
-
-            if (isBackendMessage) {
-                if (i === frontendFromIndex) {
-                    startBackendIndex = backendIndex;
-                }
-                if (i === frontendToIndex) {
-                    endBackendIndex = backendIndex;
-                }
-                backendIndex++;
-            }
-        }
-
-        return { start: startBackendIndex, end: endBackendIndex };
-    }
-
-    /**
-     * Delete from backend at the given index (removes index and everything after).
-     */
-    async function deleteFromBackendIndex(backendIndex) {
-        if (backendIndex < 0) return { success: false, reason: 'invalid_index' };
-
-        try {
-            const response = await fetch('/delete', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ index: backendIndex })
-            });
-            const data = await response.json();
-            console.log('Backend delete result:', data);
-            return data;
-        } catch (e) {
-            console.error('Failed to delete from backend:', e);
-            return { success: false, reason: 'network_error' };
-        }
-    }
-
-    /**
-     * Edit a message in the backend at a specific index.
-     */
-    async function editAtBackendIndex(backendIndex, newContent) {
-        if (backendIndex < 0) return { success: false, reason: 'invalid_index' };
-
-        try {
-            const response = await fetch('/edit', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ index: backendIndex, content: newContent })
-            });
-            const data = await response.json();
-            console.log('Backend edit result:', data);
-            return data;
-        } catch (e) {
-            console.error('Failed to edit in backend:', e);
-            return { success: false, reason: 'network_error' };
-        }
-    }
-
-    /**
-     * Sync the entire conversation history with the backend.
-     * This is a nuclear option - rebuilds _turns from scratch.
-     * Use when indices get out of sync.
-     */
-    async function syncFullBackendContext() {
-        const messagesToSync = [];
-
-        for (const msg of conversationHistory) {
-            const content = msg.content || '';
-
-            // Only include messages that go to the AI
-            if (msg.role === 'user' && !content.startsWith('/')) {
-                messagesToSync.push({
-                    role: 'user',
-                    content: content
-                });
-            } else if (msg.role === 'ai' || msg.role === 'assistant') {
-                // Clean up stopped/cancelled markers for backend
-                let cleanContent = content;
-                if (cleanContent.endsWith(' [Stopped]')) {
-                    cleanContent = cleanContent.slice(0, -10);
-                } else if (cleanContent.endsWith(' [Cancelled]')) {
-                    cleanContent = cleanContent.slice(0, -12);
-                } else if (cleanContent === '[Stopped]' || cleanContent === '[Cancelled]') {
-                    cleanContent = '';
-                }
-                if (cleanContent) {
-                    messagesToSync.push({
-                        role: 'assistant',
-                        content: cleanContent
-                    });
-                }
-            }
-            // Skip commands, announcements, etc.
-        }
-
-        console.log('Syncing', messagesToSync.length, 'messages to backend');
-
-        try {
-            const response = await fetch('/sync', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ messages: messagesToSync })
-            });
-            const data = await response.json();
-            console.log('Sync result:', data);
-            return data.success;
-        } catch (e) {
-            console.error('Failed to sync backend:', e);
-            return false;
-        }
-    }
-
-    function editMessage(index) {
+    function editMessage(displayIndex, backendIndex) {
         if (editingIndex !== null) {
             cancelEdit();
         }
 
-        const msg = conversationHistory[index];
+        const msg = displayMessages[displayIndex];
         if (!msg) return;
 
-        // Can only edit user messages (not commands)
+        // Can only edit user messages
         if (msg.role !== 'user') {
             addAnnouncement('Can only edit your own messages', 'error');
             return;
         }
 
-        if ((msg.content || '').startsWith('/')) {
-            addAnnouncement('Cannot edit command messages', 'error');
-            return;
-        }
+        editingIndex = displayIndex;
 
-        editingIndex = index;
-
-        const messageEl = chat.querySelector('[data-index="' + index + '"]');
+        const messageEl = chat.querySelector('[data-display-index="' + displayIndex + '"]');
         if (!messageEl) return;
 
         const originalContent = msg.content || '';
@@ -1990,7 +2257,7 @@ HTML_TEMPLATE = r"""
         const saveBtn = document.createElement('button');
         saveBtn.className = 'edit-save';
         saveBtn.textContent = 'Save';
-        saveBtn.onclick = () => saveEdit(index, textarea.value);
+        saveBtn.onclick = () => saveEdit(displayIndex, backendIndex, textarea.value);
 
         const cancelBtn = document.createElement('button');
         cancelBtn.className = 'edit-cancel';
@@ -2012,7 +2279,7 @@ HTML_TEMPLATE = r"""
         textarea.onkeydown = (e) => {
             if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                 e.preventDefault();
-                saveEdit(index, textarea.value);
+                saveEdit(displayIndex, backendIndex, textarea.value);
             }
             if (e.key === 'Escape') {
                 cancelEdit();
@@ -2020,38 +2287,38 @@ HTML_TEMPLATE = r"""
         };
     }
 
-    async function saveEdit(index, newContent) {
+    async function saveEdit(displayIndex, backendIndex, newContent) {
         newContent = (newContent || '').trim();
         if (!newContent) {
             cancelEdit();
             return;
         }
 
-        const msg = conversationHistory[index];
-        if (!msg) {
-            cancelEdit();
-            return;
-        }
+        // Update backend first
+        try {
+            const response = await fetch('/edit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ index: backendIndex, content: newContent })
+            });
+            const data = await response.json();
 
-        // Update local history
-        conversationHistory[index].content = newContent;
-        conversationHistory[index].edited = true;
-        saveHistory();
+            if (data.success) {
+                // Update local display
+                displayMessages[displayIndex].content = newContent;
+                displayMessages[displayIndex].edited = true;
 
-        // Find corresponding backend index and update there too
-        const backendIndex = frontendToBackendIndex(index);
-        console.log('Editing frontend index', index, '-> backend index', backendIndex, 'content:', newContent.substring(0, 50));
-
-        if (backendIndex >= 0) {
-            const result = await editAtBackendIndex(backendIndex, newContent);
-            if (!result.success) {
-                console.error('Backend edit failed, attempting full sync');
-                await syncFullBackendContext();
+                // Re-render from this point
+                reRenderMessagesFrom(displayIndex);
+            } else {
+                addAnnouncement('Failed to edit message: ' + (data.error || 'Unknown error'), 'error');
             }
+        } catch (e) {
+            console.error('Failed to edit message:', e);
+            addAnnouncement('Failed to edit message', 'error');
         }
 
         editingIndex = null;
-        reRenderMessagesFrom(index);
     }
 
     function cancelEdit() {
@@ -2063,98 +2330,54 @@ HTML_TEMPLATE = r"""
         reRenderMessagesFrom(index);
     }
 
-    async function deleteMessage(frontendIndex) {
-        if (frontendIndex === null || frontendIndex === undefined) return;
-
-        const msg = conversationHistory[frontendIndex];
-        if (!msg) return;
-
-        // Commands and announcements don't exist in backend
-        if (msg.role === 'command' || msg.role === 'announce') {
-            conversationHistory.splice(frontendIndex, 1);
-            reRenderAllMessages();
-            return;
-        }
-
+    async function deleteMessage(displayIndex, backendIndex) {
         if (!confirm("Delete this message and all messages after it?\n\nThis will affect the AI's memory of the conversation.")) {
             return;
         }
 
-        // Find the backend index
-        let backendIndex = 0;
-        for (let i = 0; i <= frontendIndex; i++) {
-            const m = conversationHistory[i];
-            if (m.role === 'user' || m.role === 'ai') {
-                if (i === frontendIndex) {
-                    break;
-                }
-                backendIndex++;
-            }
-        }
-
-        // Delete from backend
-        const result = await deleteFromBackendIndex(backendIndex);
-
-        if (result.success) {
-            // Reload history from backend to stay in sync
-            await reloadHistoryFromBackend();
-        } else {
-            addAnnouncement('Failed to delete message from backend', 'error');
-        }
-    }
-
-    async function reloadHistoryFromBackend() {
         try {
-            const response = await fetch('/history');
+            const response = await fetch('/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ index: backendIndex })
+            });
             const data = await response.json();
 
-            // Clear frontend
-            const wrappers = chat.querySelectorAll('.message-wrapper');
-            wrappers.forEach(wrapper => wrapper.remove());
-
-            // Reload from backend
-            if (data.messages) {
-                conversationHistory = data.messages;
-                conversationHistory.forEach((msg, index) => {
-                    createMessageElement(
-                        msg.role,
-                        msg.content,
-                        msg.timestamp || formatTime(),
-                        msg.edited || false,
-                        index
-                    );
+            if (data.success) {
+                // Remove all messages from displayIndex onwards that have a backend index >= backendIndex
+                // But keep announcements and commands
+                displayMessages = displayMessages.filter((msg, idx) => {
+                    if (idx < displayIndex) return true;
+                    // Keep messages without backend index (commands, announcements)
+                    if (msg.backendIndex === undefined || msg.backendIndex === null) return true;
+                    return false;
                 });
+
+                // Re-render everything
+                renderAllMessages();
+            } else {
+                addAnnouncement('Failed to delete message: ' + (data.error || 'Unknown error'), 'error');
             }
         } catch (e) {
-            console.error('Failed to reload history:', e);
+            console.error('Failed to delete message:', e);
+            addAnnouncement('Failed to delete message', 'error');
         }
     }
 
     function reRenderMessagesFrom(startIndex) {
+        // Remove all messages from startIndex onwards
         const wrappers = chat.querySelectorAll('.message-wrapper');
-
         wrappers.forEach(wrapper => {
-            const idx = parseInt(wrapper.dataset.index);
+            const idx = parseInt(wrapper.dataset.displayIndex);
             if (!isNaN(idx) && idx >= startIndex) {
                 wrapper.remove();
             }
         });
 
-        for (let i = startIndex; i < conversationHistory.length; i++) {
-            const msg = conversationHistory[i];
-            createMessageElement(msg.role, msg.content, msg.timestamp, msg.edited, i);
+        // Re-render from startIndex
+        for (let i = startIndex; i < displayMessages.length; i++) {
+            createMessageElement(displayMessages[i], i);
         }
-
-        scrollToBottom();
-    }
-
-    function reRenderAllMessages() {
-        const wrappers = chat.querySelectorAll('.message-wrapper');
-        wrappers.forEach(wrapper => wrapper.remove());
-
-        conversationHistory.forEach((msg, index) => {
-            createMessageElement(msg.role, msg.content, msg.timestamp, msg.edited, index);
-        });
 
         scrollToBottom();
     }
@@ -2188,7 +2411,7 @@ HTML_TEMPLATE = r"""
         currentSearchIndex = -1;
 
         // Re-render all messages to remove highlights
-        reRenderAllMessages();
+        renderAllMessages();
     }
 
     function performSearch(query) {
@@ -2200,8 +2423,8 @@ HTML_TEMPLATE = r"""
 
         searchResults = [];
 
-        conversationHistory.forEach((msg, index) => {
-            if (msg.content.toLowerCase().includes(searchQuery)) {
+        displayMessages.forEach((msg, index) => {
+            if ((msg.content || '').toLowerCase().includes(searchQuery)) {
                 searchResults.push(index);
             }
         });
@@ -2209,39 +2432,38 @@ HTML_TEMPLATE = r"""
         document.getElementById('search-count').textContent = searchResults.length + ' result' + (searchResults.length !== 1 ? 's' : '');
 
         // Re-render with highlights
-        reRenderSearchResults();
+        renderSearchResults();
 
         // Scroll to first result
         if (searchResults.length > 0) {
-            const firstResult = chat.querySelector('[data-index="' + searchResults[0] + '"]');
+            const firstResult = chat.querySelector('[data-display-index="' + searchResults[0] + '"]');
             if (firstResult) {
                 firstResult.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
         }
     }
 
-    function reRenderSearchResults() {
+    function renderSearchResults() {
         const wrappers = chat.querySelectorAll('.message-wrapper');
         wrappers.forEach(wrapper => wrapper.remove());
 
-        conversationHistory.forEach((msg, index) => {
+        displayMessages.forEach((msg, index) => {
             const wrapper = document.createElement('div');
             wrapper.className = 'message-wrapper ' + msg.role;
-            wrapper.dataset.index = index;
+            wrapper.dataset.displayIndex = index;
             wrapper.setAttribute('role', 'article');
 
             const msgDiv = document.createElement('div');
             msgDiv.className = 'message ' + msg.role;
 
             const timeStr = msg.timestamp || formatTime();
+            let content = msg.content || '';
 
             if (msg.role === 'ai' || msg.role === 'user') {
-                let content = msg.content;
-
-                // Apply search highlight if this is a search result
+                // Apply search highlight
                 if (searchResults.includes(index) && searchQuery) {
                     msgDiv.classList.add('search-highlight');
-                    const escapedQuery = searchQuery.replace("/[.*+?^${}()|[\]\\]/g", '\$&');
+                    const escapedQuery = searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\$&');
                     const regex = new RegExp('(' + escapedQuery + ')', 'gi');
                     content = content.replace(regex, '<mark>$1</mark>');
                 }
@@ -2249,7 +2471,7 @@ HTML_TEMPLATE = r"""
                 msgDiv.innerHTML = renderMarkdown(content);
                 highlightCode(msgDiv);
             } else {
-                msgDiv.innerText = msg.content;
+                msgDiv.innerHTML = content;
             }
 
             const ts = document.createElement('span');
@@ -2266,11 +2488,18 @@ HTML_TEMPLATE = r"""
                 ts.appendChild(editIndicator);
             }
 
+            if (msg.backendIndex !== undefined && msg.backendIndex !== null) {
+                const indexBadge = document.createElement('span');
+                indexBadge.className = 'index-badge';
+                indexBadge.textContent = '#' + msg.backendIndex;
+                ts.appendChild(indexBadge);
+            }
+
             msgDiv.appendChild(ts);
             wrapper.appendChild(msgDiv);
 
             if (msg.role === 'user' || msg.role === 'ai') {
-                const actions = createActionButtons(msg.role, index, msg.content);
+                const actions = createActionButtons(msg.role, index, msg.content || '', msg.backendIndex);
                 wrapper.appendChild(actions);
             }
 
@@ -2292,17 +2521,17 @@ HTML_TEMPLATE = r"""
         let content, filename, mimeType;
 
         if (format === 'json') {
-            content = JSON.stringify(conversationHistory, null, 2);
+            content = JSON.stringify(displayMessages, null, 2);
             filename = 'chat-export.json';
             mimeType = 'application/json';
         } else if (format === 'markdown') {
             let md = '# Chat Export\n\n';
             md += 'Exported on ' + new Date().toLocaleString() + '\n\n---\n\n';
 
-            conversationHistory.forEach(msg => {
+            displayMessages.forEach(msg => {
                 const role = msg.role.charAt(0).toUpperCase() + msg.role.slice(1);
-                md += '**' + role + '** (' + msg.timestamp + '):\n\n';
-                md += msg.content + '\n\n---\n\n';
+                md += '**' + role + '** (' + (msg.timestamp || 'unknown') + '):\n\n';
+                md += (msg.content || '') + '\n\n---\n\n';
             });
 
             content = md;
@@ -2314,10 +2543,10 @@ HTML_TEMPLATE = r"""
             txt += 'Exported on ' + new Date().toLocaleString() + '\n';
             txt += '================================\n\n';
 
-            conversationHistory.forEach(msg => {
+            displayMessages.forEach(msg => {
                 const role = msg.role.charAt(0).toUpperCase() + msg.role.slice(1);
-                txt += '[' + msg.timestamp + '] ' + role + ':\n';
-                txt += msg.content + '\n\n';
+                txt += '[' + (msg.timestamp || 'unknown') + '] ' + role + ':\n';
+                txt += (msg.content || '') + '\n\n';
             });
 
             content = txt;
@@ -2372,7 +2601,6 @@ HTML_TEMPLATE = r"""
     function setInputState(disabled, showTyping = false, showStop = false) {
         inputField.disabled = false;
         sendBtn.disabled = disabled;
-        statusDot.classList.toggle('inactive', disabled);
 
         typing.classList.toggle('show', showTyping);
         sendBtn.classList.toggle('hidden', showStop);
@@ -2391,7 +2619,7 @@ HTML_TEMPLATE = r"""
             }
             if (event.key === 'l' || event.key === 'L') {
                 event.preventDefault();
-                clearChat();
+                newConversation();
                 return;
             }
             if (event.key === 's' || event.key === 'S') {
@@ -2424,6 +2652,8 @@ HTML_TEMPLATE = r"""
                 const modalName = modal.id.replace('-modal', '');
                 toggleModal(modalName);
             });
+            // Close sidebar on mobile
+            closeSidebar();
             // Clear search
             if (document.getElementById('search-container').classList.contains('active')) {
                 clearSearch();
@@ -2512,18 +2742,12 @@ HTML_TEMPLATE = r"""
             await stopGeneration();
         }
 
-        if (cmd.startsWith("/new")) {
-            clearChatUI();
-        }
-        if (cmd.startsWith("/stop")) {
-            await stopGeneration();
-            return;
-        }
-
-        const timestamp = formatTime();
-        conversationHistory.push({ role: 'user_command', content: cmd, timestamp: timestamp });
-        saveHistory();
-        createMessageElement('user_command', cmd, timestamp, false, conversationHistory.length - 1);
+        // Add command to display
+        addMessage({
+            role: 'user_command',
+            content: cmd,
+            timestamp: formatTime()
+        });
 
         try {
             const response = await fetch('/send', {
@@ -2534,21 +2758,31 @@ HTML_TEMPLATE = r"""
 
             const data = await response.json();
             if (data.response) {
-                const ts = formatTime();
-                const msg = { role: 'command', content: data.response, timestamp: ts };
-                conversationHistory.push(msg);
-                saveHistory();
-                createMessageElement('command', data.response, ts, false, conversationHistory.length - 1);
+                addMessage({
+                    role: 'command',
+                    content: data.response,
+                    timestamp: formatTime()
+                });
+            }
+            saveCurrentConversation();
+
+            // Special handling for /new command
+            if (cmd.startsWith('/new') || cmd.startsWith('/clear')) {
+                displayMessages = [];
+                currentConversationId = null;
+                renderAllMessages();
+                await loadConversations();
             }
         } catch (err) {
-            if (cmd.startsWith("/restart")) {
-                const timestamp = formatTime();
-                conversationHistory.push({ role: 'command', content: "restarting server", timestamp: timestamp });
-                saveHistory();
-                createMessageElement('command', "restarting server..", timestamp, false, conversationHistory.length - 1);
+            if (cmd.startsWith('/restart')) {
+                addMessage({
+                    role: 'command',
+                    content: 'Restarting server...',
+                    timestamp: formatTime()
+                });
                 return;
             }
-            addMessage('announce', 'Error: ' + err.message);
+            addAnnouncement('Error: ' + err.message, 'error');
         }
         inputField.focus();
     }
@@ -2574,11 +2808,16 @@ HTML_TEMPLATE = r"""
         if (isStreaming) return;
 
         clearInput();
-        const timestamp = formatTime();
-        const index = conversationHistory.length;
-        conversationHistory.push({ role: 'user', content: message, timestamp: timestamp });
-        saveHistory();
-        createMessageElement('user', message, timestamp, false, index);
+
+        // Add user message to display
+        addMessage({
+            role: 'user',
+            content: message,
+            timestamp: formatTime(),
+            backendIndex: null // Will be set after stream completes
+        });
+
+        saveCurrentConversation();
 
         setInputState(true, true, true);
         isStreaming = true;
@@ -2587,7 +2826,7 @@ HTML_TEMPLATE = r"""
         // Create AI message wrapper
         const aiWrapper = document.createElement('div');
         aiWrapper.className = 'message-wrapper ai hidden';
-        aiWrapper.dataset.index = conversationHistory.length;
+        aiWrapper.dataset.displayIndex = displayMessages.length;
         chat.insertBefore(aiWrapper, typing);
         currentAiMsg = aiWrapper;
 
@@ -2597,6 +2836,7 @@ HTML_TEMPLATE = r"""
 
         let aiContent = '';
         let streamStarted = false;
+        let backendIndex = null;
 
         try {
             const response = await fetch('/stream', {
@@ -2663,16 +2903,43 @@ HTML_TEMPLATE = r"""
                                 const ts = document.createElement('span');
                                 ts.className = 'timestamp timestamp-left';
                                 ts.textContent = formatTime();
+
+                                // Add backend index badge
+                                if (data.backendIndex !== undefined && data.backendIndex !== null) {
+                                    const indexBadge = document.createElement('span');
+                                    indexBadge.className = 'index-badge';
+                                    indexBadge.textContent = '#' + data.backendIndex;
+                                    ts.appendChild(indexBadge);
+                                }
+
                                 aiMsgDiv.appendChild(ts);
 
-                                // Add to history
-                                conversationHistory.push({ role: 'ai', content: aiContent, timestamp: formatTime() });
-                                aiWrapper.dataset.index = conversationHistory.length - 1;
-                                saveHistory();
+                                // Update the user message's backend index now that we know it
+                                if (data.userIndex !== undefined && data.userIndex !== null) {
+                                    // Find the last user message and set its backend index
+                                    for (let i = displayMessages.length - 1; i >= 0; i--) {
+                                        if (displayMessages[i].role === 'user') {
+                                            displayMessages[i].backendIndex = data.userIndex;
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                // Add AI message to display
+                                displayMessages.push({
+                                    role: 'ai',
+                                    content: aiContent,
+                                    timestamp: formatTime(),
+                                    backendIndex: data.backendIndex
+                                });
+                                aiWrapper.dataset.displayIndex = displayMessages.length - 1;
 
                                 // Add action buttons
-                                const actions = createActionButtons('ai', parseInt(aiWrapper.dataset.index), aiContent);
+                                const actions = createActionButtons('ai', parseInt(aiWrapper.dataset.displayIndex), aiContent, data.backendIndex);
                                 aiWrapper.appendChild(actions);
+
+                                // Save conversation
+                                saveCurrentConversation();
                             }
 
                             if (data.error) {
@@ -2758,12 +3025,16 @@ HTML_TEMPLATE = r"""
                 aiMsgDiv.appendChild(ts);
 
                 const finalContent = existingContent ? existingContent + ' [Stopped]' : '[Stopped]';
-                conversationHistory.push({ role: 'ai', content: finalContent, timestamp: formatTime() });
-                currentAiMsg.dataset.index = conversationHistory.length - 1;
-                saveHistory();
+                displayMessages.push({
+                    role: 'ai',
+                    content: finalContent,
+                    timestamp: formatTime(),
+                    backendIndex: null // Stopped messages don't have a backend index
+                });
+                currentAiMsg.dataset.displayIndex = displayMessages.length - 1;
 
-                // Add action buttons
-                const actions = createActionButtons('ai', parseInt(currentAiMsg.dataset.index), finalContent);
+                // Add action buttons (no edit/delete for stopped messages)
+                const actions = createActionButtons('ai', parseInt(currentAiMsg.dataset.displayIndex), finalContent, null);
                 currentAiMsg.appendChild(actions);
             }
 
@@ -2781,8 +3052,7 @@ HTML_TEMPLATE = r"""
     }
 
     function clearChat() {
-        clearChatUI();
-        sendCommand('/new');
+        newConversation();
     }
 
     // =============================================================================
@@ -2797,9 +3067,7 @@ HTML_TEMPLATE = r"""
             event.target.value = '';
         }
 
-        const timestamp = formatTime();
-        const uploadMsg = '[Uploading: ' + file.name + ']';
-        addMessage('announce', uploadMsg);
+        addAnnouncement('[Uploading: ' + file.name + ']', 'info');
 
         try {
             const reader = new FileReader();
@@ -2822,19 +3090,21 @@ HTML_TEMPLATE = r"""
             const data = await response.json();
 
             if (data.success) {
-                const ts = formatTime();
-                conversationHistory.push({ role: 'user', content: '[Uploaded: ' + file.name + ']', timestamp: ts });
-                saveHistory();
-                createMessageElement('user', '[Uploaded: ' + file.name + ']', ts, false, conversationHistory.length - 1);
+                addMessage({
+                    role: 'user',
+                    content: '[Uploaded: ' + file.name + ']',
+                    timestamp: formatTime(),
+                    backendIndex: data.backendIndex
+                });
 
                 if (data.message) {
-                    addMessage('announce', data.message);
+                    addAnnouncement(data.message, 'info');
                 }
             } else {
-                addMessage('announce', 'Error: ' + (data.error || 'Upload failed'), 'error');
+                addAnnouncement('Error: ' + (data.error || 'Upload failed'), 'error');
             }
         } catch (err) {
-            addMessage('announce', 'Error: ' + err.message, 'error');
+            addAnnouncement('Error: ' + err.message, 'error');
         }
 
         inputField.focus();
@@ -2896,9 +3166,11 @@ HTML_TEMPLATE = r"""
                 '--bg-message-command': 'linear-gradient(135deg, #1a2a1a 0%, #0f1f0f 100%)',
                 '--bg-input': '#161616',
                 '--bg-code': '#0a0a0a',
+                '--bg-sidebar': '#0d0d0d',
                 '--border-color': '#2a2a2a',
                 '--border-message': '#333333',
                 '--border-user': '#444444',
+                '--border-sidebar': '#222222',
                 '--text-primary': '#e0e0e0',
                 '--text-secondary': '#a0a0a0',
                 '--text-muted': '#666666',
@@ -2934,9 +3206,11 @@ HTML_TEMPLATE = r"""
                 '--bg-message-command': 'linear-gradient(135deg, #2e382e 0%, #243024 100%)',
                 '--bg-input': '#2a2a2a',
                 '--bg-code': '#1a1a1a',
+                '--bg-sidebar': '#141414',
                 '--border-color': '#404040',
                 '--border-message': '#484848',
                 '--border-user': '#505050',
+                '--border-sidebar': '#303030',
                 '--text-primary': '#f0f0f0',
                 '--text-secondary': '#b0b0b0',
                 '--text-muted': '#808080',
@@ -2972,9 +3246,11 @@ HTML_TEMPLATE = r"""
                 '--bg-message-command': 'linear-gradient(135deg, #283028 0%, #202820 100%)',
                 '--bg-input': '#201018',
                 '--bg-code': '#1a0a14',
+                '--bg-sidebar': '#12080e',
                 '--border-color': '#482840',
                 '--border-message': '#503048',
                 '--border-user': '#583850',
+                '--border-sidebar': '#382030',
                 '--text-primary': '#f0d0e0',
                 '--text-secondary': '#c090a8',
                 '--text-muted': '#886878',
@@ -3010,9 +3286,11 @@ HTML_TEMPLATE = r"""
                 '--bg-message-command': 'linear-gradient(135deg, #183020 0%, #142818 100%)',
                 '--bg-input': '#0c1218',
                 '--bg-code': '#0a0e14',
+                '--bg-sidebar': '#080c10',
                 '--border-color': '#283850',
                 '--border-message': '#304060',
                 '--border-user': '#384868',
+                '--border-sidebar': '#182838',
                 '--text-primary': '#d0e0f0',
                 '--text-secondary': '#90b0d0',
                 '--text-muted': '#5878a0',
@@ -3048,9 +3326,11 @@ HTML_TEMPLATE = r"""
                 '--bg-message-command': 'linear-gradient(135deg, #283820 0%, #1c2818 100%)',
                 '--bg-input': '#0c140e',
                 '--bg-code': '#0a140e',
+                '--bg-sidebar': '#080e0a',
                 '--border-color': '#284030',
                 '--border-message': '#305038',
                 '--border-user': '#385840',
+                '--border-sidebar': '#183820',
                 '--text-primary': '#c8e8d0',
                 '--text-secondary': '#80c090',
                 '--text-muted': '#487058',
@@ -3086,9 +3366,11 @@ HTML_TEMPLATE = r"""
                 '--bg-message-command': 'linear-gradient(135deg, #304828 0%, #243820 100%)',
                 '--bg-input': '#20180c',
                 '--bg-code': '#1a1510',
+                '--bg-sidebar': '#12100c',
                 '--border-color': '#483820',
                 '--border-message': '#504028',
                 '--border-user': '#584830',
+                '--border-sidebar': '#302818',
                 '--text-primary': '#f0e0d0',
                 '--text-secondary': '#c8a878',
                 '--text-muted': '#907850',
@@ -3124,9 +3406,11 @@ HTML_TEMPLATE = r"""
                 '--bg-message-command': 'linear-gradient(135deg, #2e3a2e 0%, #243024 100%)',
                 '--bg-input': '#1e1e2e',
                 '--bg-code': '#11111b',
+                '--bg-sidebar': '#13131a',
                 '--border-color': '#45475a',
                 '--border-message': '#585b70',
                 '--border-user': '#6c6f85',
+                '--border-sidebar': '#313244',
                 '--text-primary': '#cdd6f4',
                 '--text-secondary': '#bac2de',
                 '--text-muted': '#6c7086',
@@ -3162,9 +3446,11 @@ HTML_TEMPLATE = r"""
                 '--bg-message-command': 'linear-gradient(135deg, #e8f0e8 0%, #e0ebe0 100%)',
                 '--bg-input': '#ffffff',
                 '--bg-code': '#f8f8f8',
+                '--bg-sidebar': '#fafafa',
                 '--border-color': '#d0d0d0',
                 '--border-message': '#c8c8c8',
                 '--border-user': '#b8b8b8',
+                '--border-sidebar': '#e0e0e0',
                 '--text-primary': '#1a1a1a',
                 '--text-secondary': '#505050',
                 '--text-muted': '#909090',
@@ -3200,9 +3486,11 @@ HTML_TEMPLATE = r"""
                 '--bg-message-command': 'linear-gradient(135deg, #e0f0e0 0%, #d8ecd8 100%)',
                 '--bg-input': '#fff8fa',
                 '--bg-code': '#fff0f4',
+                '--bg-sidebar': '#fffcfd',
                 '--border-color': '#e8b8c8',
                 '--border-message': '#d8a8b8',
                 '--border-user': '#c898a8',
+                '--border-sidebar': '#f0d0dc',
                 '--text-primary': '#2a1820',
                 '--text-secondary': '#684858',
                 '--text-muted': '#a08090',
@@ -3238,9 +3526,11 @@ HTML_TEMPLATE = r"""
                 '--bg-message-command': 'linear-gradient(135deg, #e0f0e8 0%, #d8ecd8 100%)',
                 '--bg-input': '#f8faff',
                 '--bg-code': '#f0f4fc',
+                '--bg-sidebar': '#fcfeff',
                 '--border-color': '#b8c8e8',
                 '--border-message': '#a8b8d8',
                 '--border-user': '#98a8c8',
+                '--border-sidebar': '#d0dcf0',
                 '--text-primary': '#182030',
                 '--text-secondary': '#384868',
                 '--text-muted': '#7888a8',
@@ -3276,9 +3566,11 @@ HTML_TEMPLATE = r"""
                 '--bg-message-command': 'linear-gradient(135deg, #e8f0d8 0%, #e0ecd0 100%)',
                 '--bg-input': '#f8fff8',
                 '--bg-code': '#f0fcf0',
+                '--bg-sidebar': '#fcfffc',
                 '--border-color': '#a8d0a8',
                 '--border-message': '#98c098',
                 '--border-user': '#88b088',
+                '--border-sidebar': '#c0e8c0',
                 '--text-primary': '#182818',
                 '--text-secondary': '#386838',
                 '--text-muted': '#709870',
@@ -3314,9 +3606,11 @@ HTML_TEMPLATE = r"""
                 '--bg-message-command': 'linear-gradient(135deg, #e0f0e0 0%, #d8ecd8 100%)',
                 '--bg-input': '#faf8f4',
                 '--bg-code': '#f6f0e8',
+                '--bg-sidebar': '#fcfaf6',
                 '--border-color': '#d8c8a8',
                 '--border-message': '#c8b898',
                 '--border-user': '#b8a888',
+                '--border-sidebar': '#e8d8c0',
                 '--text-primary': '#2a2018',
                 '--text-secondary': '#684828',
                 '--text-muted': '#a08060',
@@ -3352,9 +3646,11 @@ HTML_TEMPLATE = r"""
                 '--bg-message-command': 'linear-gradient(135deg, #d0e6d0 0%, #c8dcc8 100%)',
                 '--bg-input': '#eff1f5',
                 '--bg-code': '#e6e9ef',
+                '--bg-sidebar': '#f4f6f8',
                 '--border-color': '#bcc0cc',
                 '--border-message': '#acb0bc',
                 '--border-user': '#9ca0ac',
+                '--border-sidebar': '#d0d4de',
                 '--text-primary': '#4c4f69',
                 '--text-secondary': '#5c5f72',
                 '--text-muted': '#8c8fa1',
@@ -3480,6 +3776,18 @@ HTML_TEMPLATE = r"""
     // Start the app
     init();
 
+    // Save conversation before leaving page
+    window.addEventListener('beforeunload', () => {
+        if (displayMessages.length > 0) {
+            // Use sendBeacon for reliable save on page unload
+            const data = JSON.stringify({
+                id: currentConversationId,
+                messages: displayMessages
+            });
+            navigator.sendBeacon('/conversation/save', data);
+        }
+    });
+
     </script>
 </body>
 </html>
@@ -3492,7 +3800,7 @@ HTML_TEMPLATE = r"""
 class Webui(core.channel.Channel):
     """
     A web-based channel for communicating with the AI through a browser interface.
-    
+
     This channel provides:
     - Real-time streaming responses via Server-Sent Events
     - Connection monitoring with automatic reconnection
@@ -3502,57 +3810,60 @@ class Webui(core.channel.Channel):
     - Markdown rendering with syntax highlighting
     - Message editing, deletion, search, and export
     - Keyboard shortcuts and accessibility features
-    - Virtual scrolling for performance
-    - CSRF and CSP security headers
+    - Conversation history sidebar with persistent storage
+    - Proper handling of backend messages vs commands/announcements
     """
-    
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.announcement_queue = []
         self.announcement_id = 0
         self.main_loop = None
-    
+
+        # Storage for saved conversations
+        self.conversations = core.storage.StorageList("conversations", "json")
+        
     async def run(self):
         """
         Start the Flask web server to handle HTTP requests.
-        
+
         The server runs in a separate thread to avoid blocking
         the asyncio event loop.
         """
         core.log("webui", "Starting WebUI")
-        
+
         self.main_loop = asyncio.get_running_loop()
-        
+
         global channel_instance
         channel_instance = self
-        
+
         # Start Flask in a separate thread
         flask_thread = Thread(target=self._run_flask, daemon=True)
         flask_thread.start()
-        
+
         host = core.config.get("webui_host", "127.0.0.1")
         port = core.config.get("webui_port", 5000)
         core.log("webui", f"WebUI started on {host}:{port}")
-        
+
         # Keep the coroutine running
         while True:
             await asyncio.sleep(1)
-    
+
     def _run_flask(self):
         """Run Flask in a separate thread with proper socket configuration."""
         from werkzeug.serving import make_server
-        
+
         host = core.config.get("webui_host", "127.0.0.1")
         port = core.config.get("webui_port", 5000)
-        
+
         server = make_server(host, port, app, threaded=True)
         server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         server.serve_forever()
-    
+
     async def announce(self, message: str, type: str = None):
         """
         Handle announcements from the framework and push to web UI.
-        
+
         Args:
             message: The announcement message to display
             type: Optional type (info, error, important)
@@ -3564,6 +3875,60 @@ class Webui(core.channel.Channel):
             'content': message.replace('\n', '<br>'),
             'type': type,
         })
+
+    def get_backend_messages(self):
+        """
+        Get messages from the backend API.
+        Returns list of messages with role='user' or role='assistant'.
+        """
+        if not self.manager or not hasattr(self.manager, 'API'):
+            return []
+
+        # Access the renamed _messages attribute
+        messages = self.manager.API._messages if hasattr(self.manager.API, '_messages') else []
+
+        result = []
+        for i, msg in enumerate(messages):
+            role = msg.get('role', 'user')
+            # Convert 'assistant' to 'ai' for frontend display
+            if role == 'assistant':
+                role = 'ai'
+            content = msg.get('content', '')
+            if content:
+                result.append({
+                    'role': role,
+                    'content': content,
+                    'backendIndex': i,  # Attach backend index
+                    'timestamp': None
+                })
+
+        return result
+
+    def set_backend_messages(self, messages):
+        """
+        Set messages in the backend API.
+        """
+        if not self.manager or not hasattr(self.manager, 'API'):
+            return
+
+        # Convert 'ai' back to 'assistant' for backend
+        backend_messages = []
+        for msg in messages:
+            role = msg.get('role', 'user')
+            if role == 'ai':
+                role = 'assistant'
+            content = msg.get('content', '')
+            if content:
+                backend_messages.append({
+                    'role': role,
+                    'content': content
+                })
+
+        # Use set_messages if available, otherwise set directly
+        if hasattr(self.manager.API, 'set_messages'):
+            self.manager.API.set_messages(backend_messages)
+        else:
+            self.manager.API._messages = backend_messages
 
 # ==============================================================================
 # Flask Routes
@@ -3578,10 +3943,10 @@ def index():
 def poll_announcements():
     """
     Return announcements newer than the given ID.
-    
+
     Query params:
         id: Last announcement ID received by client
-    
+
     Returns:
         JSON object with list of new messages
     """
@@ -3589,41 +3954,42 @@ def poll_announcements():
         last_id = int(request.args.get('id', 0))
     except ValueError:
         last_id = 0
-    
+
     messages = []
-    for index, msg in enumerate(channel_instance.announcement_queue):
+    for msg in channel_instance.announcement_queue:
         if msg['id'] > last_id:
-            # add it to the messages
             messages.append(msg)
 
-    # clear the queue
+    # Clear the queue after sending
     channel_instance.announcement_queue = []
+
     return jsonify({'messages': messages})
 
 @app.route('/stream', methods=['POST'])
 def stream_message():
     """
     Stream AI response token by token using Server-Sent Events.
-    
+
     This endpoint:
     1. Receives user message
     2. Generates a unique stream ID
     3. Streams tokens from the AI
     4. Handles cancellation via stream_cancellations set
-    
+    5. Returns backend indices for proper message tracking
+
     Returns:
         SSE stream with JSON data for each token
     """
     global channel_instance
-    
+
     data = request.get_json()
     user_message = data.get('message', '')
     stream_id = str(uuid.uuid4())[:8]
-    
+
     def generate():
         token_queue = Queue()
         done = object()
-        
+
         async def collect_tokens():
             """Collect tokens from the AI and put them in the queue."""
             try:
@@ -3637,22 +4003,31 @@ def stream_message():
                 token_queue.put(('error', str(e)))
             finally:
                 token_queue.put(done)
-        
-        # Run the async token collection in the main event loop
+
         future = asyncio.run_coroutine_threadsafe(collect_tokens(), channel_instance.main_loop)
-        
+
         # Send stream ID first
         yield f"data: {json.dumps({'id': stream_id})}\n\n"
-        
+
+        # Get user message index after it was inserted
+        user_index = len(channel_instance.manager.API._messages) - 1 if hasattr(channel_instance.manager.API, '_messages') else 0
+
         # Stream tokens
         while True:
             item = token_queue.get()
-            
+
             if item is done:
-                yield f"data: {json.dumps({'done': True})}\n\n"
+                # NOW send backend indices - after stream completes successfully
+                assistant_index = len(channel_instance.manager.API._messages) - 1 if hasattr(channel_instance.manager.API, '_messages') else 0
+                yield f"data: {json.dumps({'done': True, 'backendIndex': assistant_index, 'userIndex': user_index})}\n\n"
                 break
             elif isinstance(item, tuple):
                 if item[0] == 'error':
+                    # Roll back the user message on error
+                    if hasattr(channel_instance.manager.API, '_messages'):
+                        messages = channel_instance.manager.API._messages
+                        if len(messages) > 0 and messages[-1].get('role') == 'user':
+                            messages.pop()
                     yield f"data: {json.dumps({'error': item[1]})}\n\n"
                     break
                 elif item[0] == 'cancelled':
@@ -3660,108 +4035,55 @@ def stream_message():
                     break
             else:
                 yield f"data: {json.dumps({'token': item})}\n\n"
-        
-        # Ensure the async task completes
+
         future.result()
-    
+
     return Response(generate(), mimetype='text/event-stream')
 
 @app.route('/send', methods=['POST'])
 def send_message():
     """
     Send a message and wait for complete response.
-    
+
     Used for commands that need immediate response.
     """
     global channel_instance
-    
+
     data = request.get_json()
     user_message = data.get('message', '')
-    
+
     future = asyncio.run_coroutine_threadsafe(
         channel_instance.send("user", user_message),
         channel_instance.main_loop
     )
     response = future.result()
-    
+
     return jsonify({'response': response})
 
 @app.route('/history')
 def get_history():
-    """Return the current conversation history from the backend."""
+    """
+    Return the current conversation history from the backend.
+
+    Each message includes a backendIndex for proper edit/delete operations.
+    Only returns messages that exist in the backend (user and assistant messages).
+    """
     global channel_instance
 
     if not channel_instance or not hasattr(channel_instance, 'manager') or not hasattr(channel_instance.manager, 'API'):
         return jsonify({'messages': []})
 
-    turns = channel_instance.manager.API._turns
-    messages = []
-
-    for i, turn in enumerate(turns):
-        # Convert backend 'assistant' to frontend 'ai'
-        role = 'ai' if turn.get('role') == 'assistant' else turn.get('role', 'user')
-        content = turn.get('content', '')
-
-        # Don't include empty content
-        if content:
-            messages.append({
-                'role': role,
-                'content': content,
-                'timestamp': None,  # Backend doesn't store timestamps, use current time
-                'index': i
-            })
+    messages = channel_instance.get_backend_messages()
 
     return jsonify({'messages': messages})
 
-@app.route('/sync', methods=['POST'])
-def sync_context():
-    """
-    Sync the frontend conversation history with the backend context.
-    This rebuilds _turns from the provided messages list.
-
-    Use this when indices get out of sync between frontend and backend.
-    """
-    global channel_instance
-
-    data = request.get_json()
-    messages = data.get('messages', [])
-
-    if not channel_instance or not hasattr(channel_instance, 'manager') or not hasattr(channel_instance.manager, 'API'):
-        return jsonify({'success': False, 'error': 'API not available'})
-
-    # Rebuild _turns from the provided messages
-    # Frontend sends messages with role='user' and role='ai' (or 'assistant')
-    # Backend uses role='user' and role='assistant'
-    new_turns = []
-    for msg in messages:
-        role = msg.get('role', '')
-        content = msg.get('content', '')
-
-        # Normalize role names
-        if role == 'ai':
-            role = 'assistant'
-
-        if role in ('user', 'assistant'):
-            new_turns.append({
-                'role': role,
-                'content': content
-            })
-
-    channel_instance.manager.API._turns = new_turns
-    core.log("webui", f"Synced context: {len(new_turns)} turns")
-
-    # Return the new state for verification
-    turns_summary = [{'role': t['role'], 'content': t['content'][:50] + '...' if len(t['content']) > 50 else t['content']} for t in new_turns]
-
-    return jsonify({
-        'success': True, 
-        'count': len(new_turns),
-        'turns': turns_summary
-    })
-
 @app.route('/edit', methods=['POST'])
 def edit_message():
-    """Edit a message in the conversation history."""
+    """
+    Edit a message in the backend conversation history.
+
+    Uses the backend index directly for reliable editing.
+    """
     global channel_instance
 
     data = request.get_json()
@@ -3771,23 +4093,27 @@ def edit_message():
     if not channel_instance or not hasattr(channel_instance, 'manager') or not hasattr(channel_instance.manager, 'API'):
         return jsonify({'success': False, 'error': 'API not available'})
 
-    turns = channel_instance.manager.API._turns
+    messages = channel_instance.manager.API._messages if hasattr(channel_instance.manager.API, '_messages') else []
 
-    if 0 <= index < len(turns):
-        if turns[index]['role'] != "user":
-            return jsonify({"success": False, error: f"Tried to edit a system message!"})
+    if 0 <= index < len(messages):
+        if messages[index].get('role') not in ('user', 'assistant'):
+            return jsonify({'success': False, 'error': 'Cannot edit system messages'})
 
-        old_content = turns[index]['content'][:50] if turns[index].get('content') else ''
-        turns[index]['content'] = new_content
-        core.log("webui", f"Edited turn {index}: '{old_content}...' -> '{new_content[:50]}...'")
-        return jsonify({'success': True, 'turns_count': len(turns)})
+        old_content = messages[index].get('content', '')[:50]
+        messages[index]['content'] = new_content
+        core.log("webui", f"Edited message {index}: '{old_content}...' -> '{new_content[:50]}...'")
+        return jsonify({'success': True, 'messages_count': len(messages)})
 
-    core.log("webui", f"Edit failed: index {index} out of range (turns has {len(turns)})")
-    return jsonify({'success': False, 'error': f'Index {index} out of range (turns has {len(turns)})'})
+    core.log("webui", f"Edit failed: index {index} out of range (messages has {len(messages)})")
+    return jsonify({'success': False, 'error': f'Index {index} out of range'})
 
 @app.route('/delete', methods=['POST'])
 def delete_message():
-    """Delete a message and all messages after it from the context."""
+    """
+    Delete a message and all messages after it from the backend context.
+
+    Uses the backend index directly for reliable deletion.
+    """
     global channel_instance
 
     data = request.get_json()
@@ -3796,73 +4122,242 @@ def delete_message():
     if not channel_instance or not hasattr(channel_instance, 'manager') or not hasattr(channel_instance.manager, 'API'):
         return jsonify({'success': False, 'error': 'API not available'})
 
-    turns = channel_instance.manager.API._turns
-    original_count = len(turns)
+    messages = channel_instance.manager.API._messages if hasattr(channel_instance.manager.API, '_messages') else []
+    original_count = len(messages)
 
-    if 0 <= index <= len(turns):
-        if turns[index]['role'] != "user":
-            return jsonify({"success": False, "error": f"Tried to delete a system message!"})
+    if 0 <= index < len(messages):
+        if messages[index].get('role') not in ('user', 'assistant'):
+            return jsonify({'success': False, 'error': 'Cannot delete system messages'})
 
-        removed_count = len(turns) - index
+        removed_count = len(messages) - index
         # Keep only messages before the index
-        channel_instance.manager.API._turns = turns[:index]
-        remaining_count = len(channel_instance.manager.API._turns)
-        core.log("webui", f"Deleted {removed_count} turns from index {index}, {remaining_count} remaining")
+        channel_instance.manager.API._messages = messages[:index]
+        remaining_count = len(channel_instance.manager.API._messages)
+        core.log("webui", f"Deleted {removed_count} messages from index {index}, {remaining_count} remaining")
         return jsonify({
-            'success': True, 
+            'success': True,
             'removed': removed_count,
             'remaining': remaining_count,
-            'turns_count': remaining_count
+            'messages_count': remaining_count
         })
 
-    core.log("webui", f"Delete failed: index {index} out of range (turns has {len(turns)})")
-    return jsonify({'success': False, 'error': f'Index {index} out of range (turns has {len(turns)})'})
+    core.log("webui", f"Delete failed: index {index} out of range (messages has {len(messages)})")
+    return jsonify({'success': False, 'error': f'Index {index} out of range'})
 
 @app.route('/cancel', methods=['POST'])
 def cancel_stream():
     """
     Cancel an ongoing stream.
-    
+
     Sets the cancel flag on the API and adds the stream ID to cancellations.
     """
     global channel_instance
-    
+
     data = request.get_json()
     stream_id = data.get('id')
-    
+
     # Set the cancel flag on the API
     if channel_instance:
         channel_instance.manager.API.cancel_request = True
-    
+
     if stream_id:
         stream_cancellations.add(stream_id)
-    
+
     return jsonify({'success': True})
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
     """
     Handle file upload.
-    
+
     Receives base64-encoded file content and processes it.
+    Returns the backend index of the inserted message.
     """
     global channel_instance
-    
+
     data = request.get_json()
     filename = data.get('filename', '')
     content_b64 = data.get('content', '')
     mimetype = data.get('mimetype', '')
-    
+
     try:
         content = base64.b64decode(content_b64).decode('utf-8', errors='replace')
-        
+
+        # Get the index before insertion
+        messages = channel_instance.manager.API._messages if hasattr(channel_instance.manager.API, '_messages') else []
+        backend_index = len(messages)
+
         # Insert the file content into the conversation
         result = f"File uploaded: {filename} ({len(content)} bytes)"
-        asyncio.run(channel_instance.manager.API.insert_turn("user", f"[File: {filename}]\n{content}..."))
-        
-        return jsonify({'success': True, 'message': result})
+        asyncio.run_coroutine_threadsafe(
+            channel_instance.manager.API.insert_message("user", f"[File: {filename}]\n{content}..."),
+            channel_instance.main_loop
+        ).result()
+
+        return jsonify({
+            'success': True,
+            'message': result,
+            'backendIndex': backend_index
+        })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
+
+# ==============================================================================
+# Conversation Management Routes
+# ==============================================================================
+
+@app.route('/conversations')
+def list_conversations():
+    """
+    List all saved conversations.
+    """
+    global channel_instance
+
+    if not channel_instance:
+        return jsonify({'conversations': []})
+
+    conversations = []
+
+    for conv in channel_instance.conversations:
+        conversations.append({
+            'id': conv.get('id'),
+            'title': conv.get('title', 'New Conversation'),
+            'created': conv.get('created'),
+            'updated': conv.get('updated'),
+            'message_count': len(conv.get('messages', []))
+        })
+
+    # Sort by updated time, most recent first
+    conversations.sort(key=lambda x: x.get('updated', ''), reverse=True)
+
+    return jsonify({'conversations': conversations})
+
+@app.route('/conversation/save', methods=['POST'])
+def save_conversation():
+    """
+    Save the current conversation.
+
+    Accepts the full displayMessages array from the frontend, which includes
+    all message types (user, ai, command, announcement).
+
+    Returns the conversation ID.
+    """
+    global channel_instance
+
+    if not channel_instance:
+        return jsonify({'success': False, 'error': 'Channel not available'})
+
+    data = request.get_json()
+    conv_id = data.get('id')
+    messages = data.get('messages', [])
+
+    # Generate a title from the first user message
+    title = 'New Conversation'
+    for msg in messages:
+        if msg.get('role') in ('user', 'user_command'):
+            content = msg.get('content', '')
+            if content and not content.startswith('/'):
+                # Take first 50 chars as title
+                title = content[:50]
+                if len(content) > 50:
+                    title += '...'
+                break
+
+    now = datetime.utcnow().isoformat()
+
+    if conv_id:
+        # Update existing conversation
+        for i, conv in enumerate(channel_instance.conversations):
+            if conv.get('id') == conv_id:
+                channel_instance.conversations[i] = {
+                    'id': conv_id,
+                    'title': title,
+                    'messages': messages,
+                    'created': conv.get('created', now),
+                    'updated': now
+                }
+                channel_instance.conversations.save()
+                return jsonify({'success': True, 'id': conv_id})
+
+    # Create new conversation
+    conv_id = conv_id or str(uuid.uuid4())[:8]
+
+    channel_instance.conversations.append({
+        'id': conv_id,
+        'title': title,
+        'messages': messages,
+        'created': now,
+        'updated': now
+    })
+    channel_instance.conversations.save()
+
+    return jsonify({'success': True, 'id': conv_id})
+
+@app.route('/conversation/load')
+def load_conversation():
+    """
+    Load a conversation by ID.
+
+    Restores all messages (including commands and announcements) to the frontend.
+    Also sets the backend messages for the AI context.
+    """
+    global channel_instance
+
+    if not channel_instance:
+        return jsonify({'success': False, 'error': 'Channel not available'})
+
+    conv_id = request.args.get('id')
+    if not conv_id:
+        return jsonify({'success': False, 'error': 'No conversation ID provided'})
+
+    for conv in channel_instance.conversations:
+        if conv.get('id') == conv_id:
+            messages = conv.get('messages', [])
+
+            # Extract only user and assistant messages for backend
+            backend_messages = []
+            for msg in messages:
+                role = msg.get('role')
+                if role in ('user', 'ai'):
+                    backend_role = 'assistant' if role == 'ai' else 'user'
+                    content = msg.get('content', '')
+                    if content:
+                        backend_messages.append({
+                            'role': backend_role,
+                            'content': content
+                        })
+
+            # Set backend messages
+            channel_instance.set_backend_messages(backend_messages)
+
+            return jsonify({
+                'success': True,
+                'conversation': conv
+            })
+
+    return jsonify({'success': False, 'error': 'Conversation not found'})
+
+@app.route('/conversation/delete', methods=['POST'])
+def delete_conversation():
+    """
+    Delete a conversation by ID.
+    """
+    global channel_instance
+
+    if not channel_instance:
+        return jsonify({'success': False, 'error': 'Channel not available'})
+
+    conv_id = request.args.get('id')
+    if not conv_id:
+        return jsonify({'success': False, 'error': 'No conversation ID provided'})
+
+    for i, conv in enumerate(channel_instance.conversations):
+        if conv.get('id') == conv_id:
+            channel_instance.conversations.pop(i)
+            channel_instance.conversations.save()
+            return jsonify({'success': True})
+
+    return jsonify({'success': False, 'error': 'Conversation not found'})
 
 # ==============================================================================
 # PWA Support Routes
@@ -3888,7 +4383,7 @@ def manifest():
 @app.route('/sw.js')
 def service_worker():
     sw_code = """
-const CACHE_VERSION = '2.0.0';
+const CACHE_VERSION = '3.0.0';
 const CACHE_NAME = 'ai-chat-v-' + CACHE_VERSION;
 
 // Only cache LOCAL resources that we control
@@ -3947,10 +4442,10 @@ self.addEventListener('fetch', (event) => {
     }
 
     // For other local requests, try cache first
-    event.respondWith(
-        caches.match(event.request)
-            .then((response) => response || fetch(event.request))
-    );
+    // event.respondWith(
+    //    caches.match(event.request)
+    //        .then((response) => response || fetch(event.request))
+    // );
 });
 """
     response = Response(sw_code, mimetype='application/javascript')
