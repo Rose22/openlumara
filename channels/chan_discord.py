@@ -40,7 +40,6 @@ class Client(discord.Client):
 
     async def on_ready(self):
         core.log("discord", "logged in.")
-        await self.ai_channel.announce("i'm up and running!")
 
     async def on_message(self, message):
         if message.author == self.user:

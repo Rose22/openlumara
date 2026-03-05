@@ -151,7 +151,7 @@ class Channel:
 
                 return "\n\n".join(context_display)
             case "restart":
-                await self.announce_all("restarting server..")
+                await self.announce("restarting server..")
                 time.sleep(0.1)
                 os.execv(sys.argv[0], sys.argv)
             case "stop":
