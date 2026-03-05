@@ -120,7 +120,7 @@ class APIClient():
 
         return response
 
-    async def build_context(self, system_prompt=True):
+    async def build_context(self, system_prompt=True, end_prompt=True):
         # context = system prompt + message history
         context = []
 
@@ -131,7 +131,7 @@ class APIClient():
         # insert message history
         context = context+self._messages
 
-        if system_prompt:
+        if end_prompt:
             histend = await self.manager.get_end_prompt()
             # for some reason, it won't accept a 2nd system prompt. so we add it as user
             # maybe theres a better way to do this..

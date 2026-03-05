@@ -127,13 +127,6 @@ class Manager:
         system_prompt = sysprompt_top+sysprompt_middle+sysprompt_bottom
 
         if system_prompt:
-            prompt_length = len("".join(system_prompt).split())
-            prompt_length_text = "System prompt length: {prompt_length} words."
-            prompt_length += len(prompt_length_text.split())
-            prompt_length_text = prompt_length_text.replace("{prompt_length}", str(prompt_length))
-
-            system_prompt.append(prompt_length_text)
-
             return "\n\n".join(system_prompt)
         else:
             return ""
@@ -341,7 +334,7 @@ class Manager:
                         "required": [],
                         "additionalProperties": False,
                     },
-                    "strict": True,
+                    "strict": False,
                 },
             }
 
@@ -417,19 +410,14 @@ class Manager:
                 user_last_message = message
 
         if not self.API.cancel_request:
-            prompt = self.API._messages+[{"role": "system", "content": "If the tool response provides sufficient answers, tell the user the results. If not, consider if you need to use another tool? If so, call it."}]
+            prompt = [{"role": "system", "content": "If the tool response provides sufficient answers, tell the user the results. If not, consider if you need to use another tool? If so, call it."}]+self.API._messages
         else:
             if self.channel:
                 await self.channel.announce("toolcalling chain cancelled", "info")
             return None
 
-        try:
-            return await self.API._recv(
-                await self.API._request(prompt, tools=self.tools),
-                use_tools=True,
-                add_message=False
-            )
-        except Exception as e:
-            core.log_error(f"error while processing tool results", e)
-            if self.channel:
-                await self.channel.announce(f"error while processing tool results: {e}", "error")
+        return await self.API._recv(
+            await self.API._request(prompt, tools=self.tools),
+            use_tools=True,
+            add_message=False
+        )
