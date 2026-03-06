@@ -1,13 +1,12 @@
 import core
 
 class Modules(core.module.Module):
-    async def list(self):
-        """List all modules available in the system. Use this if user asks what modules are available. Do NOT rely on the list of tools."""
+    async def on_system_prompt(self):
         module_list = {
             "enabled": ", ".join(core.config.get("modules", [])),
             "disabled": ", ".join(core.config.get("modules_disabled", []))
         }
-        return module_list
+        return str(module_list)
 
     async def toggle(self, name: str):
         """Toggle a module by name."""
