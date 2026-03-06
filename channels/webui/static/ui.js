@@ -768,6 +768,25 @@ async function loadConversations() {
     }
 }
 
+async function restoreCurrentConversation() {
+    try {
+        const response = await fetch('/conversation/current');
+        const data = await response.json();
+
+        if (data.success && data.current_id && data.conversation) {
+            currentConversationId = data.current_id;
+            const messages = data.conversation.messages || [];
+
+            if (messages.length > 0) {
+                renderAllMessages(messages);
+                lastMessageIndex = messages.length;
+            }
+        }
+    } catch (e) {
+        console.error('Failed to restore current conversation:', e);
+    }
+}
+
 function renderConversationList(conversations) {
     const list = document.getElementById('conv-list');
     list.innerHTML = '';
@@ -790,6 +809,14 @@ function renderConversationList(conversations) {
         const actions = document.createElement('div');
         actions.className = 'conv-item-actions';
 
+        const renameBtn = document.createElement('button');
+        renameBtn.className = 'conv-action-btn rename';
+        renameBtn.textContent = 'Rename';
+        renameBtn.onclick = (e) => {
+            e.stopPropagation();
+            renameConversation(conv.id, conv.title);
+        };
+
         const deleteBtn = document.createElement('button');
         deleteBtn.className = 'conv-action-btn delete';
         deleteBtn.textContent = 'Delete';
@@ -798,6 +825,7 @@ function renderConversationList(conversations) {
             deleteConversation(conv.id);
         };
 
+        actions.appendChild(renameBtn);
         actions.appendChild(deleteBtn);
         meta.appendChild(date);
         meta.appendChild(actions);
@@ -902,6 +930,28 @@ async function deleteConversation(convId) {
         }
     } catch (e) {
         console.error('Failed to delete conversation:', e);
+    }
+}
+
+async function renameConversation(convId, currentTitle) {
+    const newTitle = prompt('Enter new name:', currentTitle);
+    if (!newTitle || newTitle.trim() === '' || newTitle === currentTitle) return;
+
+    try {
+        const response = await fetch('/conversation/rename', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: convId, title: newTitle.trim() })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+            await loadConversations();
+        } else {
+            alert('Failed to rename: ' + data.error);
+        }
+    } catch (e) {
+        console.error('Failed to rename conversation:', e);
     }
 }
 
@@ -1644,6 +1694,11 @@ updateConnectionStatus('connecting');
 async function init() {
     try {
         await checkConnection();
+
+        // Load current conversation from backend if available
+        if (isConnected) {
+            await restoreCurrentConversation();
+        }
     } catch (err) {
         isConnected = false;
         updateConnectionStatus('disconnected');

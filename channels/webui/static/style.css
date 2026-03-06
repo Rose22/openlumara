@@ -721,6 +721,7 @@ header h1 {
     text-align: center;
     font-size: 0.9rem;
     max-width: 90%;
+    white-space: pre-wrap;
 }
 
 .message.announce.announce_error {

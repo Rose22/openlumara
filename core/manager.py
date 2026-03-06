@@ -351,7 +351,15 @@ class Manager:
 
             # Fix broken JSON arguments (this was a pain..)
             raw_args = tool_call_dict['function']['arguments']
-            modified_args = json_repair.loads(raw_args)
+            try:
+                modified_args = json_repair.loads(raw_args)
+            except:
+                modified_args = {}
+
+            # handle faulty or empty args
+            if not isinstance(modified_args, dict):
+                modified_args = {}
+
             tool_call_dict['function']['arguments'] = json.dumps(modified_args)
 
             repaired_tool_calls.append(tool_call_dict)

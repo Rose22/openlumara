@@ -14,7 +14,7 @@ class Module:
         """unified way of returning tool results"""
         return {
             "status": "success" if success else "error",
-            "content": data
+            "content": str(data)
         }
 
     async def on_system_prompt(self):

@@ -87,6 +87,9 @@ class Webui(core.channel.Channel):
         # Storage for saved conversations (frontend metadata only)
         self.conversations = core.storage.StorageList("conversations", "json")
 
+        # Track currently active conversation
+        self.current_conversation_id = None
+
     async def run(self):
         """Start the Flask web server."""
         core.log("webui", "Starting WebUI")
@@ -473,6 +476,7 @@ def save_conversation():
                     'updated': now
                 }
                 channel_instance.conversations.save()
+                channel_instance.current_conversation_id = conv_id
                 return jsonify({'success': True, 'id': conv_id})
 
     # Create new conversation
@@ -485,6 +489,7 @@ def save_conversation():
         'updated': now
     })
     channel_instance.conversations.save()
+    channel_instance.current_conversation_id = conv_id
 
     return jsonify({'success': True, 'id': conv_id})
 
@@ -507,6 +512,9 @@ def load_conversation():
             # Push messages to backend
             channel_instance.set_messages(messages)
 
+            # Track active conversation
+            channel_instance.current_conversation_id = conv_id
+
             return jsonify({
                 'success': True,
                 'conversation': {
@@ -515,6 +523,90 @@ def load_conversation():
                     'messages': messages
                 }
             })
+
+    return jsonify({'success': False, 'error': 'Conversation not found'})
+
+@app.route('/conversation/current')
+def get_current_conversation():
+    """Get the currently active conversation ID and its messages."""
+    global channel_instance
+
+    if not channel_instance:
+        return jsonify({'success': False, 'error': 'Channel not available'})
+
+    conv_id = channel_instance.current_conversation_id
+
+    if not conv_id:
+        return jsonify({
+            'success': True,
+            'current_id': None,
+            'conversation': None
+        })
+
+    for conv in channel_instance.conversations:
+        if conv.get('id') == conv_id:
+            return jsonify({
+                'success': True,
+                'current_id': conv_id,
+                'conversation': {
+                    'id': conv.get('id'),
+                    'title': conv.get('title', 'New Conversation'),
+                    'messages': conv.get('messages', [])
+                }
+            })
+
+    # ID set but conversation not found - clear it
+    channel_instance.current_conversation_id = None
+    return jsonify({
+        'success': True,
+        'current_id': None,
+        'conversation': None
+    })
+
+@app.route('/conversation/rename', methods=['POST'])
+def rename_conversation():
+    """Rename a saved conversation."""
+    global channel_instance
+
+    if not channel_instance:
+        return jsonify({'success': False, 'error': 'Channel not available'})
+
+    data = request.get_json()
+    conv_id = data.get('id')
+    new_title = data.get('title', '').strip()
+
+    if not conv_id:
+        return jsonify({'success': False, 'error': 'No conversation ID provided'})
+
+    if not new_title:
+        return jsonify({'success': False, 'error': 'Title cannot be empty'})
+
+    for i, conv in enumerate(channel_instance.conversations):
+        if conv.get('id') == conv_id:
+            channel_instance.conversations[i]['title'] = new_title[:100]
+            channel_instance.conversations.save()
+            return jsonify({'success': True, 'title': new_title[:100]})
+
+    return jsonify({'success': False, 'error': 'Conversation not found'})
+
+@app.route('/conversation/delete', methods=['POST'])
+def delete_conversation():
+    """Delete a saved conversation."""
+    global channel_instance
+
+    if not channel_instance:
+        return jsonify({'success': False, 'error': 'Channel not available'})
+
+    conv_id = request.args.get('id') or request.get_json(silent=True).get('id')
+
+    if not conv_id:
+        return jsonify({'success': False, 'error': 'No conversation ID provided'})
+
+    for i, conv in enumerate(channel_instance.conversations):
+        if conv.get('id') == conv_id:
+            del channel_instance.conversations[i]
+            channel_instance.conversations.save()
+            return jsonify({'success': True})
 
     return jsonify({'success': False, 'error': 'Conversation not found'})
 

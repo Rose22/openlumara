@@ -354,6 +354,8 @@ class APIClient():
                                 yield word
                     except Exception as e:
                         core.log_error(f"error while handling tool calls", e)
+                        if self.manager.channel:
+                            await self.manager.channel.announce(f"error while handling tool calls: {e}", "error")
 
             if token_usage is None:
                 # fall back to tokenizer for context length counting
