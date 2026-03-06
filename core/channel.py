@@ -218,10 +218,11 @@ class Channel:
 
     async def send_stream(self, role: str, message: str, **kwargs):
         """sends a message to the AI from within the current channel, streaming version"""
-        if len(self.manager.API._messages) >= 2:
-            self.manager.API._messages.pop()
-            self.manager.API._messages.pop()
-            self._last_cmd_was_temporary = False
+        if self._last_cmd_was_temporary:
+            if len(self.manager.API._messages) >= 2:
+                self.manager.API._messages.pop()
+                self.manager.API._messages.pop()
+                self._last_cmd_was_temporary = False
 
         cmd = await self._process_input(message)
         if cmd:
