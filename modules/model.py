@@ -25,9 +25,9 @@ class Model(core.module.Module):
 
         match args[0]:
             case "switch":
-                if len(args) == 0:
+                if len(args) < 2:
                     return "please provide a model to switch to"
-                return await self.switch(args[1].strip())
+                return await self.switch(args[2].strip())
             case "list":
                 return model_list
             case _:
