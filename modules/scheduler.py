@@ -124,6 +124,7 @@ class Scheduler(core.module.Module):
 
     def _advance_to_next_weekday(self, candidate: datetime.datetime) -> datetime.datetime:
         """Advances datetime to next valid weekday (Mon-Fri)."""
+        candidate += datetime.timedelta(days=1)
         while candidate.weekday() >= 5:  # Saturday=5, Sunday=6
             candidate += datetime.timedelta(days=1)
         return candidate
