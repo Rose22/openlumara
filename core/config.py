@@ -24,6 +24,7 @@ default_config = {
 }
 
 default_modules = (
+    "identity",
     "module",
     "model",
     "memory",
