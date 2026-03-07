@@ -85,7 +85,7 @@ class Webui(core.channel.Channel):
         self.main_loop = None
 
         # Storage for saved conversations (frontend metadata only)
-        self.conversations = core.storage.StorageList("conversations", "json")
+        self.conversations = core.storage.StorageList("conversations", "msgpack")
 
         # Track currently active conversation
         self.current_conversation_id = None
