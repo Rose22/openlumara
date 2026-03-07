@@ -416,7 +416,7 @@ def upload_file():
 # =============================================================================
 @app.route('/conversations')
 def list_conversations():
-    """List all saved conversations."""
+    """List all saved conversations with message content for searching."""
     global channel_instance
 
     if not channel_instance:
@@ -424,12 +424,24 @@ def list_conversations():
 
     conversations = []
     for conv in channel_instance.conversations:
+        # Include up to the first 5 messages for preview/search
+        # Truncate each message to 500 chars to keep response small
+        messages_preview = []
+        for msg in conv.get('messages', [])[:5]:
+            content = msg.get('content', '')
+            if content:
+                messages_preview.append({
+                    'role': msg.get('role'),
+                    'content': content[:500]
+                })
+
         conversations.append({
             'id': conv.get('id'),
             'title': conv.get('title', 'New Conversation'),
             'created': conv.get('created'),
             'updated': conv.get('updated'),
-            'message_count': len(conv.get('messages', []))
+            'message_count': len(conv.get('messages', [])),
+            'messages': messages_preview  # Added for search
         })
 
     conversations.sort(key=lambda x: x.get('updated', ''), reverse=True)

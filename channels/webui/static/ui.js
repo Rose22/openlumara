@@ -28,6 +28,8 @@ let editingIndex = null;
 // Search state
 let searchQuery = '';
 let searchResults = [];
+let allConversations = [];
+let searchInContent = false;
 
 // Polling cleanup
 let pollIntervalId = null;
@@ -45,7 +47,6 @@ const statusDot = document.getElementById('status');
 const dropOverlay = document.getElementById('drop-overlay');
 const sidebar = document.getElementById('sidebar');
 const sidebarOverlay = document.getElementById('sidebar-overlay');
-let allConversations = [];
 
 // =============================================================================
 // Configuration
@@ -789,7 +790,7 @@ async function restoreCurrentConversation() {
 }
 
 function renderConversationList(conversations) {
-    allConversations = conversations; // Store for filtering
+    allConversations = conversations;
 
     const list = document.getElementById('conv-list');
     const searchInput = document.getElementById('conv-search');
@@ -809,6 +810,11 @@ function renderConversationList(conversations) {
     conversations.forEach(conv => {
         const item = document.createElement('div');
         item.className = 'conv-item' + (conv.id === currentConversationId ? ' active' : '');
+
+        // Store conversation data on the element for easy access during filtering
+        item.dataset.convId = conv.id;
+        item.dataset.convData = JSON.stringify(conv);
+
         item.onclick = () => loadConversation(conv.id);
 
         const title = document.createElement('div');
@@ -850,35 +856,145 @@ function renderConversationList(conversations) {
         list.appendChild(item);
     });
 
-    // Re-apply any active search filter
+    // Re-apply filter after render
     if (currentSearchQuery) {
         filterConversations(currentSearchQuery);
     }
+}
+
+// =============================================================================
+// Conversation Search/Filter
+// =============================================================================
+
+function toggleSearchMode() {
+    searchInContent = !searchInContent;
+
+    const toggleBtn = document.getElementById('search-toggle');
+    const searchInput = document.getElementById('conv-search');
+
+    if (searchInContent) {
+        toggleBtn.classList.add('active');
+        toggleBtn.setAttribute('aria-pressed', 'true');
+        toggleBtn.title = 'Search in content (enabled)';
+    } else {
+        toggleBtn.classList.remove('active');
+        toggleBtn.setAttribute('aria-pressed', 'false');
+        toggleBtn.title = 'Search in content (disabled)';
+    }
+
+    // Re-run filter with current query
+    const currentQuery = searchInput ? searchInput.value : '';
+    filterConversations(currentQuery);
 }
 
 function filterConversations(query) {
     const searchQuery = (query || '').toLowerCase().trim();
     const items = document.querySelectorAll('.conv-item');
 
+    // Clear all snippets and visibility states first
+    items.forEach(item => {
+        const existingSnippet = item.querySelector('.conv-snippet');
+        if (existingSnippet) {
+            existingSnippet.remove();
+        }
+        item.classList.remove('hidden-by-search');
+    });
+
+    // Show all when search is empty
     if (!searchQuery) {
-        // Show all conversations when search is empty
-        items.forEach(item => {
-            item.classList.remove('hidden-by-search');
-        });
         return;
     }
 
     items.forEach(item => {
-        const title = item.querySelector('.conv-item-title');
-        const titleText = title ? title.textContent.toLowerCase() : '';
+        const titleEl = item.querySelector('.conv-item-title');
+        const titleText = titleEl ? titleEl.textContent.toLowerCase() : '';
 
-        if (titleText.includes(searchQuery)) {
-            item.classList.remove('hidden-by-search');
-        } else {
+        // Get conversation data from dataset
+        let convData = null;
+        try {
+            convData = JSON.parse(item.dataset.convData || 'null');
+        } catch (e) {
+            convData = null;
+        }
+
+        let matchesTitle = titleText.includes(searchQuery);
+        let matchSnippet = null;
+
+        // If content search is enabled, also search in messages
+        if (searchInContent && convData && convData.messages) {
+            for (const msg of convData.messages) {
+                const content = (msg.content || '').toLowerCase();
+                if (content.includes(searchQuery)) {
+                    matchSnippet = extractSnippet(msg.content, searchQuery, 60);
+                    break; // Use first match
+                }
+            }
+        }
+
+        const isVisible = matchesTitle || matchSnippet;
+
+        if (!isVisible) {
             item.classList.add('hidden-by-search');
+        } else if (matchSnippet && searchInContent) {
+            // Add snippet after the meta element
+            const metaEl = item.querySelector('.conv-item-meta');
+            if (metaEl && !item.querySelector('.conv-snippet')) {
+                const snippetEl = document.createElement('div');
+                snippetEl.className = 'conv-snippet';
+                snippetEl.innerHTML = matchSnippet;
+                // Insert after meta
+                metaEl.insertAdjacentElement('afterend', snippetEl);
+            }
         }
     });
 }
+
+function extractSnippet(content, query, maxLength) {
+    if (!content) return '';
+
+    const lowerContent = content.toLowerCase();
+    const queryLower = query.toLowerCase();
+    const matchIndex = lowerContent.indexOf(queryLower);
+
+    if (matchIndex === -1) return '';
+
+    // Calculate snippet boundaries
+    const contextChars = Math.floor((maxLength - query.length) / 2);
+    let start = Math.max(0, matchIndex - contextChars);
+    let end = Math.min(content.length, matchIndex + query.length + contextChars);
+
+    // Adjust to not cut words
+    if (start > 0) {
+        const spaceIndex = content.lastIndexOf(' ', start);
+        if (spaceIndex > matchIndex - contextChars - 10) {
+            start = spaceIndex + 1;
+        }
+    }
+    if (end < content.length) {
+        const spaceIndex = content.indexOf(' ', end);
+        if (spaceIndex !== -1 && spaceIndex < end + 10) {
+            end = spaceIndex;
+        }
+    }
+
+    let snippet = content.substring(start, end);
+
+    // Add ellipsis
+    if (start > 0) snippet = '...' + snippet;
+    if (end < content.length) snippet = snippet + '...';
+
+    // Escape HTML and highlight match
+    snippet = escapeHtml(snippet);
+    const regex = new RegExp(`(${escapeRegex(query)})`, 'gi');
+    snippet = snippet.replace(regex, '<mark>$1</mark>');
+
+    return snippet;
+}
+
+function escapeRegex(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\$&');
+}
+
 
 function formatDate(timestamp) {
     if (!timestamp) return '';

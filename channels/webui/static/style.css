@@ -276,10 +276,13 @@ html, body {
 .sidebar-search {
     padding: 8px 12px;
     border-bottom: 1px solid var(--border-sidebar);
+    display: flex;
+    gap: 8px;
+    align-items: center;
 }
 
 .sidebar-search-input {
-    width: 100%;
+    flex: 1;
     padding: 10px 14px;
     background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
@@ -299,8 +302,60 @@ html, body {
     color: var(--text-muted);
 }
 
+.search-toggle {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.search-toggle:hover {
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    border-color: var(--border-color);
+}
+
+.search-toggle.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg-primary);
+}
+
+.search-toggle.active:hover {
+    filter: brightness(1.1);
+}
+
 .conv-item.hidden-by-search {
     display: none;
+}
+
+.conv-snippet {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+    padding: 6px 8px;
+    background: var(--bg-primary);
+    border-radius: var(--radius-sm);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border-left: 2px solid var(--accent);
+}
+
+.conv-snippet mark {
+    background: var(--accent);
+    color: var(--bg-primary);
+    padding: 0 2px;
+    border-radius: 2px;
 }
 
 /* ==========================================================================
