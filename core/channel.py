@@ -50,10 +50,11 @@ class Channel:
         """processes user input and detects special commands that control opticlaw"""
         message = message.strip().lower()
         cmd_prefix = core.config.get("cmd_prefix", "/")
+        cmd_prefix_index = message.find(cmd_prefix)+len(cmd_prefix)
         if not message.startswith(cmd_prefix):
             return None
 
-        cmd = message.split(cmd_prefix)[1].split()
+        cmd = message[cmd_prefix_index:].split()
         args = cmd[1:]
 
         match cmd[0]:
