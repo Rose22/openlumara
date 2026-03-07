@@ -105,11 +105,15 @@ class Channel:
                 if not args:
                     display_list = []
                     for key, value in core.config.config.items():
-                        if not isinstance(value, list):
-                            if "_key" in key or "_token" in key:
-                                value = "******"
+                        if isinstance(value, list):
+                            continue
+                        elif isinstance(value, bool):
+                            value = "on" if value else "off"
+                        elif "_key" in key or "_token" in key:
+                            value = "******"
 
-                            display_list.append(f"{key}: {value}")
+                        display_list.append(f"{key}: {value}")
+
                     return "\n".join(display_list)
 
                 key = args[0].lower()
@@ -118,7 +122,10 @@ class Channel:
 
                 if len(args) < 2:
                     # show value
-                    return core.config.get(key)
+                    value = core.config.get(key)
+                    if isinstance(value, bool):
+                        value = "on" if value else "off"
+                    return value
                 else:
                     if key in ("api_url", "api_key"):
                         return "it is unsafe to modify API settings while opticlaw is running. please manually edit the config file."
