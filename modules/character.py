@@ -49,7 +49,7 @@ class Character(core.module.Module):
 
         user_name = self.user_profile.get("name", "User")
 
-        character_text += f"\nWrite your replies as {character_name} in a chat between {character_name} and {user_name}."
+        character_text += f"\nWrite your replies as {character_name} in a chat between {character_name} and {user_name}. Keep your replies short and concise, at most 2 paragraphs."
 
         user_profile = ""
         if self.user_profile:

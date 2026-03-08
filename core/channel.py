@@ -20,6 +20,7 @@ class Channel:
 == built in commands ==
 /new                    start a new session (clears context window)
 /clear                  same as /new
+/undo                   deletes one turn in conversation history
 /sysprompt              show current system prompt
 /prompts                show which modules are injecting prompts into the system prompt
 /context                show current context window
@@ -55,8 +56,18 @@ class Channel:
         message = message.strip().lower()
         cmd_prefix = core.config.get("cmd_prefix", "/")
         cmd_prefix_index = message.find(cmd_prefix)+len(cmd_prefix)
+
+        # why not lol
+        if message.startswith("STOP"):
+            await self.manager.API.cancel()
+            return "stopped!"
+
         if not message.startswith(cmd_prefix):
             return None
+
+        # always use temporary commands if tools are turned off. command output being seen by the AI is not useful and usually not wanted in that case
+        if not core.config.get("tools"):
+            self._last_cmd_was_temporary = True
 
         cmd = message[cmd_prefix_index:].split()
         args = cmd[1:]
@@ -69,6 +80,11 @@ class Channel:
                 # alias for "new"
                 self.manager.API._messages = []
                 return "New session started."
+            case "undo":
+                self.manager.API._messages.pop()
+                self.manager.API._messages.pop()
+                self._last_cmd_was_temporary = True
+                return "Turn undone."
             case "help":
                 return await self._get_help()
             case "status":
