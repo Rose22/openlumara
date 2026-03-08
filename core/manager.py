@@ -307,27 +307,27 @@ class Manager:
             del(func_params["self"])
 
             func_params_translated = {}
+            required_args = []
             # add method arguments (parameters) to the tool call object
             for param_name, param in func_params.items():
-                # translate parameter type name to the correct format
-                param_split = str(param).split(":")
-                param_name = param_split[0].strip()
-                param_type = "str"
-                if len(param_split) > 1:
-                    param_type = param_split[1].split()[0].strip()
+                # detect the type of a parameter
+                param_annotation = param.annotation
+                if param_annotation == inspect.Parameter.empty:
+                    param_type = "string"
+                elif param_annotation == str:
+                    param_type = "string"
+                elif param_annotation == int:
+                    param_type = "integer"
+                elif param_annotation == bool:
+                    param_type = "boolean"
+                elif param_annotation == list:
+                    param_type = "array"
+                elif param_annotation == dict:
+                    param_type = "object"
 
-                param_type_map = {
-                    "str": "string",
-                    "int": "integer",
-                    "list": "array",
-                    "dict": "object",
-                    "bool": "boolean"
-                    # TODO: support more types
-                }
-
-                for word, replacement in param_type_map.items():
-                    if param_type == word:
-                        param_type = replacement
+                # add params without a default value to the required params list
+                if param.default == inspect.Parameter.empty:
+                    required_args.append(param_name)
 
                 func_params_translated[param_name] = {"type": param_type, "description": param_descriptions.get(param_name)}
 
@@ -340,13 +340,13 @@ class Manager:
                     "parameters": {
                         "type": "object",
                         "properties": func_params_translated,
-                        #"required": [key for key in func_params.keys()],
-                        "required": [],
+                        "required": required_args,
                         "additionalProperties": False,
                     },
-                    "strict": False,
+                    "strict": True,
                 },
             }
+            print(json.dumps(tool, indent=2))
 
             self.tools.append(tool)
 
@@ -358,21 +358,32 @@ class Manager:
 
         for tool_call in tool_calls:
             tool_call_dict = tool_call.to_dict()
-
-            # Fix broken JSON arguments (this was a pain..)
             raw_args = tool_call_dict['function']['arguments']
-            try:
-                modified_args = json_repair.loads(raw_args)
-            except:
+
+            # handle both string and dict arguments
+            if isinstance(raw_args, dict):
+                # sometimes a model returns a dict, so use it as-is
+                modified_args = raw_args
+            elif isinstance(raw_args, str):
+                # attempt to repair json
+                try:
+                    modified_args = json_repair.loads(raw_args)
+                except Exception as e:
+                    core.log("error", f"JSON repair failed: {e}")
+                    modified_args = {}
+            else:
+                core.log("error", f"unexpected arguments type: {type(raw_args)}")
                 modified_args = {}
 
-            # handle faulty or empty args
+            # validate arguments
             if not isinstance(modified_args, dict):
+                core.log("error", f"Arguments not a dict: {modified_args}")
                 modified_args = {}
 
+            # ensure args is a string
             tool_call_dict['function']['arguments'] = json.dumps(modified_args)
 
-            repaired_tool_calls.append(tool_call_dict)
+        repaired_tool_calls.append(tool_call_dict)
 
         # Add fixed tool calls to the context
         self.API._messages.append({
