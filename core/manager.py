@@ -356,8 +356,9 @@ class Manager:
         repaired_tool_calls = []
 
         for tool_call in tool_calls:
-            tool_call_dict = tool_call.to_dict()
-            raw_args = tool_call_dict['function']['arguments']
+            if not isinstance(tool_call, dict):
+                tool_call = tool_call.model_dump(warnings=False)
+            raw_args = tool_call['function']['arguments']
 
             # handle both string and dict arguments
             if isinstance(raw_args, dict):
@@ -380,9 +381,9 @@ class Manager:
                 modified_args = {}
 
             # ensure args is a string
-            tool_call_dict['function']['arguments'] = json.dumps(modified_args)
+            tool_call['function']['arguments'] = json.dumps(modified_args)
 
-        repaired_tool_calls.append(tool_call_dict)
+            repaired_tool_calls.append(tool_call)
 
         # Add fixed tool calls to the context
         self.API._messages.append({
