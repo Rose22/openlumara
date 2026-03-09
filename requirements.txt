@@ -4,6 +4,7 @@ prompt_toolkit
 msgpack
 pyyaml
 json_repair
+aiofiles
 python-ulid
 requests
 flask
