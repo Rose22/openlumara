@@ -87,7 +87,7 @@ class APIClient():
         """trims context to keep token consumption low"""
 
         if not max_messages:
-            max_messages = core.config.get("max_messages", 20)
+            max_messages = core.config.get("max_messages", 200)
         if not max_tokens:
             # TODO: find a way to get max tokens. also count tokens instead of words
             max_tokens = core.config.get("max_context", 8192)
@@ -98,15 +98,20 @@ class APIClient():
 
         request_too_big = False
         context_trimmed = False
-        message_count_exceeded = (len(self._messages) >= max_messages)
         tokens_exceeded = (num_tokens >= max_tokens)
+        message_count_exceeded = (len(self._messages) >= max_messages)
+        num_tokens = self.count_tokens_local(self._messages)
+
         # need to recalculate it cuz this is a while loop
         while len(self._messages) >= max_messages or num_tokens >= max_tokens:
+            self._messages.pop(0)
             if not self._messages:
                 request_too_big = True
                 # we've exhausted all messages. handle it later in this function
                 break
-            self._messages.pop(0)
+
+            # keep recalculating tokens
+            num_tokens = self.count_tokens_local(self._messages)
 
         if self.manager.channel:
             if request_too_big:
