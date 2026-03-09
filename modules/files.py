@@ -29,7 +29,7 @@ def sizeof_format(num, suffix="B"):
         num /= 1024.0
     return f"{num:.1f}Yi{suffix}"
 
-class File(core.module.Module):
+class Files(core.module.Module):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.sandbox_path = os.path.realpath(os.path.expanduser(core.config.get("sandbox_folder")))
