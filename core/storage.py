@@ -232,7 +232,7 @@ class StorageText:
         self._data = ""
 
         self.path = core.get_path(os.path.join(data_dir, file_path))
-        if not os.path.exists(self.path):
+        if os.path.exists(self.path):
             self.load()
         else:
             self.save()
