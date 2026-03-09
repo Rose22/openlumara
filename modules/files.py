@@ -3,6 +3,7 @@ import os
 import sys
 import asyncio
 import aiofiles
+import urllib
 import shutil
 import datetime
 
@@ -28,11 +29,13 @@ def sizeof_format(num, suffix="B"):
         num /= 1024.0
     return f"{num:.1f}Yi{suffix}"
 
-class Files(core.module.Module):
+class File(core.module.Module):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.sandbox_path = os.path.realpath(os.path.expanduser(core.config.get("sandbox_folder")))
         self.trash_path = os.path.realpath(os.path.join(core.get_data_path(), "trash"))
+
+        self.max_file_size = 100 * 1024 * 1024  # 100MB
 
         if not os.path.exists(self.sandbox_path):
             os.makedirs(self.sandbox_path, exist_ok=True)
@@ -49,8 +52,23 @@ class Files(core.module.Module):
         path = self._strip_sandbox_path(path)
 
         # basic path traversal prevention
-        if ".." in path.split(os.path.sep):
+        decoded = path
+        for _ in range(3):  # Handle double/triple encoding
+            decoded = urllib.parse.unquote(decoded)
+
+        if ".." in decoded or "\x00" in decoded:
             raise ValueError("Path traversal is not allowed")
+
+        # block symlink paths
+        if hasattr(os, 'O_NOFOLLOW'):
+            # check if any component is a symlink
+            parts = path.split(os.path.sep)
+            for i, part in enumerate(parts):
+                if i == 0:
+                    continue  # Skip root
+                test_path = os.path.join(self.sandbox_path, *parts[:i])
+                if os.path.islink(test_path):
+                    raise ValueError("Symlinks are not allowed inside the sandbox")
 
         # normalize path
         path = os.path.normpath(path)
@@ -135,10 +153,8 @@ class Files(core.module.Module):
 
         await self.manager.channel.announce(f"backing up {path}..")
 
-        timestamp = datetime.datetime.now().strftime("%d%M%Y%H%M%S")
-        def syncopy(safe_path):
-            shutil.copy(safe_path, f"{safe_path}.{timestamp}.old")
-        _run_sync(syncopy(safe_path))
+        timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+        await _run_sync(shutil.copy, safe_path, f"{safe_path}.{timestamp}.old")
 
         return self.result(True)
 
@@ -150,12 +166,15 @@ class Files(core.module.Module):
 
         return self.result(True)
 
-    async def create_file(self, path: str, body: str) -> dict:
+    async def create(self, path: str, body: str) -> dict:
         """Create a file with your specified content. Use relative paths."""
         safe_path = self._get_sandbox_path(path)
 
         if os.path.exists(safe_path):
             return self.result(f"error: file already exists!", False)
+
+        if len(body) > self.max_file_size:
+            return self.result("error: file too large", False)
 
         try:
             # O_EXCL makes sure it wont overwrite
@@ -172,7 +191,7 @@ class Files(core.module.Module):
 
         return self.result(True)
 
-    async def read_file(self, path: str):
+    async def read(self, path: str):
         """Reads a file inside the sandbox. Use relative paths."""
         safe_path = self._get_sandbox_path(path)
         try:
@@ -191,9 +210,13 @@ class Files(core.module.Module):
         except Exception as e:
             return self.result(f"error: {e}")
 
-    async def write_file(self, path: str, body: str) -> dict:
+    async def write(self, path: str, body: str) -> dict:
         """Write to file inside the sandbox. Use relative paths. Always makes a backup for safety."""
         safe_path = self._get_sandbox_path(path)
+
+        if len(body) > self.max_file_size:
+            return self.result("error: file too large", False)
+
         await self.manager.channel.announce(f"writing to file {self._strip_sandbox_path(safe_path)}...")
 
         try:
@@ -220,12 +243,15 @@ class Files(core.module.Module):
         except Exception as e:
             return self.result(e, False)
 
-    async def append_to_file(self, path: str, body: str) -> dict:
+    async def append(self, path: str, body: str) -> dict:
         """Append to file inside the sandbox. Use relative paths. Always makes a backup for safety."""
         safe_path = self._get_sandbox_path(path)
 
         if not os.path.exists(safe_path):
             return self.result("file did not exist", False)
+
+        if len(body) > self.max_file_size:
+            return self.result("error: file too large", False)
 
         await self.manager.channel.announce(f"appending to file...")
 
@@ -247,7 +273,7 @@ class Files(core.module.Module):
         except Exception as e:
             return self.result(e, False)
 
-    async def move_file(self, src_path: str, target_path: str) -> dict:
+    async def move(self, src_path: str, target_path: str) -> dict:
         """Moves a file from src_path to target_path. Can also be used to rename files. Use relative paths."""
         src = self._get_sandbox_path(src_path)
         tgt = self._get_sandbox_path(target_path)
@@ -265,7 +291,7 @@ class Files(core.module.Module):
         except Exception as e:
             return self.result(e, False)
 
-    async def move_multiple_files(self, list_of_moves: list) -> dict:
+    async def move_multiple(self, list_of_moves: list) -> dict:
         """
         Moves multiple files from source to destination. Use relative paths!
         list_of_moves is structured as such:
@@ -287,9 +313,6 @@ class Files(core.module.Module):
         and so on
         """
 
-        def syncmove(src_path, tgt_path):
-            shutil.move(src_path, tgt_path)
-
         result = []
         for file_data in list_of_moves:
             # first, make a backup
@@ -301,7 +324,7 @@ class Files(core.module.Module):
             src_path = self._get_sandbox_path(file_data["source_path"])
             tgt_path = self._get_sandbox_path(file_data["target_path"])
             try:
-                _run_sync(syncmove(src_path, tgt_path))
+                await _run_sync(shutil.move, src_path, tgt_path)
                 output = "success"
             except Exception as e:
                 output = f"error: {e}"
@@ -313,7 +336,7 @@ class Files(core.module.Module):
 
         return self.result(result)
 
-    async def delete_file(self, path: str) -> dict:
+    async def delete(self, path: str) -> dict:
         """Moves a file to trash. Never outright deletes, for safety's sake"""
         safe_path = self._get_sandbox_path(path)
 
@@ -326,7 +349,7 @@ class Files(core.module.Module):
             if not os.path.exists(dest_path):
                 target = dest_path
             else:
-                timestamp = datetime.datetime.now().strftime("%d%M%Y%H%M%S")
+                timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
                 target = f"{dest_path}.{timestamp}"
 
             await _run_sync(shutil.move, safe_path, target)
