@@ -223,7 +223,7 @@ function renderAllMessages(messages, animate = false) {
     wrappers.forEach(wrapper => wrapper.remove());
 
     messages.forEach((msg) => {
-        const wrapper = createMessageElement(msg, msg.index, animate);  // Use msg.index
+        createMessageElement(msg, msg.index, animate);
     });
 
     scrollToBottom();
@@ -232,7 +232,18 @@ function renderAllMessages(messages, animate = false) {
 function createMessageElement(msg, index, animate = false) {
     const role = msg.role || 'user';
     const rawContent = msg.content || '';
+    const toolCalls = msg.tool_calls || null;
+    const toolCallId = msg.tool_call_id || null;
     const timestamp = msg.timestamp || formatTime();
+
+    // Handle tool response - find and update existing tool call
+    if (role === 'tool' && toolCallId) {
+        const existingWrapper = document.querySelector(`[data-tool-call-id="${toolCallId}"]`);
+        if (existingWrapper) {
+            updateToolCallWithResponse(existingWrapper, rawContent);
+            return existingWrapper.closest('.message-wrapper');
+        }
+    }
 
     const parsed = parseMessageContent(rawContent);
     const displayContent = parsed.displayContent || rawContent;
@@ -246,8 +257,12 @@ function createMessageElement(msg, index, animate = false) {
         wrapperClass = 'command_response';
         msgClass = 'command_response';
     } else if (role === 'tool') {
+        // Standalone tool response (no matching call found)
         wrapperClass = 'tool';
         msgClass = 'tool';
+    } else if (toolCalls && toolCalls.length > 0) {
+        wrapperClass = 'tool_call';
+        msgClass = 'tool_call';
     } else if (role === 'schedule') {
         wrapperClass = 'schedule';
         msgClass = 'schedule';
@@ -280,8 +295,11 @@ function createMessageElement(msg, index, animate = false) {
     // Render based on message type
     if (parsed.isAnnouncement) {
         msgDiv.innerHTML = escapeHtml(displayContent);
-    } else if (role === 'tool') {
-        msgDiv.innerHTML = renderToolMessage(rawContent);
+    } else if (role === 'tool' && !toolCallId) {
+        // Standalone tool response (no matching call)
+        msgDiv.innerHTML = renderStandaloneToolResponse(rawContent);
+    } else if (toolCalls && toolCalls.length > 0) {
+        msgDiv.innerHTML = renderToolCalls(toolCalls);
     } else if (role === 'schedule') {
         msgDiv.innerHTML = renderScheduleMessage(rawContent);
     } else if (parsed.isCommandOutput || wrapperClass === 'user_command') {
@@ -294,24 +312,31 @@ function createMessageElement(msg, index, animate = false) {
         highlightCode(msgDiv);
     }
 
-    const ts = document.createElement('span');
-    ts.className = 'timestamp';
+    const isToolMessage = toolCalls && toolCalls.length > 0;
 
-    if (wrapperClass === 'user' || wrapperClass === 'user_command') {
-        ts.classList.add('timestamp-right');
-    } else if (wrapperClass === 'ai' || wrapperClass === 'command_response') {
-        ts.classList.add('timestamp-left');
-    } else {
-        ts.classList.add('timestamp-center');
+    // Only add timestamp for non-tool messages
+    if (!isToolMessage) {
+        const ts = document.createElement('span');
+        ts.className = 'timestamp';
+
+        if (wrapperClass === 'user' || wrapperClass === 'user_command') {
+            ts.classList.add('timestamp-right');
+        } else if (wrapperClass === 'ai' || wrapperClass === 'command_response') {
+            ts.classList.add('timestamp-left');
+        } else {
+            ts.classList.add('timestamp-center');
+        }
+
+        ts.textContent = timestamp;
+        ts.innerHTML += ` <span class="index-badge">#${index}</span>`;
+
+        msgDiv.appendChild(ts);
     }
 
-    ts.textContent = timestamp;
-    ts.innerHTML += ` <span class="index-badge">#${index}</span>`;
-
-    msgDiv.appendChild(ts);
     wrapper.appendChild(msgDiv);
 
-    if (role === 'user' || role === 'assistant') {
+    // Only add action buttons for regular user/assistant messages, not tool messages
+    if ((role === 'user' || role === 'assistant') && !isToolMessage && !parsed.isAnnouncement && !parsed.isCommandOutput) {
         const actions = createActionButtons(role, index, displayContent);
         wrapper.appendChild(actions);
     }
@@ -375,46 +400,256 @@ function escapeHtml(text) {
 // Special Message Renderers
 // =============================================================================
 
-function renderToolMessage(content) {
-    let data;
-    try {
-        data = typeof content === 'string' ? JSON.parse(content) : content;
-    } catch (e) {
-        return `<pre>${escapeHtml(content)}</pre>`;
+function renderToolCalls(toolCalls) {
+    if (!toolCalls || toolCalls.length === 0) {
+        return '';
     }
 
-    const toolName = data.name || data.tool || data.function || 'Tool';
-    const status = data.status || data.result?.status || 'success';
-    const args = data.arguments || data.args || data.params || null;
-    const result = data.result || data.output || data.response || data;
+    let html = '';
 
-    const statusClass = status === 'error' ? 'error' : 'success';
-    const statusIcon = status === 'error'
-        ? `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`
-        : `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>`;
+    toolCalls.forEach((call, idx) => {
+        const func = call.function || call;
+        const toolName = func.name || 'Unknown Tool';
+        const argsRaw = func.arguments || '{}';
+        const callId = call.id || `tool-${Date.now()}-${idx}`;
 
-    let html = `
-        <div class="tool-header">
-            <svg class="tool-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
-            </svg>
-            <span class="tool-name">${escapeHtml(toolName)}</span>
-            <span class="tool-status ${statusClass}">${statusIcon} ${escapeHtml(status)}</span>
-        </div>
-    `;
+        let args = {};
+        try {
+            args = typeof argsRaw === 'string' ? JSON.parse(argsRaw) : argsRaw;
+        } catch (e) {
+            args = { raw: argsRaw };
+        }
 
-    if (args && Object.keys(args).length > 0) {
-        html += `<div class="tool-args"><strong>Arguments:</strong> ${escapeHtml(JSON.stringify(args))}</div>`;
-    }
+        const argEntries = Object.entries(args);
+        let headerExtraHtml = '';
 
-    /*
-    if (result) {
-        const resultStr = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
-        html += `<div class="tool-result"><pre>${escapeHtml(resultStr)}</pre></div>`;
-    }
-    */
+        // If only one argument, show it in the header
+        if (argEntries.length === 1) {
+            const [argName, argValue] = argEntries[0];
+            let displayValue = typeof argValue === 'object'
+                ? JSON.stringify(argValue)
+                : String(argValue);
+
+            if (displayValue.length > 50) {
+                displayValue = displayValue.substring(0, 50) + '...';
+            }
+            headerExtraHtml = `<span class="tool-call-inline-arg">${escapeHtml(displayValue)}</span>`;
+        } else if (argEntries.length > 1) {
+            // If multiple arguments, show count in a circle
+            headerExtraHtml = `<span class="tool-call-arg-count">${argEntries.length}</span>`;
+        }
+
+        html += `
+            <div class="tool-call-card collapsed" data-tool-call-id="${escapeHtml(callId)}">
+                <div class="tool-call-header" onclick="toggleToolCard(this)">
+                    <svg class="tool-call-toggle" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                    <svg class="tool-call-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+                    </svg>
+                    <span class="tool-call-name">${escapeHtml(toolName)}</span>
+                    ${headerExtraHtml}
+                    <span class="tool-call-status pending">calling...</span>
+                </div>
+                <div class="tool-call-body">
+                    <div class="tool-call-section">
+                        <div class="tool-call-section-title">Arguments</div>
+                        <div class="tool-call-args">
+        `;
+
+        if (argEntries.length > 0) {
+            argEntries.forEach(([argName, argValue]) => {
+                let displayValue = typeof argValue === 'object'
+                    ? JSON.stringify(argValue)
+                    : String(argValue);
+
+                if (displayValue.length > 50) {
+                    displayValue = displayValue.substring(0, 50) + '...';
+                }
+
+                html += `
+                    <div class="tool-call-arg-row">
+                        <span class="tool-call-arg-name">${escapeHtml(argName)}</span>
+                        <span class="tool-call-arg-value">${escapeHtml(displayValue)}</span>
+                    </div>
+                `;
+            });
+        } else {
+            html += `<div class="tool-call-no-args">No arguments</div>`;
+        }
+
+        html += `
+                        </div>
+                    </div>
+                    <div class="tool-call-section tool-response-section" style="display: none;">
+                        <div class="tool-call-section-title">Response</div>
+                        <div class="tool-response-content"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
 
     return html;
+}
+
+function toggleToolCard(headerElement) {
+    const card = headerElement.closest('.tool-call-card');
+    if (card) {
+        card.classList.toggle('collapsed');
+    }
+}
+
+function updateToolCallWithResponse(cardElement, responseContent) {
+    // Update status
+    const status = cardElement.querySelector('.tool-call-status');
+    if (status) {
+        status.classList.remove('pending');
+        status.classList.add('completed');
+        status.textContent = 'done';
+    }
+
+    // Show and populate response section
+    const responseSection = cardElement.querySelector('.tool-response-section');
+    const responseContentDiv = cardElement.querySelector('.tool-response-content');
+
+    if (responseSection && responseContentDiv) {
+        responseSection.style.display = 'block';
+        responseContentDiv.innerHTML = renderToolResponseContent(responseContent);
+    }
+}
+
+function renderToolResponseContent(content) {
+    let displayContent = content;
+    let isJson = false;
+    let parsedData = null;
+
+    try {
+        parsedData = JSON.parse(content);
+        isJson = true;
+    } catch (e) {
+        // Not JSON, use as-is
+    }
+
+    if (isJson && parsedData !== null) {
+        return renderJsonResponseCompact(parsedData);
+    }
+
+    // Truncate long plain text
+    if (displayContent.length > 500) {
+        displayContent = displayContent.substring(0, 500) + '...';
+    }
+
+    return `<div class="tool-response-string">${escapeHtml(displayContent)}</div>`;
+}
+
+function renderJsonResponseCompact(data) {
+    if (typeof data === 'string') {
+        try {
+            const inner = JSON.parse(data);
+            return renderJsonResponseCompact(inner);
+        } catch (e) {
+            let str = data;
+            if (str.length > 500) {
+                str = str.substring(0, 500) + '...';
+            }
+            return `<div class="tool-response-string">${escapeHtml(str)}</div>`;
+        }
+    }
+
+    if (Array.isArray(data)) {
+        if (data.length === 0) {
+            return `<div class="tool-response-empty">Empty array</div>`;
+        }
+
+        let html = `<div class="tool-response-header-compact">Array (${data.length} items)</div>`;
+        html += `<div class="tool-response-array-compact">`;
+        const maxItems = Math.min(data.length, 5);
+        for (let i = 0; i < maxItems; i++) {
+            const item = data[i];
+            html += `<div class="tool-response-item-compact">`;
+            html += `<span class="tool-response-item-index">[${i}]</span>`;
+            if (typeof item === 'object' && item !== null) {
+                html += renderJsonResponseCompact(item);
+            } else {
+                let strVal = String(item);
+                if (strVal.length > 80) strVal = strVal.substring(0, 80) + '...';
+                html += `<span class="tool-response-scalar">${escapeHtml(strVal)}</span>`;
+            }
+            html += `</div>`;
+        }
+        if (data.length > 5) {
+            html += `<div class="tool-response-more">+ ${data.length - 5} more items</div>`;
+        }
+        html += `</div>`;
+        return html;
+    }
+
+    if (typeof data === 'object' && data !== null) {
+        const entries = Object.entries(data);
+
+        if (entries.length === 0) {
+            return `<div class="tool-response-empty">Empty object</div>`;
+        }
+
+        let html = `<div class="tool-response-object-compact">`;
+        entries.forEach(([key, value]) => {
+            html += `<div class="tool-response-kv-compact">`;
+            html += `<span class="tool-response-key">${escapeHtml(key)}</span>`;
+            html += `<span class="tool-response-colon">:</span>`;
+
+            if (typeof value === 'object' && value !== null) {
+                html += renderJsonResponseCompact(value);
+            } else {
+                let strVal = String(value);
+                if (strVal.length > 100) strVal = strVal.substring(0, 100) + '...';
+                html += `<span class="tool-response-scalar">${escapeHtml(strVal)}</span>`;
+            }
+
+            html += `</div>`;
+        });
+        html += `</div>`;
+        return html;
+    }
+
+    // Primitive
+    let strVal = String(data);
+    if (strVal.length > 100) strVal = strVal.substring(0, 100) + '...';
+    return `<span class="tool-response-scalar">${escapeHtml(strVal)}</span>`;
+}
+
+function renderStandaloneToolResponse(content) {
+    // For tool responses without a matching call
+    const responseId = 'tool-res-' + Math.random().toString(36).substring(2, 9);
+
+    let preview = content;
+    if (preview.length > 80) {
+        preview = preview.substring(0, 80).replace(/\n/g, ' ') + '...';
+    }
+
+    return `
+        <div class="tool-call-card" id="${responseId}">
+            <div class="tool-call-header" onclick="toggleToolCard(this)">
+                <svg class="tool-call-toggle" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+                <svg class="tool-call-status-icon done" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span class="tool-call-name">Tool Response</span>
+                <span class="tool-call-status completed">done</span>
+            </div>
+            <div class="tool-call-body">
+                <div class="tool-call-section">
+                    <div class="tool-call-section-title">Response</div>
+                    <div class="tool-response-content">
+                        ${renderToolResponseContent(content)}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
 }
 
 function renderScheduleMessage(content) {
@@ -474,9 +709,7 @@ function renderScheduleMessage(content) {
 }
 
 function handleScheduleAction(type, id) {
-    // Handle schedule actions (cancel, snooze, etc.)
     console.log('Schedule action:', type, id);
-    // You can implement this to send requests to your backend
 }
 
 // =============================================================================
@@ -711,13 +944,24 @@ async function pollMessages() {
 
         if (data.messages && data.messages.length > 0) {
             for (const msg of data.messages) {
-                const parsed = parseMessageContent(msg.content);
+                const parsed = parseMessageContent(msg.content || '');
+                const hasToolCalls = msg.tool_calls && msg.tool_calls.length > 0;
+                const isToolResponse = msg.role === 'tool';
 
-                // During streaming, allow announcements and command-related messages through
+                // ✅ FIX: Always identify tool messages clearly
+                const isToolMessage = hasToolCalls || isToolResponse;
+                const isUserCommand = msg.role === 'user' && (msg.content || '').trim().startsWith('/');
+                const isCommandOutput = parsed.isCommandOutput;
+
+                // ✅ FIX: Relax the streaming filter.
+                // ONLY skip regular assistant text tokens during streaming if you want to avoid flicker.
+                // BUT NEVER skip tool calls or tool responses.
                 if (isStreaming && !parsed.isAnnouncement) {
-                    const isUserCommand = msg.role === 'user' && msg.content.trim().startsWith('/');
-                    const isCommandOutput = parsed.isCommandOutput;
-                    if (!isUserCommand && !isCommandOutput) continue;
+                    if (!isUserCommand && !isCommandOutput && !isToolMessage) {
+                        // Skip regular chat text during stream to avoid double-rendering
+                        // (since the stream handler renders tokens live)
+                        continue;
+                    }
                 }
 
                 // Show browser notification for announcements (always)
@@ -1499,7 +1743,7 @@ async function send() {
     if (!message) return;
 
     // Commands bypass the streaming lock entirely
-    if (message.trim().startsWith('/')) {
+    if (message.trim().startsWith('/') || message.trim().startsWith("STOP")) {
         clearInput();
         return sendCommand(message);
     }
@@ -1649,7 +1893,7 @@ function finishStream() {
 
 async function sendCommand(message) {
     try {
-        if (message.startsWith("/stop")) {
+        if (message.startsWith("/stop") || message.startsWith("STOP")) {
             // if the command was stop, dont await the response, just send it immediately
             const response = fetch('/send', {
                 method: 'POST',

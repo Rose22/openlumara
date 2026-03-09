@@ -57,8 +57,6 @@ class Model(core.module.Module):
         core.config.config.save()
 
         self.manager.API.set_model(found_id)
-        if self.manager.channel:
-            await self.manager.channel.announce(f"Model switched to {found_id}", "info")
 
-        return f"model has been set to {found_id}"
+        return f"model has been switched to {found_id}"
 

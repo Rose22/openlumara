@@ -138,11 +138,16 @@ class Webui(core.channel.Channel):
         for i, msg in enumerate(messages):
             role = msg.get('role', 'user')
             content = msg.get('content', '')
+            tool_calls = msg.get('tool_calls', None)
+            tool_call_id = msg.get('tool_call_id', None)
 
-            if content:
+            # Include messages with content OR tool_calls OR tool responses
+            if content or tool_calls or role == 'tool':
                 result.append({
                     'role': role,
                     'content': content,
+                    'tool_calls': tool_calls,
+                    'tool_call_id': tool_call_id,
                     'index': i
                 })
 
@@ -157,11 +162,16 @@ class Webui(core.channel.Channel):
             msg = messages[i]
             role = msg.get('role', 'user')
             content = msg.get('content', '')
+            tool_calls = msg.get('tool_calls', None)
+            tool_call_id = msg.get('tool_call_id', None)
 
-            if content:
+            # Include messages with content OR tool_calls OR tool responses
+            if content or tool_calls or role == 'tool':
                 result.append({
                     'role': role,
                     'content': content,
+                    'tool_calls': tool_calls,
+                    'tool_call_id': tool_call_id,
                     'index': i
                 })
 
@@ -174,15 +184,25 @@ class Webui(core.channel.Channel):
         for msg in messages:
             role = msg.get('role', 'user')
             content = msg.get('content', '')
+            tool_calls = msg.get('tool_calls')
+            tool_call_id = msg.get('tool_call_id')
 
             if role == 'ai':
                 role = 'assistant'
 
+            # Build the message dict dynamically
+            clean_msg = {'role': role}
+
             if content:
-                backend_messages.append({
-                    'role': role,
-                    'content': content
-                })
+                clean_msg['content'] = content
+
+            if tool_calls:
+                clean_msg['tool_calls'] = tool_calls
+
+            if tool_call_id:
+                clean_msg['tool_call_id'] = tool_call_id
+
+            backend_messages.append(clean_msg)
 
         self.manager.API.set_messages(backend_messages)
 

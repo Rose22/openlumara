@@ -57,31 +57,95 @@ class APIClient():
     def set_messages(self, messages: list):
         self._messages = messages
 
-    def _convert_message(self, role: str, content: str):
-        # Convert special roles to valid API roles with prefixes
-        if role.startswith('announce_'):
-            # announce_info, announce_error, announce_important, announce_schedule
-            ann_type = role[9:]  # 'announce_info' -> 'info'
-            content = f"[System {ann_type.title()}]: {content}"
-            role = 'user'
-        elif role == 'command':
-            # User commands stay as user role
-            role = 'user'
-        elif role == 'command_response':
-            # Command responses appear as assistant
-            content = f"[Command Output]: {content}"
-            role = 'user'
-        # i guess we just default to user for all of them, but im keeping this just in case
-        return {"role": role, "content": content}
+    def _insert_blank_user_msg(self):
+        if not self._messages:
+            return True
 
-    async def insert_message(self, role: str, content: str, num_tokens=None):
-        """inserts a message (dict with role and content) into context, trimming when needed"""
+        last_msg = self._messages[-1]
+        last_role = last_msg.get("role")
+
+        # Case 1: Last message was NOT an assistant.
+        if last_role != "assistant":
+            return True
+
+        # Case 2: Last message WAS an assistant. Check for tool_calls.
+        tool_calls = last_msg.get("tool_calls")
+
+        if tool_calls:
+            # CRITICAL: Do NOT insert a user message. 
+            # Sequence MUST be: Assistant(tool_call) -> Tool(result).
+            return True
+
+        # Case 3: Standard assistant text. Insert dummy user to break AA sequence.
+        self._messages.append({"role": "user", "content": "."})
+        return True
+
+    def _convert_message(self, role: str, content: str, tool_call_id: str = None):
+        # 1. Handle explicit Tool Roles first (Bypass turn-order logic)
+        if role == 'tool_output' or role == 'tool':
+            if not tool_call_id:
+                # Fallback or error handling if ID is missing
+                core.log("warning", "Tool output missing tool_call_id, attempting to find latest call")
+                # In a real fix, you should enforce this ID passing
+                pass 
+
+            return {
+                "role": "tool",
+                "content": content,
+                "tool_call_id": tool_call_id
+            }
+
+        # 2. Map Internal Roles
+        final_role = role
+        final_content = content
+
+        if role.startswith('announce_'):
+            ann_type = role[9:]
+            final_content = f"[System {ann_type.title()}]: {content}"
+            final_role = 'assistant'
+        elif role == 'command':
+            final_role = 'user'
+        elif role == 'command_response':
+            final_content = f"[Command Output]: {content}"
+            final_role = 'assistant'
+        elif role == 'system':
+            final_role = 'assistant'
+            final_content = f"[System]: {content}"
+
+        # 3. Enforce Turn Order ONLY for non-tool messages
+        if final_role == 'assistant':
+            self._insert_blank_user_msg()
+
+        return {"role": final_role, "content": final_content}
+
+    async def insert_message(self, role: str, content: str, num_tokens=None, raw_message: dict = None, tool_call_id: str = None):
+        """
+        Inserts a message into context.
+
+        Args:
+            role: Internal role (e.g., 'user', 'announce_info', 'tool_output')
+            content: Content string
+            num_tokens: Optional token count for trimming logic
+            raw_message: If provided, bypasses conversion and inserts this dict directly.
+            tool_call_id: Required if role is 'tool_output' to link back to the call
+        """
         if not core.config.get("context_window", False):
-            # allow completely turning off context
             return
 
         await self.trim_messages(num_tokens=num_tokens)
-        return self._messages.append(self._convert_message(role, content))
+
+        if raw_message:
+            # Direct insertion for complex objects (like assistant + tool_calls)
+            # We still need to check if this violates turn order if it's an assistant message
+            if raw_message.get("role") == "assistant":
+                self._insert_blank_user_msg()
+
+            self._messages.append(raw_message)
+        else:
+            # Standard conversion path - PASS tool_call_id HERE
+            self._messages.append(self._convert_message(role, content, tool_call_id=tool_call_id))
+
+        return self._messages
 
     async def trim_messages(self, max_messages: int = None, max_tokens: int = None, num_tokens: int = None):
         """trims context to keep token consumption low"""

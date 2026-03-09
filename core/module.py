@@ -1,6 +1,7 @@
 import core
 import re
 import inspect
+import json
 
 class Module:
     """Base class for modules/plugins"""
@@ -14,7 +15,7 @@ class Module:
         """unified way of returning tool results"""
         return {
             "status": "success" if success else "error",
-            "content": str(data)
+            "content": data
         }
 
     async def on_system_prompt(self):
