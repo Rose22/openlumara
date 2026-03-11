@@ -115,7 +115,7 @@ class ToolcallManager:
             return
 
         # Build context and stream response
-        context = await self.channel.context.get(system_prompt=True)
+        context = await self.channel.context.get(system_prompt=False)
         prompt = [
             {
                 "role": "system",
@@ -125,6 +125,8 @@ class ToolcallManager:
                 )
             }
         ] + context
+
+        print(json.dumps(prompt, indent=2))
 
         final_content = []
         had_recursive_call = False
