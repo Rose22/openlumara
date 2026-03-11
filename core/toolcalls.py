@@ -126,8 +126,6 @@ class ToolcallManager:
             }
         ] + context
 
-        print(json.dumps(prompt, indent=2))
-
         final_content = []
         had_recursive_call = False
 
