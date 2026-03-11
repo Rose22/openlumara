@@ -17,7 +17,8 @@ let isConnected = false;
 let reconnectAttempts = 0;
 let reconnectTimer = null;
 let lastMessageIndex = 0;
-let currentConversationId = null;
+let currentChatId = null;
+let userIsEditing = false;
 
 // Stream state
 let isStreaming = false;
@@ -27,10 +28,15 @@ let currentStreamId = null;
 let editingIndex = null;
 
 // Search state
+// Search state
 let searchQuery = '';
 let searchResults = [];
-let allConversations = [];
+let currentSearchIndex = -1;
+let originalMessageContents = new Map();
+let allChats = [];
 let searchInContent = false;
+let activeTagFilter = null;
+let allTags = [];
 
 // Polling cleanup
 let pollIntervalId = null;
@@ -860,7 +866,7 @@ function showAnnouncementNotification(content, type) {
 // Connection Status Messages
 // =============================================================================
 let statusMessageElement = null;
-let lastActiveConversationId = null;
+let lastActiveChatId = null;
 
 function showConnectionStatus(status) {
     const wrapper = document.createElement('div');
@@ -928,9 +934,9 @@ async function checkConnection() {
                 if (reconnectAttempts > 0) {
                     showConnectionStatus('reconnected');
 
-                    if (lastActiveConversationId) {
-                        await loadConversation(lastActiveConversationId);
-                        lastActiveConversationId = null;
+                    if (lastActiveChatId) {
+                        await loadChat(lastActiveChatId);
+                        lastActiveChatId = null;
                     } else {
                         await syncMessages();
                     }
@@ -954,7 +960,7 @@ function handleConnectionError() {
 
     if (wasConnected) {
         isConnected = false;
-        lastActiveConversationId = currentConversationId;
+        lastActiveChatId = currentChatId;
         updateConnectionStatus('disconnected');
         showConnectionStatus('disconnected');
     }
@@ -987,6 +993,7 @@ function scheduleReconnect() {
 
 async function pollMessages() {
     if (!isConnected) return;
+    if (userIsEditing) return;
 
     try {
         const response = await fetch('/messages/since?index=' + lastMessageIndex, {
@@ -1000,13 +1007,21 @@ async function pollMessages() {
 
         const data = await response.json();
 
-        // Check if backend switched conversations
-        if (data.current_conversation_id !== undefined) {
-            if (data.current_conversation_id !== currentConversationId) {
-                // Backend has a different current conversation - sync up
-                await restoreCurrentConversation();
-                await loadConversations();
+        // Check if backend switched chats
+        if (data.current_chat_id !== undefined) {
+            if (data.current_chat_id !== currentChatId) {
+                // Different chat - full reload
+                await restoreCurrentChat();
+                await loadChats();
                 return;
+            }
+
+            // Same chat but title/tags might have changed
+            if (data.current_chat_title !== undefined) {
+                updateChatTitleBar(
+                    data.current_chat_title,
+                    data.current_chat_tags || []
+                );
             }
         }
 
@@ -1076,363 +1091,629 @@ async function syncMessages() {
 }
 
 // =============================================================================
-// Conversations
+// Chats
 // =============================================================================
 
-async function loadConversations() {
+async function loadChats() {
     try {
-        const response = await fetch('/conversations');
-        const data = await response.json();
-        renderConversationList(data.conversations || []);
+        const [chatResponse, tagsResponse] = await Promise.all([
+            fetch('/chats'),
+            fetch('/chat/tags')
+        ]);
+
+        const chatData = await chatResponse.json();
+        const tagsData = await tagsResponse.json();
+
+        allTags = tagsData.tags || [];
+        renderTagFilter();
+        renderChatList(chatData.chats || []);
     } catch (e) {
-        console.error('Failed to load conversations:', e);
+        console.error('Failed to load chats:', e);
     }
 }
 
-async function restoreCurrentConversation() {
+async function restoreCurrentChat() {
     try {
-        const response = await fetch('/conversation/current');
+        const response = await fetch('/chat/current');
         const data = await response.json();
 
-        if (data.success && data.conversation && data.conversation.id) {
-            currentConversationId = data.conversation.id;
-            const messages = data.conversation.messages || [];
-            updateConversationTitleBar(data.conversation.title);
+        if (data.success && data.chat && data.chat.id) {
+            currentChatId = data.chat.id;
+            const messages = data.chat.messages || [];
+            const tags = data.chat.tags || [];
+
+            updateChatTitleBar(data.chat.title, tags);
 
             if (messages.length > 0) {
                 renderAllMessages(messages);
                 lastMessageIndex = messages.length;
             } else {
-                // Empty conversation - clear the chat
                 const wrappers = chat.querySelectorAll('.message-wrapper');
                 wrappers.forEach(wrapper => wrapper.remove());
                 lastMessageIndex = 0;
             }
         } else {
-            // No current conversation on backend
-            currentConversationId = null;
+            currentChatId = null;
             lastMessageIndex = 0;
             const wrappers = chat.querySelectorAll('.message-wrapper');
             wrappers.forEach(wrapper => wrapper.remove());
-            updateConversationTitleBar(null);
+            updateChatTitleBar(null);
         }
     } catch (e) {
-        console.error('Failed to restore current conversation:', e);
-        currentConversationId = null;
-        updateConversationTitleBar(null);
+        console.error('Failed to restore current chat:', e);
+        currentChatId = null;
+        updateChatTitleBar(null);
     }
 }
 
-async function getCurrentConversationId() {
+async function getCurrentChatId() {
     try {
-        const response = await fetch('/conversation/current');
+        const response = await fetch('/chat/current');
         const data = await response.json();
 
-        if (data.success && data.conversation && data.conversation.id) {
-            currentConversationId = data.conversation.id;
-            return data.conversation.id;
+        if (data.success && data.chat && data.chat.id) {
+            currentChatId = data.chat.id;
+            return data.chat.id;
         }
         return null;
     } catch (e) {
-        console.error('Failed to get current conversation ID:', e);
+        console.error('Failed to get current chat ID:', e);
         return null;
     }
 }
 
-function renderConversationList(conversations) {
-    allConversations = conversations;
+function renderChatList(chats) {
+    allChats = chats;
 
-    const list = document.getElementById('conv-list');
-    const searchInput = document.getElementById('conv-search');
+    const list = document.getElementById('chat-list');
+    const searchInput = document.getElementById('chat-search');
     const currentSearchQuery = searchInput ? searchInput.value : '';
 
     list.innerHTML = '';
 
-    if (conversations.length === 0) {
+    if (chats.length === 0) {
         const emptyMsg = document.createElement('div');
-        emptyMsg.className = 'conv-empty';
-        emptyMsg.textContent = 'No conversations yet';
+        emptyMsg.className = 'chat-empty';
+        emptyMsg.textContent = 'No chats yet';
         emptyMsg.style.cssText = 'padding: 20px; text-align: center; color: var(--text-muted); font-size: 0.85rem;';
         list.appendChild(emptyMsg);
         return;
     }
 
-    conversations.forEach(conv => {
+    chats.forEach(chat => {
         const item = document.createElement('div');
-        item.className = 'conv-item' + (conv.id === currentConversationId ? ' active' : '');
+        item.className = 'chat-item' + (chat.id === currentChatId ? ' active' : '');
 
-        item.dataset.convId = conv.id;
-        item.dataset.convData = JSON.stringify(conv);
+        item.dataset.chatId = chat.id;
+        item.dataset.chatData = JSON.stringify(chat);
 
-        item.onclick = () => loadConversation(conv.id);
-
-        const title = document.createElement('div');
-        title.className = 'conv-item-title';
-        title.textContent = conv.title || 'New Conversation';
-
-        const meta = document.createElement('div');
-        meta.className = 'conv-item-meta';
-
-        const date = document.createElement('span');
-        date.textContent = formatDate(conv.updated || conv.created);
-
-        const actions = document.createElement('div');
-        actions.className = 'conv-item-actions';
-
-        // Only delete button, no rename
-        const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'conv-action-btn delete';
-        deleteBtn.textContent = 'Delete';
-        deleteBtn.onclick = (e) => {
-            e.stopPropagation();
-            deleteConversation(conv.id);
+        item.onclick = (e) => {
+            // Don't trigger load if clicking on action buttons or editing
+            if (e.target.closest('.chat-item-actions') ||
+                e.target.closest('.inline-rename-container')) {
+                return;
+                }
+                loadChat(chat.id);
         };
 
+        const title = document.createElement('div');
+        title.className = 'chat-item-title';
+        title.textContent = chat.title || 'New chat';
+
+        // Tags container
+        const tagsContainer = document.createElement('div');
+        tagsContainer.className = 'chat-tags';
+
+        const tags = chat.tags || [];
+        tags.slice(0, 3).forEach(tag => {
+            const tagEl = document.createElement('span');
+            tagEl.className = 'chat-tag';
+            tagEl.textContent = tag;
+            tagsContainer.appendChild(tagEl);
+        });
+
+        if (tags.length > 3) {
+            const moreEl = document.createElement('span');
+            moreEl.className = 'chat-tag';
+            moreEl.textContent = `+${tags.length - 3}`;
+            tagsContainer.appendChild(moreEl);
+        }
+
+        const meta = document.createElement('div');
+        meta.className = 'chat-item-meta';
+
+        const date = document.createElement('span');
+        date.textContent = formatDate(chat.updated || chat.created);
+
+        const actions = document.createElement('div');
+        actions.className = 'chat-item-actions';
+
+        const editBtn = document.createElement('button');
+        editBtn.className = 'chat-action-btn edit';
+        editBtn.innerHTML = ICONS.edit;
+        editBtn.setAttribute('aria-label', 'Rename');
+        editBtn.setAttribute('title', 'Rename');
+        editBtn.onclick = (e) => {
+            e.stopPropagation();
+            renameChat(chat.id, chat.title || 'New chat');
+        };
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'chat-action-btn delete';
+        deleteBtn.innerHTML = ICONS.trash;
+        deleteBtn.setAttribute('aria-label', 'Delete');
+        deleteBtn.setAttribute('title', 'Delete');
+        deleteBtn.onclick = (e) => {
+            e.stopPropagation();
+            if (confirm('Delete this chat?')) {
+                deleteChat(chat.id);
+            }
+        };
+
+        actions.appendChild(editBtn);
         actions.appendChild(deleteBtn);
         meta.appendChild(date);
         meta.appendChild(actions);
 
         item.appendChild(title);
+        if (tags.length > 0) {
+            item.appendChild(tagsContainer);
+        }
         item.appendChild(meta);
         list.appendChild(item);
     });
 
+    // Apply active tag filter
+    if (activeTagFilter) {
+        filterChatsByTag();
+    }
+
+    // Apply text search if active
     if (currentSearchQuery) {
-        filterConversations(currentSearchQuery);
+        filterChats(currentSearchQuery);
     }
 }
 
-async function newConversation() {
+
+async function newChat() {
     if (isStreaming) {
         return;
     }
 
     try {
-        const response = await fetch('/conversation/new', {
+        const response = await fetch('/chat/new', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title: 'New Conversation' })
+            body: JSON.stringify({ title: 'New chat' })
         });
 
         const data = await response.json();
 
-        if (data.success && data.conversation) {
-            currentConversationId = data.conversation.id;
+        if (data.success && data.chat) {
+            currentChatId = data.chat.id;
             lastMessageIndex = 0;
 
-            updateConversationTitleBar(data.conversation.title);
+            updateChatTitleBar(data.chat.title);
 
             const wrappers = chat.querySelectorAll('.message-wrapper');
             wrappers.forEach(wrapper => wrapper.remove());
 
-            await loadConversations();
+            await loadChats();
             closeSidebar();
         }
     } catch (e) {
-        console.error('Failed to create new conversation:', e);
+        console.error('Failed to create new chat:', e);
     }
 }
 
 
-// Internal helper to load a conversation without closing the sidebar
-async function loadConversationInternal(convId, cachedMessages = null) {
+// Internal helper to load a chat without closing the sidebar
+async function loadChatInternal(chatId, cachedMessages = null) {
     try {
         // Use cached messages if available (avoids extra fetch)
         if (cachedMessages) {
-            currentConversationId = convId;
+            currentChatId = chatId;
             renderAllMessages(cachedMessages);
             lastMessageIndex = cachedMessages.length;
             return;
         }
 
-        const response = await fetch('/conversation/load?id=' + convId);
+        const response = await fetch('/chat/load?id=' + chatId);
         const data = await response.json();
 
-        if (data.success && data.conversation) {
-            currentConversationId = convId;
-            renderAllMessages(data.conversation.messages || []);
-            lastMessageIndex = (data.conversation.messages || []).length;
+        if (data.success && data.chat) {
+            currentChatId = chatId;
+            renderAllMessages(data.chat.messages || []);
+            lastMessageIndex = (data.chat.messages || []).length;
         }
     } catch (e) {
-        console.error('Failed to load conversation internally:', e);
+        console.error('Failed to load chat internally:', e);
     }
 }
 
-async function loadConversation(convId) {
+async function loadChat(chatId) {
     if (isStreaming) {
         return;
     }
 
     try {
-        const response = await fetch('/conversation/load?id=' + convId);
+        const response = await fetch('/chat/load?id=' + chatId);
         const data = await response.json();
 
-        if (data.success && data.conversation) {
-            currentConversationId = convId;
-            const messages = data.conversation.messages || [];
+        if (data.success && data.chat) {
+            currentChatId = chatId;
+            const messages = data.chat.messages || [];
             renderAllMessages(messages, true);
-            lastMessageIndex = messages.length;
-            await loadConversations();
+            lastMessageIndex = data.chat.total ||
+            (messages.length > 0 ? messages[messages.length - 1].index + 1 : 0);
+
+            // Update the titlebar with title and tags
+            updateChatTitleBar(
+                data.chat.title,
+                data.chat.tags || []
+            );
+
+            await loadChats();
             closeSidebar();
         } else {
-            console.error('Failed to load conversation:', data.error);
+            console.error('Failed to load chat:', data.error);
         }
     } catch (e) {
-        console.error('Failed to load conversation:', e);
+        console.error('Failed to load chat:', e);
     }
 }
 
-// Note: Conversations are auto-saved by the backend when messages are added.
+// Note: Chats are auto-saved by the backend when messages are added.
 // No explicit save endpoint exists. This function is kept for potential future use
 // or for triggering a UI state sync.
-async function saveCurrentConversation() {
+async function saveCurrentChat() {
     // Backend auto-saves, so this is a no-op for now
-    // Refresh the conversation list to reflect any changes
-    await loadConversations();
+    // Refresh the chat list to reflect any changes
+    await loadChats();
 }
 
-async function deleteConversation(convId) {
-    if (!confirm('Delete this conversation?')) return;
+async function deleteChat(chatId) {
+    if (!confirm('Delete this chat?')) return;
 
     try {
-        const response = await fetch('/conversation/delete?id=' + convId, {
+        const response = await fetch('/chat/delete?id=' + chatId, {
             method: 'POST'
         });
         const data = await response.json();
 
         if (data.success) {
-            // Sync with backend's chat.current - don't make our own decision
-            await restoreCurrentConversation();
-            await loadConversations();
-        }
-    } catch (e) {
-        console.error('Failed to delete conversation:', e);
-    }
-}
+            // Sync with backend's chat.current
+            await restoreCurrentChat();
 
-async function renameConversation(convId, currentTitle) {
-    const newTitle = prompt('Enter new name:', currentTitle);
-    if (!newTitle || newTitle.trim() === '' || newTitle === currentTitle) return;
+            // Force refresh the chat list
+            await loadChats();
 
-    // The backend only allows renaming the CURRENT conversation
-    // Strategy: if renaming a different conversation, load it first, rename, then restore
-    const wasCurrentConversation = currentConversationId === convId;
-    const previousConvId = currentConversationId;
-
-    try {
-        // If this is not the current conversation, we need to load it first
-        if (!wasCurrentConversation) {
-            const loadResponse = await fetch('/conversation/load?id=' + convId);
-            const loadData = await loadResponse.json();
-
-            if (!loadData.success) {
-                alert('Failed to load conversation for renaming');
-                return;
-            }
-        }
-
-        // Now rename it (it's the current conversation)
-        const response = await fetch('/conversation/rename', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title: newTitle.trim() })
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-            // Refresh conversation list
-            await loadConversations();
-
-            // If we loaded a different conversation, restore the previous one
-            if (!wasCurrentConversation && previousConvId) {
-                await loadConversationInternal(previousConvId);
-            }
-
-            // Update the current conversation ID if we renamed the current one
-            if (wasCurrentConversation) {
-                // Title changed but ID stays the same
-            }
+            // Close sidebar on mobile
+            closeSidebar();
         } else {
-            alert('Failed to rename: ' + (data.error || 'Unknown error'));
-
-            // Restore previous conversation if we changed it
-            if (!wasCurrentConversation && previousConvId) {
-                await loadConversationInternal(previousConvId);
-            }
+            console.error('Failed to delete:', data.error);
+            alert('Failed to delete chat: ' + (data.error || 'Unknown error'));
         }
     } catch (e) {
-        console.error('Failed to rename conversation:', e);
+        console.error('Failed to delete chat:', e);
+        alert('Failed to delete chat');
+    }
+}
 
-        // Restore previous conversation if we changed it
-        if (!wasCurrentConversation && previousConvId) {
-            try {
-                await loadConversationInternal(previousConvId);
-            } catch (restoreErr) {
-                console.error('Failed to restore conversation:', restoreErr);
+async function renameChat(chatId, currentTitle) {
+    const chatItem = document.querySelector(`[data-chat-id="${chatId}"]`);
+    if (!chatItem) return;
+
+    const titleEl = chatItem.querySelector('.chat-item-title');
+    if (!titleEl) return;
+
+    // Don't start editing if already editing
+    if (titleEl.dataset.editing === 'true') return;
+
+    userIsEditing = true;
+
+    // Create inline edit container
+    const editContainer = document.createElement('div');
+    editContainer.className = 'inline-rename-container sidebar-rename';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'inline-rename-input';
+    input.value = currentTitle;
+
+    const actions = document.createElement('div');
+    actions.className = 'inline-rename-actions';
+
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'inline-rename-btn save';
+    saveBtn.innerHTML = ICONS.check;
+    saveBtn.setAttribute('aria-label', 'Save');
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'inline-rename-btn cancel';
+    cancelBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+    cancelBtn.setAttribute('aria-label', 'Cancel');
+
+    actions.appendChild(cancelBtn);
+    actions.appendChild(saveBtn);
+
+    editContainer.appendChild(input);
+    editContainer.appendChild(actions);
+
+    // Store original
+    const originalContent = titleEl.innerHTML;
+    titleEl.innerHTML = '';
+    titleEl.appendChild(editContainer);
+    titleEl.dataset.editing = 'true';
+
+    input.focus();
+    input.select();
+
+    // Cleanup function
+    const cleanup = () => {
+        titleEl.innerHTML = originalContent;
+        delete titleEl.dataset.editing;
+        userIsEditing = false;
+    };
+
+    // Save function
+    const saveRename = async () => {
+        const newTitle = input.value.trim();
+        if (!newTitle || newTitle === currentTitle) {
+            cleanup();
+            return;
+        }
+
+        // The backend only allows renaming the CURRENT chat
+        // Strategy: if renaming a different chat, load it first, rename, then restore
+        const wasCurrentChat = currentChatId === chatId;
+        const previousConvId = currentChatId;
+
+        try {
+            // If this is not the current chat, we need to load it first
+            if (!wasCurrentChat) {
+                const loadResponse = await fetch('/chat/load?id=' + chatId);
+                const loadData = await loadResponse.json();
+
+                if (!loadData.success) {
+                    alert('Failed to load chat for renaming');
+                    cleanup();
+                    return;
+                }
             }
+
+            // Now rename it (it's the current chat)
+            const response = await fetch('/chat/rename', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: newTitle })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Refresh chat list
+                await loadChats();
+
+                // If we loaded a different chat, restore the previous one
+                if (!wasCurrentChat && previousConvId) {
+                    await loadChatInternal(previousConvId);
+                }
+
+                // Update the current chat ID if we renamed the current one
+                if (wasCurrentChat) {
+                    // Title changed but ID stays the same
+                    const titleText = document.getElementById('chat-title-text');
+                    if (titleText) {
+                        titleText.textContent = newTitle;
+                    }
+                }
+            } else {
+                alert('Failed to rename: ' + (data.error || 'Unknown error'));
+
+                // Restore previous chat if we changed it
+                if (!wasCurrentChat && previousConvId) {
+                    await loadChatInternal(previousConvId);
+                }
+            }
+        } catch (e) {
+            console.error('Failed to rename chat:', e);
+
+            // Restore previous chat if we changed it
+            if (!wasCurrentChat && previousConvId) {
+                try {
+                    await loadChatInternal(previousConvId);
+                } catch (restoreErr) {
+                    console.error('Failed to restore chat:', restoreErr);
+                }
+            }
+        }
+
+        cleanup();
+    };
+
+    // Event handlers
+    saveBtn.onclick = saveRename;
+    cancelBtn.onclick = cleanup;
+
+    input.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            saveRename();
+        }
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            cleanup();
+        }
+    };
+
+    input.onblur = (e) => {
+        setTimeout(() => {
+            if (titleEl.dataset.editing === 'true' &&
+                !editContainer.contains(document.activeElement)) {
+                cleanup();
+                }
+        }, 100);
+    };
+}2
+
+// =============================================================================
+// Chat Title Bar Management
+// =============================================================================
+
+function updateChatTitleBar(title = null, tags = []) {
+    const titleBar = document.getElementById('chat-title-bar');
+    const titleText = document.getElementById('chat-title-text');
+    const tagsContainer = document.getElementById('chat-title-tags');
+
+    if (!title && currentChatId === null) {
+        titleBar.classList.add('no-chat');
+        titleText.textContent = 'New chat';
+    } else {
+        titleBar.classList.remove('no-chat');
+        titleText.textContent = title || 'New chat';
+    }
+
+    // Update tags
+    if (tagsContainer) {
+        tagsContainer.innerHTML = '';
+        if (tags && tags.length > 0) {
+            tags.forEach(tag => {
+                const tagEl = document.createElement('span');
+                tagEl.className = 'chat-tag';
+                tagEl.textContent = tag;
+                tagsContainer.appendChild(tagEl);
+            });
         }
     }
 }
 
-// =============================================================================
-// Conversation Title Bar Management
-// =============================================================================
-
-function updateConversationTitleBar(title = null) {
-    const titleBar = document.getElementById('conv-title-bar');
-    const titleText = document.getElementById('conv-title-text');
-
-    if (!title && currentConversationId === null) {
-        // No active conversation
-        titleBar.classList.add('no-conversation');
-        titleText.textContent = 'New Conversation';
-    } else {
-        titleBar.classList.remove('no-conversation');
-        titleText.textContent = title || 'New Conversation';
-    }
-}
-
-async function renameCurrentConversation() {
-    if (currentConversationId === null) {
+async function renameCurrentChat() {
+    if (currentChatId === null) {
         return;
     }
 
-    const titleText = document.getElementById('conv-title-text');
+    const titleText = document.getElementById('chat-title-text');
     const currentTitle = titleText.textContent;
-    const newTitle = prompt('Enter new name:', currentTitle);
 
-    if (!newTitle || newTitle.trim() === '' || newTitle === currentTitle) return;
+    // Don't start editing if already editing
+    if (titleText.dataset.editing === 'true') return;
 
-    try {
-        const response = await fetch('/conversation/rename', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title: newTitle.trim() })
-        });
+    userIsEditing = true;
 
-        const data = await response.json();
+    // Create inline edit container
+    const editContainer = document.createElement('div');
+    editContainer.className = 'inline-rename-container';
 
-        if (data.success) {
-            updateConversationTitleBar(newTitle.trim());
-            await loadConversations();
-        } else {
-            alert('Failed to rename: ' + (data.error || 'Unknown error'));
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'inline-rename-input';
+    input.value = currentTitle;
+    input.setAttribute('aria-label', 'Edit chat name');
+
+    const actions = document.createElement('div');
+    actions.className = 'inline-rename-actions';
+
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'inline-rename-btn save';
+    saveBtn.innerHTML = ICONS.check;
+    saveBtn.setAttribute('aria-label', 'Save');
+    saveBtn.setAttribute('title', 'Save');
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'inline-rename-btn cancel';
+    cancelBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+    cancelBtn.setAttribute('aria-label', 'Cancel');
+    cancelBtn.setAttribute('title', 'Cancel');
+
+    actions.appendChild(cancelBtn);
+    actions.appendChild(saveBtn);
+
+    editContainer.appendChild(input);
+    editContainer.appendChild(actions);
+
+    // Store original element state
+    const originalContent = titleText.innerHTML;
+    titleText.innerHTML = '';
+    titleText.appendChild(editContainer);
+    titleText.dataset.editing = 'true';
+
+    input.focus();
+    input.select();
+
+    // Cleanup function
+    const cleanup = () => {
+        titleText.innerHTML = originalContent;
+        delete titleText.dataset.editing;
+        userIsEditing = false;
+    };
+
+    // Save function
+    const saveRename = async () => {
+        const newTitle = input.value.trim();
+        if (!newTitle || newTitle === currentTitle) {
+            cleanup();
+            return;
         }
-    } catch (e) {
-        console.error('Failed to rename conversation:', e);
-    }
+
+        try {
+            const response = await fetch('/chat/rename', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: newTitle })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                titleText.textContent = newTitle;
+                await loadChats();
+            } else {
+                alert('Failed to rename: ' + (data.error || 'Unknown error'));
+            }
+        } catch (e) {
+            console.error('Failed to rename chat:', e);
+            alert('Failed to rename chat');
+        }
+
+        cleanup();
+    };
+
+    // Event handlers
+    saveBtn.onclick = saveRename;
+    cancelBtn.onclick = cleanup;
+
+    input.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            saveRename();
+        }
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            cleanup();
+        }
+    };
+
+    input.onblur = (e) => {
+        // Small delay to allow button clicks to register
+        setTimeout(() => {
+            if (titleText.dataset.editing === 'true' &&
+                !editContainer.contains(document.activeElement)) {
+                cleanup();
+                }
+        }, 100);
+    };
 }
 
 // =============================================================================
-// Conversation Search/Filter
+// Chat Search/Filter
 // =============================================================================
 
 function toggleSearchMode() {
     searchInContent = !searchInContent;
 
     const toggleBtn = document.getElementById('search-toggle');
-    const searchInput = document.getElementById('conv-search');
+    const searchInput = document.getElementById('chat-search');
 
     if (searchInContent) {
         toggleBtn.classList.add('active');
@@ -1446,16 +1727,16 @@ function toggleSearchMode() {
 
     // Re-run filter with current query
     const currentQuery = searchInput ? searchInput.value : '';
-    filterConversations(currentQuery);
+    filterChats(currentQuery);
 }
 
-function filterConversations(query) {
+function filterChats(query) {
     const searchQuery = (query || '').toLowerCase().trim();
-    const items = document.querySelectorAll('.conv-item');
+    const items = document.querySelectorAll('.chat-item');
 
     // Clear all snippets and visibility states first
     items.forEach(item => {
-        const existingSnippet = item.querySelector('.conv-snippet');
+        const existingSnippet = item.querySelector('.chat-snippet');
         if (existingSnippet) {
             existingSnippet.remove();
         }
@@ -1468,23 +1749,23 @@ function filterConversations(query) {
     }
 
     items.forEach(item => {
-        const titleEl = item.querySelector('.conv-item-title');
+        const titleEl = item.querySelector('.chat-item-title');
         const titleText = titleEl ? titleEl.textContent.toLowerCase() : '';
 
-        // Get conversation data from dataset
-        let convData = null;
+        // Get chat data from dataset
+        let chatData = null;
         try {
-            convData = JSON.parse(item.dataset.convData || 'null');
+            chatData = JSON.parse(item.dataset.chatData || 'null');
         } catch (e) {
-            convData = null;
+            chatData = null;
         }
 
         let matchesTitle = titleText.includes(searchQuery);
         let matchSnippet = null;
 
         // If content search is enabled, also search in messages
-        if (searchInContent && convData && convData.messages) {
-            for (const msg of convData.messages) {
+        if (searchInContent && chatData && chatData.messages) {
+            for (const msg of chatData.messages) {
                 const content = (msg.content || '').toLowerCase();
                 if (content.includes(searchQuery)) {
                     matchSnippet = extractSnippet(msg.content, searchQuery, 60);
@@ -1499,10 +1780,10 @@ function filterConversations(query) {
             item.classList.add('hidden-by-search');
         } else if (matchSnippet && searchInContent) {
             // Add snippet after the meta element
-            const metaEl = item.querySelector('.conv-item-meta');
-            if (metaEl && !item.querySelector('.conv-snippet')) {
+            const metaEl = item.querySelector('.chat-item-meta');
+            if (metaEl && !item.querySelector('.chat-snippet')) {
                 const snippetEl = document.createElement('div');
-                snippetEl.className = 'conv-snippet';
+                snippetEl.className = 'chat-snippet';
                 snippetEl.innerHTML = matchSnippet;
                 // Insert after meta
                 metaEl.insertAdjacentElement('afterend', snippetEl);
@@ -1569,6 +1850,112 @@ function formatDate(timestamp) {
     if (diff < 604800000) return Math.floor(diff / 86400000) + 'd ago';
 
     return date.toLocaleDateString();
+}
+
+// =============================================================================
+// Tag Management Functions
+// =============================================================================
+
+async function loadTags() {
+    try {
+        const response = await fetch('/chat/tags');
+        const data = await response.json();
+        allTags = data.tags || [];
+        renderTagFilter();
+    } catch (e) {
+        console.error('Failed to load tags:', e);
+    }
+}
+
+function renderTagFilter() {
+    const tagList = document.getElementById('tag-list');
+    const clearBtn = document.getElementById('clear-tag-filter');
+
+    if (!tagList) return;
+
+    tagList.innerHTML = '';
+
+    if (allTags.length === 0) {
+        tagList.innerHTML = '<span class="no-tags-hint" style="font-size: 0.75rem; color: var(--text-muted);">No tags yet</span>';
+        return;
+    }
+
+    allTags.forEach(tag => {
+        const chip = document.createElement('button');
+        chip.className = 'tag-chip' + (activeTagFilter === tag ? ' active' : '');
+        chip.textContent = tag;
+        chip.onclick = () => toggleTagFilter(tag);
+        tagList.appendChild(chip);
+    });
+
+    // Show/hide clear button
+    if (clearBtn) {
+        clearBtn.style.display = activeTagFilter ? 'flex' : 'none';
+    }
+}
+
+function toggleTagFilter(tag) {
+    if (activeTagFilter === tag) {
+        // Clicking active tag clears the filter
+        activeTagFilter = null;
+    } else {
+        activeTagFilter = tag;
+    }
+
+    renderTagFilter();
+    filterChatsByTag();
+}
+
+function clearTagFilter() {
+    activeTagFilter = null;
+    renderTagFilter();
+    filterChatsByTag();
+}
+
+function filterChatsByTag() {
+    const items = document.querySelectorAll('.chat-item');
+
+    items.forEach(item => {
+        if (activeTagFilter) {
+            const chatData = JSON.parse(item.dataset.chatData || '{}');
+            const tags = chatData.tags || [];
+
+            if (tags.includes(activeTagFilter)) {
+                item.classList.remove('hidden-by-tag');
+            } else {
+                item.classList.add('hidden-by-tag');
+            }
+        } else {
+            item.classList.remove('hidden-by-tag');
+        }
+    });
+
+    // Also apply text search filter if active
+    const searchInput = document.getElementById('chat-search');
+    if (searchInput && searchInput.value) {
+        filterChats(searchInput.value);
+    }
+}
+
+async function updateCurrentTags(tags) {
+    try {
+        const response = await fetch('/chat/tags', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tags: tags })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            await loadChats();
+        }
+
+        return data;
+    } catch (e) {
+        console.error('Failed to update tags:', e);
+        return { success: false, error: e.message };
+    }
 }
 
 // =============================================================================
@@ -1695,37 +2082,214 @@ function clearSearch() {
     const container = document.getElementById('search-container');
     const input = document.getElementById('search-input');
     const count = document.getElementById('search-count');
+    const indexEl = document.getElementById('search-index');
+
+    // Restore original message contents
+    restoreOriginalContents();
 
     container.classList.remove('active');
     input.value = '';
-    count.textContent = '0 results';
+    if (count) count.textContent = '';
+    if (indexEl) indexEl.textContent = '';
     searchQuery = '';
     searchResults = [];
+    currentSearchIndex = -1;
+}
+
+function restoreOriginalContents() {
+    originalMessageContents.forEach((originalHtml, wrapper) => {
+        const msgDiv = wrapper.querySelector('.message');
+        if (msgDiv) {
+            msgDiv.innerHTML = originalHtml;
+            msgDiv.classList.remove('search-highlight');
+        }
+    });
+    originalMessageContents.clear();
+
+    // Also clear current highlights
+    chat.querySelectorAll('.search-match.current').forEach(el => {
+        el.classList.remove('current');
+    });
 }
 
 function performSearch(query) {
-    searchQuery = query.toLowerCase();
+    searchQuery = query.toLowerCase().trim();
+
+    // Clear previous highlights
+    restoreOriginalContents();
+
     if (!searchQuery) {
-        document.getElementById('search-count').textContent = '0 results';
+        const countEl = document.getElementById('search-count');
+        const indexEl = document.getElementById('search-index');
+        if (countEl) countEl.textContent = '';
+        if (indexEl) indexEl.textContent = '';
+        searchResults = [];
+        currentSearchIndex = -1;
+        updateSearchNavButtons();
         return;
     }
 
     const wrappers = chat.querySelectorAll('.message-wrapper');
     searchResults = [];
+    currentSearchIndex = -1;
 
     wrappers.forEach(wrapper => {
         const msgDiv = wrapper.querySelector('.message');
+        if (!msgDiv) return;
+
         const text = msgDiv.textContent.toLowerCase();
 
         if (text.includes(searchQuery)) {
-            searchResults.push(parseInt(wrapper.dataset.index));
+            searchResults.push(wrapper);
+
+            // Store original content before highlighting
+            originalMessageContents.set(wrapper, msgDiv.innerHTML);
+
+            // Highlight matching text
+            highlightMatches(msgDiv, searchQuery);
             msgDiv.classList.add('search-highlight');
-        } else {
-            msgDiv.classList.remove('search-highlight');
         }
     });
 
-    document.getElementById('search-count').textContent = searchResults.length + ' result' + (searchResults.length !== 1 ? 's' : '');
+    const countEl = document.getElementById('search-count');
+    const indexEl = document.getElementById('search-index');
+
+    if (countEl) {
+        countEl.textContent = searchResults.length + ' result' + (searchResults.length !== 1 ? 's' : '');
+    }
+
+    // Scroll to first result
+    if (searchResults.length > 0) {
+        currentSearchIndex = 0;
+        scrollToSearchResult(0);
+    } else if (indexEl) {
+        indexEl.textContent = '';
+    }
+
+    updateSearchNavButtons();
+}
+
+function highlightMatches(element, query) {
+    // Use TreeWalker to find text nodes and highlight matches
+    // This avoids breaking HTML structure
+    const walker = document.createTreeWalker(
+        element,
+        NodeFilter.SHOW_TEXT,
+        null,
+        false
+    );
+
+    const textNodes = [];
+    let node;
+    while (node = walker.nextNode()) {
+        // Skip text nodes inside certain elements
+        if (node.parentNode.tagName === 'SCRIPT' ||
+            node.parentNode.tagName === 'STYLE' ||
+            node.parentNode.classList.contains('copy-btn')) {
+            continue;
+            }
+            textNodes.push(node);
+    }
+
+    // Process text nodes in reverse to not break indices
+    for (let i = textNodes.length - 1; i >= 0; i--) {
+        const textNode = textNodes[i];
+        const text = textNode.nodeValue;
+        const lowerText = text.toLowerCase();
+
+        if (!lowerText.includes(query)) continue;
+
+        const fragment = document.createDocumentFragment();
+        let lastIndex = 0;
+        let searchIndex = 0;
+
+        // Find all matches (case-insensitive)
+        while ((searchIndex = lowerText.indexOf(query, lastIndex)) !== -1) {
+            // Add text before match
+            if (searchIndex > lastIndex) {
+                fragment.appendChild(
+                    document.createTextNode(text.substring(lastIndex, searchIndex))
+                );
+            }
+
+            // Add highlighted match - preserve original case
+            const mark = document.createElement('mark');
+            mark.className = 'search-match';
+            mark.textContent = text.substring(searchIndex, searchIndex + query.length);
+            fragment.appendChild(mark);
+
+            lastIndex = searchIndex + query.length;
+        }
+
+        // Add remaining text after last match
+        if (lastIndex < text.length) {
+            fragment.appendChild(
+                document.createTextNode(text.substring(lastIndex))
+            );
+        }
+
+        // Replace the text node with the fragment
+        textNode.parentNode.replaceChild(fragment, textNode);
+    }
+}
+
+function scrollToSearchResult(index) {
+    if (index < 0 || index >= searchResults.length) return;
+
+    // Remove previous current highlight
+    const prevHighlight = chat.querySelector('.search-match.current');
+    if (prevHighlight) {
+        prevHighlight.classList.remove('current');
+    }
+
+    const wrapper = searchResults[index];
+    const msgDiv = wrapper.querySelector('.message');
+
+    // Add current highlight to first match in the message
+    const currentMark = msgDiv.querySelector('.search-match');
+    if (currentMark) {
+        currentMark.classList.add('current');
+    }
+
+    // Scroll into view with smooth behavior
+    wrapper.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+        inline: 'nearest'
+    });
+
+    currentSearchIndex = index;
+    updateSearchNavButtons();
+
+    // Update index display
+    const indexEl = document.getElementById('search-index');
+    if (indexEl) {
+        indexEl.textContent = `${currentSearchIndex + 1} / ${searchResults.length}`;
+    }
+}
+
+function nextSearchResult() {
+    if (searchResults.length === 0) return;
+    currentSearchIndex = (currentSearchIndex + 1) % searchResults.length;
+    scrollToSearchResult(currentSearchIndex);
+}
+
+function prevSearchResult() {
+    if (searchResults.length === 0) return;
+    currentSearchIndex = (currentSearchIndex - 1 + searchResults.length) % searchResults.length;
+    scrollToSearchResult(currentSearchIndex);
+}
+
+function updateSearchNavButtons() {
+    const prevBtn = document.getElementById('search-prev');
+    const nextBtn = document.getElementById('search-next');
+
+    if (prevBtn) {
+        prevBtn.disabled = searchResults.length === 0;
+    }
+    if (nextBtn) {
+        nextBtn.disabled = searchResults.length === 0;
+    }
 }
 
 // =============================================================================
@@ -1829,6 +2393,9 @@ function setInputState(disabled, showTyping = false, showStop = false) {
 
 function handleKeyDown(event) {
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const searchContainer = document.getElementById('search-container');
+    const searchInput = document.getElementById('search-input');
+    const isSearchActive = searchContainer && searchContainer.classList.contains('active');
 
     if (event.ctrlKey || event.metaKey) {
         if (event.key === 'Enter') {
@@ -1862,6 +2429,24 @@ function handleKeyDown(event) {
         }
     }
 
+    // Handle search navigation
+    if (isSearchActive && document.activeElement === searchInput) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            if (event.shiftKey) {
+                prevSearchResult();
+            } else {
+                nextSearchResult();
+            }
+            return;
+        }
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            clearSearch();
+            return;
+        }
+    }
+
     if (event.key === 'Escape') {
         if (isStreaming) {
             stopGeneration();
@@ -1871,7 +2456,7 @@ function handleKeyDown(event) {
             toggleModal(modalName);
         });
         closeSidebar();
-        if (document.getElementById('search-container').classList.contains('active')) {
+        if (isSearchActive) {
             clearSearch();
         }
         return;
@@ -1964,8 +2549,8 @@ async function send() {
 
     clearInput();
 
-    // Track if we started without a conversation (for lazy creation)
-    const startedWithoutConversation = currentConversationId === null;
+    // Track if we started without a chat (for lazy creation)
+    const startedWithoutChat = currentChatId === null;
 
     // Create user message element
     const userWrapper = document.createElement('div');
@@ -2159,15 +2744,18 @@ async function send() {
 
         await syncMessages();
 
-        // Always sync current conversation from backend
-        const convResponse = await fetch('/conversation/current');
-        const convData = await convResponse.json();
-        if (convData.success && convData.conversation) {
-            currentConversationId = convData.conversation.id;
-            updateConversationTitleBar(convData.conversation.title);
+        // Always sync current chat from backend
+        const chatResponse = await fetch('/chat/current');
+        const chatData = await chatResponse.json();
+        if (chatData.success && chatData.chat) {
+            currentChatId = chatData.chat.id;
+            updateChatTitleBar(
+                chatData.chat.title,
+                chatData.chat.tags || []
+            );
         }
 
-        await loadConversations();
+        await loadChats();
     }
 }
 
@@ -2218,15 +2806,18 @@ async function sendCommand(message) {
             }
         }
 
-        // Always sync current conversation from backend
-        const convResponse = await fetch('/conversation/current');
-        const convData = await convResponse.json();
-        if (convData.success && convData.conversation) {
-            currentConversationId = convData.conversation.id;
-            updateConversationTitleBar(convData.conversation.title);
+        // Always sync current chat from backend
+        const chatResponse = await fetch('/chat/current');
+        const chatData = await chatResponse.json();
+        if (chatData.success && chatData.chat) {
+            currentChatId = chatData.chat.id;
+            updateChatTitleBar(
+                chatData.chat.title,
+                chatData.chat.tags || []
+            );
         }
 
-        await loadConversations();
+        await loadChats();
     } catch (err) {
         console.error('Command failed:', err);
     }
@@ -2265,7 +2856,7 @@ async function stopGeneration(sent_from_command = false) {
 
 async function clearChat() {
     try {
-        await newConversation();
+        await newChat();
         await syncMessages();
     } catch (err) {
         console.error('Failed to clear chat:', err);
@@ -3771,9 +4362,9 @@ async function init() {
     try {
         await checkConnection();
 
-        // Load current conversation from backend if available
+        // Load current chat from backend if available
         if (isConnected) {
-            await restoreCurrentConversation();
+            await restoreCurrentChat();
         }
     } catch (err) {
         isConnected = false;
@@ -3782,7 +4373,7 @@ async function init() {
     }
 
     loadTheme();
-    loadConversations();
+    loadChats();
     requestNotificationPermission();
 
     pollIntervalId = setInterval(() => {

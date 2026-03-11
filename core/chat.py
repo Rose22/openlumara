@@ -3,11 +3,22 @@ import ulid
 import datetime
 
 class Chat:
+    DEFAULT_DATA = {
+        "title": "",
+        "tags": []
+    }
+
     """contains openAI messages array, and can save and load sets of messages from files"""
     def __init__(self, channel):
         self.data = core.storage.StorageList(f"{channel.name}_chats", "json")
         self.channel = channel
         self.current = None
+
+        # find any missing metadata fields and add them
+        for index, chat in enumerate(self.data):
+            for key, default_value in self.DEFAULT_DATA.items():
+                if key not in chat.keys():
+                    self.data[index][key] = default_value
 
     def _find_index(self, id: str):
         """find index of the chat with that ID"""
@@ -24,6 +35,7 @@ class Chat:
         self.data.append({
             "id": str(ulid.ULID())[:8],
             "title": title,
+            "tags": [],
             "messages": [],
             "created": now,
             "updated": now
@@ -76,6 +88,7 @@ class Chat:
         self.current = index
 
         return True
+
     async def get_all(self):
         """returns all chats in the storage"""
         return self.data
@@ -87,11 +100,47 @@ class Chat:
 
     async def set_title(self, title: str):
         if self.current is None:
-            return None
+            return False
 
         self.data[self.current]["title"] = title
         await self.save()
         return True
+
+    async def set_tags(self, tags: list):
+        if self.current is None:
+            return False
+
+        self.data[self.current]["tags"] = tags
+        await self.save()
+        return True
+
+    async def get_tags(self):
+        if self.current is None:
+            return False
+
+        return self.data[self.current].get("tags", [])
+
+    async def add_tag(self, tag: str):
+        if self.current is None:
+            return False
+
+        if tag not in self.data[self.current]["tags"]:
+            self.data[self.current]["tags"].append(tag)
+            await self.save()
+            return True
+
+        return False
+
+    async def pop_tag(self, tag: str):
+        if self.current is None:
+            return False
+
+        if tag in self.data[self.current]["tags"]:
+            self.data[self.current]["tags"].remove(tag)
+            await self.save()
+            return True
+
+        return False
 
     async def get(self):
         """get message history of current chat"""

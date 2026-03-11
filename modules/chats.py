@@ -23,7 +23,9 @@ class Chats(core.module.Module):
             return "Failed to wipe chat history"
 
     @core.module.command("chats", temporary=True)
-    async def list(self, args: list):
+    async def _list(self, args: list):
+        # if i overwrite the list builtin, it leads to really bad stuff
+
         """list chats"""
 
         chats = await self.channel.context.chat.get_all()
@@ -59,11 +61,12 @@ class Chats(core.module.Module):
         return f"chat renamed to {newname}"
 
     # AI tool version
-    async def rename(self, new_name: str):
-        """lets you rename the current chat"""
+    async def tag_chat(self, new_name: str, tags: list):
+        """lets you rename and tag the current chat"""
 
         if not new_name:
             return self.result("name must not be blank", False)
 
-        result = await self.channel.context.chat.set_title(new_name)
-        return self.result(f"chat renamed to {new_name}")
+        await self.channel.context.chat.set_title(new_name)
+        await self.channel.context.chat.set_tags(tags)
+        return self.result(f"chat organised!")

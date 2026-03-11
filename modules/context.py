@@ -24,7 +24,10 @@ class Context(core.module.Module):
 
         return sysprompt if sysprompt else "BLANK"
 
-    @core.module.command("context", temporary=True)
+    @core.module.command("context", temporary=True, help={
+        "": "show current context window",
+        "raw": "show context as raw JSON"
+    })
     async def show_context(self, args):
         """shows current context window"""
 
@@ -35,7 +38,8 @@ class Context(core.module.Module):
         if not context:
             return "BLANK"
 
-        if len(args) > 1 and args[1] == "raw":
+        if len(args) and args[0] == "raw":
+            import json
             return json.dumps(context, indent=2)
 
         context_display = []

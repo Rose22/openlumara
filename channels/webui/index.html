@@ -26,15 +26,15 @@
     <div class="app-wrapper">
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
-                <span class="sidebar-title">Conversations</span>
+                <span class="sidebar-title">Chats</span>
             </div>
             <div class="sidebar-search">
                 <input type="text"
                        class="sidebar-search-input"
-                       id="conv-search"
-                       placeholder="Search conversations..."
-                       oninput="filterConversations(this.value)"
-                       aria-label="Search conversations">
+                       id="chat-search"
+                       placeholder="Search chats..."
+                       oninput="filterChats(this.value)"
+                       aria-label="Search chats">
                 <button class="search-toggle"
                         id="search-toggle"
                         onclick="toggleSearchMode()"
@@ -50,15 +50,29 @@
                     </svg>
                 </button>
             </div>
+            <div id="tag-filter" class="tag-filter">
+                <div class="tag-filter-header">
+                    <span>Filter by tag</span>
+                    <button id="clear-tag-filter" class="clear-filter-btn" title="Clear filter" style="display: none;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+                <div id="tag-list" class="tag-list">
+                    <!-- Tags will be populated here -->
+                </div>
+            </div>
             <div class="sidebar-content">
-                <div class="conv-list" id="conv-list"></div>
+                <div class="chat-list" id="chat-list"></div>
             </div>
             <div class="sidebar-footer">
-                <button class="new-conv-btn" onclick="newConversation()">
+                <button class="new-chat-btn" onclick="newChat()">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                     </svg>
-                    New Conversation
+                    New Chat
                 </button>
             </div>
         </aside>
@@ -114,23 +128,54 @@
                     </div>
                 </header>
 
-                <!-- Conversation Title Bar -->
-                <div class="conv-title-bar" id="conv-title-bar">
-                    <span class="conv-title-text" id="conv-title-text">New Conversation</span>
-                    <button class="conv-title-rename" id="conv-title-rename" onclick="renameCurrentConversation()" title="Rename conversation">
+                <!-- Chat Title Bar -->
+                <div class="chat-title-bar" id="chat-title-bar">
+                    <span class="chat-title-text" id="chat-title-text">New Chat</span>
+                    <div id="chat-title-tags" class="chat-title-tags"></div>
+                    <button class="chat-title-rename" id="chat-title-rename" onclick="renameCurrentChat()" title="Rename chat">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                         </svg>
                     </button>
                 </div>
-
                 <div class="search-container" id="search-container">
-                    <input type="text" class="search-input" id="search-input" placeholder="Search messages..." oninput="performSearch(this.value)">
-                    <div class="search-count" id="search-count">0 results</div>
-                    <button class="header-btn" onclick="clearSearch()">✕</button>
+                    <div class="search-input-wrapper">
+                        <input type="text"
+                            id="search-input"
+                            class="search-input"
+                            placeholder="Search in chat..."
+                            oninput="performSearch(this.value)">
+                        <button id="search-prev"
+                                class="search-nav-btn"
+                                onclick="prevSearchResult()"
+                                disabled
+                                aria-label="Previous match"
+                                title="Previous match (Shift+Enter)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="18 15 12 9 6 15"></polyline>
+                            </svg>
+                        </button>
+                        <span id="search-index" class="search-index"></span>
+                        <button id="search-next"
+                                class="search-nav-btn"
+                                onclick="nextSearchResult()"
+                                disabled
+                                aria-label="Next match"
+                                title="Next match (Enter)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </button>
+                        <span id="search-count" class="search-count"></span>
+                        <button class="search-close-btn" onclick="clearSearch()" aria-label="Close search">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
-
                 <div class="modal-overlay" id="settings-overlay" onclick="closeModalOnOverlay(event, 'settings')"></div>
                 <div class="modal settings-modal" id="settings-modal" role="dialog" aria-labelledby="settings-title">
                     <div class="modal-header">

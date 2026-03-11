@@ -164,7 +164,7 @@ def get_messages():
     return jsonify({
         'messages': result,
         'count': len(result),
-        'current_conversation_id': current_id
+        'current_chat_id': current_id
     })
 
 @app.route('/messages/since')
@@ -180,8 +180,10 @@ def get_messages_since():
 
     messages = _run_async(channel_instance.context.chat.get()) or []
     current_id = _run_async(channel_instance.context.chat.get_id())
-    result = []
+    current_title = _run_async(channel_instance.context.chat.get_title())
+    current_tags = _run_async(channel_instance.context.chat.get_tags()) or []
 
+    result = []
     for i in range(since_index, len(messages)):
         msg = messages[i]
         msg_data = {
@@ -198,7 +200,9 @@ def get_messages_since():
         'messages': result,
         'count': len(result),
         'total': len(messages),
-        'current_conversation_id': current_id
+        'current_chat_id': current_id,
+        'current_chat_title': current_title,
+        'current_chat_tags': current_tags
     })
 
 @app.route('/stream', methods=['POST'])
@@ -286,7 +290,7 @@ def send_message():
     return jsonify({
         'response': response,
         'total': len(messages),
-        'current_conversation': {
+        'current_chat': {
             'id': current_id,
             'title': current_title
         }
@@ -381,19 +385,19 @@ def upload_file():
         return jsonify({'success': False, 'error': str(e)})
 
 # =============================================================================
-# Conversation Management Routes
+# Chat Management Routes
 # =============================================================================
 
-@app.route('/conversations')
-def list_conversations():
-    """List all saved conversations with message content for searching."""
+@app.route('/chats')
+def list_chats():
+    """List all saved chats with message content for searching."""
     global channel_instance
 
     if not channel_instance:
-        return jsonify({'conversations': []})
+        return jsonify({'chats': []})
 
     all_chats = _run_async(channel_instance.context.chat.get_all())
-    conversations = []
+    chats = []
 
     for conv in all_chats:
         messages_preview = []
@@ -405,21 +409,22 @@ def list_conversations():
                     'content': content[:500]
                 })
 
-        conversations.append({
+        chats.append({
             'id': conv.get('id'),
-            'title': conv.get('title', 'New Conversation'),
+            'title': conv.get('title', 'New Chat'),
+            'tags': conv.get('tags', []),  # Include tags
             'created': conv.get('created'),
             'updated': conv.get('updated'),
             'message_count': len(conv.get('messages', [])),
             'messages': messages_preview
         })
 
-    conversations.sort(key=lambda x: x.get('updated', ''), reverse=True)
-    return jsonify({'conversations': conversations})
+    chats.sort(key=lambda x: x.get('updated', ''), reverse=True)
+    return jsonify({'chats': chats})
 
-@app.route('/conversation/load')
-def load_conversation():
-    """Load an existing conversation by ID."""
+@app.route('/chat/load')
+def load_chat():
+    """Load an existing chat by ID."""
     global channel_instance
 
     if not channel_instance:
@@ -427,15 +432,16 @@ def load_conversation():
 
     conv_id = request.args.get('id')
     if not conv_id:
-        return jsonify({'success': False, 'error': 'No conversation ID provided'})
+        return jsonify({'success': False, 'error': 'No chat ID provided'})
 
     success = _run_async(channel_instance.context.chat.load(conv_id))
     if not success:
-        return jsonify({'success': False, 'error': 'Conversation not found'})
+        return jsonify({'success': False, 'error': 'Chat not found'})
 
     messages = _run_async(channel_instance.context.chat.get()) or []
     title = _run_async(channel_instance.context.chat.get_title())
     loaded_id = _run_async(channel_instance.context.chat.get_id())
+    tags = _run_async(channel_instance.context.chat.get_tags()) or []
 
     # Add index to each message
     result = []
@@ -452,17 +458,18 @@ def load_conversation():
 
     return jsonify({
         'success': True,
-        'conversation': {
+        'chat': {
             'id': loaded_id,
-            'title': title or 'New Conversation',
+            'title': title or 'New Chat',
+            'tags': tags,
             'messages': result,
             'total': len(result)
         }
     })
 
-@app.route('/conversation/current')
-def get_current_conversation():
-    """Get the currently active conversation ID and its messages."""
+@app.route('/chat/current')
+def get_current_chat():
+    """Get the currently active chat ID and its messages."""
     global channel_instance
 
     if not channel_instance:
@@ -475,11 +482,12 @@ def get_current_conversation():
         return jsonify({
             'success': True,
             'current_id': None,
-            'conversation': None
+            'chat': None
         })
 
     messages = _run_async(chat.get()) or []
     title = _run_async(chat.get_title())
+    tags = _run_async(chat.get_tags()) or []
 
     # Add index to each message
     result = []
@@ -496,26 +504,27 @@ def get_current_conversation():
 
     return jsonify({
         'success': True,
-        'conversation': {
+        'chat': {
             'id': conv_id,
-            'title': title or 'New Conversation',
+            'title': title or 'New Chat',
+            'tags': tags,
             'messages': result,
             'total': len(result)
         }
     })
 
-@app.route('/conversation/rename', methods=['POST'])
-def rename_conversation():
-    """Rename the current conversation."""
+@app.route('/chat/rename', methods=['POST'])
+def rename_chat():
+    """Rename the current chat."""
     global channel_instance
 
     if not channel_instance:
         return jsonify({'success': False, 'error': 'Channel not available'})
 
-    # Only rename if we have an active conversation
+    # Only rename if we have an active chat
     conv_id = _run_async(channel_instance.context.chat.get_id())
     if conv_id is None:
-        return jsonify({'success': False, 'error': 'No active conversation'})
+        return jsonify({'success': False, 'error': 'No active chat'})
 
     data = request.get_json()
     new_title = data.get('title', '').strip()
@@ -527,14 +536,14 @@ def rename_conversation():
 
     return jsonify({'success': True, 'title': new_title})
 
-@app.route('/conversation/new', methods=['POST'])
-def new_conversation():
+@app.route('/chat/new', methods=['POST'])
+def new_chat():
     """
-    Start a fresh conversation.
+    Start a fresh chat.
 
-    Note: This explicitly creates a new empty conversation. In most cases,
+    Note: This explicitly creates a new empty chat. In most cases,
     you don't need to call this - just send a message and the chat system
-    will auto-create a conversation if needed.
+    will auto-create a chat if needed.
     """
     global channel_instance
 
@@ -542,22 +551,22 @@ def new_conversation():
         return jsonify({'success': False, 'error': 'Channel not available'})
 
     data = request.get_json() or {}
-    title = data.get('title', 'New Conversation')
+    title = data.get('title', 'New Chat')
 
     _run_async(channel_instance.context.chat.new(title))
 
     return jsonify({
         'success': True,
-        'conversation': {
+        'chat': {
             'id': _run_async(channel_instance.context.chat.get_id()),
             'title': title,
             'messages': []
         }
     })
 
-@app.route('/conversation/delete', methods=['POST'])
-def delete_conversation():
-    """Delete a saved conversation."""
+@app.route('/chat/delete', methods=['POST'])
+def delete_chat():
+    """Delete a saved chat."""
     global channel_instance
 
     if not channel_instance:
@@ -567,14 +576,99 @@ def delete_conversation():
     conv_id = data.get('id') or request.args.get('id')
 
     if not conv_id:
-        return jsonify({'success': False, 'error': 'No conversation ID provided'})
+        return jsonify({'success': False, 'error': 'No chat ID provided'})
 
     success = _run_async(channel_instance.context.chat.delete(conv_id))
 
     if not success:
-        return jsonify({'success': False, 'error': 'Conversation not found'})
+        return jsonify({'success': False, 'error': 'Chat not found'})
 
     return jsonify({'success': True})
+
+@app.route('/chat/tags', methods=['GET'])
+def get_all_tags():
+    """Get all unique tags across all chats."""
+    global channel_instance
+
+    if not channel_instance:
+        return jsonify({'tags': []})
+
+    all_chats = _run_async(channel_instance.context.chat.get_all()) or []
+    tags = set()
+
+    for chat in all_chats:
+        for tag in chat.get('tags', []):
+            tags.add(tag)
+
+    return jsonify({'tags': sorted(list(tags))})
+
+@app.route('/chat/tags', methods=['POST'])
+def update_chat_tags():
+    """Update tags for the current chat."""
+    global channel_instance
+
+    if not channel_instance:
+        return jsonify({'success': False, 'error': 'Channel not available'})
+
+    data = request.get_json() or {}
+    tags = data.get('tags', [])
+
+    if not isinstance(tags, list):
+        return jsonify({'success': False, 'error': 'Tags must be a list'})
+
+    # Check if there's a current chat
+    conv_id = _run_async(channel_instance.context.chat.get_id())
+    if conv_id is None:
+        return jsonify({'success': False, 'error': 'No active chat'})
+
+    # Use the Chat methods
+    _run_async(channel_instance.context.chat.set_tags(tags))
+
+    return jsonify({'success': True, 'tags': tags})
+
+@app.route('/chat/tag', methods=['POST'])
+def add_chat_tag():
+    """Add a single tag to the current chat."""
+    global channel_instance
+
+    if not channel_instance:
+        return jsonify({'success': False, 'error': 'Channel not available'})
+
+    data = request.get_json() or {}
+    tag = data.get('tag', '').strip()
+
+    if not tag:
+        return jsonify({'success': False, 'error': 'Tag cannot be empty'})
+
+    conv_id = _run_async(channel_instance.context.chat.get_id())
+    if conv_id is None:
+        return jsonify({'success': False, 'error': 'No active chat'})
+
+    success = _run_async(channel_instance.context.chat.add_tag(tag))
+
+    return jsonify({'success': success, 'tag': tag})
+
+@app.route('/chat/tag', methods=['DELETE'])
+def remove_chat_tag():
+    """Remove a single tag from the current chat."""
+    global channel_instance
+
+    if not channel_instance:
+        return jsonify({'success': False, 'error': 'Channel not available'})
+
+    data = request.get_json() or {}
+    tag = data.get('tag', '').strip()
+
+    if not tag:
+        return jsonify({'success': False, 'error': 'Tag cannot be empty'})
+
+    conv_id = _run_async(channel_instance.context.chat.get_id())
+    if conv_id is None:
+        return jsonify({'success': False, 'error': 'No active chat'})
+
+    success = _run_async(channel_instance.context.chat.pop_tag(tag))
+
+    return jsonify({'success': success, 'tag': tag})
 
 # =============================================================================
 # Settings editing routes
