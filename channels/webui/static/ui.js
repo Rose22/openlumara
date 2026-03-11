@@ -18,7 +18,8 @@ let reconnectAttempts = 0;
 let reconnectTimer = null;
 let lastMessageIndex = 0;
 let currentChatId = null;
-let userIsEditing = false;
+let userIsEditing = false
+let currentTitleBarTags = [];;
 
 // Stream state
 let isStreaming = false;
@@ -28,7 +29,6 @@ let currentStreamId = null;
 let editingIndex = null;
 
 // Search state
-// Search state
 let searchQuery = '';
 let searchResults = [];
 let currentSearchIndex = -1;
@@ -36,7 +36,9 @@ let originalMessageContents = new Map();
 let allChats = [];
 let searchInContent = false;
 let activeTagFilter = null;
+let tagFilterCollapsed = true; // Default to collapsed
 let allTags = [];
+let titleBarResizeTimeout = null;
 
 // Polling cleanup
 let pollIntervalId = null;
@@ -246,7 +248,7 @@ function renderReasoningBlock(reasoningContent, isCollapsed = true) {
     if (!reasoningContent) return '';
 
     const escaped = escapeHtml(reasoningContent);
-    const collapsedClass = isCollapsed ? 'collapsed' : '';
+    const collapsedClass = isCollapsed ? 'collapsed' : 'expanded';
 
     return `
     <div class="reasoning-wrapper ${collapsedClass}">
@@ -271,6 +273,7 @@ function toggleReasoningBlock(headerElement) {
     const wrapper = headerElement.closest('.reasoning-wrapper');
     if (wrapper) {
         wrapper.classList.toggle('collapsed');
+        wrapper.classList.toggle('expanded');
     }
 }
 
@@ -1205,20 +1208,6 @@ function renderChatList(chats) {
         tagsContainer.className = 'chat-tags';
 
         const tags = chat.tags || [];
-        tags.slice(0, 3).forEach(tag => {
-            const tagEl = document.createElement('span');
-            tagEl.className = 'chat-tag';
-            tagEl.textContent = tag;
-            tagsContainer.appendChild(tagEl);
-        });
-
-        if (tags.length > 3) {
-            const moreEl = document.createElement('span');
-            moreEl.className = 'chat-tag';
-            moreEl.textContent = `+${tags.length - 3}`;
-            tagsContainer.appendChild(moreEl);
-        }
-
         const meta = document.createElement('div');
         meta.className = 'chat-item-meta';
 
@@ -1245,20 +1234,22 @@ function renderChatList(chats) {
         deleteBtn.setAttribute('title', 'Delete');
         deleteBtn.onclick = (e) => {
             e.stopPropagation();
-            if (confirm('Delete this chat?')) {
-                deleteChat(chat.id);
-            }
+            deleteChat(chat.id);
         };
 
         actions.appendChild(editBtn);
         actions.appendChild(deleteBtn);
         meta.appendChild(date);
         meta.appendChild(actions);
-
-        item.appendChild(title);
         if (tags.length > 0) {
+            renderFittedTags(tagsContainer, tags, {
+                maxStart: 3,
+                minTags: 1,
+                showTooltip: true
+            });
             item.appendChild(tagsContainer);
         }
+        item.appendChild(title);
         item.appendChild(meta);
         list.appendChild(item);
     });
@@ -1569,21 +1560,22 @@ function updateChatTitleBar(title = null, tags = []) {
     if (!title && currentChatId === null) {
         titleBar.classList.add('no-chat');
         titleText.textContent = 'New chat';
+        tagsContainer.innerHTML = '';
+        titleBar.classList.remove('has-tags');
+        currentTitleBarTags = [];
     } else {
         titleBar.classList.remove('no-chat');
         titleText.textContent = title || 'New chat';
-    }
+        currentTitleBarTags = tags || [];
 
-    // Update tags
-    if (tagsContainer) {
-        tagsContainer.innerHTML = '';
-        if (tags && tags.length > 0) {
-            tags.forEach(tag => {
-                const tagEl = document.createElement('span');
-                tagEl.className = 'chat-tag';
-                tagEl.textContent = tag;
-                tagsContainer.appendChild(tagEl);
-            });
+        if (tagsContainer) {
+            if (tags && tags.length > 0) {
+                titleBar.classList.add('has-tags');
+                renderTitleBarTags();
+            } else {
+                tagsContainer.innerHTML = '';
+                titleBar.classList.remove('has-tags');
+            }
         }
     }
 }
@@ -1745,6 +1737,7 @@ function filterChats(query) {
 
     // Show all when search is empty
     if (!searchQuery) {
+        filterTagsBySearch('');
         return;
     }
 
@@ -1790,6 +1783,9 @@ function filterChats(query) {
             }
         }
     });
+
+    // Also filter tags based on search
+    filterTagsBySearch(query);
 }
 
 function extractSnippet(content, query, maxLength) {
@@ -1834,6 +1830,7 @@ function extractSnippet(content, query, maxLength) {
     return snippet;
 }
 
+
 function escapeRegex(string) {
     return string.replace(/[.*+?^${}()|[\]\\]/g, '\$&');
 }
@@ -1867,31 +1864,65 @@ async function loadTags() {
     }
 }
 
+function toggleTagFilterSection() {
+    tagFilterCollapsed = !tagFilterCollapsed;
+
+    // Update header arrow
+    const header = document.querySelector('.tag-filter-header');
+    const arrow = header?.querySelector('.tag-filter-arrow');
+    const tagList = document.getElementById('tag-list');
+
+    if (arrow) {
+        arrow.classList.toggle('expanded', !tagFilterCollapsed);
+    }
+
+    if (tagList) {
+        tagList.classList.toggle('collapsed', tagFilterCollapsed);
+    }
+
+    // Save preference to localStorage
+    localStorage.setItem('tagFilterCollapsed', tagFilterCollapsed);
+}
+
 function renderTagFilter() {
     const tagList = document.getElementById('tag-list');
     const clearBtn = document.getElementById('clear-tag-filter');
+    const arrow = document.querySelector('.tag-filter-arrow');
 
     if (!tagList) return;
+
+    // Update arrow state
+    if (arrow) {
+        arrow.classList.toggle('expanded', !tagFilterCollapsed);
+    }
 
     tagList.innerHTML = '';
 
     if (allTags.length === 0) {
-        tagList.innerHTML = '<span class="no-tags-hint" style="font-size: 0.75rem; color: var(--text-muted);">No tags yet</span>';
-        return;
+        const emptyHint = document.createElement('span');
+        emptyHint.className = 'no-tags-hint';
+        emptyHint.textContent = 'No tags yet';
+        tagList.appendChild(emptyHint);
+    } else {
+        allTags.forEach(tag => {
+            const chip = document.createElement('button');
+            chip.className = 'tag-chip' + (activeTagFilter === tag ? ' active' : '');
+            chip.textContent = tag;
+            chip.onclick = (e) => {
+                e.stopPropagation();
+                toggleTagFilter(tag);
+            };
+            tagList.appendChild(chip);
+        });
     }
-
-    allTags.forEach(tag => {
-        const chip = document.createElement('button');
-        chip.className = 'tag-chip' + (activeTagFilter === tag ? ' active' : '');
-        chip.textContent = tag;
-        chip.onclick = () => toggleTagFilter(tag);
-        tagList.appendChild(chip);
-    });
 
     // Show/hide clear button
     if (clearBtn) {
         clearBtn.style.display = activeTagFilter ? 'flex' : 'none';
     }
+
+    // Apply collapsed state
+    tagList.classList.toggle('collapsed', tagFilterCollapsed);
 }
 
 function toggleTagFilter(tag) {
@@ -1937,6 +1968,67 @@ function filterChatsByTag() {
     }
 }
 
+// Load saved preference on init
+function initTagFilterState() {
+    const saved = localStorage.getItem('tagFilterCollapsed');
+    if (saved !== null) {
+        tagFilterCollapsed = saved === 'true';
+    }
+}
+
+function filterTagsBySearch(query) {
+    const searchQuery = (query || '').toLowerCase().trim();
+    const tagChips = document.querySelectorAll('#tag-list .tag-chip');
+
+    if (!searchQuery) {
+        // Show all tags when search is empty
+        tagChips.forEach(chip => {
+            chip.classList.remove('hidden-by-search');
+        });
+        return;
+    }
+
+    tagChips.forEach(chip => {
+        const tagName = chip.textContent.toLowerCase();
+
+        // Check if tag name matches search directly
+        if (tagName.includes(searchQuery)) {
+            chip.classList.remove('hidden-by-search');
+            return;
+        }
+
+        // Check if any chat with this tag matches the search
+        const hasMatchingChat = allChats.some(chat => {
+            const tags = chat.tags || [];
+            const chipText = chip.textContent;
+
+            // Skip chats that don't have this tag
+            if (!tags.includes(chipText)) return false;
+
+            // Check title match
+            const titleMatch = (chat.title || '').toLowerCase().includes(searchQuery);
+            if (titleMatch) return true;
+
+            // Check content match if enabled
+            if (searchInContent && chat.messages) {
+                for (const msg of chat.messages) {
+                    if ((msg.content || '').toLowerCase().includes(searchQuery)) {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        });
+
+        if (hasMatchingChat) {
+            chip.classList.remove('hidden-by-search');
+        } else {
+            chip.classList.add('hidden-by-search');
+        }
+    });
+}
+
 async function updateCurrentTags(tags) {
     try {
         const response = await fetch('/chat/tags', {
@@ -1956,6 +2048,197 @@ async function updateCurrentTags(tags) {
         console.error('Failed to update tags:', e);
         return { success: false, error: e.message };
     }
+}
+
+function fitTagsToContainer(container) {
+    const tags = container.querySelectorAll('.chat-tag:not(.tag-overflow)');
+    const overflowEl = container.querySelector('.tag-overflow');
+
+    // Check if overflowing (single-row container)
+    const isOverflowing = container.scrollWidth > container.clientWidth;
+
+    if (isOverflowing && tags.length > 0) {
+        // Need to remove at least one tag
+        if (tags.length === 1) {
+            // Can't remove more, truncate the tag text
+            const tag = tags[0];
+            const originalText = tag.textContent;
+            if (originalText.length > 8) {
+                tag.textContent = originalText.substring(0, 6) + '...';
+                tag.title = originalText;
+            }
+            return;
+        }
+
+        // Remove the last visible tag
+        const lastTag = tags[tags.length - 1];
+        lastTag.remove();
+
+        // Update or create overflow indicator
+        const remainingTags = currentTitleBarTags.length - (tags.length - 1);
+        if (overflowEl) {
+            overflowEl.textContent = `+${remainingTags}`;
+            overflowEl.title = currentTitleBarTags.slice(tags.length - 1).join(', ');
+        } else {
+            const moreEl = document.createElement('span');
+            moreEl.className = 'chat-tag tag-overflow';
+            moreEl.textContent = `+${remainingTags}`;
+            moreEl.title = currentTitleBarTags.slice(tags.length - 1).join(', ');
+            container.appendChild(moreEl);
+        }
+
+        // Recursively check again
+        requestAnimationFrame(() => fitTagsToContainer(container));
+    }
+}
+
+function handleTitleBarResize() {
+    if (titleBarResizeTimeout) clearTimeout(titleBarResizeTimeout);
+    titleBarResizeTimeout = setTimeout(() => {
+        if (currentTitleBarTags.length > 0) {
+            renderTitleBarTags();
+        }
+    }, 100);
+}
+
+function renderTitleBarTags() {
+    const tagsContainer = document.getElementById('chat-title-tags');
+    if (!tagsContainer || !currentTitleBarTags.length) {
+        if (tagsContainer) tagsContainer.innerHTML = '';
+        return;
+    }
+
+    // Determine max based on screen width
+    const width = window.innerWidth;
+    let maxVisibleTags;
+    if (width <= 400) {
+        maxVisibleTags = 1;
+    } else if (width <= 500) {
+        maxVisibleTags = 2;
+    } else if (width <= 600) {
+        maxVisibleTags = 2;
+    } else {
+        maxVisibleTags = 4;
+    }
+
+    renderFittedTags(tagsContainer, currentTitleBarTags, {
+        maxStart: maxVisibleTags,
+        minTags: 1,
+        showTooltip: true
+    });
+}
+
+/**
+ * Fit tags into a container, showing overflow indicator if needed
+ * @param {HTMLElement} container - The container element
+ * @param {string[]} tags - Array of tag strings
+ * @param {Object} options - Options
+ * @param {number} options.maxStart - Initial max tags before measuring (default: 3)
+ * @param {number} options.minTags - Minimum tags to always show (default: 1)
+ * @param {boolean} options.showTooltip - Whether to show full list on overflow (default: true)
+ */
+function renderFittedTags(container, tags, options = {}) {
+    const {
+        maxStart = 3,
+        minTags = 1,
+        showTooltip = true
+    } = options;
+
+    container.innerHTML = '';
+
+    if (!tags || tags.length === 0) {
+        return;
+    }
+
+    // Store data for adjustment
+    container._tagData = { tags, minTags, showTooltip, maxStart };
+
+    // Render all tags up to maxStart first
+    const fragment = document.createDocumentFragment();
+    const tagsToShow = tags.slice(0, maxStart);
+
+    tagsToShow.forEach(tag => {
+        const tagEl = document.createElement('span');
+        tagEl.className = 'chat-tag';
+        tagEl.textContent = tag;
+        fragment.appendChild(tagEl);
+    });
+
+    // Add overflow indicator if needed
+    if (tags.length > maxStart) {
+        const moreEl = document.createElement('span');
+        moreEl.className = 'chat-tag tag-overflow';
+        moreEl.textContent = `+${tags.length - maxStart}`;
+        if (showTooltip) {
+            moreEl.title = tags.slice(maxStart).join(', ');
+        }
+        fragment.appendChild(moreEl);
+    }
+
+    container.appendChild(fragment);
+
+    // Adjust after layout
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+        adjustFittedTags(container);
+    }));
+}
+
+function adjustFittedTags(container) {
+    const data = container._tagData;
+    if (!data) return;
+
+    const { tags, minTags, showTooltip } = data;
+
+    // Wait for container to have dimensions
+    if (container.clientWidth === 0) {
+        requestAnimationFrame(() => adjustFittedTags(container));
+        return;
+    }
+
+    const isOverflowing = container.scrollWidth > container.clientWidth;
+
+    if (!isOverflowing) {
+        return;
+    }
+
+    const visibleTags = container.querySelectorAll('.chat-tag:not(.tag-overflow)');
+    const overflowEl = container.querySelector('.tag-overflow');
+
+    // If at minimum, truncate text instead
+    if (visibleTags.length <= minTags) {
+        visibleTags.forEach(tag => {
+            if (tag.textContent.length > 8) {
+                tag.title = tag.textContent;
+                tag.textContent = tag.textContent.substring(0, 6) + '...';
+            }
+        });
+        return;
+    }
+
+    // Remove last visible tag
+    visibleTags[visibleTags.length - 1].remove();
+
+    // Update or create overflow indicator
+    const newCount = container.querySelectorAll('.chat-tag:not(.tag-overflow)').length;
+    const remaining = tags.length - newCount;
+
+    if (overflowEl) {
+        overflowEl.textContent = `+${remaining}`;
+        if (showTooltip) {
+            overflowEl.title = tags.slice(newCount).join(', ');
+        }
+    } else {
+        const moreEl = document.createElement('span');
+        moreEl.className = 'chat-tag tag-overflow';
+        moreEl.textContent = `+${remaining}`;
+        if (showTooltip) {
+            moreEl.title = tags.slice(newCount).join(', ');
+        }
+        container.appendChild(moreEl);
+    }
+
+    // Check again
+    requestAnimationFrame(() => adjustFittedTags(container));
 }
 
 // =============================================================================
@@ -2855,9 +3138,20 @@ async function stopGeneration(sent_from_command = false) {
 }
 
 async function clearChat() {
+    if (!confirm("Really clear the chat?")) return false;
+
     try {
-        await newChat();
-        await syncMessages();
+        const response = await fetch('/chat/clear', {
+            method: 'POST'
+        });
+
+        if (response.ok) {
+            // Reload
+            if (currentChatId) {
+                await loadChat(currentChatId);
+            }
+            await loadChats();
+        }
     } catch (err) {
         console.error('Failed to clear chat:', err);
     }
@@ -2907,7 +3201,7 @@ async function handleFileUpload(event) {
 // Theme System
 // =============================================================================
 
-let currentThemeFamily = 'default';
+let currentThemeFamily = 'monochrome';
 let currentThemeMode = 'dark'; // 'dark' or 'light'
 
 // Parse theme ID to extract family and mode
@@ -3049,14 +3343,14 @@ function updateThemeButtons() {
 
 // Load saved theme preferences
 function loadTheme() {
-    const savedFamily = localStorage.getItem('themeFamily') || 'default';
+    const savedFamily = localStorage.getItem('themeFamily') || 'monochrome';
     const savedMode = localStorage.getItem('themeMode') || 'dark';
 
     // Verify the theme exists
     const themeId = buildThemeId(savedFamily, savedMode);
     if (!themes[themeId]) {
         // Fall back to default dark
-        currentThemeFamily = 'default';
+        currentThemeFamily = 'monochrome';
         currentThemeMode = 'dark';
     } else {
         currentThemeFamily = savedFamily;
@@ -3954,7 +4248,7 @@ async function saveSettings() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(settingsData),
-                                     signal: AbortSignal.timeout(30000)
+            signal: AbortSignal.timeout(30000)
         });
 
         if (!response.ok) {
@@ -4192,7 +4486,7 @@ function createThemeSection() {
     const wrapper = document.createElement('div');
     wrapper.className = 'settings-theme-section';
 
-    const savedFamily = localStorage.getItem('themeFamily') || 'default';
+    const savedFamily = localStorage.getItem('themeFamily') || 'monochrome';
     const savedMode = localStorage.getItem('themeMode') || 'dark';
     const families = getThemeFamilies();
 
@@ -4374,7 +4668,10 @@ async function init() {
 
     loadTheme();
     loadChats();
+    initTagFilterState();
     requestNotificationPermission();
+
+    window.addEventListener('resize', handleTitleBarResize);
 
     pollIntervalId = setInterval(() => {
         if (isConnected) {

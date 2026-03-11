@@ -2,9 +2,14 @@ import core
 import asyncio
 import prompt_toolkit
 import prompt_toolkit.patch_stdout
+import sys
 
 class Cli(core.channel.Channel):
     async def run(self):
+        # only activate the CLI channel if running in a real terminal
+        if not sys.stdin.isatty():
+            return False
+
         with prompt_toolkit.patch_stdout.patch_stdout():
             prompt_session = prompt_toolkit.PromptSession()
             while True:

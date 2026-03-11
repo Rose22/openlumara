@@ -359,76 +359,202 @@ html, body {
     border-radius: 2px;
 }
 
-/* Tag Filter Section */
-.tag-filter {
+/* ==========================================================================
+   Tag Filter Section - Scrollable
+   ========================================================================== */
+/* Tag filter collapsible header */
+.tag-filter-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     padding: 12px 16px;
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.2s ease;
     border-bottom: 1px solid var(--border-color);
+}
+
+.tag-filter-header:hover {
+    background-color: var(--bg-hover);
+}
+
+.tag-filter-header-text {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.tag-filter-arrow {
+    transition: transform 0.2s ease;
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.tag-filter-arrow.expanded {
+    transform: rotate(180deg);
+}
+
+/* Collapsed tag list */
+#tag-list.collapsed {
+display: none;
+}
+
+/* Keep no-tags hint visible even when collapsed (optional - remove if you want it hidden) */
+#tag-list.collapsed .no-tags-hint {
+display: none;
+}
+
+/* Hidden by search (for tags) */
+.tag-chip.hidden-by-search {
+    display: none;
+}
+
+/* ==========================================================================
+   Tag Filter Section
+   ========================================================================== */
+.tag-filter {
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
 }
 
 .tag-filter-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 8px;
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--text-muted);
-}
-
-.clear-filter-btn {
-    background: none;
-    border: none;
-    color: var(--text-muted);
+    padding: 12px 16px;
     cursor: pointer;
-    padding: 2px;
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    user-select: none;
+    transition: background-color 0.2s ease;
 }
 
-.clear-filter-btn:hover {
-    color: var(--text-primary);
-    background: var(--bg-tertiary);
+.tag-filter-header:hover {
+    background-color: var(--bg-tertiary);
+}
+
+.tag-filter-header-text {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.tag-filter-arrow {
+    transition: transform 0.2s ease;
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.tag-filter-arrow.expanded {
+    transform: rotate(180deg);
+}
+
+.tag-list-container {
+    max-height: 200px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    /* Firefox scrollbar */
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar) var(--bg-sidebar);
+}
+
+/* WebKit scrollbar (Chrome, Safari, Edge) */
+.tag-list-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.tag-list-container::-webkit-scrollbar-track {
+    background: var(--bg-sidebar);
+    border-radius: 3px;
+}
+
+.tag-list-container::-webkit-scrollbar-thumb {
+    background: var(--scrollbar);
+    border-radius: 3px;
+}
+
+.tag-list-container::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-hover);
 }
 
 .tag-list {
+    padding: 8px 16px;
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
+}
+
+.tag-list.collapsed {
+    display: none;
+}
+
+.clear-filter-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    margin: 8px 16px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: all 0.2s ease;
+}
+
+.clear-filter-btn:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
 }
 
 .tag-chip {
     display: inline-flex;
     align-items: center;
     padding: 4px 10px;
-    border-radius: 12px;
     font-size: 0.75rem;
-    font-weight: 500;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
     cursor: pointer;
-    transition: all 0.15s ease;
-    background: var(--bg-tertiary);
+    transition: all 0.2s ease;
     color: var(--text-secondary);
-    border: 1px solid transparent;
 }
 
 .tag-chip:hover {
-    background: var(--bg-hover);
-    color: var(--text-primary);
+    background: var(--bg-tertiary);
+    border-color: var(--text-muted);
 }
 
 .tag-chip.active {
     background: var(--accent);
-    color: var(--bg-primary);
+    border-color: var(--accent);
+    color: white;
 }
 
-/* Tag chips in chat items */
+.tag-chip.hidden-by-search {
+    display: none;
+}
+
+.no-tags-hint {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    padding: 8px 0;
+}
+
+/* ==========================================================================
+ *  Chat Tags (in sidebar items and title bar)
+ *  ========================================================================== */
 .chat-tags {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 4px;
     margin-top: 4px;
+    overflow: hidden;
+    height: 20px;
 }
 
 .chat-tag {
@@ -444,14 +570,23 @@ html, body {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    flex-shrink: 1;
+    min-width: 0;
 }
 
-/* Tag chips in chat titles */
+.chat-tag.tag-overflow {
+    flex-shrink: 0;
+    cursor: default;
+}
+
+/* Title bar tags - single row with overflow handling */
 .chat-title-tags {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 4px;
-    margin-left: 8px;
+    max-width: 300px;
+    overflow: hidden;
+    height: 24px;
 }
 
 .chat-title-tags .chat-tag {
@@ -460,17 +595,69 @@ html, body {
     background: var(--bg-tertiary);
     border-radius: 8px;
     color: var(--text-muted);
+    white-space: nowrap;
+    flex-shrink: 1;
+    min-width: 0;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-/* Responsive */
+.chat-title-tags .tag-overflow {
+    font-size: 0.65rem;
+    padding: 2px 6px;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+    cursor: default;
+}
+
+/* Mobile adjustments */
+@media (max-width: 600px) {
+    .chat-title-tags {
+        max-width: 100px;
+        gap: 3px;
+    }
+
+    .chat-title-tags .chat-tag {
+        max-width: 70px;
+        font-size: 0.6rem;
+        padding: 1px 4px;
+    }
+
+    .chat-title-tags .tag-overflow {
+        font-size: 0.6rem;
+        padding: 1px 4px;
+    }
+
+    .tag-list-container {
+        max-height: 150px;
+    }
+
+    .tag-chip {
+        padding: 10px 14px;
+        font-size: 0.8rem;
+    }
+}
+
 @media (max-width: 480px) {
     .tag-filter {
         padding: 10px 12px;
     }
 
     .tag-chip {
-        padding: 3px 8px;
-        font-size: 0.7rem;
+        padding: 10px 14px;
+        font-size: 0.8rem;
+    }
+
+    .chat-title-tags {
+        max-width: 80px;
+    }
+
+    .chat-title-tags .chat-tag {
+        max-width: 50px;
     }
 }
 
@@ -720,6 +907,7 @@ header h1 {
     height: 40px;
     max-height: 40px;
     position: relative;
+    flex-wrap: wrap;
 }
 
 .chat-title-text {
@@ -729,8 +917,18 @@ header h1 {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 400px;
+    max-width: 600px;
     text-align: center;
+    flex-shrink: 1;
+    min-width: 0;
+}
+
+.chat-title-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 100%;
+    overflow: hidden;
 }
 
 .chat-title-rename {
@@ -1148,6 +1346,10 @@ flex: 1;
     height: 0;
 }
 
+.theme-switch input:checked + .theme-slider:before {
+    background-color: var(--bg-primary);
+}
+
 .theme-slider {
     position: absolute;
     cursor: pointer;
@@ -1340,10 +1542,7 @@ flex: 1;
     color: var(--text-muted);
     border-radius: var(--radius-sm);
     margin-bottom: 4px;
-}
-
-.reasoning-header:hover {
-    background: var(--bg-tertiary);
+    transition: background 0.25s ease;
 }
 
 .reasoning-icon {
@@ -1359,9 +1558,7 @@ flex: 1;
 
 /* Reasoning block - only the content area */
 .reasoning-block {
-    border-left: 3px solid var(--accent);
     background: var(--bg-tertiary);
-    border-radius: 4px;
     overflow: hidden;
     max-height: 2000px;
     opacity: 1;
@@ -1380,6 +1577,19 @@ flex: 1;
 .reasoning-wrapper.collapsed .reasoning-block {
     max-height: 0;
     opacity: 0;
+    border-radius: var(--radius-sm);
+}
+
+.reasoning-wrapper.expanded .reasoning-header {
+    background: var(--bg-tertiary);
+    /* rounded on top, straight on bottom */
+    border-radius: var(--radius-sm) var(--radius-sm) 0px 0px;
+}
+.reasoning-wrapper.collapsed .reasoning-header {
+    background: transparent;
+}
+.reasoning-wrapper.collapsed .reasoning-header:hover {
+    background: var(--bg-tertiary);
 }
 
 /* Arrow rotation animation */
@@ -1668,7 +1878,7 @@ flex: 1;
 }
 
 .tool-call-arg-name {
-    color: #8888aa;
+    color: var(--accent);
     min-width: 80px;
     flex-shrink: 0;
     font-weight: 500;
@@ -1980,7 +2190,7 @@ flex: 1;
 }
 
 .message div {
-    margin: 8px 0;
+    margin: 0 0;
 }
 
 .message ul, .message ol {
@@ -3032,12 +3242,13 @@ flex: 1;
     display: flex;
     align-items: center;
     gap: 8px;
+    color: var(--bg-primary);
 }
 
 .settings-btn.primary {
     background: var(--accent);
     border: none;
-    color: white;
+    color: var(--bg-primary);
 }
 
 .settings-btn.primary:hover:not(:disabled) {
@@ -3324,8 +3535,7 @@ flex: 1;
 }
 
 .toggle-list-switch.active::after {
-    left: 19px;
-    background: white;
+    background: var(--bg-primary);
 }
 
 /* Sensitive input (token/key fields) */

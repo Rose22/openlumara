@@ -564,6 +564,12 @@ def new_chat():
         }
     })
 
+@app.route("/chat/clear", methods=["POST"])
+def clear_chat():
+    global channel_instance
+    _run_async(channel_instance.context.chat.clear())
+    return jsonify({"success": True})
+
 @app.route('/chat/delete', methods=['POST'])
 def delete_chat():
     """Delete a saved chat."""

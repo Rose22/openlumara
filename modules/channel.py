@@ -11,7 +11,7 @@ class Channel(core.module.Module):
             case "cli":
                 chan_instr = "type /help for help. /stop is not available here."
             case "webui":
-                chan_instr = "type /help for help. features only available while channel is WebUI: press the gear icon at the top of the screen to change theme! on mobile, press the hamburger button (on the top left) or swipe from the left to open the sidebar. on desktop, the sidebar is always visible on the left. type text in the sidebar to search in conversations, use the icon next to the search box in the sidebar to toggle searching within conversation content instead of title. user can stop text generation by pressing the stop button, or typing /stop. user can press ctrl+/ to see keyboard shortcuts)." 
+                chan_instr = "type /help for help. features only available while channel is WebUI: press the gear icon at the top of the screen to open the settings. press the icon with a down arrow to export chats. on mobile, press the hamburger button (on the top left) or swipe from the left to open the sidebar. on desktop, the sidebar is always visible on the left. type text in the sidebar to search in conversations, use the icon next to the search box in the sidebar to toggle searching within conversation content instead of title. click or tap the `filter by tag` header in the sidebar to select tags to filter by. user can stop text generation by pressing the stop button, or typing /stop. user can press ctrl+/ to see keyboard shortcuts)."
             case "discord":
                 chan_instr = "say `/help` to me for a list of commands."
             case _:

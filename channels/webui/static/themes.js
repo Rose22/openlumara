@@ -22,7 +22,7 @@ const themes = {
             '--text-secondary': '#a8a8a8',
             '--text-muted': '#5a5a5a',
             '--text-code': '#d4d4d4',
-            '--accent': '#ffffff',
+            '--accent': '#ababab',
             '--accent-glow': 'rgba(255, 255, 255, 0.5)',
             '--accent-secondary': '#38bdf8',
             '--error': '#ef4444',

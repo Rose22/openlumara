@@ -51,17 +51,22 @@
                 </button>
             </div>
             <div id="tag-filter" class="tag-filter">
-                <div class="tag-filter-header">
-                    <span>Filter by tag</span>
+                <div class="tag-filter-header" onclick="toggleTagFilterSection()">
+                    <span class="tag-filter-header-text">Filter by Tag</span>
+                    <svg class="tag-filter-arrow" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                </div>
+                <div class="tag-list-container">
+                    <div id="tag-list" class="tag-list collapsed">
+                        <!-- Tags will be populated here -->
+                    </div>
                     <button id="clear-tag-filter" class="clear-filter-btn" title="Clear filter" style="display: none;">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <line x1="18" y1="6" x2="6" y2="18"></line>
                             <line x1="6" y1="6" x2="18" y2="18"></line>
                         </svg>
                     </button>
-                </div>
-                <div id="tag-list" class="tag-list">
-                    <!-- Tags will be populated here -->
                 </div>
             </div>
             <div class="sidebar-content">
@@ -130,8 +135,10 @@
 
                 <!-- Chat Title Bar -->
                 <div class="chat-title-bar" id="chat-title-bar">
-                    <span class="chat-title-text" id="chat-title-text">New Chat</span>
-                    <div id="chat-title-tags" class="chat-title-tags"></div>
+                    <div class="chat-title-content">
+                        <span class="chat-title-text" id="chat-title-text">New Chat</span>
+                        <div id="chat-title-tags" class="chat-title-tags"></div>
+                    </div>
                     <button class="chat-title-rename" id="chat-title-rename" onclick="renameCurrentChat()" title="Rename chat">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>

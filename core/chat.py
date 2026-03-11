@@ -50,7 +50,7 @@ class Chat:
             return False
 
         self.data[self.current]["messages"] = []
-        self.save()
+        await self.save()
 
         return True
     async def delete(self, id: str):
