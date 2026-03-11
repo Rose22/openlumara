@@ -97,8 +97,8 @@ class Webui(core.channel.Channel):
         flask_thread = Thread(target=self._run_flask, daemon=True)
         flask_thread.start()
 
-        host = core.config.get("webui_host", "127.0.0.1")
-        port = core.config.get("webui_port", 5000)
+        host = core.config.get("channels").get("settings").get("webui").get("host", "127.0.0.1")
+        port = core.config.get("channels").get("settings").get("webui").get("port", 5000)
         core.log("webui", f"WebUI started on {host}:{port}")
 
         while True:
@@ -108,8 +108,8 @@ class Webui(core.channel.Channel):
         """Run Flask in a separate thread."""
         from werkzeug.serving import make_server
 
-        host = core.config.get("webui_host", "127.0.0.1")
-        port = core.config.get("webui_port", 5000)
+        host = core.config.get("channels").get("settings").get("webui").get("host", "127.0.0.1")
+        port = core.config.get("channels").get("settings").get("webui").get("port", 5000)
 
         server = make_server(host, port, app, threaded=True)
         server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -564,6 +564,17 @@ def delete_conversation():
 
     _run_async(channel_instance.context.chat.delete(conv_id))
     return jsonify({'success': True})
+
+# =============================================================================
+# Settings editing routes
+# =============================================================================
+@app.route('/settings/load')
+def load_settings():
+    return jsonify(core.config.config)
+
+@app.route("/settings/save")
+def save_settings():
+    pass
 
 # =============================================================================
 # PWA Support Routes

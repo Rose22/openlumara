@@ -26,30 +26,24 @@ class Channel:
             module.channel = self
 
     async def send(self, message: dict):
-        print(message)
+        """sends a message to the AI from within the current channel"""
 
         # as soon as user sends a message in this channel, set current channel (tracked in the manager) to this one
         await self._set_as_active_channel()
-
-        """sends a message to the AI from within the current channel"""
-        if self._last_cmd_was_temporary:
-            # Remove the last two messages: the command and the command_response
-            # We pop twice to ensure both the trigger and the result are gone.
-            if len(await self.context.chat.get()) >= 2:
-                await self.context.chat.pop()
-                await self.context.chat.pop()
-                self._last_cmd_was_temporary = False
 
         cmd_response = None
         if message.get("role", "user") == "user":
             cmd_response = await self.commands.process_input(message)
 
         if cmd_response:
+            # set temporary flag on temporary commands so that they disappear upon the next user message
+            use_temporary = True if message.get("content") in self.commands.TEMPORARY else False
+
             # insert /command into context so that it gets properly tracked and displayed
-            await self.context.chat.add({"role": "user", "content": message.get("content")})
+            await self.context.chat.add({"role": "user", "content": message.get("content")}, temporary=use_temporary)
 
             # insert and return the command response without sending it to the AI
-            await self.context.chat.add({"role": "assistant", "content": f"[Command Output]: {''.join(cmd_response)}"})
+            await self.context.chat.add({"role": "assistant", "content": f"[Command Output]: {''.join(cmd_response)}"},  temporary=use_temporary)
             return cmd_response
         else:
             # if not a command, send the message to the AI and return it's response
@@ -57,7 +51,7 @@ class Channel:
             # add sent message to context
             await self.context.chat.add(message)
 
-            context = await self.context.build(system_prompt=True)
+            context = await self.context.get(system_prompt=True)
 
             # then request AI response and add it to context
             response = await self.manager.API.send(context)
@@ -65,23 +59,21 @@ class Channel:
             return response
 
     async def send_stream(self, message: dict):
+        """sends a message to the AI from within the current channel, streaming version"""
+
         # as soon as user sends a message in this channel, set current channel (tracked in the manager) to this one
         await self._set_as_active_channel()
-
-        """sends a message to the AI from within the current channel, streaming version"""
-        if self._last_cmd_was_temporary:
-            if len(await self.context.chat.get()) >= 2:
-                await self.context.chat.pop()
-                await self.context.chat.pop()
-                self._last_cmd_was_temporary = False
 
         cmd = None
         if message.get("role", "user") == "user":
             cmd = await self.commands.process_input(message)
 
         if cmd:
+            # set temporary flag on temporary commands so that they disappear upon the next user message
+            use_temporary = True if cmd in self.commands.TEMPORARY else False
+
             # insert /command into context so that it gets properly tracked and displayed
-            await self.context.chat.add({"role": "user", "content": message})
+            await self.context.chat.add({"role": "user", "content": message.get("content")}, temporary=use_temporary)
 
             # insert and return the command response without sending it to the AI
             cmd_response = []
@@ -89,22 +81,27 @@ class Channel:
                 cmd_response.append(word)
                 token_data = {"type": "content", "content": word}
                 yield token_data
-            await self.context.chat.add({"role": "assistant", "content": f"[Command Output]: {''.join(cmd_response)}"})
+            await self.context.chat.add({"role": "assistant", "content": f"[Command Output]: {''.join(cmd_response)}"},  temporary=use_temporary)
             return
         else:
             # add to context
             await self.context.chat.add(message)
 
             # and stream the response to the caller of this method
-            context = await self.context.build(system_prompt=True)
+            context = await self.context.get(system_prompt=True)
             final_content = []
+            final_reasoning = []
             tc_response = None
             tool_calls_occurred = False
+
             async for token in self.manager.API.send_stream(context):
                 token_type = token.get("type")
-                if token_type in ("content", "reasoning"):
+                if token_type == "content":
                     # this is a normal piece of streamed text
                     final_content.append(token.get("content"))
+                    yield token
+                elif token_type == "reasoning":
+                    final_reasoning.append(token.get("content"))
                     yield token
                 elif token_type == "tool_calls":
                     tool_calls_occurred = True
@@ -122,19 +119,23 @@ class Channel:
 
             # add AI's response to context as well
             if not tool_calls_occurred:
-                await self.context.chat.add({
+                new_message = {
                     "role": "assistant",
                     "content": "".join(final_content)
-                })
+                }
 
-    async def announce(self, message: str, type=None, insert_message=True):
+                if final_reasoning:
+                    new_message["reasoning_content"] = "".join(final_reasoning)
+
+                await self.context.chat.add(new_message)
+
+    async def announce(self, message: str, type=None):
         """called externally to announce things in this channel, such as a reminder sent by the AI"""
         if not type:
             type = "info"
 
         # insert announced message into context
-        if insert_message:
-            await self.context.chat.add({"role": "assistant", "content": f"[System {type}]: {message}"})
+        await self.context.chat.add({"role": "assistant", "content": f"[System {type}]: {message}"})
 
         # Subclass hook
         await self._announce(message, type=type)

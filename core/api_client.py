@@ -29,7 +29,7 @@ class APIClient():
     async def _request(self, context, tools=None, stream=False):
         """send a request to the LLM and return the response object"""
 
-        if not core.config.get("tools"):
+        if not core.config.get("model").get("use_tools"):
             # allow switching tools off globally
             tools = None
 
@@ -38,17 +38,17 @@ class APIClient():
             "messages": context,
             "tools": tools,
             "stream": stream,
-            "temperature": core.config.get("model_temp", 0.2)
+            "temperature": core.config.get("model").get("temperature", 0.2)
         }
 
         if stream:
             req["stream_options"] = {"include_usage": True}
 
-        if core.config.get("debug"):
+        if core.config.get("channels").get("debug"):
             core.log("debug:request", str(req))
 
         response = await self._AI.chat.completions.create(**req)
-        if core.config.get("debug"):
+        if core.config.get("channels").get("debug"):
             core.log("debug:response", str(response))
 
         return response
@@ -109,7 +109,7 @@ class APIClient():
 
         # handle tool calls, if any
         tool_calls = None
-        if use_tools and core.config.get("tools", False) and response_main.message.tool_calls:
+        if use_tools and core.config.get("model").get("use_tools", False) and response_main.message.tool_calls:
             tool_calls = response_main.message.tool_calls
 
         result = {}
@@ -180,7 +180,7 @@ class APIClient():
                     final_tool_calls.append(tool_call)
 
                 # handle tool calls, if any
-                if final_tool_calls and use_tools and core.config.get("tools", False):
+                if final_tool_calls and use_tools and core.config.get("model").get("use_tools", False):
                     yield {"type": "tool_calls", "content": final_tool_calls}
 
             yield {"type": "token_usage", "content": token_usage}

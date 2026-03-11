@@ -82,7 +82,7 @@
                             </svg>
                         </button>
                         <div class="status-dot" id="status" role="status" aria-label="Connection status"></div>
-                        <h1>OptiClaw</h1>
+                        <h1>AI Chat</h1>
                     </div>
                     <div class="header-right">
                         <button class="header-btn" id="search-btn" onclick="toggleSearch()" title="Search messages (Ctrl+F)">
@@ -132,14 +132,41 @@
                 </div>
 
                 <div class="modal-overlay" id="settings-overlay" onclick="closeModalOnOverlay(event, 'settings')"></div>
-                <div class="modal" id="settings-modal" role="dialog" aria-labelledby="settings-title">
+                <div class="modal settings-modal" id="settings-modal" role="dialog" aria-labelledby="settings-title">
                     <div class="modal-header">
                         <h2 id="settings-title">Settings</h2>
                         <button class="modal-close" onclick="toggleModal('settings')" aria-label="Close settings">×</button>
                     </div>
-                    <div class="modal-content">
-                        <h3>Theme</h3>
-                        <div class="theme-grid" id="theme-grid"></div>
+                    <div class="settings-body">
+                        <div class="settings-sidebar">
+                            <div class="settings-nav" id="settings-nav"></div>
+                        </div>
+                        <div class="settings-content">
+                            <div class="settings-loading" id="settings-loading">
+                                <div class="settings-spinner"></div>
+                                <span>Loading settings...</span>
+                            </div>
+                            <div class="settings-error" id="settings-error" style="display:none;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                                </svg>
+                                <p id="settings-error-msg">Failed to load settings</p>
+                                <button class="settings-retry-btn" onclick="loadSettings()">Retry</button>
+                            </div>
+                            <div class="settings-form" id="settings-form" style="display:none;"></div>
+                        </div>
+                    </div>
+                    <div class="settings-footer">
+                        <button class="settings-btn secondary" onclick="resetSettingsForm()">Reset</button>
+                        <button class="settings-btn primary" onclick="saveSettings()" id="settings-save-btn">
+                            <span class="btn-text">Save Changes</span>
+                            <span class="btn-loading" style="display:none;">
+                                <div class="btn-spinner"></div>
+                                Saving...
+                            </span>
+                        </button>
                     </div>
                 </div>
 

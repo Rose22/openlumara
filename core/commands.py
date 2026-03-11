@@ -1,34 +1,5 @@
 import core
 
-# Registry format: {"command_name": [(class_type, method), ...]}
-_command_registry = {}
-
-def command(name, description=None):
-    """
-    Decorator to register a method as a command handler.
-    If description is not provided, it falls back to the function's docstring.
-    """
-    def decorator(func):
-        func._is_command = True
-        func._command_name = name.lower().strip()
-
-        # Use provided description, otherwise try to get docstring
-        desc = description
-        if desc is None:
-            doc = func.__doc__
-            if doc:
-                # Grab the first line of the docstring for the help text
-                desc = doc.strip().split('\n')[0]
-
-        func._command_description = desc or ""
-        return func
-    return decorator
-
-def register_command_handler(command_name, cls, method):
-    if command_name not in _command_registry:
-        _command_registry[command_name] = []
-    _command_registry[command_name].append((cls, method))
-
 def get_commands_help(modules_dict):
     """
     Builds a help string grouped by module instance.
@@ -39,7 +10,7 @@ def get_commands_help(modules_dict):
         module_cmds = []
 
         # Scan the global registry for commands belonging to this instance's class
-        for cmd_name, handlers in _command_registry.items():
+        for cmd_name, handlers in core.module._command_registry.items():
             for registered_cls, method in handlers:
                 if isinstance(instance, registered_cls):
                     desc = method._command_description
@@ -57,6 +28,9 @@ def get_commands_help(modules_dict):
     return "\n\n".join(output)
 
 class Commands:
+    # delete these after they are shown to the user once
+    TEMPORARY = ("context", "sysprompt", "tools")
+
     def __init__(self, channel):
         self.channel = channel
 
@@ -111,32 +85,34 @@ class Commands:
             return None
 
         # always use temporary commands if tools are turned off. command output being seen by the AI is not useful and usually not wanted in that case
-        if not core.config.get("tools"):
-            self.channel._last_cmd_was_temporary = True
 
         cmd = message_content[cmd_prefix_index:].split()
         args = cmd[1:]
 
         match cmd[0]:
             case "new":
-                self.channel.context.clear_messages()
+                result = await self.channel.context.chat.new()
+                if not result:
+                    return "failed to start new session"
+
                 return "New session started."
             case "clear":
-                # alias for "new"
-                self.channel.context.clear_messages()
-                return "New session started."
+                result = await self.channel.context.chat.clear()
+                if not result:
+                    return "failed to clear current chat"
+                return "Cleared current chat!"
             # case "undo":
             #     self.channel.manager.API._messages.pop()
             #     self.channel.manager.API._messages.pop()
-            #     self.channel._last_cmd_was_temporary = True
+            #     self._last_cmd_was_temporary = True
             #     return "Turn undone."
             case "help":
                 return await self._get_help()
             case "status":
                 return "\n".join(await self.channel.manager.get_status())
             case "modules":
-                modules_str = "\n".join(core.config.get("modules"))
-                modules_disabled_str = "\n".join(core.config.get("modules_disabled"))
+                modules_str = "\n".join(core.config.get("modules").get("enabled"))
+                modules_disabled_str = "\n".join(core.config.get("modules").get("disabled"))
                 modules_loaded_str = "\n".join(self.channel.manager.modules.keys())
 
                 return f"== loaded ==\n{modules_loaded_str}\n\n== disabled ==\n{modules_disabled_str}\n"
@@ -217,9 +193,9 @@ class Commands:
                 for module_name, module in self.channel.manager.modules.items():
                     has_sysprompt = True if await module.on_system_prompt() else False
 
-                    if has_sysprompt and (module_name not in core.config.get("modules_disable_prompts")):
+                    if has_sysprompt and (module_name not in core.config.get("modules").get("disabled_prompts")):
                         enabled.append(module_name)
-                    elif module_name not in core.config.get("modules_disable_prompts"):
+                    elif module_name not in core.config.get("modules").get("disabled_prompts"):
                         no_prompt.append(module_name)
                     else:
                         disabled.append(module_name)
@@ -230,7 +206,7 @@ class Commands:
                 return f"== modules with active prompts ==\n{enabled_str}\n\n== modules that don't include prompts ==\n{no_prompt_str}\n\n== modules with disabled prompts ==\n{disabled_str}"
 
             case "tools":
-                if not core.config.get("tools", False):
+                if not core.config.get("model").get("use_tools", False):
                     return "tools are turned off"
 
                 tool_map = {}
@@ -249,18 +225,16 @@ class Commands:
                     tools_display = "\n".join(tools)
                     tool_map_display.append(f"== {module_name} ==\n{tools_display}")
 
-                self.channel._last_cmd_was_temporary = True
-
                 return "\n\n".join(tool_map_display)
             case "sysprompt":
-                if not core.config.get("context_window"):
+                if not core.config.get("api").get("context_window"):
                     return "CONTEXT DISABLED"
 
                 _sysprompt = await self.channel.manager.get_system_prompt()
                 if not _sysprompt:
                     _sysprompt = "BLANK"
                 sysprompt = f"=== system prompt ===\n{_sysprompt}"
-                disabled_prompts = core.config.get("modules_disable_prompts")
+                disabled_prompts = core.config.get("modules").get("disabled_prompts")
                 if disabled_prompts:
                     sysprompt += "\n\n=== disabled prompts ===\n"
                     sysprompt += "\n".join([mod_name for mod_name in disabled_prompts])
@@ -268,21 +242,17 @@ class Commands:
                 if endprompt:
                     sysprompt += f"\n\n=== end prompts ===\n{endprompt}"
 
-                self.channel._last_cmd_was_temporary = True
-
                 return sysprompt if sysprompt else "BLANK"
             case "context":
-                if not core.config.get("context_window"):
+                if not core.config.get("api").get("context_window"):
                     return "CONTEXT DISABLED"
 
-                context = await self.channel.context.build(system_prompt=True)
+                context = await self.channel.context.get(system_prompt=True)
                 if not context:
                     return "BLANK"
 
                 if len(cmd) > 1 and cmd[1] == "raw":
                     return json.dumps(context, indent=2)
-
-                self.channel._last_cmd_was_temporary = True
 
                 context_display = []
 
@@ -296,7 +266,7 @@ class Commands:
 
                 context_display.append("---")
 
-                disabled_prompts = core.config.get("modules_disable_prompts")
+                disabled_prompts = core.config.get("modules").get("disabled_prompts")
                 if disabled_prompts:
                     disabled_prompts_str = "\n".join([mod_name for mod_name in disabled_prompts])
                     context_display.append(f"== disabled prompts ==\n{disabled_prompts_str}")
@@ -320,8 +290,8 @@ class Commands:
                     cmd_lookup = cmd[0].lower().strip()
 
                     # See if this command exists in the registry
-                    if cmd_lookup in _command_registry:
-                        for registered_cls, method in _command_registry[cmd_lookup]:
+                    if cmd_lookup in core.module._command_registry:
+                        for registered_cls, method in core.module._command_registry[cmd_lookup]:
                             # Find the instance of this class in the loaded modules
                             for module_inst in self.channel.manager.modules.values():
                                 if isinstance(module_inst, registered_cls):

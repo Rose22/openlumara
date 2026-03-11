@@ -81,7 +81,7 @@ class StorageList(list):
             case "json":
                 self._write(json.dumps(self, indent=2))
             case "yaml":
-                self._write(yaml.dump(self))
+                self._write(yaml.dump(self, default_flow_style=False, sort_keys=False))
             case "msgpack":
                 self._write(msgpack.packb(self))
             case "text":
@@ -186,7 +186,7 @@ class StorageDict(dict):
             case "json":
                 self._write(json.dumps(dict(self), indent=2))
             case "yaml":
-                self._write(yaml.dump(dict(self)))
+                self._write(yaml.dump(dict(self), default_flow_style=False, sort_keys=False))
             case "msgpack":
                 self._write(msgpack.packb(dict(self)))
             case "text":

@@ -37,7 +37,7 @@ class Files(core.module.Module):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.sandbox_path = os.path.realpath(os.path.expanduser(core.config.get("sandbox_folder")))
+        self.sandbox_path = os.path.realpath(os.path.expanduser(core.config.get("files").get("sandbox_folder")))
         self.trash_path = os.path.realpath(os.path.join(core.get_data_path(), "trash"))
 
 

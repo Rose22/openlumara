@@ -31,7 +31,18 @@ class Chat:
         index = len(self.data) - 1
         self.current = index
 
-        return self.data.save()
+        self.data.save()
+        return True
+    async def clear(self):
+        index = self._find_index(id)
+
+        if not index:
+            return False
+
+        self.data[index]["messages"] = []
+        self.save()
+
+        return True
     async def delete(self, id: str):
         """delete an entire chat"""
 
@@ -67,10 +78,11 @@ class Chat:
 
     async def set_title(self, title: str):
         if not self.current:
-            await self.new()
+            return None
 
         self.data[self.current]["title"] = title
         await self.save()
+        return True
 
     async def get(self):
         """get message history of current chat"""
@@ -92,17 +104,18 @@ class Chat:
         self.data[self.current]["messages"] = messages
         await self.save()
         return True
-    async def add(self, message: dict):
+    async def add(self, message: dict, temporary = False):
         """add message to current chat"""
         if not self.current:
             await self.new()
 
-        # Debug: log what's being saved
-        if message.get('tool_calls'):
-            print(f"DEBUG chat.add: role={message.get('role')}, content_len={len(message.get('content', ''))}, has_tool_calls=True")
+        # if temporary, set the flag. gets handled in self.trim()
+        if temporary:
+            message["temporary"] = True
 
-        self.data[self.current]["messages"].append(message)
         await self.trim() # automatically trim chat history
+        await self._insert_blank_user_msg(message)
+        self.data[self.current]["messages"].append(message)
         index = len(self.data[self.current]["messages"]) - 1
 
         await self.save()
@@ -120,9 +133,14 @@ class Chat:
     async def trim(self, max_messages: int = None, max_tokens: int = None, num_tokens: int = None):
         """trims chat history to keep token consumption low"""
         if not max_messages:
-            max_messages = int(core.config.get("max_messages", 200))
+            max_messages = int(core.config.get("api").get("max_messages", 200))
         if not max_tokens:
-            max_tokens = int(core.config.get("max_context", 8192))
+            max_tokens = int(core.config.get("api").get("max_context", 8192))
+
+        # get rid of temporary messages
+        for index, msg in enumerate(await self.get()):
+            if msg.get("temporary"):
+                self.pop(index)
 
         if not num_tokens:
             # fall back to counting messages list using tiktoken
@@ -155,6 +173,25 @@ class Chat:
             elif context_trimmed:
                 await self.channel.announce("Input was too large! Context size trimmed.\n\nSent tokens: {num_tokens}\nMax allowed tokens: {max_tokens}", "error")
         return len(messages) <= max_messages
+
+    async def _insert_blank_user_msg(self, message: dict):
+        messages = await self.get()
+
+        if (
+            # if we have anything at all in the messages array
+            messages and
+            # and the last message was not a user or tool response message
+            messages[-1].get("role") not in ("user", "tool") and
+            # and the last message was also not an assistant message with toolcalls
+            not messages[-1].get("tool_calls") and
+            # and the message we're about to post isn't by the user role
+            message.get("role") != "user"
+        ):
+            # ensure message turn order is correct
+            # assistants are allowed to output after a tool role message
+            # but not after their own message..
+            self.chat.add({"role": "user", "content": "[SYSTEM_TICK]"})
+        return True
 
     async def count_tokens(self, messages: list = None) -> int:
         """

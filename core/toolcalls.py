@@ -54,9 +54,6 @@ class ToolcallManager:
         # Add assistant message to context
         await self.channel.context.chat.add(assistant_message)
 
-        # signal new turn
-        yield {"type": "new_turn", "content": initial_content or ""}
-
         # Execute each tool and add their responses
         for tool_call_dict in repaired_tool_calls:
             tool_name = tool_call_dict['function']['name']
@@ -118,7 +115,7 @@ class ToolcallManager:
             return
 
         # Build context and stream response
-        context = await self.channel.context.build(system_prompt=True)
+        context = await self.channel.context.get(system_prompt=True)
         prompt = [
             {
                 "role": "system",

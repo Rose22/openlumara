@@ -18,7 +18,7 @@ class Module:
             # Check if it's a function and has our custom attribute
             if callable(method) and hasattr(method, "_is_command"):
                 cmd_name = method._command_name
-                core.commands.register_command_handler(cmd_name, cls, method)
+                register_command_handler(cmd_name, cls, method)
 
     def result(self, data, success=True):
         """unified way of returning tool results"""
@@ -41,6 +41,37 @@ class Module:
     async def on_background(self):
         """This method will be added as a background task that will run contineously in the background. Use it for things like schedulers, cronjobs, etc!"""
         pass
+
+# --------------
+# command decorator (@core.module.command)
+# Registry format: {"command_name": [(class_type, method), ...]}
+_command_registry = {}
+
+def command(name, description=None):
+    """
+    Decorator to register a method as a command handler.
+    If description is not provided, it falls back to the function's docstring.
+    """
+    def decorator(func):
+        func._is_command = True
+        func._command_name = name.lower().strip()
+
+        # Use provided description, otherwise try to get docstring
+        desc = description
+        if desc is None:
+            doc = func.__doc__
+            if doc:
+                # Grab the first line of the docstring for the help text
+                desc = doc.strip().split('\n')[0]
+
+        func._command_description = desc or ""
+        return func
+    return decorator
+
+def register_command_handler(command_name, cls, method):
+    if command_name not in _command_registry:
+        _command_registry[command_name] = []
+    _command_registry[command_name].append((cls, method))
 
 def load(package, base_class, respect_config: bool = True):
     """
@@ -83,7 +114,7 @@ def load(package, base_class, respect_config: bool = True):
 
                 # only load enabled modules into memory
                 if respect_config:
-                    if get_name(attr) not in core.config.get("modules", [])+core.config.get("channels", []):
+                    if get_name(attr) not in core.config.get("modules").get("enabled", [])+core.config.get("channels").get("enabled", []):
                         continue
 
                 discovered.append(attr)

@@ -20,7 +20,7 @@ async def main():
     # the manager class connects everything together
     manager = core.manager.Manager()
     # connect to openAI API
-    manager.connect(core.config.get("model"), base_url=core.config.get("api_url"), api_key=core.config.get("api_key"))
+    manager.connect(core.config.get("model").get("name"), base_url=core.config.get("api").get("url"), api_key=core.config.get("api").get("key"))
     # run main loop
     await manager.run()
 

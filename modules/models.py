@@ -1,6 +1,6 @@
 import core
 
-class Model(core.module.Module):
+class Models(core.module.Module):
     """lets your AI help you switch between models"""
 
     def __init__(self, *args, **kwargs):
@@ -15,28 +15,23 @@ class Model(core.module.Module):
         current_model = self.manager.API.get_model()
         return f"Current model: {current_model}\nModels you can switch to using the models_switch() toolcall: {models_str}"
 
-    @core.commands.command("model")
+    @core.module.command("model")
     async def model(self, args: list):
-         """switch to model <name>. leave blank to show currently active model"""
+         """switch to model <name>"""
          if not args:
             return f"Current model: {self.manager.API.get_model()}"
 
          return await self.switch(args[0].strip())
 
-    @core.commands.command("models")
+    @core.module.command("models")
     async def models(self, args: list):
+        """list models"""
+
         if not self.models:
             self.models = await self.manager.API._AI.models.list()
 
         model_list = "\n".join([model.id for model in self.models.data])
         return model_list
-
-    async def on_command_help(self):
-        return """
-/models                list models
-/model                 show currently active model
-/model <name>          switch to model with provided name
-"""
 
     async def switch(self, name: str):
         if not self.models:
@@ -52,7 +47,7 @@ class Model(core.module.Module):
         if not found:
             return "model does not exist. use models_list() first"
 
-        core.config.config["model"] = found_id
+        core.config.config["model"]["name"] = found_id
         core.config.config.save()
 
         self.manager.API.set_model(found_id)

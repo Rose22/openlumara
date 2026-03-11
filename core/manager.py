@@ -46,7 +46,7 @@ class Manager:
     async def run(self):
         """main loop"""
         # load channels
-        if not core.config.get("channels"):
+        if not core.config.get("channels").get("enabled"):
             print("ERROR: At least one channel must be enabled in the config! Try the `cli` channel for a basic terminal UI.")
             exit(1)
 
@@ -55,7 +55,7 @@ class Manager:
         for channel in channels.get_all():
             # only load enabled channels
             channel_name_snakecase = core.modules.get_name(channel)
-            if channel_name_snakecase in core.config.get("channels", []):
+            if channel_name_snakecase in core.config.get("channels").get("enabled", []):
                 chan = channel(self)
                 self.channels[channel_name_snakecase] = chan
 
@@ -71,13 +71,13 @@ class Manager:
                 self.channel = self.channels[last_channel]
 
         # load modules
-        if core.config.get("modules"):
+        if core.config.get("modules").get("enabled"):
             core.log("init", "loading modules")
             loaded_module_names = []
             for module in modules.get_all():
                 # only load enabled modules
                 module_name_snakecase = core.modules.get_name(module)
-                if module_name_snakecase in core.config.get("modules", []):
+                if module_name_snakecase in core.config.get("modules").get("enabled", []):
                     loaded_module = await self.add_module_class(module)
                     # run startup methods
                     if hasattr(loaded_module, "on_ready"):
@@ -94,7 +94,7 @@ class Manager:
         else:
             core.log("init", "all modules disabled in config")
 
-        if not core.config.get("context_window"):
+        if not core.config.get("api").get("context_window"):
             core.log("init", "context window is disabled")
 
         # print()
@@ -113,13 +113,13 @@ class Manager:
         sysprompt_middle = []
         sysprompt_bottom = []
         for module_name, module in self.modules.items():
-            if not core.config.get("tools", False) and module_name not in nonagentic_modules:
+            if not core.config.get("model").get("use_tools", False) and module_name not in nonagentic_modules:
                 # skip most prompts if tools are turned off
                 continue
 
             module_sysprompt = await module.on_system_prompt()
 
-            if module_sysprompt and (module_name not in core.config.get("modules_disable_prompts", [])):
+            if module_sysprompt and (module_name not in core.config.get("modules").get("disabled_prompts", [])):
                 # default to module name
                 sysprompt_header = ' '.join(module_name.split('_')).capitalize()
                 if hasattr(module, "_header") and module._header:
@@ -150,7 +150,7 @@ class Manager:
         for module_name, module in self.modules.items():
             module_sysprompt = await module.on_end_prompt()
 
-            if module_sysprompt and (module_name not in core.config.get("modules_disable_end_prompts", [])):
+            if module_sysprompt and (module_name not in core.config.get("modules").get("disabled_end_prompts", [])):
                 prompt_chunk = f"# {' '.join(module_name.split('_')).capitalize()}\n{str(module_sysprompt).strip()}"
                 histend_prompt.append(prompt_chunk)
 

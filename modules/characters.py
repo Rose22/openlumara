@@ -1,6 +1,6 @@
 import core
 
-class Character(core.module.Module):
+class Characters(core.module.Module):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.characters = core.storage.StorageDict("characters", type="json")
@@ -8,7 +8,10 @@ class Character(core.module.Module):
         self.user_profile = core.storage.StorageDict("character_user", "json")
         self._header = "Profiles"
 
-    def _list_characters(self):
+    @core.module.command("characters")
+    async def _list_characters(self, args: list = []):
+        """list all your characters"""
+
         # collect categories
         if not self.characters:
             return {}
@@ -35,6 +38,27 @@ class Character(core.module.Module):
         characters = "\n".join(char_list)
         return characters
 
+    @core.module.command("character")
+    async def cmd_switch(self, args: list):
+        """switch to character <name>"""
+
+        name = " ".join(args)
+        if not name:
+            char = self.active_character.get()
+            if char:
+                return f"currently active character: {char}"
+            else:
+                return "please provide a character name."
+        elif name in("reset", "default"):
+                self.active_character.set(None)
+                return "character has been reset to default"
+
+        character = self._find_character(name)
+        if not character:
+            return f"character {name} does not exist!"
+        response = await self.switch(character)
+        return f"character switched to {character}"
+
     async def on_system_prompt(self):
         curr_char = self.characters.get(self.active_character.get())
         character_text = ""
@@ -56,39 +80,10 @@ class Character(core.module.Module):
             user_profile = f"## User\nName: {self.user_profile.get('name')}\nProfile: {self.user_profile.get('profile')}"
 
         tool_text = ""
-        if core.config.get("tools", False):
-            tool_text = f"You can switch between identities using character_switch(). User can switch characters using the `/character` command. Characters available to switch yourself to:\n{self._list_characters()}"
+        if core.config.get("model").get("use_tools", False):
+            tool_text = f"You can switch between identities using character_switch(). User can switch characters using the `/character` command. Characters available to switch yourself to:\n{await self._list_characters()}"
 
         return f"{user_profile}\n\n## You\n{character_text}\n\n{tool_text}"
-
-    async def on_command(self, cmd: str):
-        name = " ".join(cmd)
-        if not name:
-            char = self.active_character.get()
-            if char:
-                return f"currently active character: {char}"
-            else:
-                return "please provide a character name."
-        elif name in("reset", "default"):
-                self.active_character.set(None)
-                return "character has been reset to default"
-        elif name == "list":
-            return self._list_characters()
-
-        character = self._find_character(name)
-        if not character:
-            return f"character {name} does not exist!"
-        response = await self.switch(character)
-        #await self.channel.send("user", f"Hi {name}")
-        return f"character switched to {character}"
-
-    async def on_command_help(self):
-        return """
-/character              show currently active character
-/character <name>       switches to that character
-/character list         lists all characters
-/character reset        reset to default character
-"""
 
     async def switch(self, name: str):
         """Switches you to a different character. This will change your personality! Use this if user requests it."""
