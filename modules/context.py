@@ -26,6 +26,7 @@ class Context(core.module.Module):
 
     @core.module.command("context", temporary=True, help={
         "": "show current context window",
+        "full": "show context window including system prompt",
         "raw": "show context as raw JSON"
     })
     async def show_context(self, args):
@@ -34,7 +35,9 @@ class Context(core.module.Module):
         if not core.config.get("api").get("context_window"):
             return "CONTEXT DISABLED"
 
-        context = await self.channel.context.get(system_prompt=True)
+        show_system_prompt = True if len(args) and args[0] == "full" else False
+
+        context = await self.channel.context.get(system_prompt=show_system_prompt)
         if not context:
             return "BLANK"
 

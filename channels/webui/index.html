@@ -263,16 +263,20 @@
                                 <div class="shortcut-keys"><span class="shortcut-key">Shift</span><span class="shortcut-key">Enter</span></div>
                             </div>
                             <div class="shortcut-item">
-                                <span class="shortcut-desc">Clear chat</span>
-                                <div class="shortcut-keys"><span class="shortcut-key">Ctrl</span><span class="shortcut-key">L</span></div>
+                                <span class="shortcut-desc">Toggle sidebar</span>
+                                <div class="shortcut-keys"><span class="shortcut-key">Ctrl</span><span class="shortcut-key">B</span></div>
                             </div>
                             <div class="shortcut-item">
                                 <span class="shortcut-desc">Settings</span>
                                 <div class="shortcut-keys"><span class="shortcut-key">Ctrl</span><span class="shortcut-key">S</span></div>
                             </div>
                             <div class="shortcut-item">
-                                <span class="shortcut-desc">Search</span>
+                                <span class="shortcut-desc">Search Current Chat</span>
                                 <div class="shortcut-keys"><span class="shortcut-key">Ctrl</span><span class="shortcut-key">F</span></div>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-desc">Search All Chats (Global Search)</span>
+                                <div class="shortcut-keys"><span class="shortcut-key">Ctrl</span><span class="shortcut-key">Space</span></div>
                             </div>
                             <div class="shortcut-item">
                                 <span class="shortcut-desc">Export</span>
@@ -281,6 +285,52 @@
                             <div class="shortcut-item">
                                 <span class="shortcut-desc">Stop generation</span>
                                 <div class="shortcut-keys"><span class="shortcut-key">Escape</span></div>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-desc">Clear chat</span>
+                                <div class="shortcut-keys"><span class="shortcut-key">Ctrl</span><span class="shortcut-key">L</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Global Search Modal -->
+                <div class="modal-overlay" id="global-search-overlay" onclick="closeModalOnOverlay(event, 'global-search')"></div>
+                <div class="modal global-search-modal" id="global-search-modal" role="dialog" aria-labelledby="global-search-title">
+                    <div class="global-search-header">
+                        <div class="global-search-input-wrapper">
+                            <svg class="global-search-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <path d="m21 21-4.35-4.35"></path>
+                            </svg>
+                            <input type="text"
+                                id="global-search-input"
+                                class="global-search-input"
+                                placeholder="Search all chats..."
+                                oninput="handleGlobalSearch(this.value)"
+                                aria-label="Search all chats">
+                        </div>
+                        <button class="global-search-close" onclick="closeGlobalSearch()" aria-label="Close search">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="global-search-content">
+                        <div class="global-search-content-toggle">
+                            <label class="global-search-checkbox">
+                                <input type="checkbox" id="global-search-content-toggle" checked onchange="toggleGlobalSearchContent()">
+                                <span class="global-search-checkbox-label">Search in message content</span>
+                            </label>
+                        </div>
+                        <div class="global-search-results" id="global-search-results">
+                            <div class="global-search-empty">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <circle cx="11" cy="11" r="8"></circle>
+                                    <path d="m21 21-4.35-4.35"></path>
+                                </svg>
+                                <p>Start typing to search through all chats</p>
                             </div>
                         </div>
                     </div>
@@ -299,7 +349,7 @@
                         </svg>
                     </button>
                     <input type="file" id="file-input" onchange="handleFileUpload(event)" aria-hidden="true">
-                    <textarea id="message" placeholder="Type a message..." onkeydown="handleKeyDown(event)" rows="1" aria-label="Message input"></textarea>
+                    <textarea id="message" placeholder="Type a message..." rows="1" aria-label="Message input"></textarea>
                     <button id="send" onclick="send()" aria-label="Send message">Send</button>
                     <button id="stop" onclick="stopGeneration()" aria-label="Stop generation">Stop</button>
                 </div>

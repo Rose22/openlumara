@@ -155,7 +155,7 @@ class Commands:
                     return "please provide a name of the module to toggle"
 
                 import modules
-                module_manager = modules.module.Module(self.channel.manager)
+                module_manager = modules.modules.Modules(self.channel.manager)
                 found = False
                 for module in modules.get_all(respect_config=False):
                     module_name = core.modules.get_name(module)

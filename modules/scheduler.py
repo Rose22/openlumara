@@ -6,12 +6,13 @@ import ulid
 class Scheduler(core.module.Module):
     async def on_ready(self):
         self.schedule = core.storage.StorageList("schedule", type="json")
+        self.tc_manager = core.toolcalls.ToolcallManager(self.channel)
 
     async def on_background(self):
         """main loop"""
         core.log("init", "scheduler started")
         while True:
-            for job in self.schedule:
+            for job in list(self.schedule):
                 trigger_time = datetime.datetime.fromisoformat(job.get("trigger_time"))
 
                 if datetime.datetime.now() >= trigger_time:
@@ -19,29 +20,55 @@ class Scheduler(core.module.Module):
                         tools = self.manager.tools.copy()
                         for index, tool_obj in enumerate(tools):
                             if tool_obj.get("function", {}).get("name") == "scheduler_add_job":
-                                del(tools[index])
+                                del tools[index]
 
                         action = job.get("action")
                         if self.channel:
-                            message = await self.manager.API._recv(
-                                await self.manager.API._request([
-                                    {
-                                        "role": "user",
-                                        "content": f"# An event has triggered!\nPlease follow these instructions:\n{action}\nUse tools if needed. For simple reminders, do not use tools."
-                                    }
-                                ]),
-                                use_context=False,
+                            event_message = {
+                                "role": "user",
+                                "content": (
+                                    f"# An event has triggered!\n"
+                                    f"Please follow these instructions:\n"
+                                    f"{action}\n"
+                                    f"Use tools if needed. For simple reminders, do not use tools."
+                                )
+                            }
+
+                            response = await self.manager.API.send(
+                                [event_message],
                                 use_tools=True,
                                 tools=tools
                             )
-                            if message:
-                                await self.channel.announce(message, "schedule")
-                                self.schedule.pop(self._get_index(job.get("id")))
-                                self.schedule.save()
 
-                                # Reschedule if recurring
-                                if job.get("recurring"):
-                                    await self._reschedule_job(job)
+                            final_content = ""
+
+                            if response:
+                                tool_calls = response.get("tool_calls")
+
+                                if tool_calls:
+                                    final_content_list = []
+                                    async for token in self.tc_manager.process(
+                                        tool_calls,
+                                        initial_content=response.get("content", "")
+                                    ):
+                                        if token.get("type") in ("content", "reasoning"):
+                                            final_content_list.append(token.get("content"))
+                                    final_content = "".join(final_content_list)
+                                else:
+                                    final_content = response.get("content", "")
+                                    assistant_msg = {"role": "assistant", "content": final_content}
+                                    if response.get("reasoning"):
+                                        assistant_msg["reasoning_content"] = response["reasoning"]
+
+                                if final_content:
+                                    await self.channel.announce(final_content, "schedule")
+
+                            self.schedule.pop(self._get_index(job.get("id")))
+                            self.schedule.save()
+
+                            if job.get("recurring"):
+                                await self._reschedule_job(job)
+
                     except Exception as e:
                         core.log("scheduler", f"error: {e}")
 
@@ -65,13 +92,11 @@ class Scheduler(core.module.Module):
         """
         now = datetime.datetime.now()
 
-        # Check for specific clock time (hour/minute set as target time)
         if recur.get("target_hour") is not None:
             target_hour = recur["target_hour"]
             target_minute = recur.get("target_minute", 0)
             target_second = recur.get("target_second", 0)
 
-            # Build candidate time for today
             candidate = now.replace(
                 hour=target_hour,
                 minute=target_minute,
@@ -79,22 +104,17 @@ class Scheduler(core.module.Module):
                 microsecond=0
             )
 
-            # Handle specific weekday (0=Monday, 6=Sunday)
             if recur.get("target_weekday") is not None:
                 target_weekday = recur["target_weekday"]
                 days_until_target = (target_weekday - now.weekday()) % 7
                 if days_until_target == 0 and candidate <= now:
                     days_until_target = 7
                 candidate += datetime.timedelta(days=days_until_target)
-            
-            # Handle weekdays_only (Mon-Fri)
+
             elif recur.get("weekdays_only"):
-                if candidate.weekday() >= 5:  # Weekend
+                if candidate.weekday() >= 5 or candidate <= now:
                     candidate = self._advance_to_next_weekday(candidate)
-                elif candidate <= now:
-                    candidate = self._advance_to_next_weekday(candidate)
-            
-            # Handle regular daily/weekly recurrence
+
             else:
                 interval_days = recur.get("days", 1)
                 if candidate <= now:
@@ -102,7 +122,6 @@ class Scheduler(core.module.Module):
 
             return candidate
 
-        # Relative time (standard delta)
         delta = datetime.timedelta(
             weeks=recur.get("weeks", 0),
             days=recur.get("days", 0),
@@ -111,7 +130,6 @@ class Scheduler(core.module.Module):
             seconds=recur.get("seconds", 0)
         )
 
-        # Safety check: if delta is zero, return None to prevent infinite loop
         if delta.total_seconds() == 0:
             return None
 
@@ -120,7 +138,7 @@ class Scheduler(core.module.Module):
     def _advance_to_next_weekday(self, candidate: datetime.datetime) -> datetime.datetime:
         """Advances datetime to next valid weekday (Mon-Fri)."""
         candidate += datetime.timedelta(days=1)
-        while candidate.weekday() >= 5:  # Saturday=5, Sunday=6
+        while candidate.weekday() >= 5:
             candidate += datetime.timedelta(days=1)
         return candidate
 
@@ -133,7 +151,10 @@ class Scheduler(core.module.Module):
 
     def _weekday_name(self, weekday: int) -> str:
         """Convert weekday number to name (0=Monday, 6=Sunday)"""
-        days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        days = [
+            "Monday", "Tuesday", "Wednesday",
+            "Thursday", "Friday", "Saturday", "Sunday"
+        ]
         return days[weekday]
 
     def __str__(self):
@@ -152,7 +173,7 @@ class Scheduler(core.module.Module):
                     if display_hour == 0:
                         display_hour = 12
                     time_str = f"{display_hour}:{minute:02d} {period}"
-                    
+
                     if recur.get("target_weekday") is not None:
                         time_due = f"every {self._weekday_name(recur['target_weekday'])} at {time_str}"
                     elif recur.get("weekdays_only"):
@@ -350,4 +371,3 @@ class Scheduler(core.module.Module):
         self.schedule.pop(index)
         self.schedule.save()
         return self.result("job deleted")
-

@@ -13,30 +13,39 @@ class Client(discord.Client):
         message_obj = await discord_channel.send("...")
 
         message_content = []
-        try:
-            next_edit_time = datetime.datetime.now()
-            message_content_full = []
-            max_tokens_per_message = 400
-            async with message_obj.channel.typing():
-                async for token in token_stream:
-                    # if tokens exceed 200, add a new message to target for the edits
-                    if len(message_content) >= max_tokens_per_message:
-                        message_content = []
-                        message_obj = await discord_channel.send("...")
 
-                    message_content.append(token)
-                    message_content_full.append(token)
+        next_edit_time = datetime.datetime.now()
+        message_content_full = []
+        max_tokens_per_message = 400
+        shown_reasoning_text = False
+        async with message_obj.channel.typing():
+            async for token in token_stream:
+                # if tokens exceed 200, add a new message to target for the edits
+                if len(message_content) >= max_tokens_per_message:
+                    message_content = []
+                    message_obj = await discord_channel.send("...")
 
-                    # edit message every few seconds or if token limit reached
-                    if datetime.datetime.now() >= next_edit_time or len(message_content) >= max_tokens_per_message:
-                        await message_obj.edit(content="".join(message_content))
-                        next_edit_time = datetime.datetime.now() + datetime.timedelta(seconds=1)
+                if token.get("type") == "reasoning":
+                    # reasoning would be very hard to show on discord lol
+                    if not shown_reasoning_text:
+                        await message_obj.edit(content="thinking..")
+                        shown_reasoning_text = True
+                    continue
 
+                word = token.get("content")
+                message_content.append(word)
+                message_content_full.append(word)
+
+                # edit message every few seconds or if token limit reached
+                if datetime.datetime.now() >= next_edit_time or len(message_content) >= max_tokens_per_message:
+                    await message_obj.edit(content="".join(message_content))
+                    next_edit_time = datetime.datetime.now() + datetime.timedelta(seconds=1)
+
+        if message_content:
             await message_obj.edit(content="".join(message_content))
-
             return "".join(message_content)
-        except Exception as e:
-            print(f"error: {e}")
+        else:
+            return "..come again?"
 
     async def on_ready(self):
         core.log("discord", "logged in.")
@@ -65,7 +74,7 @@ class Client(discord.Client):
                            content = content.replace(str(mention), "") 
                            content = content.replace("<@>", "")
 
-                        response_obj = self.ai_channel.send_stream("user", content)
+                        response_obj = self.ai_channel.send_stream({"role": "user", "content": content})
                     except Exception as e:
                         return await message.channel.send(f"error while sending request to AI: {e}")
 
@@ -73,7 +82,7 @@ class Client(discord.Client):
                     response_content = await self._stream_to_discord(response_obj, message.channel)
                     core.log("discord", f"<{message.guild.me.name}> {response_content}")
                 except Exception as e:
-                    return await message.channel.send(f"error while receiving response from AI: {e}")
+                    return await message.channel.send(f"error while receiving response from AI: {e} | {e.__traceback__.tb_frame.f_code.co_filename}, {e.__traceback__.tb_frame.f_code.co_name}, ln:{e.__traceback__.tb_lineno}")
 
 class Discord(core.channel.Channel):
     def __init__(self, manager):
@@ -93,7 +102,7 @@ class Discord(core.channel.Channel):
                     await channel.send(msg)
 
     async def run(self):
-        token = core.config.config.get("discord_token")
+        token = core.config.config.get("channels").get("settings").get("discord").get("token")
 
         if not token:
             core.log("error", "discord token not set! set it in config.yaml as discord_token")
