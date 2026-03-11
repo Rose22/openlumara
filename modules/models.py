@@ -1,7 +1,7 @@
 import core
 
 class Models(core.module.Module):
-    """lets your AI help you switch between models"""
+    """switch between AI models"""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

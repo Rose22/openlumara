@@ -147,8 +147,9 @@ def get_messages():
         return jsonify({'messages': [], 'count': 0})
 
     messages = _run_async(channel_instance.context.chat.get()) or []
-    result = []
+    current_id = _run_async(channel_instance.context.chat.get_id())
 
+    result = []
     for i, msg in enumerate(messages):
         msg_data = {
             'role': msg.get('role', 'user'),
@@ -162,7 +163,8 @@ def get_messages():
 
     return jsonify({
         'messages': result,
-        'count': len(result)
+        'count': len(result),
+        'current_conversation_id': current_id
     })
 
 @app.route('/messages/since')
@@ -177,6 +179,7 @@ def get_messages_since():
         since_index = 0
 
     messages = _run_async(channel_instance.context.chat.get()) or []
+    current_id = _run_async(channel_instance.context.chat.get_id())
     result = []
 
     for i in range(since_index, len(messages)):
@@ -187,14 +190,15 @@ def get_messages_since():
             'tool_calls': msg.get('tool_calls'),
             'tool_call_id': msg.get('tool_call_id'),
             'reasoning_content': msg.get('reasoning_content'),
-            'index': i  # Explicitly include index
+            'index': i
         }
         result.append(msg_data)
 
     return jsonify({
         'messages': result,
         'count': len(result),
-        'total': len(messages)
+        'total': len(messages),
+        'current_conversation_id': current_id
     })
 
 @app.route('/stream', methods=['POST'])
@@ -263,11 +267,7 @@ def stream_message():
 
 @app.route('/send', methods=['POST'])
 def send_message():
-    """
-    Send a message and wait for complete response.
-
-    Used for commands that need immediate response.
-    """
+    """Send a message and wait for complete response."""
     global channel_instance
 
     data = request.get_json()
@@ -279,10 +279,17 @@ def send_message():
     )
     response = future.result()
 
-    total = len(_run_async(channel_instance.context.chat.get()))
+    messages = _run_async(channel_instance.context.chat.get()) or []
+    current_id = _run_async(channel_instance.context.chat.get_id())
+    current_title = _run_async(channel_instance.context.chat.get_title())
+
     return jsonify({
         'response': response,
-        'total': total
+        'total': len(messages),
+        'current_conversation': {
+            'id': current_id,
+            'title': current_title
+        }
     })
 
 @app.route('/edit', methods=['POST'])
@@ -562,7 +569,11 @@ def delete_conversation():
     if not conv_id:
         return jsonify({'success': False, 'error': 'No conversation ID provided'})
 
-    _run_async(channel_instance.context.chat.delete(conv_id))
+    success = _run_async(channel_instance.context.chat.delete(conv_id))
+
+    if not success:
+        return jsonify({'success': False, 'error': 'Conversation not found'})
+
     return jsonify({'success': True})
 
 # =============================================================================

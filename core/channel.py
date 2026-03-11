@@ -36,14 +36,6 @@ class Channel:
             cmd_response = await self.commands.process_input(message)
 
         if cmd_response:
-            # set temporary flag on temporary commands so that they disappear upon the next user message
-            use_temporary = True if message.get("content") in self.commands.TEMPORARY else False
-
-            # insert /command into context so that it gets properly tracked and displayed
-            await self.context.chat.add({"role": "user", "content": message.get("content")}, temporary=use_temporary)
-
-            # insert and return the command response without sending it to the AI
-            await self.context.chat.add({"role": "assistant", "content": f"[Command Output]: {''.join(cmd_response)}"},  temporary=use_temporary)
             return cmd_response
         else:
             # if not a command, send the message to the AI and return it's response
@@ -64,25 +56,14 @@ class Channel:
         # as soon as user sends a message in this channel, set current channel (tracked in the manager) to this one
         await self._set_as_active_channel()
 
-        cmd = None
+        cmd_response = None
         if message.get("role", "user") == "user":
-            cmd = await self.commands.process_input(message)
+            cmd_response = await self.commands.process_input(message)
 
-        if cmd:
-            # set temporary flag on temporary commands so that they disappear upon the next user message
-            use_temporary = True if cmd in self.commands.TEMPORARY else False
-
-            # insert /command into context so that it gets properly tracked and displayed
-            await self.context.chat.add({"role": "user", "content": message.get("content")}, temporary=use_temporary)
-
+        if cmd_response:
             # insert and return the command response without sending it to the AI
-            cmd_response = []
-            for word in cmd:
-                cmd_response.append(word)
-                token_data = {"type": "content", "content": word}
-                yield token_data
-            await self.context.chat.add({"role": "assistant", "content": f"[Command Output]: {''.join(cmd_response)}"},  temporary=use_temporary)
-            return
+            for word in cmd_response:
+                yield {"type": "content", "content": word}
         else:
             # add to context
             await self.context.chat.add(message)

@@ -999,6 +999,17 @@ async function pollMessages() {
         }
 
         const data = await response.json();
+
+        // Check if backend switched conversations
+        if (data.current_conversation_id !== undefined) {
+            if (data.current_conversation_id !== currentConversationId) {
+                // Backend has a different current conversation - sync up
+                await restoreCurrentConversation();
+                await loadConversations();
+                return;
+            }
+        }
+
         const messages = data.messages || [];
 
         if (messages.length > 0) {
@@ -1011,10 +1022,8 @@ async function pollMessages() {
                 const isUserCommand = msg.role === 'user' && (msg.content || '').trim().startsWith('/');
                 const isCommandOutput = parsed.isCommandOutput;
 
-                // Freeze streaming content when first tool call appears
                 if (isStreaming && hasToolCalls && !streamFrozen) {
                     streamFrozen = true;
-                    // Don't update aiContent anymore - it's frozen
                 }
 
                 if (isStreaming && !parsed.isAnnouncement) {
@@ -1088,20 +1097,23 @@ async function restoreCurrentConversation() {
         if (data.success && data.conversation && data.conversation.id) {
             currentConversationId = data.conversation.id;
             const messages = data.conversation.messages || [];
-
             updateConversationTitleBar(data.conversation.title);
 
             if (messages.length > 0) {
                 renderAllMessages(messages);
-                // Use total from response, or calculate from last message index
-                lastMessageIndex = data.conversation.total ||
-                (messages[messages.length - 1].index + 1);
+                lastMessageIndex = messages.length;
             } else {
+                // Empty conversation - clear the chat
+                const wrappers = chat.querySelectorAll('.message-wrapper');
+                wrappers.forEach(wrapper => wrapper.remove());
                 lastMessageIndex = 0;
             }
-        } else if (data.success && data.current_id === null) {
+        } else {
+            // No current conversation on backend
             currentConversationId = null;
             lastMessageIndex = 0;
+            const wrappers = chat.querySelectorAll('.message-wrapper');
+            wrappers.forEach(wrapper => wrapper.remove());
             updateConversationTitleBar(null);
         }
     } catch (e) {
@@ -1259,9 +1271,7 @@ async function loadConversation(convId) {
             currentConversationId = convId;
             const messages = data.conversation.messages || [];
             renderAllMessages(messages, true);
-            // Use total from response, or calculate from last message index
-            lastMessageIndex = data.conversation.total ||
-            (messages.length > 0 ? messages[messages.length - 1].index + 1 : 0);
+            lastMessageIndex = messages.length;
             await loadConversations();
             closeSidebar();
         } else {
@@ -1291,20 +1301,9 @@ async function deleteConversation(convId) {
         const data = await response.json();
 
         if (data.success) {
-            // If we deleted the current conversation, create a new one
-            if (currentConversationId === convId) {
-                currentConversationId = null;
-                lastMessageIndex = 0;
-
-                // Clear the chat display
-                const wrappers = chat.querySelectorAll('.message-wrapper');
-                wrappers.forEach(wrapper => wrapper.remove());
-
-                // Create a new conversation
-                await newConversation();
-            } else {
-                await loadConversations();
-            }
+            // Sync with backend's chat.current - don't make our own decision
+            await restoreCurrentConversation();
+            await loadConversations();
         }
     } catch (e) {
         console.error('Failed to delete conversation:', e);
@@ -2157,22 +2156,18 @@ async function send() {
         finishStream();
         userWrapper.remove();
         aiWrapper.remove();
-        await syncMessages();
-        await saveCurrentConversation();
 
-        // If we started without a conversation, fetch the new ID and title
-        if (startedWithoutConversation) {
-            const convId = await getCurrentConversationId();
-            if (convId) {
-                // Fetch the title too
-                const response = await fetch('/conversation/current');
-                const data = await response.json();
-                if (data.success && data.conversation) {
-                    updateConversationTitleBar(data.conversation.title);
-                }
-            }
-            await loadConversations();
+        await syncMessages();
+
+        // Always sync current conversation from backend
+        const convResponse = await fetch('/conversation/current');
+        const convData = await convResponse.json();
+        if (convData.success && convData.conversation) {
+            currentConversationId = convData.conversation.id;
+            updateConversationTitleBar(convData.conversation.title);
         }
+
+        await loadConversations();
     }
 }
 
@@ -2205,28 +2200,33 @@ function finishStream() {
 async function sendCommand(message) {
     try {
         if (message.startsWith("/stop") || message.startsWith("STOP")) {
-            // if the command was stop, dont await the response, just send it immediately
-            const response = fetch('/send', {
+            fetch('/send', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message: message })
             });
             await stopGeneration(true);
         } else {
-            // for any other command, wait the response
             const response = await fetch('/send', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message: message })
             });
+
+            if (!isStreaming) {
+                await syncMessages();
+            }
         }
 
-        // Only sync immediately if NOT streaming - otherwise pollMessages() handles it
-        // syncMessages() clears all message wrappers including the active streaming one
-        if (!isStreaming) {
-            await syncMessages();
-            await saveCurrentConversation();
+        // Always sync current conversation from backend
+        const convResponse = await fetch('/conversation/current');
+        const convData = await convResponse.json();
+        if (convData.success && convData.conversation) {
+            currentConversationId = convData.conversation.id;
+            updateConversationTitleBar(convData.conversation.title);
         }
+
+        await loadConversations();
     } catch (err) {
         console.error('Command failed:', err);
     }

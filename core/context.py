@@ -18,7 +18,9 @@ class Context:
             context = context+[{"role": "system", "content": await self.channel.manager.get_system_prompt()}]
 
         # insert message history
-        context = context+(await self.chat.get())
+        messages = await self.chat.get()
+        if messages:
+            context = context+(await self.chat.get())
 
         if end_prompt:
             histend = await self.channel.manager.get_end_prompt()

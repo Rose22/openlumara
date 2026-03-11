@@ -1,7 +1,28 @@
 import core
 
 class Chats(core.module.Module):
-    @core.module.command("chats")
+    """manage your chat history"""
+
+    @core.module.command("new", temporary=True)
+    async def new_chat(self, args):
+        """starts a new session"""
+        result = await self.channel.context.chat.new()
+        if result:
+            return "New session started."
+        else:
+            return "Failed to start new session"
+
+    @core.module.command("clear")
+    async def clear_chat(self, args):
+        """clear chat history"""
+
+        result = await self.channel.context.chat.clear()
+        if result:
+            return "Chat history wiped."
+        else:
+            return "Failed to wipe chat history"
+
+    @core.module.command("chats", temporary=True)
     async def list(self, args: list):
         """list chats"""
 
@@ -15,21 +36,34 @@ class Chats(core.module.Module):
 
         return result
 
-    @core.module.command("chat")
+    @core.module.command("load", temporary=True)
     async def load(self, args: list):
-        """load chat using ID"""
+        """load chat using its ID"""
         if not args:
             return "please provide a chat ID"
 
+        print(args[0])
         result = await self.channel.context.chat.load(args[0])
         if not result:
             return "failed to load chat"
         return "chat loaded"
 
     @core.module.command("rename")
-    async def rename(self, args: list):
+    async def cmd_rename(self, args: list):
+        """rename current chat"""
+
         newname = " ".join(args)
         result = await self.channel.context.chat.set_title(newname)
         if not result:
             return "rename failed"
         return f"chat renamed to {newname}"
+
+    # AI tool version
+    async def rename(self, new_name: str):
+        """lets you rename the current chat"""
+
+        if not new_name:
+            return self.result("name must not be blank", False)
+
+        result = await self.channel.context.chat.set_title(new_name)
+        return self.result(f"chat renamed to {new_name}")

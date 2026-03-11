@@ -34,12 +34,10 @@ class Chat:
         self.data.save()
         return True
     async def clear(self):
-        index = self._find_index(id)
-
-        if not index:
+        if self.current is None:
             return False
 
-        self.data[index]["messages"] = []
+        self.data[self.current]["messages"] = []
         self.save()
 
         return True
@@ -48,36 +46,47 @@ class Chat:
 
         index = self._find_index(id)
 
-        if not index:
+        if index is None:
             return False
 
-        return self.data.pop(index)
+        self.data.pop(index)
+        self.data.save()
+
+        # Adjust current index if needed
+        if self.current == index:
+            # Deleted the current chat - reset or move to previous
+            self.current = min(index, len(self.data) - 1) if self.data else None
+        elif self.current > index:
+            # Current was after deleted item, shift down
+            self.current -= 1
+
+        return self.current
 
     async def save(self):
-        if not self.current:
+        if self.current is None:
             await self.new()
 
         return self.data.save()
     async def load(self, id: str):
         index = self._find_index(id)
 
-        if not index:
+        if index is None:
             return False
 
-        await self.set(self.data[index].get("messages", []))
         self.current = index
+
         return True
     async def get_all(self):
         """returns all chats in the storage"""
         return self.data
 
     async def get_title(self):
-        if not self.current:
+        if self.current is None:
             return None
         return self.data[self.current].get("title")
 
     async def set_title(self, title: str):
-        if not self.current:
+        if self.current is None:
             return None
 
         self.data[self.current]["title"] = title
@@ -86,19 +95,19 @@ class Chat:
 
     async def get(self):
         """get message history of current chat"""
-        if not self.current:
+        if self.current is None:
             return None
 
         return self.data[self.current].get("messages", [])
     async def get_id(self):
-        if not self.current:
+        if self.current is None:
             return None
 
         return self.data[self.current].get("id", None)
 
     async def set(self, messages: list):
         """overwrite message history of current chat"""
-        if not self.current:
+        if self.current is None:
             await self.new()
 
         self.data[self.current]["messages"] = messages
@@ -106,7 +115,7 @@ class Chat:
         return True
     async def add(self, message: dict, temporary = False):
         """add message to current chat"""
-        if not self.current:
+        if self.current is None:
             await self.new()
 
         # if temporary, set the flag. gets handled in self.trim()
@@ -122,7 +131,7 @@ class Chat:
         return index
     async def pop(self, index: int = None):
         """pop message from current chat"""
-        if not self.current:
+        if self.current is None:
             await self.new()
 
         self.data[self.current]["messages"].pop(index)
@@ -137,25 +146,34 @@ class Chat:
         if not max_tokens:
             max_tokens = int(core.config.get("api").get("max_context", 8192))
 
+        messages = await self.get()
+        if not messages:
+            return 0 # no messages, so length is 0
+
         # get rid of temporary messages
-        for index, msg in enumerate(await self.get()):
+        for index, msg in enumerate(messages):
             if msg.get("temporary"):
-                self.pop(index)
+                await self.pop(index)
 
         if not num_tokens:
             # fall back to counting messages list using tiktoken
             num_tokens = await self.count_tokens()
 
+        # re-fetch messages, cuz we popped
+        messages = await self.get()
+
         request_too_big = False
         context_trimmed = False
         tokens_exceeded = (num_tokens >= max_tokens)
-        message_count_exceeded = (len(await self.get()) >= max_messages)
+        message_count_exceeded = (len(messages) >= max_messages)
         num_tokens = await self.count_tokens()
 
         # need to recalculate it cuz this is a while loop
-        messages = await self.get()
         while len(messages) >= max_messages or num_tokens >= max_tokens:
-            self.pop(0)
+            # pop!
+            await self.pop(0)
+
+            # keep re-fetching
             messages = await self.get()
             if not messages:
                 request_too_big = True
@@ -190,7 +208,7 @@ class Chat:
             # ensure message turn order is correct
             # assistants are allowed to output after a tool role message
             # but not after their own message..
-            self.chat.add({"role": "user", "content": "[SYSTEM_TICK]"})
+            await self.add({"role": "user", "content": "[SYSTEM_TICK]"})
         return True
 
     async def count_tokens(self, messages: list = None) -> int:
@@ -208,6 +226,9 @@ class Chat:
 
         num_tokens = 0
         _messages = messages if messages else await self.get()
+        if not _messages:
+            return 0
+
         for message in _messages:
             # OpenAI message format overhead is ~4 tokens per message
             # <im_start>{role/name}\n{content}<im_end>\n

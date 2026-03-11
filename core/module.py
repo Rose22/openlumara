@@ -47,17 +47,20 @@ class Module:
 # Registry format: {"command_name": [(class_type, method), ...]}
 _command_registry = {}
 
-def command(name, description=None):
+def command(name, help=None, temporary=False):
     """
     Decorator to register a method as a command handler.
-    If description is not provided, it falls back to the function's docstring.
+    Accepts a string description or a dictionary for subcommand help.
+    If not provided, falls back to the function's docstring (first line).
     """
     def decorator(func):
         func._is_command = True
+        func._is_temporary = temporary
         func._command_name = name.lower().strip()
 
-        # Use provided description, otherwise try to get docstring
-        desc = description
+        desc = help
+
+        # Fallback to docstring if no help provided
         if desc is None:
             doc = func.__doc__
             if doc:
@@ -72,6 +75,23 @@ def register_command_handler(command_name, cls, method):
     if command_name not in _command_registry:
         _command_registry[command_name] = []
     _command_registry[command_name].append((cls, method))
+
+def command_is_temporary(command_name):
+    """Check if a command is marked as temporary."""
+    if command_name not in _command_registry:
+        return False
+    for registered_cls, method in _command_registry[command_name]:
+        if getattr(method, '_is_temporary', False):
+            return True
+    return False
+
+def get_command_description(command_name):
+    """Get the description for a command."""
+    if command_name not in _command_registry:
+        return None
+    for registered_cls, method in _command_registry[command_name]:
+        return getattr(method, '_command_description', '')
+    return None
 
 def load(package, base_class, respect_config: bool = True):
     """

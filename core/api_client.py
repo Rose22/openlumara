@@ -83,6 +83,10 @@ class APIClient():
         except Exception as e:
             core.log_error("error while sending request to AI", e)
 
+    async def cancel(self):
+        self.cancel_request = True
+        return True
+
     async def _recv(self, response, use_tools=True):
         """takes a response object and extracts the message from it, handling tool calls if needed"""
 

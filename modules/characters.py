@@ -1,6 +1,8 @@
 import core
 
 class Characters(core.module.Module):
+    """lets your AI embody different characters! inspired by characterAI, janitorAI, sillytavern, etc."""
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.characters = core.storage.StorageDict("characters", type="json")
@@ -38,10 +40,12 @@ class Characters(core.module.Module):
         characters = "\n".join(char_list)
         return characters
 
-    @core.module.command("character")
+    @core.module.command("character", help={
+        "": "show current character",
+        "<name>": "switch to character <name>",
+        "reset": "switch to default AI assistant character"
+    })
     async def cmd_switch(self, args: list):
-        """switch to character <name>"""
-
         name = " ".join(args)
         if not name:
             char = self.active_character.get()

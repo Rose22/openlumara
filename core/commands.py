@@ -1,10 +1,12 @@
 import core
+import textwrap
 
 def get_commands_help(modules_dict):
     """
     Builds a help string grouped by module instance.
     """
     output = []
+    cmd_prefix = core.config.get("cmd_prefix", "/")
 
     for module_name, instance in modules_dict.items():
         module_cmds = []
@@ -14,15 +16,34 @@ def get_commands_help(modules_dict):
             for registered_cls, method in handlers:
                 if isinstance(instance, registered_cls):
                     desc = method._command_description
-                    # Format: /command              description
-                    module_cmds.append(f"{cmd_name:<20} {desc}")
+
+                    # Handle dictionary help for subcommands
+                    if isinstance(desc, dict):
+                        for subcmd, subdesc in desc.items():
+                            # Concatenate base command with subcommand key
+                            # e.g. "identity" + " " + "set <text>" -> "identity set <text>"
+                            full_cmd = f"{cmd_name} {subcmd}".strip()
+                            module_cmds.append(f"{cmd_prefix}{full_cmd:<20} {subdesc}")
+                    else:
+                        # Handle standard string description
+                        module_cmds.append(f"{cmd_prefix}{cmd_name:<20} {desc}")
+
                     break # Only take the first matching handler
 
         # If this module has any commands, add them to the output
         if module_cmds:
             # Sort alphabetically
             module_cmds.sort()
-            section = f"== {module_name} ==\n" + "\n".join(module_cmds)
+
+            # Retrieve class docstring
+            doc = instance.__class__.__doc__
+
+            if doc:
+                clean_doc = textwrap.dedent(doc).strip()
+                section = f"== {module_name} ==\n{clean_doc}\n\n" + "\n".join(module_cmds)
+            else:
+                section = f"== {module_name} ==\n" + "\n".join(module_cmds)
+
             output.append(section)
 
     return "\n\n".join(output)
@@ -39,21 +60,10 @@ class Commands:
 
         help_text = """
 == built in commands ==
-/new                    start a new session (clears context window)
-/clear                  same as /new
-/sysprompt              show current system prompt
-/prompts                show which modules are injecting prompts into the system prompt
-/context                show current context window
-/tools                  list tools available to the AI
-
-/status                 show status info
 /modules                list modules
 /module                 enable/disable a module by name
-
-/set                    shows you all settings
-/set <name>             shows you the value of a setting
-/set <name> <value>     sets a setting to that value
-
+/tools                  list tools available to the AI
+/status                 show status info
 /restart                restarts the server
 /stop                   stops the AI in it's tracks
 /help                   this help
@@ -69,38 +79,62 @@ class Commands:
 
         return "\n\n".join(output)
 
-    async def process_input(self, message: dict):
-        """processes user input and detects special commands that control opticlaw"""
+    def _check_if_temporary(self, cmd: str):
+        # set temporary flag on temporary commands so that they disappear upon the next user message
+        if (
+            # manually marked as temporary
+            cmd in self.TEMPORARY
+            or
+            # marked as temporary within the decorator (@core.module.command(name, temporary=True)
+            core.module.command_is_temporary(cmd)
+            or
+            # just make them all temporary if tool usage is turned off
+            not core.config.get("model").get("use_tools")
+        ):
+            return True
+        return False
+
+    async def _extract_cmd(self, message: dict):
         message_content_orig = message.get("content")
         message_content = message.get("content").strip().lower()
         cmd_prefix = core.config.get("cmd_prefix", "/")
         cmd_prefix_index = message_content.find(cmd_prefix)+len(cmd_prefix)
 
-        # why not lol
-        if message_content_orig.startswith("STOP"):
-            await self.channel.manager.API.cancel()
-            return "stopped!"
-
-        if not message_content.startswith(cmd_prefix):
-            return None
-
-        # always use temporary commands if tools are turned off. command output being seen by the AI is not useful and usually not wanted in that case
-
         cmd = message_content[cmd_prefix_index:].split()
         args = cmd[1:]
 
-        match cmd[0]:
-            case "new":
-                result = await self.channel.context.chat.new()
-                if not result:
-                    return "failed to start new session"
+        return (cmd_prefix, cmd, args)
 
-                return "New session started."
-            case "clear":
-                result = await self.channel.context.chat.clear()
-                if not result:
-                    return "failed to clear current chat"
-                return "Cleared current chat!"
+    async def process_input(self, message: dict):
+        """wrapper around the real _process_input, handles insertion of context"""
+        cmd_prefix, cmd, args = await self._extract_cmd(message)
+
+        # treat message as normal if it's not a command
+        if cmd is None or not message.get("content").startswith(cmd_prefix):
+            return False
+
+        use_temporary = self._check_if_temporary(cmd[0])
+
+        # insert /command into context so that it gets properly tracked and displayed
+        args_display = ""
+        if args:
+            args_display += " "
+            args_display += "".join(args)
+        await self.channel.context.chat.add({"role": "user", "content": f"{cmd_prefix}{cmd[0]}{args_display}"}, temporary=use_temporary)
+
+        result = await self._process_input(message)
+
+        # insert command result into context, flagging as temporary if needed
+        await self.channel.context.chat.add({"role": "assistant", "content": f"[Command Output]:\n{result}"}, temporary=use_temporary)
+
+        return result
+
+    async def _process_input(self, message: dict):
+        """processes user input and detects special commands that control opticlaw"""
+
+        cmd_prefix, cmd, args = await self._extract_cmd(message)
+
+        match cmd[0]:
             # case "undo":
             #     self.channel.manager.API._messages.pop()
             #     self.channel.manager.API._messages.pop()
@@ -138,73 +172,6 @@ class Commands:
                 await asyncio.sleep(0.2)
                 await core.restart()
                 return
-            case "set":
-                if not args:
-                    display_list = []
-                    for key, value in core.config.config.items():
-                        if isinstance(value, list):
-                            continue
-                        elif isinstance(value, bool):
-                            value = "on" if value else "off"
-                        elif "_key" in key or "_token" in key:
-                            value = "******"
-
-                        display_list.append(f"{key}: {value}")
-
-                    return "\n".join(display_list)
-
-                key = args[0].lower()
-                if key not in core.config.config.keys():
-                    return "that setting does not exist"
-
-                if len(args) < 2:
-                    # show value
-                    value = core.config.get(key)
-                    if isinstance(value, bool):
-                        value = "on" if value else "off"
-                    return value
-                else:
-                    if key in ("api_url", "api_key"):
-                        return "it is unsafe to modify API settings while opticlaw is running. please manually edit the config file."
-
-                    # set value
-                    setting = " ".join(args[1:])
-                    if isinstance(core.config.get(key), list):
-                        return "use the respective module to change this setting"
-                    if isinstance(core.config.get(key), bool):
-                        if setting.lower() in ("true", "on"):
-                            setting = True
-                        elif setting.lower() in ("false", "off"):
-                            setting = False
-                        else:
-                            return "set this setting to either on or off"
-
-                    if isinstance(setting, str) and setting.isdecimal():
-                        setting = int(setting)
-
-                    core.config.config[key] = setting
-                    core.config.config.save()
-
-                    return "setting changed!"
-            case "prompts":
-                enabled = []
-                no_prompt = []
-                disabled = []
-                for module_name, module in self.channel.manager.modules.items():
-                    has_sysprompt = True if await module.on_system_prompt() else False
-
-                    if has_sysprompt and (module_name not in core.config.get("modules").get("disabled_prompts")):
-                        enabled.append(module_name)
-                    elif module_name not in core.config.get("modules").get("disabled_prompts"):
-                        no_prompt.append(module_name)
-                    else:
-                        disabled.append(module_name)
-
-                enabled_str = "\n".join(enabled)
-                no_prompt_str = "\n".join(no_prompt)
-                disabled_str = "\n".join(disabled)
-                return f"== modules with active prompts ==\n{enabled_str}\n\n== modules that don't include prompts ==\n{no_prompt_str}\n\n== modules with disabled prompts ==\n{disabled_str}"
-
             case "tools":
                 if not core.config.get("model").get("use_tools", False):
                     return "tools are turned off"
@@ -226,58 +193,6 @@ class Commands:
                     tool_map_display.append(f"== {module_name} ==\n{tools_display}")
 
                 return "\n\n".join(tool_map_display)
-            case "sysprompt":
-                if not core.config.get("api").get("context_window"):
-                    return "CONTEXT DISABLED"
-
-                _sysprompt = await self.channel.manager.get_system_prompt()
-                if not _sysprompt:
-                    _sysprompt = "BLANK"
-                sysprompt = f"=== system prompt ===\n{_sysprompt}"
-                disabled_prompts = core.config.get("modules").get("disabled_prompts")
-                if disabled_prompts:
-                    sysprompt += "\n\n=== disabled prompts ===\n"
-                    sysprompt += "\n".join([mod_name for mod_name in disabled_prompts])
-                endprompt = await self.channel.manager.get_end_prompt()
-                if endprompt:
-                    sysprompt += f"\n\n=== end prompts ===\n{endprompt}"
-
-                return sysprompt if sysprompt else "BLANK"
-            case "context":
-                if not core.config.get("api").get("context_window"):
-                    return "CONTEXT DISABLED"
-
-                context = await self.channel.context.get(system_prompt=True)
-                if not context:
-                    return "BLANK"
-
-                if len(cmd) > 1 and cmd[1] == "raw":
-                    return json.dumps(context, indent=2)
-
-                context_display = []
-
-                for message in context:
-                    content = message.get("content")
-                    if not content:
-                        if message.get("tool_calls"):
-                            content = str(message.get("tool_calls"))
-
-                    context_display.append(f"== {message.get('role')} ==\n{content}")
-
-                context_display.append("---")
-
-                disabled_prompts = core.config.get("modules").get("disabled_prompts")
-                if disabled_prompts:
-                    disabled_prompts_str = "\n".join([mod_name for mod_name in disabled_prompts])
-                    context_display.append(f"== disabled prompts ==\n{disabled_prompts_str}")
-
-                ctx_string = ""
-                context_size = await self.channel.context.get_size()
-                for key, value in context_size.items():
-                    ctx_string += f"{key}: {value}\n"
-                context_display.append(f"== context size ==\n{ctx_string}")
-
-                return "\n\n".join(context_display)
             case "restart":
                 await core.restart(self.channel)
             case "stop":
@@ -285,11 +200,12 @@ class Commands:
                 await self.channel.manager.API.cancel()
                 return "stopped!"
             case _:
-                # Check the new decorator registry
+                # handle module commands by using their decorated methods
+
                 if self.channel.manager.modules:
                     cmd_lookup = cmd[0].lower().strip()
 
-                    # See if this command exists in the registry
+                    # See if this command exists in the command registry
                     if cmd_lookup in core.module._command_registry:
                         for registered_cls, method in core.module._command_registry[cmd_lookup]:
                             # Find the instance of this class in the loaded modules

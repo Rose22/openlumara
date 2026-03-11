@@ -1,6 +1,8 @@
 import core
 
 class Identity(core.module.Module):
+    """manage your AI's personality"""
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.identity = core.storage.StorageList("identity", type="text")
@@ -27,6 +29,26 @@ class Identity(core.module.Module):
         self.identity.append(content)
         self.identity.save()
         return self.result(True)
+
+    # command version
+    @core.module.command("identity", help={
+        "": "show AI's current identity",
+        "set <text>": "sets your AI's identity",
+        "clear": "clears your AI's identity"
+    })
+    async def cmd_set(self, args):
+        if not args:
+            return self.identity[0] if len(self.identity) > 0 else "You have not yet set up an identity."
+
+        if args[0] == "set":
+            text = " ".join(args[1:])
+            await self.set(text)
+            return "identity set!"
+        elif args[0] == "clear":
+            await self.clear()
+            return "identity cleared."
+        else:
+            return "invalid argument"
 
     async def clear(self):
         """Wipes your identity as an AI so you may start from scratch. USE WITH CAUTION!"""
