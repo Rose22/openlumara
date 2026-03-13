@@ -3,17 +3,39 @@
 // =============================================================================
 
 async function send() {
-    if (!isConnected) {
-        return;
-    }
-
+    // Don't block on server connection check - let it fail naturally
+    // This allows the initial message to trigger the connection check
     const message = inputField.value.trim();
     if (!message) return;
 
-    // Commands bypass the streaming lock entirely
+    // Commands bypass all checks entirely
     if (message.trim().startsWith('/') || message.trim().startsWith("STOP")) {
         clearInput();
         return sendCommand(message);
+    }
+
+    // Check API connection status before sending regular messages
+    try {
+        const statusResponse = await fetch('/api/status', {
+            signal: AbortSignal.timeout(5000)
+        });
+
+        if (statusResponse.ok) {
+            const statusData = await statusResponse.json();
+
+            if (!statusData.connected) {
+                clearInput();
+                showApiConfigError(
+                    statusData.error || 'API is not connected.',
+                    statusData.error_type,
+                    statusData.action
+                );
+                return;
+            }
+        }
+    } catch (err) {
+        // Server might be unreachable - let the send attempt fail naturally
+        console.error('Could not check API status:', err);
     }
 
     if (isStreaming) return;
@@ -85,6 +107,29 @@ async function send() {
                                      signal: currentController.signal
         });
 
+        // Handle server errors (not API errors)
+        if (!response.ok) {
+            if (response.status === 503) {
+                let errorData;
+                try {
+                    errorData = await response.json();
+                } catch (e) {
+                    errorData = { error: 'API is not available.' };
+                }
+                userWrapper.remove();
+                aiWrapper.remove();
+                showApiConfigError(
+                    errorData.error || 'API is not available.',
+                    errorData.error_type,
+                    errorData.action
+                );
+                finishStream();
+                return;
+            } else {
+                throw new Error(`Server error: ${response.status}`);
+            }
+        }
+
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
@@ -121,7 +166,6 @@ async function send() {
                                     typing.classList.remove('show');
                                     aiWrapper.classList.remove('hidden');
                                 }
-                                // Only accumulate if not frozen
                                 if (!streamFrozen) {
                                     aiContent += token;
                                     updateStreamingContent(aiMsgDiv, aiContent, aiReasoning);
@@ -137,7 +181,6 @@ async function send() {
                                 aiWrapper.classList.remove('hidden');
                             }
                             hasReasoning = true;
-                            // Only accumulate if not frozen
                             if (!streamFrozen) {
                                 aiReasoning += data.content || '';
                                 updateStreamingContent(aiMsgDiv, aiContent, aiReasoning);
@@ -146,26 +189,21 @@ async function send() {
                         }
 
                         if (data.type === 'new_turn') {
-                            // Start a new assistant turn during tool processing
                             currentTurnIndex++;
                             aiContent = '';
                             aiReasoning = '';
 
-                            // Create a new turn container if needed
                             if (!aiWrapper.querySelector('.turn-container')) {
                                 aiMsgDiv.innerHTML = '<div class="turn-container current"></div>';
                             }
 
-                            // Create previous turn divs for earlier content
                             const prevTurns = streamingTurns.map(t =>
                             `<div class="assistant-turn">${renderMarkdown(t.content)}</div>`
                             ).join('');
 
-                            // Add tool decisions container
                             aiMsgDiv.innerHTML = prevTurns + '<div class="turn-container current"></div>';
                         }
 
-                        // Legacy token format (backward compatibility)
                         if (data.token && !data.type) {
                             if (!streamStarted) {
                                 streamStarted = true;
@@ -185,7 +223,8 @@ async function send() {
                             if (!streamStarted) {
                                 aiWrapper.classList.remove('hidden');
                             }
-                            aiMsgDiv.innerHTML = '<span style="color:#f88;">[Error: ' + escapeHtml(data.error) + ']</span>';
+                            const errorDetails = data.error_data || {};
+                            aiMsgDiv.innerHTML = `<span style="color:#f88;">[Error: ${escapeHtml(errorDetails.message || data.error)}]</span>`;
                         }
                     } catch (e) {
                         // Ignore parse errors
@@ -201,11 +240,9 @@ async function send() {
             aiMsgDiv.innerHTML = '<span style="color:#f88;">Error: ' + escapeHtml(err.message) + '</span>';
         }
     } finally {
-        // Animate reasoning collapse before finalizing
         const reasoningWrapper = aiWrapper.querySelector('.reasoning-wrapper');
         if (reasoningWrapper && !reasoningWrapper.classList.contains('collapsed')) {
             reasoningWrapper.classList.add('collapsed');
-            // Wait for animation to complete (match CSS transition duration)
             await new Promise(resolve => setTimeout(resolve, 300));
         }
 
@@ -215,7 +252,6 @@ async function send() {
 
         await syncMessages();
 
-        // Always sync current chat from backend
         const chatResponse = await fetch('/chat/current');
         const chatData = await chatResponse.json();
         if (chatData.success && chatData.chat) {
@@ -230,34 +266,15 @@ async function send() {
     }
 }
 
-function updateStreamingContent(msgDiv, content, reasoning) {
-    let html = '';
-
-    // Add reasoning block if present (collapsed during streaming)
-    if (reasoning) {
-        html += renderReasoningBlock(reasoning, false); // Not collapsed during streaming
-    }
-
-    // Add main content
-    if (content) {
-        html += renderMarkdown(content);
-    }
-
-    msgDiv.innerHTML = html;
-    highlightCode(msgDiv);
-}
-
-function finishStream() {
-    setInputState(false, false, false);
-    isStreaming = false;
-    streamFrozen = false;
-    currentController = null;
-    currentStreamId = null;
-    inputField.focus();
-}
-
 async function sendCommand(message) {
+    // Commands work even when API is disconnected
     try {
+        // Handle /connect command specially
+        if (message.toLowerCase() === '/connect') {
+            await reconnectApi();
+            return;
+        }
+
         if (message.startsWith("/stop") || message.startsWith("STOP")) {
             fetch('/send', {
                 method: 'POST',
@@ -271,6 +288,22 @@ async function sendCommand(message) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message: message })
             });
+
+            // Handle API configuration errors
+            if (response.status === 503) {
+                let errorData;
+                try {
+                    errorData = await response.json();
+                } catch (e) {
+                    errorData = { error: 'API is not available.' };
+                }
+                showApiConfigError(
+                    errorData.error || 'API is not available.',
+                    errorData.error_type,
+                    errorData.action
+                );
+                return;
+            }
 
             if (!isStreaming) {
                 await syncMessages();
@@ -292,6 +325,32 @@ async function sendCommand(message) {
     } catch (err) {
         console.error('Command failed:', err);
     }
+}
+
+function updateStreamingContent(msgDiv, content, reasoning) {
+    let html = '';
+
+    // Add reasoning block if present (collapsed during streaming)
+    if (reasoning) {
+        html += renderReasoningBlock(reasoning, false);
+    }
+
+    // Add main content
+    if (content) {
+        html += renderMarkdown(content);
+    }
+
+    msgDiv.innerHTML = html;
+    highlightCode(msgDiv);
+}
+
+function finishStream() {
+    setInputState(false, false, false);
+    isStreaming = false;
+    streamFrozen = false;
+    currentController = null;
+    currentStreamId = null;
+    inputField.focus();
 }
 
 async function stopGeneration(sent_from_command = false) {
@@ -323,24 +382,4 @@ async function stopGeneration(sent_from_command = false) {
 
     await syncMessages();
     finishStream();
-}
-
-async function clearChat() {
-    if (!confirm("Really clear the chat?")) return false;
-
-    try {
-        const response = await fetch('/chat/clear', {
-            method: 'POST'
-        });
-
-        if (response.ok) {
-            // Reload
-            if (currentChatId) {
-                await loadChat(currentChatId);
-            }
-            await loadChats();
-        }
-    } catch (err) {
-        console.error('Failed to clear chat:', err);
-    }
 }

@@ -19,13 +19,38 @@ import core
 async def main():
     # the manager class connects everything together
     manager = core.manager.Manager()
-    # connect to openAI API
-    manager.connect(core.config.get("model").get("name"), base_url=core.config.get("api").get("url"), api_key=core.config.get("api").get("key"))
     # run main loop
-    await manager.run()
+    return await manager.run()
 
-try:
-    asyncio.run(main())
-except KeyboardInterrupt:
-    print("Shutting down..")
-    exit()
+def do_restart():
+    """cross-platform restart with TTY/console inheritance"""
+    script = os.path.abspath(sys.argv[0])
+    args = [sys.executable, script] + sys.argv[1:]
+
+    if sys.platform == "win32":
+        # windows: spawn new process, inherit same console
+        subprocess.Popen(
+            args,
+            stdin=sys.stdin,
+            stdout=sys.stdout,
+            stderr=sys.stderr,
+        )
+        sys.exit(0)
+    else:
+        # unix: replace process, inherits TTY automatically
+        os.execv(sys.executable, args)
+
+while True:
+    result = None
+    try:
+        result = asyncio.run(main())
+    except KeyboardInterrupt:
+        pass
+
+    if result == "restart":
+        do_restart()
+    else:
+        print("Shutting down..")
+        exit()
+
+

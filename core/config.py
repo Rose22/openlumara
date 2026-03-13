@@ -4,18 +4,17 @@ import core
 import modules
 import channels
 
-config = core.storage.StorageDict("config", "yaml", data_dir="config")
+config = core.storage.StorageDict("config", "yaml", data_dir="config", autoreload=True)
 
 default_config = {
     "api": {
         "url": "http://localhost:5001/v1",
         "key": "KEY_HERE",
-        "max_messages": 200,
-        "context_window": True
+        "max_messages": 200
     },
     "model": {
         "name": "MODEL_HERE",
-        "temp": 0.2,
+        "temperature": 0.2,
         "use_tools": True
     },
     "channels": {
@@ -25,6 +24,9 @@ default_config = {
             "webui": {
                 "host": "localhost",
                 "port": 5000
+            },
+            "discord": {
+                "token": "TOKEN_HERE"
             }
         }
     },

@@ -10,7 +10,11 @@ class Models(core.module.Module):
     async def on_system_prompt(self):
         """Returns a list of AI/LLM models available to switch to"""
         if not self.models:
-            self.models = await self.manager.API._AI.models.list()
+            models = await self.manager.API.list_models()
+            if not models:
+                return None
+            self.models = models
+
         models_str = ", ".join([model.id for model in self.models.data])
         current_model = self.manager.API.get_model()
         return f"Current model: {current_model}\nModels you can switch to using the models_switch() toolcall: {models_str}"
@@ -26,16 +30,15 @@ class Models(core.module.Module):
     @core.module.command("models")
     async def models(self, args: list):
         """list models"""
-
         if not self.models:
-            self.models = await self.manager.API._AI.models.list()
+            return "Failed to fetch models"
 
         model_list = "\n".join([model.id for model in self.models.data])
         return model_list
 
     async def switch(self, name: str):
         if not self.models:
-            self.models = await self.manager.API._AI.models.list()
+            return False
 
         found = False
         found_id = None

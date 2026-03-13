@@ -110,9 +110,15 @@ class StorageList(list):
             case "text":
                 self.extend(data.split("\n"))
 
+    def get(self, *args, **kwargs):
+        if self.autoreload:
+            self.load()
+
+        return super().get(*args, **kwargs)
+
 class StorageDict(dict):
     """subclassed dict that handles storage of data. supports a variety of storage formats."""
-    def __init__(self, file_path, type: str, manager=None, data_dir=None, *args):
+    def __init__(self, file_path, type: str, manager=None, data_dir=None, autoreload=False, *args):
         super().__init__(*args)
 
         if not data_dir:
@@ -126,6 +132,7 @@ class StorageDict(dict):
 
         self.path = core.get_path(os.path.join(data_dir, file_path))
         self.binary = False
+        self.autoreload = autoreload
 
         # lets not overwrite a builtin
         file_type = type
@@ -217,9 +224,15 @@ class StorageDict(dict):
 
         return True
 
+    def get(self, *args, **kwargs):
+        if self.autoreload:
+            self.load()
+
+        return super().get(*args, **kwargs)
+
 class StorageText:
     """simple class that saves its content to a text file"""
-    def __init__(self, file_path, manager=None, data_dir=None, *args):
+    def __init__(self, file_path, manager=None, data_dir=None, autoreload=False, *args):
         super().__init__(*args)
 
         if not data_dir:
@@ -232,6 +245,7 @@ class StorageText:
             os.mkdir(data_dir)
 
         self._data = ""
+        self.autoreload = autoreload
 
         self.path = core.get_path(os.path.join(data_dir, file_path))
         if os.path.exists(self.path):
@@ -246,6 +260,8 @@ class StorageText:
         self._data = str(new_data)
         self.save()
     def get(self):
+        if self.autoreload:
+            self.load()
         return str(self._data)
 
     def load(self):

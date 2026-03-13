@@ -25,6 +25,26 @@ class Channel:
         for module_name, module in self.manager.modules.items():
             module.channel = self
 
+    def _get_disconnection_message(self):
+        """Generate a user-friendly disconnection message."""
+        status = self.manager.get_api_status()
+        error = status.get("error", "Unknown error")
+
+        message_parts = ["Not connected to API."]
+
+        if error:
+            message_parts.append(f"Error: {error}")
+
+        # Provide actionable guidance
+        if not status.get("url_configured"):
+            message_parts.append("Please configure your API URL in config/config.yml")
+        elif not status.get("key_configured"):
+            message_parts.append("Please configure your API key in config/config.yml")
+        else:
+            message_parts.append("Use /connect to retry connection, or check your settings.")
+
+        return "\n".join(message_parts)
+
     async def send(self, message: dict):
         """sends a message to the AI from within the current channel"""
 
@@ -40,13 +60,31 @@ class Channel:
         else:
             # if not a command, send the message to the AI and return it's response
 
+            # Check connection status
+            if not self.manager.API.connected:
+                # Try to reconnect automatically once
+                reconnected = await self.manager.API.connect()
+                if not reconnected:
+                    return self._get_disconnection_message()
+
             # add sent message to context
             await self.context.chat.add(message)
 
             context = await self.context.get(system_prompt=True, end_prompt=True)
 
+            # Check if context generation failed (can happen if disconnected)
+            if context is None:
+                return self._get_disconnection_message()
+
             # then request AI response and add it to context
             response = await self.manager.API.send(context)
+
+            # Handle error responses
+            if isinstance(response, dict) and "error" in response:
+                await self.context.chat.pop()  # Remove the user message we just added
+                error_msg = response.get("message", "Unknown error occurred")
+                return f"API Error: {error_msg}\n\nUse /connect to retry."
+
             await self.context.chat.add({"role": "assistant", "content": response})
             return response
 
@@ -65,11 +103,25 @@ class Channel:
             for word in cmd_response:
                 yield {"type": "content", "content": word}
         else:
+            # Check connection status
+            if not self.manager.API.connected:
+                # Try to reconnect automatically once
+                reconnected = await self.manager.API.connect()
+                if not reconnected:
+                    yield {"type": "content", "content": self._get_disconnection_message()}
+                    return
+
             # add to context
             await self.context.chat.add(message)
 
             # and stream the response to the caller of this method
             context = await self.context.get(system_prompt=True, end_prompt=True)
+
+            # Check if context generation failed
+            if context is None:
+                yield {"type": "content", "content": self._get_disconnection_message()}
+                return
+
             final_content = []
             final_reasoning = []
             tc_response = None
@@ -77,6 +129,14 @@ class Channel:
 
             async for token in self.manager.API.send_stream(context):
                 token_type = token.get("type")
+
+                # Handle error tokens
+                if token_type == "error":
+                    error_data = token.get("content", {})
+                    error_msg = error_data.get("message", "Unknown error")
+                    yield {"type": "content", "content": f"API Error: {error_msg}"}
+                    return
+
                 if token_type == "content":
                     # this is a normal piece of streamed text
                     final_content.append(token.get("content"))
@@ -120,6 +180,7 @@ class Channel:
 
         # Subclass hook
         await self._announce(message, type=type)
+
     async def _announce(self, message: str, type=None):
         """override this one in subclasses"""
         raise NotImplementedError

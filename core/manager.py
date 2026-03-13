@@ -9,6 +9,7 @@ import json
 import json_repair
 import inspect
 import re
+import subprocess
 
 class Manager:
     """the central class that manages everything"""
@@ -16,28 +17,14 @@ class Manager:
     # --- main ---
     def __init__(self):
         self._async_tasks = set()
-        self.API = None # connect later with .connect()
+        self.API = core.api_client.APIClient(self) # connect later with .connect()
         self.savedata = core.storage.StorageDict("save", "msgpack")
         self.channels = {}
         self.channel = None # current active channel. gets dynamically switched around
         self.modules = {}
         self.tools = []
 
-    def connect(self, *args, **kwargs):
-        args = (self,)+args
-        try:
-            self.API = core.api_client.APIClient(*args, **kwargs)
-        except Exception as e:
-            core.log("error", f"error connecting to API: {e}")
-            exit(1)
-
-        # Retrieve specific model details
-        #model_info = self.API._AI.models.retrieve(model_id)
-        # models = self.API._AI.models.list()
-        # for model in models.data:
-        #     print(model)
-
-        return self.API
+        self._restart_requested = False
 
     def _remove_async_task(self, task):
         self._async_tasks.discard(task)
@@ -97,22 +84,90 @@ class Manager:
         else:
             core.log("core", "all modules disabled in config")
 
-        if not core.config.get("api").get("context_window"):
-            core.log("core", "context window is disabled")
-
-        # print()
-        # print("\n".join(await self.get_status()))
-        # print("---\n")
+        # Attempt API connection but don't fail if it doesn't work
+        await self._initialize_api_connection()
 
         # run everything
         core.log("core", "startup complete")
-        await asyncio.gather(*self._async_tasks)
+
+        await asyncio.gather(*self._async_tasks, return_exceptions=True)
+
+        if self._restart_requested:
+            return "restart"
+        return None
+
+    async def restart(self):
+        if self.channel:
+            await self.channel.announce("restarting server..")
+        core.log("core", "restarting server..")
+
+        self._restart_requested = True
+
+        # shutdown channels
+        for channel_name, channel in self.channels.items():
+            if hasattr(channel, "shutdown"):
+                try:
+                    if asyncio.iscoroutinefunction(channel.shutdown):
+                        await channel.shutdown()
+                    else:
+                        channel.shutdown()
+                except Exception as e:
+                    core.log("warning", f"Error shutting down {channel_name}: {e}")
+
+        # Cancel all running tasks so gather() returns
+        for task in list(self._async_tasks):
+            task.cancel()
+
+    async def _initialize_api_connection(self):
+        """Initialize API connection with user-friendly error handling."""
+        core.log("API", "connecting to AI..")
+
+        connected = await self.API.connect()
+        if not connected:
+            error = self.API.get_last_error() or "Unknown error"
+            core.log("API", f"Failed to connect: {error}")
+            core.log("API", "OptiClaw will continue in disconnected mode.")
+            core.log("API", "Use the /reconnect command to retry after fixing your configuration.")
+
+    async def reconnect_api(self):
+        """Manually trigger API reconnection. Returns status dict."""
+        core.log("API", "Attempting to reconnect...")
+
+        # First validate config
+        validation = self.API._validate_config()
+        if not validation["valid"]:
+            return {
+                "success": False,
+                "error": validation["error"],
+                "action": "Please update your config file and try again."
+            }
+
+        connected = await self.API.reconnect()
+        if connected:
+            core.log("API", "Reconnected successfully")
+            return {
+                "success": True,
+                "message": "Successfully connected to API"
+            }
+        else:
+            error = self.API.get_last_error() or "Unknown error"
+            return {
+                "success": False,
+                "error": error,
+                "action": "Please check your API settings and try again."
+            }
+
+    def get_api_status(self):
+        """Get current API connection status for display."""
+        return self.API.get_connection_status()
 
     async def get_system_prompt(self):
+        # Allow generating system prompt even when disconnected
+        # (modules may still need to provide context)
         nonagentic_modules = ("character", "time")
         system_prompt = []
 
-        #W automatically insert system prompts returned by modules (such as memory)
+        # automatically insert system prompts returned by modules (such as memory)
         sysprompt_top = []
         sysprompt_middle = []
         sysprompt_bottom = []
@@ -160,24 +215,39 @@ class Manager:
         else:
             return ""
 
-    # async def get_status(self):
-    #     status_list = []
-    #     status_list.append("== server ==")
-    #     status_list.append("API server: " + str(core.config.get("api_url")))
-    #     if "webui" in core.config.get("channels"):
-    #         status_list.append(f"WebUI: {core.config.get('webui_host')}:{core.config.get('webui_port')}")
-    #     status_list.append("AI model: " + str(self.API.get_model()))
-    #
-    #     status_list.append("")
-    #
-    #     status_list.append("== context size ==")
-    #     ctx_string = ""
-    #     context_size = await self.API.get_context_size()
-    #     for key, value in context_size.items():
-    #         ctx_string += f"{key}: {value}\n"
-    #     status_list.append(ctx_string)
-    #
-    #     return status_list
+    async def get_status(self):
+        status_list = []
+        status_list.append("== server ==")
+
+        # API status section
+        api_status = self.get_api_status()
+        if api_status["connected"]:
+            status_list.append("API Status: Connected")
+        else:
+            status_list.append("API Status: Disconnected")
+            if api_status["error"]:
+                status_list.append(f"  Error: {api_status['error']}")
+            if not api_status["url_configured"]:
+                status_list.append("  Warning: API URL not configured")
+            if not api_status["key_configured"]:
+                status_list.append("  Warning: API key not configured")
+
+        status_list.append("API server: " + str(core.config.get("api").get("url", "Not configured")))
+        if "webui" in core.config.get("channels").get("enabled"):
+            status_list.append(f"WebUI: {core.config.get('channels').get('settings').get('webui').get('host')}:{core.config.get('channels').get('settings').get('webui').get('port')}")
+        status_list.append("AI model: " + str(self.API.get_model() or "Not set"))
+
+        if self.channel:
+            status_list.append("")
+
+            status_list.append("== context size ==")
+            ctx_string = ""
+            context_size = await self.channel.context.get_size()
+            for key, value in context_size.items():
+                ctx_string += f"{key}: {value}\n"
+            status_list.append(ctx_string)
+
+        return status_list
 
     # --- tools ---
     def parse_tool_docstring(self, docstring):

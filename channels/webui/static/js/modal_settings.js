@@ -17,7 +17,7 @@ const SETTINGS_ICONS = {
     other: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>`
 };
 
-// Category descriptions (generic)
+// Category descriptions
 const CATEGORY_DESCRIPTIONS = {};
 
 // Check if a setting is a toggle list (has enabled/disabled arrays)
@@ -34,23 +34,24 @@ function getAllToggleItems(data) {
     return [...new Set([...enabled, ...disabled])].sort();
 }
 
-// Organize settings into categories based on structure
+// Organize settings into categories, grouping by second-level key (e.g. modules.X)
 function organizeSettingsIntoCategories(originalData) {
     const categories = {};
 
-    // Always add appearance first for theme
+    // Always add appearance first
     categories.appearance = {
         title: 'Appearance',
         description: 'Theme and interface customization',
         isTheme: true,
-        items: [],
+        groups: new Map(),
         order: 0
     };
 
-    // Process each top-level key
     let order = 1;
+
+    // Process each top-level key (category)
     for (const [topKey, topValue] of Object.entries(originalData)) {
-        // Skip theme-related keys
+        // Skip theme keys
         if (topKey.toLowerCase() === 'theme' || topKey.toLowerCase() === 'theme_mode') {
             continue;
         }
@@ -58,34 +59,173 @@ function organizeSettingsIntoCategories(originalData) {
         const category = topKey;
         categories[category] = {
             title: formatLabel(category),
-            description: CATEGORY_DESCRIPTIONS[category] || `Configure ${formatLabel(category).toLowerCase()}`,
-            items: [],
+            description: CATEGORY_DESCRIPTIONS[category] ||
+            `Configure ${formatLabel(category).toLowerCase()}`,
+            groups: new Map(),
             order: order++
         };
 
-        // Check if this is a toggle list (enabled/disabled pattern)
-        if (isToggleList(topValue)) {
-            categories[category].isToggleList = true;
-            categories[category].toggleListKey = topKey;
-            categories[category].items.push({
-                key: topKey,
-                value: topValue,
-                type: 'toggle_list'
-            });
+        // Helper to add item to the correct group
+        const addToGroup = (groupKey, groupTitle, item, isDirect = false) => {
+            if (!categories[category].groups.has(groupKey)) {
+                categories[category].groups.set(groupKey, {
+                    title: groupTitle,
+                    items: [],
+                    isDirect: isDirect
+                });
+            }
+            categories[category].groups.get(groupKey).items.push(item);
+        };
 
-            // Add any settings sub-object
+        // Special handling for modules and channels
+        if (topKey === 'modules' || topKey === 'channels') {
+            // Get list of enabled items to filter settings
+            const enabledItems = new Set(topValue.enabled || []);
+            const allItems = getAllToggleItems(topValue);
+
+            // Add the toggle list directly (ungrouped) at the top
+            addToGroup('_direct_', null, {
+                key: topKey,
+                value: {
+                    enabled: topValue.enabled || [],
+                    disabled: topValue.disabled || []
+                },
+                type: 'toggle_list'
+            }, true);
+
+            // Only show settings for enabled items
             if (topValue.settings && typeof topValue.settings === 'object') {
-                flattenSettingsObject(topValue.settings, `${topKey}.settings`, categories[category].items);
+                for (const [itemName, itemSettings] of Object.entries(topValue.settings)) {
+                    // Skip settings for disabled modules/channels
+                    if (!enabledItems.has(itemName)) {
+                        continue;
+                    }
+
+                    const groupKey = `${topKey}.settings.${itemName}`;
+                    const groupTitle = formatLabel(itemName);
+
+                    if (typeof itemSettings === 'object' && itemSettings !== null &&
+                        !Array.isArray(itemSettings) && !isToggleList(itemSettings)) {
+                        // Flatten nested settings
+                        flattenSettingsObject(itemSettings, groupKey, (item) => {
+                            addToGroup(groupKey, groupTitle, item);
+                        });
+                        } else {
+                            // Simple value or toggle list
+                            addToGroup(groupKey, groupTitle, {
+                                key: groupKey,
+                                value: itemSettings,
+                                type: isToggleList(itemSettings) ? 'toggle_list' : detectType(itemSettings),
+                                       description: FIELD_DESCRIPTIONS[groupKey] || null
+                            });
+                        }
+                }
+            }
+
+            // Add any other top-level items that aren't settings (direct, ungrouped)
+            for (const [secondKey, secondValue] of Object.entries(topValue)) {
+                if (secondKey === 'settings' || secondKey === 'enabled' ||
+                    secondKey === 'disabled' || secondKey === 'disabled_prompts') {
+                    continue;
+                    }
+                    const groupKey = `${topKey}.${secondKey}`;
+                addToGroup('_direct_', null, {
+                    key: groupKey,
+                    value: secondValue,
+                    type: detectType(secondValue)
+                }, true);
             }
             continue;
         }
 
-        // Regular object - flatten and add items
+        // Check if this is a toggle list at top level
+        if (isToggleList(topValue)) {
+            addToGroup('_direct_', null, {
+                key: topKey,
+                value: topValue,
+                type: 'toggle_list'
+            }, true);
+
+            // If toggle list has a settings sub-object, show settings for enabled items only
+            if (topValue.settings && typeof topValue.settings === 'object') {
+                const enabledItems = new Set(topValue.enabled || []);
+                for (const [itemName, itemSettings] of Object.entries(topValue.settings)) {
+                    if (!enabledItems.has(itemName)) {
+                        continue;
+                    }
+                    const groupKey = `${topKey}.settings.${itemName}`;
+                    const groupTitle = formatLabel(itemName);
+
+                    if (typeof itemSettings === 'object' && itemSettings !== null &&
+                        !Array.isArray(itemSettings) && !isToggleList(itemSettings)) {
+                        flattenSettingsObject(itemSettings, groupKey, (item) => {
+                            addToGroup(groupKey, groupTitle, item);
+                        });
+                        } else {
+                            addToGroup(groupKey, groupTitle, {
+                                key: groupKey,
+                                value: itemSettings,
+                                type: isToggleList(itemSettings) ? 'toggle_list' : detectType(itemSettings),
+                                       description: FIELD_DESCRIPTIONS[groupKey] || null
+                            });
+                        }
+                }
+            }
+            continue;
+        }
+
+        // Regular object - separate simple values from complex values
         if (typeof topValue === 'object' && topValue !== null && !Array.isArray(topValue)) {
-            flattenSettingsObject(topValue, topKey, categories[category].items);
+            // Categorize children
+            const simpleItems = [];
+            const complexItems = [];
+
+            for (const [secondKey, secondValue] of Object.entries(topValue)) {
+                if (isToggleList(secondValue)) {
+                    complexItems.push([secondKey, secondValue]);
+                } else if (Array.isArray(secondValue)) {
+                    complexItems.push([secondKey, secondValue]);
+                } else if (typeof secondValue === 'object' && secondValue !== null) {
+                    complexItems.push([secondKey, secondValue]);
+                } else {
+                    // Simple value (string, number, boolean, null)
+                    simpleItems.push([secondKey, secondValue]);
+                }
+            }
+
+            // Add simple values directly (no grouping)
+            for (const [key, value] of simpleItems) {
+                addToGroup('_direct_', null, {
+                    key: `${category}.${key}`,
+                    value: value,
+                    type: detectType(value)
+                }, true);
+            }
+
+            // Group complex values
+            for (const [secondKey, secondValue] of complexItems) {
+                const groupKey = `${topKey}.${secondKey}`;
+                const groupTitle = formatLabel(secondKey);
+
+                if (typeof secondValue === 'object' && secondValue !== null &&
+                    !Array.isArray(secondValue) && !isToggleList(secondValue)) {
+                    // It's a nested object, flatten its contents
+                    flattenSettingsObject(secondValue, groupKey, (item) => {
+                        addToGroup(groupKey, groupTitle, item);
+                    });
+                    } else {
+                        // It's a toggle list or array
+                        addToGroup(groupKey, groupTitle, {
+                            key: groupKey,
+                            value: secondValue,
+                            type: isToggleList(secondValue) ? 'toggle_list' : detectType(secondValue),
+                                   description: FIELD_DESCRIPTIONS[groupKey] || null
+                        });
+                    }
+            }
         } else {
-            // Simple value
-            categories[category].items.push({
+            // Simple value at top level (no groups)
+            addToGroup(topKey, formatLabel(topKey), {
                 key: topKey,
                 value: topValue,
                 type: detectType(topValue)
@@ -93,42 +233,26 @@ function organizeSettingsIntoCategories(originalData) {
         }
     }
 
-    // Sort items: toggle lists first, then simple fields, then arrays/objects
-    for (const cat of Object.keys(categories)) {
-        categories[cat].items.sort((a, b) => {
-            // Toggle lists always come first
-            if (a.type === 'toggle_list' && b.type !== 'toggle_list') return -1;
-            if (b.type === 'toggle_list' && a.type !== 'toggle_list') return 1;
-
-            // Then simple fields before complex types
-            const aComplex = a.type === 'array' || a.type === 'object';
-            const bComplex = b.type === 'array' || b.type === 'object';
-            if (aComplex && !bComplex) return 1;
-            if (!aComplex && bComplex) return -1;
-
-            return 0;
-        });
-    }
-
     return categories;
 }
 
 // Flatten a settings object into dot-notation items
-function flattenSettingsObject(obj, prefix, items) {
+function flattenSettingsObject(obj, prefix, callback) {
     for (const [key, value] of Object.entries(obj)) {
         const fullKey = prefix ? `${prefix}.${key}` : key;
 
-        if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+        if (typeof value === 'object' && value !== null &&
+            !Array.isArray(value) && !isToggleList(value)) {
             // Nested object - recurse
-            flattenSettingsObject(value, fullKey, items);
-        } else {
-            items.push({
-                key: fullKey,
-                value: value,
-                type: detectType(value),
-                       description: FIELD_DESCRIPTIONS[fullKey] || null
-            });
-        }
+            flattenSettingsObject(value, fullKey, callback);
+            } else {
+                callback({
+                    key: fullKey,
+                    value: value,
+                    type: isToggleList(value) ? 'toggle_list' : detectType(value),
+                         description: FIELD_DESCRIPTIONS[fullKey] || null
+                });
+            }
     }
 }
 
@@ -301,7 +425,7 @@ function renderSettingsForm(categories) {
             const themeSection = createThemeSection();
             itemsContainer.appendChild(themeSection);
 
-            if (data.items && data.items.length > 0) {
+            if (data.groups && data.groups.size > 0) {
                 const separator = document.createElement('div');
                 separator.className = 'settings-separator';
                 separator.innerHTML = '<hr style="border: none; border-top: 1px solid var(--border-color); margin: 24px 0;">';
@@ -309,52 +433,52 @@ function renderSettingsForm(categories) {
             }
         }
 
-        // Track if previous item was a toggle list
-        let lastWasToggleList = false;
-
-        // Render items
-        for (let i = 0; i < data.items.length; i++) {
-            const item = data.items[i];
-
-            // Check if this item belongs to a toggle list's settings
-            const keyParts = item.key.split('.');
-            const settingsIndex = keyParts.indexOf('settings');
-
-            // Only create collapsible group if NOT directly after a toggle list
-            if (settingsIndex !== -1 && settingsIndex < keyParts.length - 2 && !lastWasToggleList) {
-                const groupName = keyParts[settingsIndex + 1];
-                const groupPath = keyParts.slice(0, settingsIndex + 2).join('.');
-
-                // Find or create group
-                let groupContainer = itemsContainer.querySelector(`[data-group="${groupPath}"]`);
-
-                if (!groupContainer) {
-                    groupContainer = document.createElement('div');
-                    groupContainer.className = 'settings-group';
-                    groupContainer.dataset.group = groupPath;
-                    groupContainer.innerHTML = `
-                    <div class="settings-group-header" onclick="toggleSettingsGroup(this)">
-                    <span class="settings-group-title">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
-                    ${formatLabel(groupName)} Settings
-                    </span>
-                    </div>
-                    <div class="settings-group-content" style="display: none;"></div>
-                    `;
-                    itemsContainer.appendChild(groupContainer);
-                }
-
-                const groupContent = groupContainer.querySelector('.settings-group-content');
-                const itemEl = createSettingItem(item);
-                groupContent.appendChild(itemEl);
-            } else {
-                // Render directly
-                const itemEl = createSettingItem(item);
-                itemsContainer.appendChild(itemEl);
+        // Render groups - put direct items first
+        if (data.groups) {
+            // First render direct (ungrouped) items
+            const directGroup = data.groups.get('_direct_');
+            if (directGroup && directGroup.isDirect) {
+                directGroup.items.forEach(item => {
+                    const itemEl = createSettingItem(item);
+                    itemsContainer.appendChild(itemEl);
+                });
             }
 
-            // Track if this was a toggle list
-            lastWasToggleList = (item.type === 'toggle_list');
+            // Then render grouped items
+            data.groups.forEach((groupData, groupKey) => {
+                // Skip direct items - already rendered
+                if (groupKey === '_direct_') return;
+
+                const groupContainer = document.createElement('div');
+                groupContainer.className = 'settings-group';
+                groupContainer.dataset.group = groupKey;
+
+                // Create header (clickable to collapse)
+                const header = document.createElement('div');
+                header.className = 'settings-group-header';
+                header.onclick = () => toggleSettingsGroup(header);
+                header.innerHTML = `
+                <span class="settings-group-title">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                ${groupData.title}
+                </span>
+                `;
+
+                // Create content container
+                const content = document.createElement('div');
+                content.className = 'settings-group-content';
+                content.style.display = 'none';
+
+                // Render items within the group
+                groupData.items.forEach(item => {
+                    const itemEl = createSettingItem(item);
+                    content.appendChild(itemEl);
+                });
+
+                groupContainer.appendChild(header);
+                groupContainer.appendChild(content);
+                itemsContainer.appendChild(groupContainer);
+            });
         }
 
         section.appendChild(itemsContainer);
@@ -439,17 +563,26 @@ function createToggleListInput(key, value) {
     const allItems = getAllToggleItems(value);
     const enabledSet = new Set(value.enabled || []);
 
+    // Sort: enabled items first, then alphabetically within each group
+    const sortedItems = allItems.sort((a, b) => {
+        const aEnabled = enabledSet.has(a);
+        const bEnabled = enabledSet.has(b);
+        if (aEnabled && !bEnabled) return -1;
+        if (!aEnabled && bEnabled) return 1;
+        return a.localeCompare(b);
+    });
+
     // Status bar
     const status = document.createElement('div');
     status.className = 'toggle-list-status';
-    status.innerHTML = `<span class="toggle-count">${enabledSet.size} of ${allItems.length} enabled</span>`;
+    status.innerHTML = `<span class="toggle-count">${enabledSet.size} of ${sortedItems.length} enabled</span>`;
     wrapper.appendChild(status);
 
     // Grid of toggles
     const grid = document.createElement('div');
     grid.className = 'toggle-list-grid';
 
-    allItems.forEach(item => {
+    sortedItems.forEach(item => {
         const isEnabled = enabledSet.has(item);
 
         const itemWrapper = document.createElement('div');
@@ -459,26 +592,33 @@ function createToggleListInput(key, value) {
         name.className = 'toggle-list-name';
         name.textContent = formatLabel(item);
 
-        const toggle = document.createElement('div');
-        toggle.className = 'toggle-list-switch' + (isEnabled ? ' active' : '');
-        toggle.onclick = () => {
-            const newState = !toggle.classList.contains('active');
-            toggle.classList.toggle('active', newState);
+        const toggle = document.createElement('label');
+        toggle.className = 'toggle-switch';
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = isEnabled;
+
+        const slider = document.createElement('span');
+        slider.className = 'toggle-slider';
+
+        toggle.appendChild(checkbox);
+        toggle.appendChild(slider);
+
+        checkbox.onchange = () => {
+            const newState = checkbox.checked;
             itemWrapper.classList.toggle('enabled', newState);
 
-            // Update the data
             if (newState) {
                 enabledSet.add(item);
             } else {
                 enabledSet.delete(item);
             }
 
-            // Update status
             status.querySelector('.toggle-count').textContent =
-            `${enabledSet.size} of ${allItems.length} enabled`;
+            `${enabledSet.size} of ${sortedItems.length} enabled`;
 
-            // Save to settings
-            updateToggleListData(key, Array.from(enabledSet), allItems);
+            updateToggleListData(key, Array.from(enabledSet), sortedItems);
         };
 
         itemWrapper.appendChild(name);
@@ -635,22 +775,32 @@ function createToggleInput(key, value) {
     const wrapper = document.createElement('div');
     wrapper.className = 'setting-toggle-wrapper';
 
-    const toggle = document.createElement('div');
-    toggle.className = 'setting-toggle' + (value ? ' active' : '');
-    toggle.dataset.key = key;
-    toggle.onclick = () => {
-        toggle.classList.toggle('active');
-        const newValue = toggle.classList.contains('active');
-        label.textContent = newValue ? 'Enabled' : 'Disabled';
+    const label = document.createElement('label');
+    label.className = 'toggle-switch';
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = value;
+
+    const slider = document.createElement('span');
+    slider.className = 'toggle-slider';
+
+    const labelSpan = document.createElement('span');
+    labelSpan.className = 'setting-toggle-label';
+    labelSpan.textContent = value ? 'Enabled' : 'Disabled';
+
+    // Handle change
+    checkbox.onchange = () => {
+        const newValue = checkbox.checked;
+        labelSpan.textContent = newValue ? 'Enabled' : 'Disabled';
         handleSettingChange(key, newValue);
     };
 
-    const label = document.createElement('span');
-    label.className = 'setting-toggle-label';
-    label.textContent = value ? 'Enabled' : 'Disabled';
+    label.appendChild(checkbox);
+    label.appendChild(slider);
 
-    wrapper.appendChild(toggle);
     wrapper.appendChild(label);
+    wrapper.appendChild(labelSpan);
     return wrapper;
 }
 
@@ -677,7 +827,8 @@ function createArrayInput(key, value) {
 
     function renderItems() {
         itemsContainer.innerHTML = '';
-        header.querySelector('.setting-array-count').textContent = `${items.length} item${items.length !== 1 ? 's' : ''}`;
+        header.querySelector('.setting-array-count').textContent =
+        `${items.length} item${items.length !== 1 ? 's' : ''}`;
 
         if (items.length === 0) {
             itemsContainer.innerHTML = '<div class="setting-array-empty">No items added</div>';
@@ -743,7 +894,8 @@ function createObjectInput(key, value) {
 
     function renderEntries() {
         itemsContainer.innerHTML = '';
-        header.querySelector('span').textContent = `${entries.length} propert${entries.length !== 1 ? 'ies' : 'y'}`;
+        header.querySelector('span').textContent =
+        `${entries.length} propert${entries.length !== 1 ? 'ies' : 'y'}`;
 
         if (entries.length === 0) {
             itemsContainer.innerHTML = '<div class="setting-array-empty">No properties</div>';
@@ -868,6 +1020,14 @@ function resetSettingsForm() {
 
 // Save settings to backend
 async function saveSettings() {
+    // Check if we're on the Appearance tab - theme changes are applied immediately
+    const activeCategory = document.querySelector('.settings-nav-item.active')?.dataset.category;
+    if (activeCategory === 'appearance') {
+        // Just close the modal - theme changes are applied immediately
+        toggleModal('settings');
+        return;
+    }
+
     if (!settingsHasChanges) return;
 
     const saveBtn = document.getElementById('settings-save-btn');
@@ -1086,23 +1246,6 @@ function showSettingsSuccess() {
     setTimeout(() => success.remove(), 3000);
 }
 
-// Show success message
-function showSettingsSuccess() {
-    const form = document.getElementById('settings-form');
-    const existing = form.querySelector('.setting-success-msg');
-    if (existing) existing.remove();
-
-    const success = document.createElement('div');
-    success.className = 'setting-success-msg';
-    success.innerHTML = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
-    Settings saved successfully!
-    `;
-
-    form.insertBefore(success, form.firstChild);
-    setTimeout(() => success.remove(), 3000);
-}
-
 // Show error message
 function showSettingsError(message) {
     const form = document.getElementById('settings-form');
@@ -1117,6 +1260,13 @@ function showSettingsError(message) {
     `;
 
     form.insertBefore(error, form.firstChild);
+}
+
+// Escape HTML
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
 }
 
 // Theme section

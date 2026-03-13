@@ -60,6 +60,8 @@ class Commands:
 
         help_text = """
 == built in commands ==
+/reload                 reload server, applying new changes if config was changed
+/reconnect              reconnect to the API
 /modules                list modules
 /module                 enable/disable a module by name
 /tools                  list tools available to the AI
@@ -142,8 +144,32 @@ class Commands:
             #     return "Turn undone."
             case "help":
                 return await self._get_help()
+            case "reconnect":
+                    result = await self.channel.manager.reconnect_api()
+
+                    if result["success"]:
+                        return ["✓ ", result["message"]]
+                    else:
+                        response = [f"✗ Connection failed: {result['error']}"]
+                        if "action" in result:
+                            response.append(f"\n{result['action']}")
+                        return response
+            case "disconnect":
+                await self.channel.manager.API.disconnect()
+                return ["✓ Disconnected from API"]
             case "status":
-                return "\n".join(await self.channel.manager.get_status())
+                status = self.channel.manager.get_api_status()
+                lines = ["== API Status =="]
+
+                lines.append(f"Connected: {'Yes' if status['connected'] else 'No'}")
+                lines.append(f"Model: {status['model'] or 'Not set'}")
+                lines.append(f"URL configured: {'Yes' if status['url_configured'] else 'No'}")
+                lines.append(f"Key configured: {'Yes' if status['key_configured'] else 'No'}")
+
+                if status['error']:
+                    lines.append(f"Last error: {status['error']}")
+
+                return "\n".join(lines)
             case "modules":
                 modules_str = "\n".join(core.config.get("modules").get("enabled"))
                 modules_disabled_str = "\n".join(core.config.get("modules").get("disabled"))
@@ -170,7 +196,7 @@ class Commands:
                 await self.channel.announce("module toggled")
                 await self.channel.announce("restarting to apply module change..", "error")
                 await asyncio.sleep(0.2)
-                await core.restart()
+                await self.channel.manager.restart()
                 return
             case "tools":
                 if not core.config.get("model").get("use_tools", False):
@@ -194,7 +220,8 @@ class Commands:
 
                 return "\n\n".join(tool_map_display)
             case "restart":
-                await core.restart(self.channel)
+                #await core.restart(self.channel)
+                await self.channel.manager.restart()
             case "stop":
                 # just use restart for now until i figure out how to kill the asyncio tasks
                 await self.channel.manager.API.cancel()

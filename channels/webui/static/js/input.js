@@ -122,20 +122,10 @@ document.addEventListener('keydown', (event) => {
 
         if (!isMobile && event.key === 'Enter' && !event.shiftKey) {
             event.preventDefault();
+            event.stopPropagation();
             send();
             return;
         }
-    }
-});
-
-// Keep input-specific behavior
-inputField.addEventListener('keydown', (event) => {
-    // Handle Enter key for sending (only if not covered by global handler)
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-
-    if (!isMobile && event.key === 'Enter' && !event.shiftKey && !event.ctrlKey && !event.metaKey) {
-        event.preventDefault();
-        send();
     }
 });
 

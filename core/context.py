@@ -19,6 +19,9 @@ class Context:
         context must ALWAYS follow this strict turn order: system->user->assistant->user->assistant->user->...
         """
 
+        if not self.channel.manager.API.connected:
+            return None
+
         # context = system prompt (top) + message history (middle) + endprompt (bottom)
         context = []
 

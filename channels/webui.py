@@ -121,23 +121,18 @@ def add_security_headers(response):
     return response
 
 class Webui(core.channel.Channel):
-    """
-    Web-based channel that polls the backend for messages.
-
-    The backend (chat.get()) is the single source of truth.
-    All messages including user messages, AI responses, commands, and
-    announcements are stored in the backend and polled by the frontend.
-    """
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.main_loop = None
+        self.server = None
+        self._shutdown_requested = False
 
     async def run(self):
         """Start the Flask web server."""
         core.log("webui", "Starting WebUI")
 
         self.main_loop = asyncio.get_running_loop()
+        self._shutdown_requested = False
 
         global channel_instance
         channel_instance = self
@@ -148,10 +143,14 @@ class Webui(core.channel.Channel):
 
         host = core.config.get("channels").get("settings").get("webui").get("host", "127.0.0.1")
         port = core.config.get("channels").get("settings").get("webui").get("port", 5000)
-        core.log("webui", f"WebUI started on {host}:{port}")
+        core.log("webui", f"WebUI started on http://{host}:{port}")
 
-        while True:
-            await asyncio.sleep(1)
+        try:
+            while not self._shutdown_requested:
+                await asyncio.sleep(1)
+        except asyncio.CancelledError:
+            core.log("webui", "shutting down")
+            raise
 
     def _run_flask(self):
         """Run Flask in a separate thread."""
@@ -160,9 +159,19 @@ class Webui(core.channel.Channel):
         host = core.config.get("channels").get("settings").get("webui").get("host", "127.0.0.1")
         port = core.config.get("channels").get("settings").get("webui").get("port", 5000)
 
-        server = make_server(host, port, app, threaded=True)
-        server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        server.serve_forever()
+        self.server = make_server(host, port, app, threaded=True)
+        self.server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
+        try:
+            self.server.serve_forever()
+        except:
+            pass  # Server shutdown
+
+    def shutdown(self):
+        """Shutdown the Flask server."""
+        self._shutdown_requested = True
+        if self.server:
+            self.server.shutdown()
 
     async def _announce(self, message: str, type: str = None):
         """
@@ -188,6 +197,117 @@ def _run_async(coro):
 def index():
     """Serve the main HTML page."""
     return render_template_string(HTML_TEMPLATE, js_files=JS_FILES, css_files=CSS_FILES)
+
+def get_api_status():
+    """
+    Get detailed API connection status.
+    Returns dict with connection info and actionable error messages.
+    """
+    if not channel_instance:
+        return {
+            'connected': False,
+            'server_ok': False,
+            'error': 'Channel not available',
+            'error_type': 'server_error',
+            'action': 'Please restart the application.'
+        }
+
+    status = channel_instance.manager.get_api_status()
+
+    # Build response with actionable information
+    result = {
+        'connected': status.get('connected', False),
+        'server_ok': True,
+        'model': status.get('model'),
+        'url_configured': status.get('url_configured', False),
+        'key_configured': status.get('key_configured', False),
+        'model_configured': status.get('model_configured', False),
+    }
+
+    if not result['connected']:
+        error = status.get('error', 'Unknown error')
+        result['error'] = error
+
+        # Determine error type for frontend handling
+        if not result['url_configured']:
+            result['error_type'] = 'config_missing'
+            result['action'] = 'Please configure your API URL in Settings.'
+        elif not result['key_configured']:
+            result['error_type'] = 'config_missing'
+            result['action'] = 'Please configure your API key in Settings.'
+        elif not result['model_configured']:
+            result['error_type'] = 'config_missing'
+            result['action'] = 'Please configure a model name in Settings.'
+        elif error:
+            if 'authentication' in error.lower() or 'api key' in error.lower():
+                result['error_type'] = 'auth_failed'
+                result['action'] = 'Your API key is invalid. Please check your settings.'
+            elif 'connection' in error.lower() or 'reach' in error.lower():
+                result['error_type'] = 'connection_failed'
+                result['action'] = 'Could not reach the API server. Check the URL and your network.'
+        else:
+            result['error_type'] = 'unknown'
+            result['action'] = f'Error: {error}'
+
+    return result
+
+@app.route('/api/status')
+def api_status():
+    """Check API connection status with detailed information."""
+    return jsonify(get_api_status())
+
+@app.route('/api/reconnect', methods=['POST'])
+def api_reconnect():
+    """Attempt to reconnect to the API."""
+    if not channel_instance:
+        return jsonify({
+            'success': False,
+            'error': 'Channel not available',
+            'action': 'Please restart the application.'
+        }), 500
+
+    # Run reconnect in async context
+    result = _run_async(channel_instance.manager.reconnect_api())
+    return jsonify(result)
+
+@app.route('/api/disconnect', methods=['POST'])
+def api_disconnect():
+    """Disconnect from the API."""
+    if not channel_instance:
+        return jsonify({'success': False, 'error': 'Channel not available'}), 500
+
+    _run_async(channel_instance.manager.API.disconnect())
+    return jsonify({'success': True})
+
+@app.route('/api/models')
+def list_models():
+    """List available models from the API."""
+    if not channel_instance:
+        return jsonify({'models': [], 'error': 'Channel not available'}), 500
+
+    if not channel_instance.manager.API.connected:
+        return jsonify({
+            'models': [],
+            'error': 'Not connected to API',
+            'error_type': 'disconnected'
+        }), 503
+
+    try:
+        models = _run_async(channel_instance.manager.API.list_models())
+        # Extract model IDs from the response
+        model_list = []
+        if models and hasattr(models, 'data'):
+            for model in models.data:
+                model_list.append({
+                    'id': model.id,
+                    'owned_by': getattr(model, 'owned_by', 'unknown')
+                })
+        return jsonify({'models': model_list})
+    except Exception as e:
+        return jsonify({
+            'models': [],
+            'error': str(e)
+        }), 500
 
 @app.route('/messages')
 def get_messages():
@@ -261,6 +381,17 @@ def stream_message():
     """
     global channel_instance
 
+    # Check API connection first with detailed status
+    status = get_api_status()
+    if not status['connected']:
+        error_type = status.get('error_type', 'unknown')
+        return jsonify({
+            'error': status.get('error', 'Not connected'),
+            'error_type': error_type,
+            'action': status.get('action'),
+            'api_error': True
+        }), 503
+
     data = request.get_json()
     user_message = data.get('message', '')
     stream_id = str(uuid.uuid4())[:8]
@@ -276,9 +407,16 @@ def stream_message():
                         stream_cancellations.discard(stream_id)
                         token_queue.put(('cancelled', True))
                         break
+
+                    # Handle error tokens
+                    if isinstance(token_data, dict) and token_data.get('type') == 'error':
+                        error_content = token_data.get('content', {})
+                        token_queue.put(('error', error_content))
+                        break
+
                     token_queue.put(token_data)
             except Exception as e:
-                token_queue.put(('error', str(e)))
+                token_queue.put(('error', {'error': 'exception', 'message': str(e)}))
             finally:
                 token_queue.put(done)
 
@@ -299,7 +437,9 @@ def stream_message():
 
             elif isinstance(item, tuple):
                 if item[0] == 'error':
-                    yield f"data: {json.dumps({'error': item[1]})}\n\n"
+                    # Error content is a dict with error details
+                    error_data = item[1] if isinstance(item[1], dict) else {'message': str(item[1])}
+                    yield f"data: {json.dumps({'error': True, 'error_data': error_data})}\n\n"
                     break
                 elif item[0] == 'cancelled':
                     yield f"data: {json.dumps({'cancelled': True})}\n\n"
@@ -323,6 +463,17 @@ def send_message():
     """Send a message and wait for complete response."""
     global channel_instance
 
+    # Check API connection first with detailed status
+    status = get_api_status()
+    if not status['connected']:
+        error_type = status.get('error_type', 'unknown')
+        return jsonify({
+            'error': status.get('error', 'Not connected'),
+            'error_type': error_type,
+            'action': status.get('action'),
+            'api_error': True
+        }), 503
+
     data = request.get_json()
     user_message = data.get('message', '')
 
@@ -331,6 +482,14 @@ def send_message():
         channel_instance.main_loop
     )
     response = future.result()
+
+    # Check if response is an error
+    if isinstance(response, dict) and 'error' in response:
+        return jsonify({
+            'error': response.get('message', 'Unknown error'),
+            'error_type': response.get('error', 'unknown'),
+            'api_error': True
+        }), 500
 
     messages = _run_async(channel_instance.context.chat.get()) or []
     current_id = _run_async(channel_instance.context.chat.get_id())
@@ -461,7 +620,7 @@ def list_chats():
         chats.append({
             'id': conv.get('id'),
             'title': conv.get('title', 'New Chat'),
-            'tags': conv.get('tags', []),  # Include tags
+            'tags': conv.get('tags', []),
             'created': conv.get('created'),
             'updated': conv.get('updated'),
             'message_count': len(conv.get('messages', [])),

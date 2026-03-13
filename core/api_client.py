@@ -8,26 +8,138 @@ class APIClient():
     """
     wrapper around the openAI API to make sending/receiving messages easier to work with
     """
-    def __init__(self, manager, model: str, *args, **kwargs):
+    def __init__(self, manager):
         # store a reference to the manager
         self.manager = manager
 
-        # initialize connection to the API
-        self._AI = openai.AsyncOpenAI(*args, **kwargs)
+        self.connected = False
+        self._AI = None # replaced later using .connect()
 
-        self._model = model
+        self._model = None
         self._messages = []
 
         self.cancel_request = False
 
+        self._connection_error = None
+        self._last_connection_attempt = None
+        self._connection_attempts = 0
+
+    async def connect(self):
+        if self.connected:
+            # dont unnecessarily connect
+            return True
+
+        # validate config
+        validation_result = self._validate_config()
+        if not validation_result["valid"]:
+            self._connection_error = validation_result["error"]
+            core.log("API", f"Configuration invalid: {validation_result['error']}")
+            return False
+
+        self._model = core.config.get("model").get("name")
+        self._connection_attempts += 1
+
+        api_config = core.config.get("api")
+
+        # initialize connection to the API
+        try:
+            self._AI = openai.AsyncOpenAI(
+                base_url=api_config.get("url"),
+                api_key=api_config.get("key")
+            )
+            await self._AI.models.list()
+        except openai.AuthenticationError as e:
+            self._connection_error = "Invalid API key. Please check your configuration."
+            core.log("API", f"Authentication failed: {e}")
+            return False
+        except openai.APIConnectionError as e:
+            self._connection_error = f"Could not reach API server at {api_config.get('url')}"
+            core.log("API", f"Connection failed: {e}")
+            return False
+        except Exception as e:
+            self._connection_error = f"Connection error: {str(e)}"
+            return False
+
+        self.connected = True
+        self._connection_error = None
+        self._connection_attempts = 0
+        core.log("API", "Successfully connected to API")
+        return True
+
+    def _validate_config(self):
+        """Validate that API configuration is present and valid."""
+        result = {"valid": False, "error": None}
+
+        api_config = core.config.get("api")
+        if not api_config:
+            result["error"] = "API configuration not found in config file"
+            return result
+
+        url = api_config.get("url")
+        key = api_config.get("key")
+
+        if not url:
+            result["error"] = "API URL not configured. Please set 'url' in config."
+            return result
+
+        if not key:
+            result["error"] = "API key not configured. Please set 'key' in config."
+            return result
+
+        model_config = core.config.get("model")
+        if not model_config or not model_config.get("name"):
+            result["error"] = "Model name not configured. Please set model name in config."
+            return result
+
+        result["valid"] = True
+        return result
+
+    def get_connection_status(self):
+        """Returns a dictionary with connection status info for UI display."""
+        api_config = core.config.get("api", {})
+        model_config = core.config.get("model", {})
+
+        return {
+            "connected": self.connected,
+            "error": self._connection_error,
+            "model": self._model,
+            "attempts": self._connection_attempts,
+            "url_configured": bool(api_config.get("url")),
+            "key_configured": bool(api_config.get("key")),
+            "model_configured": bool(model_config.get("name")),
+        }
+
+    async def disconnect(self):
+        """Properly disconnect from the API."""
+        self.connected = False
+        self._AI = None
+        core.log("API", "Disconnected from API")
+        return True
+
+    async def reconnect(self):
+        """Disconnect and reconnect to the API."""
+        await self.disconnect()
+        return await self.connect()
+
     def get_model(self):
         return self._model
+
     def set_model(self, name: str):
         self._model = name
         return self._model
 
+    def get_last_error(self):
+        """Get the last connection error message."""
+        return self._connection_error
+
     async def _request(self, context, tools=None, stream=False):
         """send a request to the LLM and return the response object"""
+
+        if not self.connected:
+            # attempt to connect
+            connected = await self.connect()
+            if not connected:
+                return {"error": "not_connected", "message": self._connection_error}
 
         if not core.config.get("model").get("use_tools"):
             # allow switching tools off globally
@@ -47,14 +159,36 @@ class APIClient():
         if core.config.get("channels").get("debug"):
             core.log("debug:request", str(req))
 
-        response = await self._AI.chat.completions.create(**req)
+        try:
+            response = await self._AI.chat.completions.create(**req)
+        except openai.AuthenticationError as e:
+            core.log_error("Authentication error - disconnecting", e)
+            self.connected = False
+            self._connection_error = "Authentication failed. Please check your API key."
+            return {"error": "auth_failed", "message": str(e)}
+        except openai.APIConnectionError as e:
+            core.log_error("Connection error - disconnecting", e)
+            self.connected = False
+            self._connection_error = "Lost connection to API server."
+            return {"error": "connection_lost", "message": str(e)}
+        except openai.RateLimitError as e:
+            core.log_error("Rate limit exceeded", e)
+            return {"error": "rate_limit", "message": "Rate limit exceeded. Please wait and try again."}
+        except openai.APIStatusError as e:
+            core.log_error("API status error", e)
+            return {"error": "api_error", "message": f"API error: {e.message}"}
+        except Exception as e:
+            core.log_error("error while sending request to AI", e)
+            self.connected = False
+            return {"error": "unknown", "message": str(e)}
+
         if core.config.get("channels").get("debug"):
             core.log("debug:response", str(response))
 
         return response
 
     async def send(self, context: list, system_prompt=True, use_tools=True, tools=None, **kwargs):
-        """send a message to the LLM. returns a string"""
+        """send a message to the LLM. returns a string or error dict"""
 
         self.cancel_request = False
 
@@ -62,11 +196,18 @@ class APIClient():
         if not tools:
             tools = self.manager.tools
 
+        response = await self._request(context, tools=(tools if use_tools else None))
+
+        # Check for error response
+        if isinstance(response, dict) and "error" in response:
+            return response
+
         try:
-            return await self._recv(await self._request(context, tools=(tools if use_tools else None)))
+            result = await self._recv(response)
+            return result
         except Exception as e:
-            core.log_error("error while sending request to AI", e)
-            return None
+            core.log_error("error while processing response from AI", e)
+            return {"error": "processing_failed", "message": str(e)}
 
     async def send_stream(self, context: list, use_tools=True, tools=None):
         """send a message to the LLM. is an iterable async generator"""
@@ -77,11 +218,19 @@ class APIClient():
         if not tools:
             tools = self.manager.tools
 
+        response = await self._request(context, tools=(tools if use_tools else None), stream=True)
+
+        # Check for error response
+        if isinstance(response, dict) and "error" in response:
+            yield {"type": "error", "content": response}
+            return
+
         try:
-            async for token in self._recv_stream(await self._request(context, tools=(tools if use_tools else None), stream=True)):
+            async for token in self._recv_stream(response):
                 yield token
         except Exception as e:
             core.log_error("error while sending request to AI", e)
+            yield {"type": "error", "content": {"error": "stream_failed", "message": str(e)}}
 
     async def cancel(self):
         self.cancel_request = True
@@ -97,7 +246,7 @@ class APIClient():
             response_main = response.choices[0]
         except Exception as e:
             core.log_error("error while receiving response from AI", e)
-            return None
+            return {"error": "invalid_response", "message": str(e)}
 
         # Extract reasoning content if available
         reasoning_content = getattr(response_main.message, "reasoning_content", None) or \
@@ -192,3 +341,15 @@ class APIClient():
 
         except Exception as e:
             core.log_error("error while receiving response from AI", e)
+
+    async def list_models(self):
+        if not self.connected:
+            return []
+
+        try:
+            models = await self._AI.models.list()
+        except Exception as e:
+            core.log_error("error while retrieving model list", e)
+            return []
+
+        return models

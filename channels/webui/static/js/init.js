@@ -7,6 +7,10 @@ function cleanup() {
         clearInterval(pollIntervalId);
         pollIntervalId = null;
     }
+    if (apiStatusIntervalId) {
+        clearInterval(apiStatusIntervalId);
+        apiStatusIntervalId = null;
+    }
     if (reconnectTimer) {
         clearTimeout(reconnectTimer);
         reconnectTimer = null;
@@ -28,12 +32,11 @@ if ('serviceWorker' in navigator) {
     });
 }
 
-
 // =============================================================================
-// Main Initialization
+// Initialization
 // =============================================================================
 
-updateConnectionStatus('connecting');
+// Don't set initial connection status - let it be determined by checkConnection()
 
 async function init() {
     try {
@@ -56,11 +59,19 @@ async function init() {
 
     window.addEventListener('resize', handleTitleBarResize);
 
+    // Message polling
     pollIntervalId = setInterval(() => {
         if (isConnected) {
             pollMessages();
         }
     }, CONFIG.POLL_INTERVAL);
+
+    // Periodic API status check
+    apiStatusIntervalId = setInterval(() => {
+        if (isConnected) {
+            checkApiStatus();
+        }
+    }, CONFIG.API_STATUS_INTERVAL);
 }
 
 init();

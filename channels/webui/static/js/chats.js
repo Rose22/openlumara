@@ -693,6 +693,26 @@ function filterChats(query) {
     filterTagsBySearch(query);
 }
 
+async function clearChat() {
+    if (!confirm("Really clear the chat?")) return false;
+
+    try {
+        const response = await fetch('/chat/clear', {
+            method: 'POST'
+        });
+
+        if (response.ok) {
+            // Reload
+            if (currentChatId) {
+                await loadChat(currentChatId);
+            }
+            await loadChats();
+        }
+    } catch (err) {
+        console.error('Failed to clear chat:', err);
+    }
+}
+
 function extractSnippet(content, query, maxLength) {
     if (!content) return '';
 
