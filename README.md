@@ -31,9 +31,7 @@ Features:
 
 Clone the git repository, run `run.sh` if you're on linux, `run.bat` if you're on windows!
 
-Once it's started up, open your browser and go to the url it displays. Then in the web ui, set up your api connection, press save, and enjoy!
-
-To update, just run `git pull`.
+Once it's started up, open your browser and go to the url it displays. Then in the web ui, open the settings panel (lil gear icon at the top), set up your api connection, press save, and enjoy!
 
 # How to create your own channel
 
