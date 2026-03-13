@@ -7,4 +7,5 @@ if not exist "venv" (
     venv\Scripts\pip install -r requirements.txt
 )
 
+git pull
 venv\Scripts\python main.py
