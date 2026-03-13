@@ -68,7 +68,7 @@ class Client(discord.Client):
 
                 async with message.channel.typing():
                     try:
-                        content = message.content
+                        content = message.content.strip()
                         # remove mentions from message before sending
                         for mention in message.raw_mentions:
                            content = content.replace(str(mention), "") 

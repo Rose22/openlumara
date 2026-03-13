@@ -1,0 +1,115 @@
+/* ==========================================================================
+ *  Chat Tags (in sidebar items and title bar)
+ *  ========================================================================== */
+.chat-tags {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 4px;
+    margin-top: 4px;
+    overflow: hidden;
+    height: 20px;
+}
+
+.chat-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 6px;
+    border-radius: 8px;
+    font-size: 0.65rem;
+    font-weight: 500;
+    background: var(--bg-tertiary);
+    color: var(--text-muted);
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex-shrink: 1;
+    min-width: 0;
+}
+
+.chat-tag.tag-overflow {
+    flex-shrink: 0;
+    cursor: default;
+}
+
+/* Title bar tags - single row with overflow handling */
+.chat-title-tags {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 4px;
+    max-width: 300px;
+    overflow: hidden;
+    height: 24px;
+}
+
+.chat-title-tags .chat-tag {
+    font-size: 0.65rem;
+    padding: 2px 6px;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    flex-shrink: 1;
+    min-width: 0;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.chat-title-tags .tag-overflow {
+    font-size: 0.65rem;
+    padding: 2px 6px;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+    cursor: default;
+}
+
+/* Mobile adjustments */
+@media (max-width: 600px) {
+    .chat-title-tags {
+        max-width: 100px;
+        gap: 3px;
+    }
+
+    .chat-title-tags .chat-tag {
+        max-width: 70px;
+        font-size: 0.6rem;
+        padding: 1px 4px;
+    }
+
+    .chat-title-tags .tag-overflow {
+        font-size: 0.6rem;
+        padding: 1px 4px;
+    }
+
+    .tag-list-container {
+        max-height: 150px;
+    }
+
+    .tag-chip {
+        padding: 10px 14px;
+        font-size: 0.8rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .tag-filter {
+        padding: 10px 12px;
+    }
+
+    .tag-chip {
+        padding: 10px 14px;
+        font-size: 0.8rem;
+    }
+
+    .chat-title-tags {
+        max-width: 80px;
+    }
+
+    .chat-title-tags .chat-tag {
+        max-width: 50px;
+    }
+}

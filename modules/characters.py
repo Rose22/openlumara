@@ -21,6 +21,7 @@ class Characters(core.module.Module):
         sorted_by_cat = {}
         for character_name, character in self.characters.items():
             category = character.get("category", None)
+
             if category:
                 if category not in sorted_by_cat.keys():
                     sorted_by_cat[category] = []
@@ -34,6 +35,11 @@ class Characters(core.module.Module):
 
         char_list = []
         for category_name, category in sorted_by_cat.items():
+            if not category:
+                # autoremove empty categories
+                if category_name in self.characters.keys():
+                    del(self.characters[category_name])
+
             characters = ", ".join(category)
             char_list.append(f"{category_name}: {characters}")
 
@@ -54,7 +60,7 @@ class Characters(core.module.Module):
             else:
                 return "please provide a character name."
         elif name in("reset", "default"):
-                self.active_character.set(None)
+                self.active_character.set("")
                 return "character has been reset to default"
 
         character = self._find_character(name)
@@ -65,19 +71,18 @@ class Characters(core.module.Module):
 
     async def on_system_prompt(self):
         curr_char = self.characters.get(self.active_character.get())
-        character_text = ""
-        if curr_char:
-            character_name = self.active_character.get()
-            character_profile = self.characters.get(character_name, "").get("identity", "")
-            character_text = f"Name: {character_name}\nProfile: {character_profile}\n\n"
+        if not curr_char:
+            # don't include a character in the system prompt
+            return None
 
-        if not character_text:
-            character_text = "You are a helpful AI assistant."
-            character_name = "Assistant"
+        character_text = ""
+        character_name = self.active_character.get()
+        character_profile = self.characters.get(character_name, "").get("identity", "")
+        character_text = f"Name: {character_name}\nProfile: {character_profile}\n\n"
 
         user_name = self.user_profile.get("name", "User")
-
-        character_text += f"\nWrite your replies as {character_name} in a chat between {character_name} and {user_name}. Keep your replies short and concise, at most 2 paragraphs."
+        preferences = self.user_profile.get("preferences", "")
+        character_text += f"\nWrite your replies as {character_name} in a chat between {character_name} and {user_name}. {preferences}"
 
         user_profile = ""
         if self.user_profile:
@@ -99,8 +104,8 @@ class Characters(core.module.Module):
         return self.result(str({"instructions": f"Write your next reply as the character {name}.", "character": self._rewrite_character(name, character.get("identity"))}))
     
     async def switch_to_default(self):
-        """Switches you back to the default character."""
-        self.active_character.set(None)
+        """Switches you back to your default identity."""
+        self.active_character.set("")
         return "success"
 
     def _case_insensitive_replace(self, text, old, new):
@@ -180,8 +185,11 @@ class Characters(core.module.Module):
         Example:
             Assistant is a helpful AI. Assistant writes in a casual, concise, clear style.
         """
-        name = self._find_character(name)
-        if name:
+        if not name.strip():
+            return self.result("character name cannot be empty", False)
+
+        exists = self._find_character(name)
+        if exists:
             return self.result("character already exists", False)
 
         if not character:
@@ -235,6 +243,27 @@ class Characters(core.module.Module):
         del(self.user_profile["profile"])
         self.user_profile.save()
         return self.result("profile cleared")
+
+    async def set_preferences(self, preferences: str):
+        """
+        Sets any preferences the user has for the writing style and tone of the characters.
+        e.g. "Write your replies in a short, easy to understand style, in at most 2 paragraphs."
+        """
+        self.user_profile["preferences"] = preferences
+        self.user_profile.save()
+        return self.result("preferences set")
+
+    # command version
+    @core.module.command("charpref")
+    async def cmd_set_preferences(self, args: list):
+        """sets your preferred writing style for characters"""
+        if not args:
+            return self.user_profile.get("preferences", "no preferences have been configured yet")
+
+        pref = " ".join(args)
+        self.user_profile["preferences"] = pref
+        self.user_profile.save()
+        return "preferences set!"
 
     # async def list(self):
     #     """

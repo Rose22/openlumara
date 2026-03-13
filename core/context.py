@@ -1,4 +1,5 @@
 import core
+import copy
 
 class Context:
     def __init__(self, channel):
@@ -8,26 +9,61 @@ class Context:
         self.chat = core.chat.Chat(self.channel)
 
     async def get(self, system_prompt=True, end_prompt=True):
-        """builds the full context window using system prompt + message history + end prompt"""
+        """
+        builds the full context window using system prompt + message history + end prompt
+        to the API, we send this full context.
 
-        # context = system prompt + message history
+        to frontend channels, we send only the message history part of the context (context.chat.get()),
+        without the system prompt and without the modifications we do to it such as the endprompt.
+
+        context must ALWAYS follow this strict turn order: system->user->assistant->user->assistant->user->...
+        """
+
+        # context = system prompt (top) + message history (middle) + endprompt (bottom)
         context = []
 
         # always insert system prompt at start of context
         if system_prompt:
-            context = context+[{"role": "system", "content": await self.channel.manager.get_system_prompt()}]
+            context = [{"role": "system", "content": await self.channel.manager.get_system_prompt()}]
 
         # insert message history
-        messages = await self.chat.get()
-        if messages:
-            context = context+(await self.chat.get())
+        messages_orig = await self.chat.get()
+        if messages_orig:
+            # deepcopy so we dont end up modifying the original messages array
+            messages = copy.deepcopy(messages_orig)
+            context.extend(messages)
 
+        """
+        insert endprompt
+
+        the endprompt is information provided by modules that should be at the very end so that context doesnt have to get reprocessed every time,
+        since context reprocessing happens from the point of change onward!
+
+        like if you change something in context, it'll reprocess everything after the part where you made the change.
+
+        so the endprompt is useful for info that changes constantly,
+        such as the current time and date.
+        """
         if end_prompt:
             histend = await self.channel.manager.get_end_prompt()
             if histend:
-                # for some reason, it won't accept a 2nd system prompt. so we add it as user
-                # maybe theres a better way to do this..
-                context = context+[{"role": "user", "content": histend}]
+                # we merge the end prompt with the last message, to stay compliant with API message turn rules
+
+                # or, if we're in the very first message of a chat, we put it in the system prompt instead, just at the beginning, so that it has the information right at the start
+                if len(context) == 1:
+                    context[0]["content"] += f"\n\n{histend}"
+                else:
+                    # otherwise we search for the last user message and merge the endprompt into it
+                    for i in range(len(context) - 1, -1, -1):
+                        # ^ this is for loop that loops backwards through the array!
+                        # saves a ton of time
+
+                        if context[i].get("role") == "user":
+                            # found it, use it immediately
+                            context[i]["content"] += f"\n\n[SYSTEM INFO]:\n{histend}"
+                            break
+
+                    # since we're working with a deepcopy, this won't be visible to any frontend channels!
 
         return context
 

@@ -1,0 +1,40 @@
+/* ==========================================================================
+ *  Keyboard Shortcuts Modal
+ *  ========================================================================== */
+
+.shortcuts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.shortcut-item {
+    display: flex;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-color);
+    align-items: center;
+    justify-content: space-between;
+}
+
+.shortcut-item:last-child {
+    border-bottom: none;
+}
+
+.shortcut-keys {
+    display: flex;
+    gap: 4px;
+}
+
+.shortcut-key {
+    padding: 4px 8px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-family: monospace;
+    font-size: 0.8rem;
+}
+
+.shortcut-desc {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}

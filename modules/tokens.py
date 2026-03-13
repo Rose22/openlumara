@@ -3,7 +3,7 @@ import core
 class Tokens(core.module.Module):
     """makes an AI token-aware"""
     async def on_end_prompt(self):
-        prompt_tokens = self.manager.API.count_tokens_local(await self.manager.API.build_context(system_prompt=True, end_prompt=False))
+        prompt_tokens = await self.channel.context.chat.count_tokens()
         # reserve about 100 tokens for the end prompt, just to be safe
         prompt_tokens += 100
 

@@ -1,0 +1,48 @@
+/* ==========================================================================
+ *  CSS Custom Properties (Theme Variables)
+ *  ========================================================================== */
+:root {
+    --bg-primary: #0a0a0a;
+    --bg-secondary: #111111;
+    --bg-tertiary: #1a1a1a;
+    --bg-message-user: linear-gradient(135deg, #3a3a3a 0%, #2d2d2d 100%);
+    --bg-message-ai: #1a1a1a;
+    --bg-message-announce: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+    --bg-message-command: linear-gradient(135deg, #1a2a1a 0%, #0f1f0f 100%);
+    --bg-message-command-response: linear-gradient(135deg, #1a1a2a 0%, #0f0f1f 100%);
+    --bg-input: #161616;
+    --bg-code: #0a0a0a;
+    --bg-sidebar: #0d0d0d;
+    --border-color: #2a2a2a;
+    --border-message: #333333;
+    --border-user: #444444;
+    --border-sidebar: #222222;
+    --text-primary: #e0e0e0;
+    --text-secondary: #a0a0a0;
+    --text-muted: #666666;
+    --text-code: #d0d0d0;
+    --accent: #4ade80;
+    --accent-glow: rgba(74, 222, 128, 0.6);
+    --error: #f08080;
+    --error-bg: linear-gradient(135deg, #3a1a1a 0%, #2a0a0a 100%);
+    --error-border: #5a2a2a;
+    --important: #dada80;
+    --important-bg: linear-gradient(135deg, #3a3a1a 0%, #2a2a0a 100%);
+    --important-border: #5a5a2a;
+    --info: #80b0d0;
+    --info-bg: linear-gradient(135deg, #1a2a3a 0%, #0a1a2a 100%);
+    --info-border: #2a4a6a;
+    --button-bg: linear-gradient(135deg, #3a3a3a 0%, #2a2a2a 100%);
+    --button-hover: linear-gradient(135deg, #444444 0%, #333333 100%);
+    --button-stop: linear-gradient(135deg, #5a2a2a 0%, #3a1a1a 100%);
+    --scrollbar: #2a2a2a;
+    --scrollbar-hover: #3a3a3a;
+    --shadow-soft: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-glow: 0 0 20px var(--accent-glow);
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+    --radius-full: 24px;
+    --sidebar-width: 280px;
+}

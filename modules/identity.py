@@ -8,6 +8,13 @@ class Identity(core.module.Module):
         self.identity = core.storage.StorageList("identity", type="text")
 
     async def on_system_prompt(self):
+        # dont use identity if the characters module is enabled and a character is currently active
+        if "characters" in core.config.get("modules").get("enabled"):
+            active_character = core.storage.StorageText("character_current")
+            if active_character.get():
+                print(repr(active_character.get()))
+                return None
+
         identity = self.identity[0] if len(self.identity) > 0 else None
         sysprompt = None
         if identity:

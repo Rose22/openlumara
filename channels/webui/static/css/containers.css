@@ -1,0 +1,28 @@
+/* ==========================================================================
+ *   App Container
+ *   ========================================================================== */
+.app-wrapper {
+    display: flex;
+    height: 100%;
+    width: 100%;
+}
+
+/* ==========================================================================
+ *  Chat Container
+ *  ========================================================================== */
+.chat-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    background: var(--bg-primary);
+    min-height: 0;
+}
+
+.chat-container.drag-over {
+    background: linear-gradient(var(--bg-primary), var(--bg-primary)) padding-box,
+    linear-gradient(90deg, var(--accent) 50%, transparent 50%) border-box;
+    border: 2px dashed var(--accent);
+}

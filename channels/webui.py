@@ -24,6 +24,55 @@ import core
 
 WEBUI_DIR = core.get_path("channels/webui")
 
+# ordered list of javascript files, to load in this exact order
+JS_FILES = [
+    "themes",
+    "icons",
+    "variables",
+    "markdown",
+    "messages",
+    "msg_actions",
+    "sidebar",
+    "utils",
+    "notif",
+    "status",
+    "polling",
+    "chats",
+    "tags",
+    "search",
+    "export",
+    "modals",
+    "input",
+    "send",
+    "upload",
+    "theming",
+    "modal_settings",
+    "responsive",
+    "init"
+]
+
+# same deal for css files
+CSS_FILES = [
+    "variables",
+    "base",
+    "containers",
+    "sidebar",
+    "tags",
+    "rename",
+    "content",
+    "header",
+    "titlebar",
+    "search",
+    "modals",
+    "search",
+    "containers",
+    "messages",
+    "input",
+    "keyboard",
+    "responsive",
+    "settings"
+]
+
 app = Flask(
     __name__,
     static_folder=os.path.join(WEBUI_DIR, "static")
@@ -138,7 +187,7 @@ def _run_async(coro):
 @app.route('/')
 def index():
     """Serve the main HTML page."""
-    return render_template_string(HTML_TEMPLATE)
+    return render_template_string(HTML_TEMPLATE, js_files=JS_FILES, css_files=CSS_FILES)
 
 @app.route('/messages')
 def get_messages():

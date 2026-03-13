@@ -1,0 +1,59 @@
+/* ==========================================================================
+ *  Responsive Styles
+ *  ========================================================================== */
+@media (min-width: 769px) {
+    .sidebar {
+        position: relative;
+        transform: none;
+    }
+
+    .sidebar-overlay {
+        display: none;
+    }
+
+    .menu-btn {
+        display: none;
+    }
+}
+
+@media (max-width: 768px) {
+    .sidebar {
+        position: fixed;
+        left: 0;
+        top: 0;
+        height: 100%;
+        transform: translateX(-100%);
+        z-index: 1000;
+    }
+
+    .sidebar.open {
+        transform: translateX(0);
+    }
+
+    .menu-btn {
+        display: flex;
+    }
+}
+
+@media (max-width: 600px) {
+    header { padding: 12px 16px; }
+    header h1 { font-size: 1.1rem; }
+    .header-btn { padding: 6px 10px; font-size: 0.8rem; }
+    .chat-container { padding: 12px; }
+    .message { max-width: 90%; padding: 10px 14px; }
+    .message-actions { opacity: 1; }
+    .input-area { padding: 12px; gap: 8px; }
+    #upload { padding: 12px; }
+    #message { padding: 12px 16px; }
+    #send, #stop { padding: 12px 18px; }
+    .message pre { padding: 10px; font-size: 0.85rem; }
+    .copy-btn { opacity: 1; padding: 6px 10px; }
+    .shortcuts-btn { display: none; }
+}
+
+@media (max-width: 400px) {
+    .header-left { gap: 8px; }
+    .status-dot { width: 8px; height: 8px; }
+    .message { padding: 8px 12px; font-size: 0.95rem; }
+    #send, #stop { padding: 12px 14px; font-size: 0.9rem; }
+}

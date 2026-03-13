@@ -1,0 +1,124 @@
+/* ==========================================================================
+ *  Input Area
+ *  ========================================================================== */
+.input-area {
+    padding: 16px;
+    background: var(--bg-primary);
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+    flex-shrink: 0;
+}
+
+#upload {
+padding: 14px 16px;
+background: var(--bg-tertiary);
+border: 1px solid var(--border-color);
+border-radius: var(--radius-full);
+color: var(--text-secondary);
+cursor: pointer;
+transition: all 0.2s;
+display: flex;
+align-items: center;
+justify-content: center;
+flex-shrink: 0;
+}
+
+#upload:hover {
+background: var(--bg-secondary);
+color: var(--accent);
+border-color: var(--accent);
+}
+
+#upload svg {
+width: 20px;
+height: 20px;
+}
+
+#file-input {
+display: none;
+}
+
+#message {
+flex: 1;
+padding: 12px 18px;
+border: 1px solid var(--border-color);
+border-radius: var(--radius-full);
+background: var(--bg-input);
+color: var(--text-primary);
+font-size: 1rem;
+outline: none;
+transition: all 0.2s;
+resize: none;
+min-height: 48px;
+max-height: 200px;
+font-family: inherit;
+line-height: 1.4;
+}
+
+#message:focus {
+border-color: var(--accent);
+box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+#message::placeholder {
+color: var(--text-muted);
+}
+
+#message:disabled {
+opacity: 0.5;
+cursor: not-allowed;
+}
+
+#send, #stop {
+padding: 14px 24px;
+border-radius: var(--radius-full);
+font-size: 1rem;
+font-weight: 600;
+cursor: pointer;
+transition: all 0.15s ease;
+flex-shrink: 0;
+}
+
+#send {
+background: var(--button-bg);
+border: 1px solid var(--accent);
+color: var(--text-primary);
+}
+
+#send.hidden { display: none; }
+
+#stop:hover {
+background: var(--button-stop-hover);
+box-shadow: 0 0 15px var(--button-stop-glow);
+}
+
+#send:active { transform: scale(0.96); }
+#send:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+#stop {
+background: var(--error-bg);
+border: 1px solid var(--error-border);
+color: var(--error);
+display: none;
+}
+
+#stop:hover {
+background: linear-gradient(135deg, #5a2a2a 0%, #4a1a1a 100%);
+box-shadow: 0 0 15px rgba(248, 113, 113, 0.3);
+}
+
+#stop:active { transform: scale(0.96); }
+#stop.show { display: block; }
+
+/* Scrollbar styling */
+.chat-container::-webkit-scrollbar { width: 6px; }
+.chat-container::-webkit-scrollbar-track { background: var(--bg-primary); }
+.chat-container::-webkit-scrollbar-thumb {
+    background: var(--scrollbar);
+    border-radius: 3px;
+}
+.chat-container::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-hover);
+}

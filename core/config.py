@@ -43,13 +43,15 @@ default_config = {
 default_modules = (
     "modules",
     "models",
+    "channel",
     "identity",
     "chats",
-    "time",
+    "context",
     "memory",
+    "system",
     "scheduler",
-    "channel",
-    "tokens"
+    "tokens",
+    "time"
 )
 
 for channel in channels.get_all(respect_config=False):

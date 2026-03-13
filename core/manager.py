@@ -146,10 +146,7 @@ class Manager:
             return ""
 
     async def get_end_prompt(self):
-        # temporarily disabled
-        return None
-
-        #W automatically insert system prompts returned by modules (such as memory)
+        # automatically insert system prompts returned by modules (such as memory)
         histend_prompt = []
         for module_name, module in self.modules.items():
             module_sysprompt = await module.on_end_prompt()

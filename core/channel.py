@@ -43,7 +43,7 @@ class Channel:
             # add sent message to context
             await self.context.chat.add(message)
 
-            context = await self.context.get(system_prompt=True)
+            context = await self.context.get(system_prompt=True, end_prompt=True)
 
             # then request AI response and add it to context
             response = await self.manager.API.send(context)
@@ -69,7 +69,7 @@ class Channel:
             await self.context.chat.add(message)
 
             # and stream the response to the caller of this method
-            context = await self.context.get(system_prompt=True)
+            context = await self.context.get(system_prompt=True, end_prompt=True)
             final_content = []
             final_reasoning = []
             tc_response = None

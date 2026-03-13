@@ -173,7 +173,8 @@ class APIClient():
                             if index not in tool_call_buffer:
                                 tool_call_buffer[index] = tool_call
 
-                            tool_call_buffer[index].function.arguments += tool_call.function.arguments
+                            if tool_call_buffer[index].function.arguments and tool_call.function.arguments:
+                                tool_call_buffer[index].function.arguments += tool_call.function.arguments
 
                 # if response has usage data, save it so we can use it to trim context!
                 if hasattr(chunk, 'usage') and chunk.usage is not None:

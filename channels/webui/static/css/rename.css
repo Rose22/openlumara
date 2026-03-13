@@ -1,0 +1,71 @@
+/* =============================================================================
+ *  Inline Rename Styles
+ *  ============================================================================= */
+
+.inline-rename-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+
+.inline-rename-container.sidebar-rename {
+    width: calc(100% - 16px);
+}
+
+.inline-rename-input {
+    flex: 1;
+    min-width: 0;
+    background: var(--bg-secondary);
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    color: var(--text-primary);
+    padding: 6px 10px;
+    font-size: inherit;
+    font-family: inherit;
+    outline: none;
+}
+
+.inline-rename-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.2);
+}
+
+.inline-rename-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.inline-rename-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.inline-rename-btn.save {
+    background: var(--accent);
+    color: var(--bg-primary);
+}
+
+.inline-rename-btn.save:hover {
+    filter: brightness(1.1);
+}
+
+.inline-rename-btn.cancel {
+    background: var(--bg-tertiary);
+    color: var(--text-muted);
+}
+
+.inline-rename-btn.cancel:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}

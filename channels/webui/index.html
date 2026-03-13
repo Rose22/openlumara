@@ -10,13 +10,16 @@
     <meta name="description" content="AI Chat Interface">
     <link rel="manifest" href="/manifest.json">
     <link rel="apple-touch-icon" href="/icon-192.png">
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/css/variables.css" />
+    <link rel="stylesheet" href="/static/css/base.css" />
+    {% for filename in css_files %}
+        <link rel="stylesheet" href="/static/css/{{ filename }}.css" />
+    {% endfor %}
     <title>OptiClaw</title>
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/styles/github-dark.css">
     <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/highlight.min.js"></script>
-    <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
     <a href="#message" class="skip-link">Skip to input</a>
@@ -357,7 +360,8 @@
         </div>
     </div>
 
-    <script src="/static/themes.js"></script>
-    <script src="/static/ui.js"></script>
+    {% for filename in js_files %}
+        <script src="/static/js/{{ filename }}.js"></script>
+    {% endfor %}
 </body>
 </html>
