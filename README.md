@@ -2,7 +2,7 @@
 
 This is not your average claw agent! This is a modular, token-efficient AI agent framework written from scratch in Python by hand.
 
-AI Disclaimer: Everything in opticlaw was coded by hand, with the exception of  chan_web.py (the Web UI channel). Here and there I asked the AI how to do certain things in Python, but no code was inserted without me personally auditing it and modifying it. This is not a vibe-coded project.
+AI Disclaimer: Everything in opticlaw was coded by hand, with the exception of chan_web.py (the Web UI channel). Here and there I asked the AI how to do certain things in Python, but no code was inserted without me personally auditing it and modifying it. This is not a vibe-coded project.
 
 <img height="480" alt="image" src="https://github.com/user-attachments/assets/f2b66d2f-1c8b-45ba-8109-36caa03afb3c" />  <img height="480" alt="image" src="https://github.com/user-attachments/assets/38aa9cbc-33a2-4b3f-a048-840e116f9c93" /> <img height="480" alt="image" src="https://github.com/user-attachments/assets/7a2cc2e9-731b-4043-8312-e3f0e78a5189" /> <img height="480" alt="image" src="https://github.com/user-attachments/assets/f82043b4-24b5-4321-89c0-941ab262e982" /> 
 
@@ -29,15 +29,9 @@ Features:
 
 # How to install
 
-Clone the git repository, then:
-```
-cd opticlaw
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-```
+Clone the git repository, run `run.sh` if you're on linux, `run.bat` if you're on windows!
 
-Run it once. It will create a folder called `config`, and inside it, a file called `config.yml`. Set up your API url and key there, and customize opticlaw to your liking!
+Once it's started up, open your browser and go to the url it displays. Then in the web ui, set up your api connection, press save, and enjoy!
 
 To update, just run `git pull`.
 
