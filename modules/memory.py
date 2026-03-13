@@ -146,13 +146,13 @@ class Memory(core.module.Module):
 
             for tag in tags:
                 # Split tag into words and check if any word exists in the query
-                if any(word in query_lower for word in tag.lower().split()):
+                if any(word in query_lower for word in str(tag).lower().split()):
                     match_found = True
                     break
 
             # Check content only if no tag match found
             if not match_found and search_in_content:
-                content = mem.get("content", "")
+                content = str(mem.get("content", ""))
                 if content and query_lower in content.lower():
                     match_found = True
 
