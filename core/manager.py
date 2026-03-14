@@ -170,7 +170,7 @@ class Manager:
     async def get_system_prompt(self):
         # Allow generating system prompt even when disconnected
         # (modules may still need to provide context)
-        nonagentic_modules = ("character", "time")
+        nonagentic_modules = ("characters", "time")
         system_prompt = []
 
         # automatically insert system prompts returned by modules (such as memory)
