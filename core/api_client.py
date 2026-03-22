@@ -278,7 +278,7 @@ class APIClient():
         return result
 
     async def _recv_stream(self, response, use_tools=True):
-        """takes a response object and extracts the message from it, handling tool calls if needed. streaming version"""
+        """Takes a response object and extracts the message from it, handling tool calls if needed. Streaming version."""
         final_tool_calls = []
         tool_call_buffer = {}
         tokens = []
@@ -292,7 +292,6 @@ class APIClient():
         try:
             async for chunk in response:
                 if self.cancel_request:
-                    # allow cancelling the stream
                     if hasattr(response, "close"):
                         await response.close()
                     return
@@ -305,9 +304,9 @@ class APIClient():
                         tokens.append(streamed_token.content)
                         yield {"type": "content", "content": streamed_token.content}
 
-                    # Handle reasoning content streaming
+                    # handle reasoning content streaming
                     reason_part = getattr(streamed_token, "reasoning_content", None) or \
-                                  getattr(streamed_token, "reasoning", None)
+                                getattr(streamed_token, "reasoning", None)
 
                     if reason_part:
                         reasoning_tokens.append(reason_part)
@@ -315,26 +314,35 @@ class APIClient():
 
                     # extract tool calls, if any
                     if streamed_token.tool_calls and use_tools:
-                        # take the streamed tool call bits and mesh them together into a completed tool call array
                         for tool_call in streamed_token.tool_calls:
                             index = tool_call.index
 
                             if index not in tool_call_buffer:
                                 tool_call_buffer[index] = tool_call
+                                # ensure arguments is a string, not None
+                                if tool_call_buffer[index].function.arguments is None:
+                                    tool_call_buffer[index].function.arguments = ""
+                            else:
+                                # Continuation chunk — merge fields into the buffer
+                                # The id and function.name are typically only on the first chunk,
+                                # but merge them defensively in case they appear later
+                                if tool_call.id:
+                                    tool_call_buffer[index].id = tool_call.id
+                                if tool_call.function.name:
+                                    tool_call_buffer[index].function.name = tool_call.function.name
+                                # Append argument fragments
+                                if tool_call.function.arguments:
+                                    tool_call_buffer[index].function.arguments += tool_call.function.arguments
 
-                            if tool_call_buffer[index].function.arguments and tool_call.function.arguments:
-                                tool_call_buffer[index].function.arguments += tool_call.function.arguments
-
-                # if response has usage data, save it so we can use it to trim context!
+                # if response has usage data, save it so we can use it to trim context
                 if hasattr(chunk, 'usage') and chunk.usage is not None:
                     token_usage = chunk.usage.prompt_tokens
 
             if use_tools:
-                for index, tool_call in tool_call_buffer.items():
-                    final_tool_calls.append(tool_call)
+                for index in sorted(tool_call_buffer.keys()):
+                    final_tool_calls.append(tool_call_buffer[index])
 
-                # handle tool calls, if any
-                if final_tool_calls and use_tools and core.config.get("model").get("use_tools", False):
+                if final_tool_calls and core.config.get("model").get("use_tools", False):
                     yield {"type": "tool_calls", "content": final_tool_calls}
 
             yield {"type": "token_usage", "content": token_usage}
