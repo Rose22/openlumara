@@ -143,6 +143,8 @@ class ToolcallManager:
                     # only collect reasoning, in case there was no normal message content. dont yield.
                     final_reasoning.append(token.get("content"))
                 elif token_type == "tool_calls":
+                    yield token
+
                     # Mark that we made a recursive call
                     had_recursive_call = True
                     # Pass accumulated content to recursive call

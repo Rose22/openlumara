@@ -131,6 +131,7 @@ class StorageDict(dict):
             os.mkdir(data_dir)
 
         self.path = core.get_path(os.path.join(data_dir, file_path))
+        self.name = os.path.basename(self.path)
         self.binary = False
         self.autoreload = autoreload
 
@@ -148,6 +149,8 @@ class StorageDict(dict):
                 file_ext = "json"
             case "yaml":
                 file_ext = "yml"
+            case "markdown":
+                file_ext = "md"
             case "msgpack":
                 file_ext = "mp"
                 self.binary = True
@@ -155,7 +158,8 @@ class StorageDict(dict):
         self.type = file_type
         self.ext = file_ext
 
-        self.path += f".{self.ext}"
+        if file_type not in ["markdown"]:
+            self.path += f".{self.ext}"
 
         if manager:
             self.manager = manager
@@ -175,6 +179,7 @@ class StorageDict(dict):
             return False
 
         return True
+
     def _read(self):
         try:
             result = None
@@ -186,6 +191,30 @@ class StorageDict(dict):
             core.log("error", f"error reading {self.name}: {e}")
             return False
 
+    def _parse_nested_keys(self, flat_dict):
+        """Convert flat keys like 'ideas/opticlaw/topic' into nested dict structure."""
+        result = {}
+        for key, value in flat_dict.items():
+            parts = key.split("/")
+            current = result
+            for part in parts[:-1]:
+                if part not in current:
+                    current[part] = {}
+                current = current[part]
+            current[parts[-1]] = value
+        return result
+
+    def _flatten_nested_keys(self, nested_dict, prefix=""):
+        """Convert nested dict into flat keys like 'ideas/opticlaw/topic'."""
+        result = {}
+        for key, value in nested_dict.items():
+            full_key = f"{prefix}/{key}" if prefix else key
+            if isinstance(value, dict):
+                result.update(self._flatten_nested_keys(value, full_key))
+            else:
+                result[full_key] = value
+        return result
+
     def save(self):
         """save content to file"""
 
@@ -194,6 +223,37 @@ class StorageDict(dict):
                 self._write(json.dumps(dict(self), indent=2))
             case "yaml":
                 self._write(yaml.dump(dict(self), default_flow_style=False, sort_keys=False))
+            case "markdown":
+                # recursive file structure
+                # keys like "ideas/opticlaw/topic" become nested directories
+                if not os.path.exists(self.path):
+                    os.makedirs(self.path, exist_ok=True)
+
+                # flatten nested dict to path keys
+                flat_items = self._flatten_nested_keys(dict(self))
+
+                for key, content in flat_items.items():
+                    file_path = os.path.join(self.path, f"{key}.md")
+                    file_dir = os.path.dirname(file_path)
+
+                    if not os.path.exists(file_dir):
+                        os.makedirs(file_dir, exist_ok=True)
+
+                    with open(file_path, "w") as f:
+                        f.write(content)
+
+                # remove files that were deleted
+                for root, dirs, files in os.walk(self.path, topdown=False):
+                    for filename in files:
+                        if filename.endswith(".md"):
+                            rel_path = os.path.relpath(os.path.join(root, filename), self.path)
+                            key = rel_path[:-3]  # remove .md extension
+                            if key not in flat_items:
+                                os.remove(os.path.join(root, filename))
+
+                    # remove empty directories
+                    if root != self.path and not os.listdir(root):
+                        os.rmdir(root)
             case "msgpack":
                 self._write(msgpack.packb(dict(self)))
             case "text":
@@ -209,7 +269,7 @@ class StorageDict(dict):
             return True
 
         data = self._read()
-        if not data:
+        if self.type not in ["markdown"] and not data:
             return None
 
         match self.type:
@@ -217,6 +277,22 @@ class StorageDict(dict):
                 self.update(json.loads(data))
             case "yaml":
                 self.update(yaml.safe_load(data))
+            case "markdown":
+                # recursive file structure
+                flat_dict = {}
+                for root, dirs, files in os.walk(self.path):
+                    for filename in files:
+                        if filename.endswith(".md"):
+                            full_path = os.path.join(root, filename)
+                            rel_path = os.path.relpath(full_path, self.path)
+                            key = rel_path[:-3]  # remove .md extension
+
+                            with open(full_path, "r") as f:
+                                flat_dict[key] = str(f.read())
+
+                # convert flat path keys to nested dict structure
+                nested_dict = self._parse_nested_keys(flat_dict)
+                self.update(nested_dict)
             case "msgpack":
                 self.update(msgpack.unpackb(data))
             case "text":

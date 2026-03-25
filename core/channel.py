@@ -145,6 +145,8 @@ class Channel:
                     final_reasoning.append(token.get("content"))
                     yield token
                 elif token_type == "tool_calls":
+                    yield token
+
                     tool_calls_occurred = True
                     # Pass accumulated content to be included in tool_calls message
 

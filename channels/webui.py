@@ -403,6 +403,10 @@ def stream_message():
         async def collect_tokens():
             try:
                 async for token_data in channel_instance.send_stream({"role": "user", "content": user_message}):
+                    if token_data.get("type") == "tool_calls":
+                        # these get handled by the channel base class
+                        continue
+
                     if stream_id in stream_cancellations:
                         stream_cancellations.discard(stream_id)
                         token_queue.put(('cancelled', True))
