@@ -115,6 +115,8 @@
     color: var(--text-secondary);
     white-space: pre-wrap;
     word-break: break-word;
+    max-height: 400px;
+    overflow: auto;
 }
 
 /* When collapsed, animate the block closed */

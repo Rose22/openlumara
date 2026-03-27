@@ -161,6 +161,11 @@
                                 <path d="M6 8h.001M10 8h.001M14 8h.001M18 8h.001M8 12h.001M12 12h.001M16 12h.001M6 16h12"></path>
                             </svg>
                         </button>
+                        <button class="header-btn" onclick="showStorageEditor()" title="Storage Editor">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                            </svg>
+                        </button>
                         <button class="header-btn" onclick="clearChat()" title="Clear chat">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <polyline points="3 6 5 6 21 6"></polyline>
@@ -329,6 +334,118 @@
                                 <span class="shortcut-desc">Clear chat</span>
                                 <div class="shortcut-keys"><span class="shortcut-key">Ctrl</span><span class="shortcut-key">L</span></div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Storage Editor Modal -->
+                <div class="modal-overlay" id="storage-overlay" onclick="closeModalOnOverlay(event, 'storage')"></div>
+                <div class="modal storage-modal" id="storage-modal" role="dialog" aria-labelledby="storage-title">
+                    <div class="modal-header">
+                        <h2 id="storage-title">Storage Editor</h2>
+                        <button class="modal-close" onclick="toggleModal('storage')" aria-label="Close storage editor">×</button>
+                    </div>
+
+                    <div class="storage-modal-body">
+                        <div class="storage-sidebar">
+                            <div class="storage-sidebar-header">
+                                <input type="text"
+                                    class="storage-search"
+                                    id="storage-search"
+                                    placeholder="Search files..."
+                                    oninput="filterStorageFiles(this.value)"
+                                    aria-label="Search storage files">
+                                <button class="storage-add-file-btn" onclick="showNewFilePrompt()" title="New file">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                        <polyline points="14 2 14 8 20 8"></polyline>
+                                        <line x1="12" y1="12" x2="12" y2="18"></line>
+                                        <line x1="9" y1="15" x2="15" y2="15"></line>
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="storage-file-list" id="storage-file-list"></div>
+                        </div>
+
+                        <div class="storage-editor" id="storage-editor">
+                            <div class="storage-placeholder" id="storage-placeholder">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+                                    <polyline points="13 2 13 9 20 9"></polyline>
+                                </svg>
+                                <p>Select a file to edit</p>
+                            </div>
+
+                            <div class="storage-loading" id="storage-loading" style="display:none;">
+                                <div class="storage-spinner"></div>
+                                <span>Loading...</span>
+                            </div>
+
+                            <div class="storage-error" id="storage-error" style="display:none;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                                </svg>
+                                <p id="storage-error-msg">Error loading file</p>
+                            </div>
+
+                            <!-- Dict Editor: Keys on left, content on right -->
+                            <div class="storage-dict-editor" id="storage-dict-editor" style="display:none;">
+                                <div class="storage-dict-keys">
+                                    <div class="storage-dict-keys-header">
+                                        <span>Keys</span>
+                                        <button class="storage-add-key-btn" onclick="addDictKey()" title="Add key">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                    <div class="storage-dict-keys-list" id="storage-dict-keys"></div>
+                                </div>
+                                <div class="storage-dict-content">
+                                    <div class="storage-dict-content-header">
+                                        <span id="storage-current-key">Select a key</span>
+                                        <button class="storage-delete-key-btn" id="storage-delete-key-btn" onclick="deleteCurrentKey()" title="Delete key" style="display:none;">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <polyline points="3 6 5 6 21 6"></polyline>
+                                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                    <textarea id="storage-dict-textarea" placeholder="Enter content..." oninput="markStorageDirty()"></textarea>
+                                </div>
+                            </div>
+
+                            <!-- List Editor -->
+                            <div class="storage-list-editor" id="storage-list-editor" style="display:none;">
+                                <div class="storage-list-toolbar">
+                                    <button class="storage-list-add-btn" onclick="addListItem()">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                                        </svg>
+                                        Add Item
+                                    </button>
+                                </div>
+                                <div class="storage-list-items" id="storage-list-items"></div>
+                            </div>
+
+                            <!-- Text Editor -->
+                            <div class="storage-text-editor" id="storage-text-editor" style="display:none;">
+                                <textarea id="storage-text-textarea" placeholder="Enter content..." oninput="markStorageDirty()"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="storage-footer" id="storage-footer" style="display:none;">
+                        <span class="storage-dirty-indicator" id="storage-dirty-indicator">Unsaved changes</span>
+                        <div class="storage-footer-btns">
+                            <button class="storage-btn secondary" onclick="discardStorageChanges()">Discard</button>
+                            <button class="storage-btn primary" onclick="saveStorageFile()" id="storage-save-btn">
+                                <span class="btn-text">Save</span>
+                            </button>
                         </div>
                     </div>
                 </div>

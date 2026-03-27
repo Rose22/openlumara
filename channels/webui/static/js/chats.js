@@ -534,7 +534,7 @@ function createGroupContainer() {
 
 async function newChat() {
     if (isStreaming) {
-        return;
+        await stopGeneration();
     }
 
     try {
@@ -589,8 +589,17 @@ async function loadChatInternal(chatId, cachedMessages = null) {
 }
 
 async function loadChat(chatId) {
-    if (isStreaming) {
+    // 1. If clicking the chat that is already active...
+    if (chatId === currentChatId) {
+        // ...just close the sidebar (mobile UX) and do nothing else.
+        // The stream continues uninterrupted.
+        closeSidebar();
         return;
+    }
+
+    // 2. If switching to a DIFFERENT chat while streaming...
+    if (isStreaming) {
+        await stopGeneration();
     }
 
     try {

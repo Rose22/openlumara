@@ -209,10 +209,28 @@ class Characters(core.module.Module):
         self.characters.save()
         return self.result("character added")
 
+    async def read(self, name: str):
+        """
+        Reads a character profile.
+        DO NOT use if trying to read the character you're currently switched to!
+        ALWAYS use before editing a character!
+        """
+        char_name = self._find_character(name)
+        if not char_name:
+            return "character does not exist!"
+
+        character = self.characters[char_name]
+        character_profile = character.get("identity", "")
+
+        return self.result(character_profile)
+
     async def edit(self, name: str, category: str = None, character: str = None):
         """
         Edits an existing character.
         Use ONLY if user explicitely requests it.
+
+        When using this tool, ALWAYS write out the full character definition. This tool fully replaces the definition!
+        NEVER summarize a character definition. Write out the FULL profile.
         """
         name = self._find_character(name)
         if not name:

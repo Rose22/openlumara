@@ -21,6 +21,8 @@ from queue import Queue
 import logging
 
 import core
+import msgpack
+import yaml
 
 WEBUI_DIR = core.get_path("channels/webui")
 
@@ -47,6 +49,7 @@ JS_FILES = [
     "upload",
     "theming",
     "modal_settings",
+    "storage_editor",
     "responsive",
     "init"
 ]
@@ -70,7 +73,8 @@ CSS_FILES = [
     "input",
     "keyboard",
     "responsive",
-    "settings"
+    "settings",
+    "storage_editor"
 ]
 
 app = Flask(
@@ -946,6 +950,345 @@ def save_settings():
         return jsonify({'success': False, 'error': 'something went wrong while saving settings!'})
 
     return jsonify({"success": True})
+
+# =============================================================================
+# Storage Editor Routes
+# =============================================================================
+
+@app.route('/storage/list')
+def list_storage_files():
+    """List all storage files in the data folder."""
+    data_dir = core.get_data_path()
+    if not os.path.exists(data_dir):
+        return jsonify({'files': []})
+
+    files = []
+
+    for root, dirs, filenames in os.walk(data_dir):
+        for filename in filenames:
+            full_path = os.path.join(root, filename)
+            rel_path = os.path.relpath(full_path, data_dir)
+
+            ext = os.path.splitext(filename)[1].lower()
+            file_type = None
+
+            if ext in ['.json', '.yml', '.yaml', '.mp']:
+                try:
+                    if ext == '.json':
+                        with open(full_path, 'r', encoding='utf-8') as f:
+                            data = json.load(f)
+                            if isinstance(data, dict):
+                                file_type = 'dict'
+                            elif isinstance(data, list):
+                                file_type = 'list'
+                            else:
+                                file_type = 'text'
+                    elif ext in ['.yml', '.yaml']:
+                        with open(full_path, 'r', encoding='utf-8') as f:
+                            data = yaml.safe_load(f)
+                            if isinstance(data, dict):
+                                file_type = 'dict'
+                            elif isinstance(data, list):
+                                file_type = 'list'
+                            else:
+                                file_type = 'text'
+                    elif ext == '.mp':
+                        with open(full_path, 'rb') as f:
+                            data = msgpack.unpackb(f.read())
+                            if isinstance(data, dict):
+                                file_type = 'dict'
+                            elif isinstance(data, list):
+                                file_type = 'list'
+                            else:
+                                file_type = 'text'
+                except Exception as e:
+                    core.log("webui", f"Error reading {rel_path}: {e}")
+                    file_type = 'unknown'
+            elif ext in ['.txt', '.md']:
+                file_type = 'text'
+            else:
+                continue
+
+            files.append({
+                'path': rel_path,
+                'type': file_type,
+                'name': filename
+            })
+
+    files.sort(key=lambda x: x['path'].lower())
+    return jsonify({'files': files, 'data_dir': data_dir})
+
+@app.route('/storage/load')
+def load_storage_file():
+    """Load a specific storage file."""
+    file_path = request.args.get('file')
+    if not file_path:
+        return jsonify({'success': False, 'error': 'No file specified'})
+
+    data_dir = core.get_data_path()
+    full_path = os.path.join(data_dir, file_path)
+
+    if not os.path.exists(full_path):
+        return jsonify({'success': False, 'error': 'File not found'})
+
+    # Security check
+    if not os.path.abspath(full_path).startswith(os.path.abspath(data_dir)):
+        return jsonify({'success': False, 'error': 'Access denied'})
+
+    ext = os.path.splitext(file_path)[1].lower()
+
+    try:
+        if ext == '.json':
+            with open(full_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                return jsonify({
+                    'success': True,
+                    'type': 'dict',
+                    'keys': sorted(data.keys()),
+                    'data': data
+                })
+            elif isinstance(data, list):
+                return jsonify({
+                    'success': True,
+                    'type': 'list',
+                    'data': data
+                })
+
+        elif ext in ['.yml', '.yaml']:
+            with open(full_path, 'r', encoding='utf-8') as f:
+                data = yaml.safe_load(f)
+            if isinstance(data, dict):
+                return jsonify({
+                    'success': True,
+                    'type': 'dict',
+                    'keys': sorted(data.keys()),
+                    'data': data
+                })
+            elif isinstance(data, list):
+                return jsonify({
+                    'success': True,
+                    'type': 'list',
+                    'data': data
+                })
+
+        elif ext == '.mp':
+            with open(full_path, 'rb') as f:
+                data = msgpack.unpackb(f.read())
+            if isinstance(data, dict):
+                return jsonify({
+                    'success': True,
+                    'type': 'dict',
+                    'keys': sorted(data.keys()),
+                    'data': data
+                })
+            elif isinstance(data, list):
+                return jsonify({
+                    'success': True,
+                    'type': 'list',
+                    'data': data
+                })
+
+        elif ext in ['.txt', '.md']:
+            with open(full_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            return jsonify({
+                'success': True,
+                'type': 'text',
+                'data': content
+            })
+
+        return jsonify({'success': False, 'error': 'Unsupported file type'})
+
+    except Exception as e:
+        core.log("webui", f"Error loading storage file: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/storage/save', methods=['POST'])
+def save_storage_file():
+    """Save a storage file."""
+    data = request.get_json()
+    file_path = data.get('file')
+    storage_type = data.get('type')
+    content = data.get('data')
+
+    if not file_path:
+        return jsonify({'success': False, 'error': 'No file specified'})
+
+    data_dir = core.get_data_path()
+    full_path = os.path.join(data_dir, file_path)
+
+    # Security check
+    if not os.path.abspath(full_path).startswith(os.path.abspath(data_dir)):
+        return jsonify({'success': False, 'error': 'Access denied'})
+
+    ext = os.path.splitext(file_path)[1].lower()
+
+    try:
+        if storage_type == 'dict':
+            data_to_save = content
+            if ext == '.json':
+                with open(full_path, 'w', encoding='utf-8') as f:
+                    json.dump(data_to_save, f, indent=2, ensure_ascii=False)
+            elif ext in ['.yml', '.yaml']:
+                with open(full_path, 'w', encoding='utf-8') as f:
+                    yaml.dump(data_to_save, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
+            elif ext == '.mp':
+                with open(full_path, 'wb') as f:
+                    f.write(msgpack.packb(data_to_save))
+            else:
+                return jsonify({'success': False, 'error': 'Unsupported file type for dict'})
+
+        elif storage_type == 'list':
+            data_to_save = content
+            if ext == '.json':
+                with open(full_path, 'w', encoding='utf-8') as f:
+                    json.dump(data_to_save, f, indent=2, ensure_ascii=False)
+            elif ext in ['.yml', '.yaml']:
+                with open(full_path, 'w', encoding='utf-8') as f:
+                    yaml.dump(data_to_save, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
+            elif ext == '.mp':
+                with open(full_path, 'wb') as f:
+                    f.write(msgpack.packb(data_to_save))
+            else:
+                return jsonify({'success': False, 'error': 'Unsupported file type for list'})
+
+        elif storage_type == 'text':
+            if ext in ['.txt', '.md']:
+                with open(full_path, 'w', encoding='utf-8') as f:
+                    f.write(content)
+            else:
+                return jsonify({'success': False, 'error': 'Unsupported file type for text'})
+
+        else:
+            return jsonify({'success': False, 'error': 'Unknown storage type'})
+
+        core.log("webui", f"Saved storage file: {file_path}")
+        return jsonify({'success': True})
+
+    except Exception as e:
+        core.log("webui", f"Error saving storage file: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/storage/delete-key', methods=['POST'])
+def delete_storage_key():
+    """Delete a key from a dict storage file."""
+    data = request.get_json()
+    file_path = data.get('file')
+    key = data.get('key')
+
+    if not file_path or key is None:
+        return jsonify({'success': False, 'error': 'Missing file or key'})
+
+    data_dir = core.get_data_path()
+    full_path = os.path.join(data_dir, file_path)
+
+    # Security check
+    if not os.path.abspath(full_path).startswith(os.path.abspath(data_dir)):
+        return jsonify({'success': False, 'error': 'Access denied'})
+
+    ext = os.path.splitext(file_path)[1].lower()
+
+    try:
+        if ext == '.json':
+            with open(full_path, 'r', encoding='utf-8') as f:
+                file_data = json.load(f)
+        elif ext in ['.yml', '.yaml']:
+            with open(full_path, 'r', encoding='utf-8') as f:
+                file_data = yaml.safe_load(f)
+        elif ext == '.mp':
+            with open(full_path, 'rb') as f:
+                file_data = msgpack.unpackb(f.read())
+        else:
+            return jsonify({'success': False, 'error': 'Unsupported file type'})
+
+        if not isinstance(file_data, dict):
+            return jsonify({'success': False, 'error': 'File is not a dictionary'})
+
+        if key in file_data:
+            del file_data[key]
+        else:
+            return jsonify({'success': False, 'error': 'Key not found'})
+
+        if ext == '.json':
+            with open(full_path, 'w', encoding='utf-8') as f:
+                json.dump(file_data, f, indent=2, ensure_ascii=False)
+        elif ext in ['.yml', '.yaml']:
+            with open(full_path, 'w', encoding='utf-8') as f:
+                yaml.dump(file_data, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
+        elif ext == '.mp':
+            with open(full_path, 'wb') as f:
+                f.write(msgpack.packb(file_data))
+
+        return jsonify({
+            'success': True,
+            'keys': sorted(file_data.keys()),
+            'data': file_data
+        })
+
+    except Exception as e:
+        core.log("webui", f"Error deleting key: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/storage/add-key', methods=['POST'])
+def add_storage_key():
+    """Add a new key to a dict storage file."""
+    data = request.get_json()
+    file_path = data.get('file')
+    key = data.get('key', '').strip()
+
+    if not file_path or not key:
+        return jsonify({'success': False, 'error': 'Missing file or key'})
+
+    data_dir = core.get_data_path()
+    full_path = os.path.join(data_dir, file_path)
+
+    # Security check
+    if not os.path.abspath(full_path).startswith(os.path.abspath(data_dir)):
+        return jsonify({'success': False, 'error': 'Access denied'})
+
+    ext = os.path.splitext(file_path)[1].lower()
+
+    try:
+        if ext == '.json':
+            with open(full_path, 'r', encoding='utf-8') as f:
+                file_data = json.load(f)
+        elif ext in ['.yml', '.yaml']:
+            with open(full_path, 'r', encoding='utf-8') as f:
+                file_data = yaml.safe_load(f)
+        elif ext == '.mp':
+            with open(full_path, 'rb') as f:
+                file_data = msgpack.unpackb(f.read())
+        else:
+            return jsonify({'success': False, 'error': 'Unsupported file type'})
+
+        if not isinstance(file_data, dict):
+            return jsonify({'success': False, 'error': 'File is not a dictionary'})
+
+        if key in file_data:
+            return jsonify({'success': False, 'error': 'Key already exists'})
+
+        file_data[key] = ''
+
+        if ext == '.json':
+            with open(full_path, 'w', encoding='utf-8') as f:
+                json.dump(file_data, f, indent=2, ensure_ascii=False)
+        elif ext in ['.yml', '.yaml']:
+            with open(full_path, 'w', encoding='utf-8') as f:
+                yaml.dump(file_data, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
+        elif ext == '.mp':
+            with open(full_path, 'wb') as f:
+                f.write(msgpack.packb(file_data))
+
+        return jsonify({
+            'success': True,
+            'keys': sorted(file_data.keys()),
+            'data': file_data
+        })
+
+    except Exception as e:
+        core.log("webui", f"Error adding key: {e}")
+        return jsonify({'success': False, 'error': str(e)})
 
 # =============================================================================
 # Server control routes
