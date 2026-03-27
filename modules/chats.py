@@ -77,7 +77,7 @@ class Chats(core.module.Module):
         return f"chat renamed to {newname}"
 
     # AI tool version
-    async def tag_chat(self, new_name: str, category: str, tags: list):
+    async def organize(self, new_name: str, category: str, tags: list = []):
         """
         Lets you rename, categorize, and tag the current chat.
 
