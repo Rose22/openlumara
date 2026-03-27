@@ -94,7 +94,6 @@ async function send(providedContent = null) {
     setInputState(true, true, true);
     isStreaming = true;
     currentController = new AbortController();
-    setMessageButtonsDisabled(true);
 
     // Create AI message wrapper (hidden until first token)
     const aiWrapper = document.createElement('div');
@@ -449,7 +448,6 @@ function updateStreamingContent(msgDiv, content, reasoning) {
 function finishStream() {
     setInputState(false, false, false);
     isStreaming = false;
-    setMessageButtonsDisabled(false);
     streamFrozen = false;
     currentController = null;
     currentStreamId = null;
