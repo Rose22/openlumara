@@ -1,4 +1,4 @@
-const CACHE_NAME = 'opticlaw-v2.0.2';
+const CACHE_NAME = 'opticlaw-v2.0.3';
 const ASSETS = ['/', '/manifest.json'];
 
 self.addEventListener('install', (e) => {

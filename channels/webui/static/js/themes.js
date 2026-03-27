@@ -2187,42 +2187,56 @@ const themes = {
         vars: {
             // === TYPOGRAPHY ===
             '--font-primary': "'Indie Flower', sans-serif",
-            '--font-display': "'Indie Flower', sans-serif", // Or use a script font here
+            '--font-display': "'Indie Flower', sans-serif",
 
             // === SHAPES (Bubbly) ===
             '--radius-sm': '12px',
             '--radius-md': '20px',
-            '--radius-lg': '30px', // Very round!
-            '--radius-xl': '999px', // Pill shape for buttons
+            '--radius-lg': '30px',
+            '--radius-xl': '999px',
 
             // === COLORS (Hot Pink Palette) ===
-            '--bg-primary': '#ffeef5', // Very light pink
+            '--bg-primary': '#ffeef5',
             '--bg-secondary': '#fff0f5',
             '--bg-tertiary': '#ffd6e7',
             '--bg-message-user': 'linear-gradient(135deg, #ff9ecc 0%, #ff85c0 100%)',
             '--bg-message-ai': '#ffffff',
             '--bg-message-announce': 'linear-gradient(135deg, #fff0f5 0%, #ffe0eb 100%)',
+            '--bg-message-command': 'linear-gradient(135deg, #ff85c0 0%, #ff69b4 100%)', // Hot Pink
+            '--bg-message-command-response': 'linear-gradient(135deg, #ffd6e7 0%, #ffcae0 100%)', // Soft Pink
             '--bg-input': '#ffffff',
             '--bg-code': '#fff5f8',
             '--bg-sidebar': '#ffe8f0',
 
             '--border-color': '#ffb8d9',
             '--border-message': '#ffc8e2',
-            '--border-user': '#ff69b4', // Hot Pink
+            '--border-user': '#ff69b4',
 
-            '--text-primary': '#d63384', // Deep Pink text
+            '--text-primary': '#d63384',
             '--text-secondary': '#e066a0',
             '--text-muted': '#f090c0',
 
-            '--accent': '#ff1493', // Deep Pink
+            '--accent': '#ff1493',
             '--accent-glow': 'rgba(255, 20, 147, 0.5)',
-            '--accent-secondary': '#c71585', // Medium Violet Red
+            '--accent-secondary': '#c71585',
 
-            '--error': '#ff69b4',
+            '--error': '#d63384', // Deep Pink (Readable Error)
             '--error-bg': 'linear-gradient(135deg, #ffe0eb 0%, #ffd0e0 100%)',
+            '--error-border': '#ff69b4',
+
+            '--important': '#ff1493', // Deep Pink instead of Yellow
+            '--important-bg': 'linear-gradient(135deg, #ffe0eb 0%, #ffd6e7 100%)',
+            '--important-border': '#ff69b4',
+
+            '--info': '#db2777', // Pink instead of Blue
+            '--info-bg': 'linear-gradient(135deg, #fff0f5 0%, #ffe4ec 100%)',
+            '--info-border': '#f8bbd0',
 
             '--button-bg': 'linear-gradient(135deg, #ff69b4 0%, #ff1493 100%)',
             '--button-hover': 'linear-gradient(135deg, #ff85c0 0%, #ff69b4 100%)',
+            '--button-stop': 'linear-gradient(135deg, #ff85c0 0%, #ff69b4 100%)',
+            '--button-stop-hover': 'linear-gradient(135deg, #ff9ecc 0%, #ff85c0 100%)',
+            '--button-stop-glow': 'rgba(255, 20, 147, 0.4)',
 
             '--scrollbar': '#ffb8d9',
             '--scrollbar-hover': '#ff99cc',
@@ -2230,15 +2244,19 @@ const themes = {
             '--shadow-soft': '0 4px 15px rgba(255, 20, 147, 0.15)',
             '--shadow-glow': '0 0 25px var(--accent-glow)',
 
+            '--tool-bg': '#fff0f5',
+            '--tool-bg-secondary': '#fff5f8',
+            '--tool-border': '#ffc8e2',
+            '--tool-border-hover': '#ff99cc',
+            '--tool-pending-bg': 'rgba(255, 105, 180, 0.15)',
+            '--tool-pending-color': '#ff69b4',
+            '--tool-completed-bg': 'rgba(255, 20, 147, 0.15)',
+            '--tool-completed-color': '#ff1493',
+
             // === DECORATION ===
-            // A subtle grid pattern or noise
             '--bg-pattern': 'radial-gradient(#ffb8d9 1px, transparent 1px)',
-
-            // Fun borders for messages
             '--message-decoration': '2px solid rgba(255, 182, 193, 0.5)',
-
-            // Avatar Shape (Optional: make them diamonds or rounded squares)
-            '--avatar-shape': '30%',
+            '--avatar-shape': '30%'
         }
     },
     'dark-sakura': {
@@ -2252,37 +2270,41 @@ const themes = {
             '--radius-xl': '999px',
 
             // === COLORS (Official Barbie Pink #DA1884) ===
-            '--bg-primary': '#12080c',       // Dark Pink-Black (not purple!)
-            '--bg-secondary': '#1e0a14',     // Deep Cherry
-            '--bg-tertiary': '#3a1025',      // Dark Rose highlight
-            '--bg-message-user': 'linear-gradient(135deg, #da1884 0%, #a01570 100%)', // Full Barbie Pink gradient
-            '--bg-message-ai': '#180810',    // Very dark pink
+            '--bg-primary': '#12080c',
+            '--bg-secondary': '#1e0a14',
+            '--bg-tertiary': '#3a1025',
+            '--bg-message-user': 'linear-gradient(135deg, #da1884 0%, #a01570 100%)',
+            '--bg-message-ai': '#180810',
             '--bg-message-announce': 'linear-gradient(135deg, #2a0c1a 0%, #1a0810 100%)',
-            '--bg-message-command': 'linear-gradient(135deg, #1a2a1a 0%, #0f1f0f 100%)', // Keeping standard green for contrast or change to pink?
+            '--bg-message-command': 'linear-gradient(135deg, #4a1830 0%, #3a1020 100%)', // Dark Pink (Not Green!)
             '--bg-message-command-response': 'linear-gradient(135deg, #2a1828 0%, #1a1020 100%)',
-            '--bg-input': '#1a0812',         // Dark input
+            '--bg-input': '#1a0812',
             '--bg-code': '#0e0608',
-            '--bg-sidebar': '#0c0408',       // Darkest pink-black
+            '--bg-sidebar': '#0c0408',
 
             '--border-color': '#4a1840',
             '--border-message': '#642050',
-            '--border-user': '#da1884',      // Barbie Pink Borders
+            '--border-user': '#da1884',
             '--border-sidebar': '#2a0818',
 
-            '--text-primary': '#ffeef4',     // Soft White-Pink
-            '--text-secondary': '#f8a0d0',   // Bright Pink text
+            '--text-primary': '#ffeef4',
+            '--text-secondary': '#f8a0d0',
             '--text-muted': '#b06090',
             '--text-code': '#ffd0e8',
 
-            '--accent': '#da1884',           // OFFICIAL BARBIE PINK
+            '--accent': '#da1884',
             '--accent-glow': 'rgba(218, 24, 132, 0.6)',
-            '--accent-secondary': '#ff69b4', // Hot Pink secondary
+            '--accent-secondary': '#ff69b4',
 
             '--error': '#ff69b4',
             '--error-bg': 'linear-gradient(135deg, #3a1020 0%, #2a0818 100%)',
             '--error-border': '#da1884',
 
-            '--info': '#da1884',
+            '--important': '#ff69b4', // Hot Pink instead of Yellow
+            '--important-bg': 'linear-gradient(135deg, #3a1025 0%, #2a0818 100%)',
+            '--important-border': '#da1884',
+
+            '--info': '#da1884', // Barbie Pink instead of Blue
             '--info-bg': 'linear-gradient(135deg, #2a0820 0%, #1a0410 100%)',
             '--info-border': '#a01570',
 
@@ -2298,20 +2320,24 @@ const themes = {
             '--shadow-soft': '0 4px 20px rgba(218, 24, 132, 0.2)',
             '--shadow-glow': '0 0 25px var(--accent-glow)',
 
+            '--tool-bg': '#1a0812',
+            '--tool-bg-secondary': '#12080c',
+            '--tool-border': '#4a1840',
+            '--tool-border-hover': '#6a2060',
+            '--tool-pending-bg': 'rgba(218, 24, 132, 0.15)',
+            '--tool-pending-color': '#da1884',
+            '--tool-completed-bg': 'rgba(255, 105, 180, 0.15)',
+            '--tool-completed-color': '#ff69b4',
+
             // === DECORATION ===
-            // Pink Sparkle Pattern
-            /* '--bg-pattern': 'radial-gradient(circle, rgba(218, 24, 132, 0.15) 1px, transparent 1px)', */
-            /* '--bg-pattern': `url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg' fill='none' stroke='%23da1884' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z'%3E%3C/path%3E%3C/svg%3E")`, */
-            // "Glitter" Sparkle Pattern: Tiny white/pink crosses
             '--bg-pattern': `
-                radial-gradient(1.5px 1.5px at 10% 20%, #ffffff, transparent),
-                radial-gradient(1px 1px at 30% 65%, #ff69b4, transparent),
-                radial-gradient(1.5px 1.5px at 70% 10%, #ffffff, transparent),
-                radial-gradient(1px 1px at 90% 50%, #da1884, transparent),
-                radial-gradient(2px 2px at 50% 80%, #ffffff, transparent)
+            radial-gradient(1.5px 1.5px at 10% 20%, #ffffff, transparent),
+            radial-gradient(1px 1px at 30% 65%, #ff69b4, transparent),
+            radial-gradient(1.5px 1.5px at 70% 10%, #ffffff, transparent),
+            radial-gradient(1px 1px at 90% 50%, #da1884, transparent),
+            radial-gradient(2px 2px at 50% 80%, #ffffff, transparent)
             `,
             '--bg-pattern-size': '200px 200px',
-
             '--message-decoration': '1px solid rgba(218, 24, 132, 0.3)',
             '--avatar-shape': '30%'
         }
