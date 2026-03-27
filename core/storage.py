@@ -6,7 +6,7 @@ import msgpack
 
 class StorageList(list):
     """subclassed list that handles storage of data. supports a variety of storage formats."""
-    def __init__(self, file_path, type: str, manager=None, data_dir=None, *args):
+    def __init__(self, file_path, type: str, manager=None, data_dir=None, autoreload=True, *args):
         super().__init__(*args)
 
         if not data_dir:
@@ -42,6 +42,7 @@ class StorageList(list):
 
         self.type = file_type
         self.ext = file_ext
+        self.autoreload = autoreload
 
         self.path += f".{self.ext}"
 
@@ -118,7 +119,7 @@ class StorageList(list):
 
 class StorageDict(dict):
     """subclassed dict that handles storage of data. supports a variety of storage formats."""
-    def __init__(self, file_path, type: str, manager=None, data_dir=None, autoreload=False, *args):
+    def __init__(self, file_path, type: str, manager=None, data_dir=None, autoreload=True, *args):
         super().__init__(*args)
 
         if not data_dir:
@@ -308,7 +309,7 @@ class StorageDict(dict):
 
 class StorageText:
     """simple class that saves its content to a text file"""
-    def __init__(self, file_path, manager=None, data_dir=None, autoreload=False, *args):
+    def __init__(self, file_path, manager=None, data_dir=None, autoreload=True, *args):
         super().__init__(*args)
 
         if not data_dir:

@@ -12,7 +12,6 @@ class Identity(core.module.Module):
         if "characters" in core.config.get("modules").get("enabled"):
             active_character = core.storage.StorageText("character_current")
             if active_character.get():
-                print(repr(active_character.get()))
                 return None
 
         identity = self.identity[0] if len(self.identity) > 0 else None
@@ -45,6 +44,7 @@ class Identity(core.module.Module):
     })
     async def cmd_set(self, args):
         if not args:
+            self.identity.load()
             return self.identity[0] if len(self.identity) > 0 else "You have not yet set up an identity."
 
         if args[0] == "set":
