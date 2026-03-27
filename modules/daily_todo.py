@@ -24,6 +24,22 @@ class DailyTodo(core.module.Module):
             self.storage["tasks"] = []
             self.storage.save()
 
+    async def on_system_prompt(self):
+        result = []
+
+        self._check_date()
+
+        if "tasks" in self.storage:
+            if not self.storage["tasks"]:
+                return "No tasks added yet!"
+
+            result.append("User's tasks for today:")
+
+            for task in self.storage["tasks"]:
+                result.append(f"- {task}")
+
+        return "\n".join(result)
+
     # ---------------------------------------------------------
     # AI Tools (Async methods for the AI to call)
     # ---------------------------------------------------------
@@ -42,10 +58,10 @@ class DailyTodo(core.module.Module):
         self.storage.save()
         return self.result(f"Task added: '{task}'")
 
-    async def remove_task(self, index: int):
+    async def complete_task(self, index: int):
         """
-        Removes a task from the list by its index number (1-based).
-        Use this when the user wants to delete or remove a task.
+        Marks a task as completed using its index number (1-based).
+        It does this by deleting the task from the list.
         """
         self._check_date()
 
@@ -77,25 +93,6 @@ class DailyTodo(core.module.Module):
             return self.result(f"Updated task {index} from '{old_task}' to '{new_text}'")
         else:
             return self.result(f"Invalid task number {index}. There are {len(tasks)} tasks.", False)
-
-    async def list_tasks(self):
-        """
-        Lists all tasks currently on the todo list.
-        Use this when the user asks what is on their list or what they have to do today.
-        """
-        self._check_date()
-
-        tasks = self.storage.get("tasks", [])
-        date_str = self.storage.get("date", "today")
-
-        if not tasks:
-            return self.result("The todo list is currently empty.")
-
-        response = f"Todo list for {date_str}:\n"
-        for i, task in enumerate(tasks, 1):
-            response += f"{i}. {task}\n"
-
-        return self.result(response)
 
     # ---------------------------------------------------------
     # User Commands (Decorated methods for direct user interaction)

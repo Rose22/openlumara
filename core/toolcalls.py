@@ -136,7 +136,7 @@ class ToolcallManager:
                 tools=self.channel.manager.tools
             ):
                 token_type = token.get("type")
-                if token_type in ("content", "reasoning"):
+                if token_type == "content":
                     final_content.append(token.get("content"))
                     yield token
                 elif token_type == "reasoning":
