@@ -106,7 +106,7 @@ async function send() {
         const response = await fetch('/stream', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: message }),
+            body: JSON.stringify({role: "user", content: message }),
             signal: currentController.signal
         });
 
@@ -368,14 +368,14 @@ async function sendCommand(message) {
             fetch('/send', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: message })
+                body: JSON.stringify({role: "user", content: message })
             });
             await stopGeneration(true);
         } else {
             const response = await fetch('/send', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: message })
+                body: JSON.stringify({role: "user", content: message })
             });
 
             // Handle API configuration errors
@@ -454,7 +454,7 @@ async function stopGeneration(sent_from_command = false) {
             fetch('/send', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: "/stop" })
+                body: JSON.stringify({role: "user", content: "/stop" })
             });
         }
         try {

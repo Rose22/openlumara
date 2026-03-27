@@ -2,42 +2,255 @@
 // Chats
 // =============================================================================
 
-// Define behaviors for specific category prefixes
+let activeCategory = 'general'; // Default category
+
 const CATEGORY_REGISTRY = {
     'char': {
-        icon: ICONS.user, // Assuming you have a user icon in your ICONS object
+        icon: ICONS.user,
         class: 'category-character',
-        label: (name) => name // Just display the name "Luna", not "char:Luna"
+        label: (name) => name,
+        groupTitle: 'Characters' // New property
     },
-    // You can add more later!
-    // 'world': {
-    //     icon: ICONS.globe,
-    //     class: 'category-world',
-    //     label: (name) => `World: ${name}`
-    // }
+    // Add others here if needed
 };
 
-// Default fallback for categories without a prefix
 const DEFAULT_CATEGORY_HANDLER = {
-    icon: ICONS.folder, // A standard folder icon
+    icon: ICONS.chat,
     class: 'category-default',
-    label: (name) => name
+    label: (name) => name,
+    groupTitle: 'Chats' // Default group for non-prefixed categories
 };
+
+/**
+ * Handles click on the Chat Pane Header.
+ * Desktop: Does nothing (or could open a dropdown if desired).
+ * Mobile: Slides the Category Pane (fullscreen) into view.
+ */
+function handlePaneHeaderClick() {
+    if (window.innerWidth <= 768) {
+        openCategoryPane();
+    }
+}
+
+function openCategoryPane() {
+    const pane = document.getElementById('category-pane');
+    if (pane) pane.classList.add('open');
+}
+
+function closeCategoryPane() {
+    const pane = document.getElementById('category-pane');
+    if (pane) pane.classList.remove('open');
+}
+
+// Helper to filter tags based on the active category
+function updateTagsForCategory(categoryKey) {
+    // 1. Filter chats to get the ones in this category
+    const chatsInCategory = allChats.filter(chat => {
+        if (categoryKey === 'general') {
+            return !chat.category || chat.category === 'general';
+        }
+        return chat.category === categoryKey;
+    });
+
+    // 2. Extract unique tags from these chats
+    const categoryTags = new Set();
+    chatsInCategory.forEach(chat => {
+        (chat.tags || []).forEach(tag => categoryTags.add(tag));
+    });
+
+    // 3. Convert to sorted array
+    const sortedTags = Array.from(categoryTags).sort();
+
+    // 4. Check if currently active tag is valid for this category
+    if (activeTagFilter && !sortedTags.includes(activeTagFilter)) {
+        // If the active tag isn't in this category, clear it
+        activeTagFilter = null;
+        const clearBtn = document.getElementById('clear-tag-filter');
+        if (clearBtn) clearBtn.style.display = 'none';
+    }
+
+    // 5. Render the tag list
+    renderTagFilter(sortedTags);
+}
+
+/**
+ * Selects a category.
+ * Desktop: Filters list immediately.
+ * Mobile: Filters list AND slides the Category Pane away (revealing Chat Pane).
+ */
+function selectCategory(categoryKey) {
+    activeCategory = categoryKey;
+
+    // 1. Update Header
+    updateChatPaneTitle(categoryKey);
+
+    // 2. Update Active State
+    const items = document.querySelectorAll('.category-item');
+    items.forEach(item => {
+        item.classList.toggle('active', item.dataset.key === categoryKey);
+    });
+
+    // 3. Filter and Render
+    // We filter the MASTER list (allChats) and pass the subset to renderChatList
+    const filtered = filterChatsByCategory(allChats, categoryKey);
+    renderChatList(filtered);
+
+    // 4. Update Tags
+    updateTagsForCategory(categoryKey);
+
+    // 5. Mobile close
+    if (window.innerWidth <= 768) {
+        closeCategoryPane();
+    }
+}
+
+
+function updateChatPaneTitle(categoryKey) {
+    const titleEl = document.getElementById('chat-pane-title');
+    let displayName = 'General';
+
+    if (categoryKey !== 'general') {
+        const parsed = parseCategory(categoryKey);
+        displayName = parsed.handler.label(parsed.name);
+    }
+
+    titleEl.textContent = displayName;
+}
+
+function filterChatsByCategory(chats, categoryKey) {
+    if (categoryKey === 'general') {
+        // General includes null, undefined, or "general"
+        return chats.filter(c => !c.category || c.category === 'general');
+    }
+    return chats.filter(c => c.category === categoryKey);
+}
+
+
+function renderCategoryList(categories) {
+    const list = document.getElementById('category-list');
+    list.innerHTML = '';
+
+    // 1. Group the data
+    const groups = {};
+
+    // Add the "Chats" group explicitly first if it doesn't exist,
+    // or rely on the loop. Let's ensure "Chats" exists to hold "General".
+    groups['Chats'] = [];
+
+    categories.forEach(catKey => {
+        const parsed = parseCategory(catKey);
+        const group = parsed.groupTitle || 'Other';
+
+        if (!groups[group]) {
+            groups[group] = [];
+        }
+
+        // Store the original key and parsed data
+        groups[group].push({ key: catKey, parsed: parsed });
+    });
+
+    // 2. Define Render Order
+    // "Chats" always first, then others alphabetically
+    const groupNames = Object.keys(groups).filter(g => g !== 'Chats').sort();
+    if (groups['Chats']) {
+        groupNames.unshift('Chats');
+    }
+
+    // 3. Render Groups
+    groupNames.forEach(groupName => {
+        // Create Group Header
+        const header = createCategoryGroupHeader(groupName);
+        list.appendChild(header);
+
+        // Create Group Content Container
+        const content = document.createElement('div');
+        content.className = 'category-group-content';
+
+        // Sort items inside the group alphabetically
+        const items = groups[groupName].sort((a, b) =>
+        a.parsed.name.localeCompare(b.parsed.name)
+        );
+
+        // Special Case: If this is the "Chats" group, prepend "General"
+        if (groupName === 'Chats') {
+            // Use ICONS.home specifically for the General category
+            const generalItem = createCategoryElement('general', 'General', ICONS.home);
+            content.appendChild(generalItem);
+        }
+
+        // Render Items
+        items.forEach(item => {
+            const el = createCategoryElement(
+                item.key,
+                item.parsed.handler.label(item.parsed.name),
+                                             item.parsed.handler.icon
+            );
+            content.appendChild(el);
+        });
+
+        list.appendChild(content);
+    });
+}
+
+function createCategoryGroupHeader(name) {
+    const header = document.createElement('div');
+    header.className = 'category-group-header';
+
+    // Default state: Expanded
+    header.innerHTML = `
+    <svg class="chevron" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <polyline points="6 9 12 15 18 9"></polyline>
+    </svg>
+    <span>${name}</span>
+    `;
+
+    header.onclick = () => {
+        const content = header.nextElementSibling;
+        const isHidden = content.style.display === 'none';
+        content.style.display = isHidden ? 'block' : 'none';
+        header.querySelector('.chevron').classList.toggle('collapsed', !isHidden);
+    };
+
+    return header;
+}
+
+function createCategoryElement(key, name, icon) {
+    const btn = document.createElement('button');
+    // Use specific class for styling
+    btn.className = 'category-item';
+    if (key === activeCategory) btn.classList.add('active');
+
+    btn.dataset.key = key;
+
+    btn.innerHTML = `
+    <span class="category-item-icon">${icon}</span>
+    <span class="category-item-name">${escapeHtml(name)}</span>
+    `;
+
+    btn.onclick = () => selectCategory(key);
+    return btn;
+}
 
 function parseCategory(categoryString) {
-    if (!categoryString) return { prefix: null, name: 'General', handler: DEFAULT_CATEGORY_HANDLER };
+    if (!categoryString) return {
+        prefix: null,
+        name: 'General',
+        fullKey: 'general',
+        handler: DEFAULT_CATEGORY_HANDLER
+    };
 
     const parts = categoryString.split(':');
 
     // Case 1: Special "prefix:name" format
     if (parts.length === 2 && CATEGORY_REGISTRY[parts[0]]) {
         const prefix = parts[0];
-        const name = parts[1];
+        const handler = CATEGORY_REGISTRY[prefix];
         return {
             prefix: prefix,
-            name: name,
+            name: parts[1],
             fullKey: categoryString,
-            handler: CATEGORY_REGISTRY[prefix]
+            handler: handler,
+            groupTitle: handler.groupTitle || 'Misc' // Fallback
         };
     }
 
@@ -46,7 +259,8 @@ function parseCategory(categoryString) {
         prefix: null,
         name: categoryString,
         fullKey: categoryString,
-        handler: DEFAULT_CATEGORY_HANDLER
+        handler: DEFAULT_CATEGORY_HANDLER,
+        groupTitle: DEFAULT_CATEGORY_HANDLER.groupTitle // "Chats"
     };
 }
 
@@ -61,8 +275,22 @@ async function loadChats() {
         const tagsData = await tagsResponse.json();
 
         allTags = tagsData.tags || [];
+        allChats = chatData.chats || [];
+
+        // Extract Unique Categories
+        const categories = new Set();
+        allChats.forEach(chat => {
+            if (chat.category && chat.category !== 'general') {
+                categories.add(chat.category);
+            }
+        });
+
         renderTagFilter();
-        renderChatList(chatData.chats || []);
+        renderCategoryList(Array.from(categories));
+
+        // Initial Load based on active state
+        selectCategory(activeCategory);
+
     } catch (e) {
         console.error('Failed to load chats:', e);
     }
@@ -228,105 +456,39 @@ function createChatElement(chat) {
 }
 
 function renderChatList(chats) {
-    allChats = chats;
-
     const list = document.getElementById('chat-list');
     const searchInput = document.getElementById('chat-search');
     const currentSearchQuery = searchInput ? searchInput.value : '';
 
     list.innerHTML = '';
 
+    // IMPORTANT: Do NOT overwrite allChats here.
+    // allChats is the master list loaded from the backend.
+    // This function receives the filtered subset to render.
+
     if (chats.length === 0) {
         const emptyMsg = document.createElement('div');
         emptyMsg.className = 'chat-empty';
-        emptyMsg.textContent = 'No chats yet';
+        emptyMsg.textContent = 'No chats in this category';
         emptyMsg.style.cssText = 'padding: 20px; text-align: center; color: var(--text-muted); font-size: 0.85rem;';
         list.appendChild(emptyMsg);
         return;
     }
 
-    // --- 1. Group Chats ---
-    const groups = {};
-    const ungrouped = []; // General category
+    // Sort by updated time (newest first)
+    chats.sort((a, b) => (b.updated || 0) - (a.updated || 0));
 
+    // Render a flat list (No grouping headers needed here anymore)
     chats.forEach(chat => {
-        const catRaw = chat.category || null;
-
-        if (catRaw) {
-            if (!groups[catRaw]) {
-                groups[catRaw] = {
-                    info: parseCategory(catRaw),
-                  chats: []
-                };
-            }
-            groups[catRaw].chats.push(chat);
-        } else {
-            ungrouped.push(chat);
-        }
+        list.appendChild(createChatElement(chat));
     });
 
-    // --- 2. Render General (Ungrouped) FIRST ---
-    if (ungrouped.length > 0) {
-        // Optional: Add a "General" header if you want it labeled explicitly
-        // const header = createGroupHeader('General', ICONS.folder, 'category-default');
-        // list.appendChild(header);
-        // const container = createGroupContainer();
-        // ungrouped.forEach(c => container.appendChild(createChatElement(c)));
-        // list.appendChild(container);
-
-        // OR (Cleaner look): Just render them flat at the top
-        ungrouped.forEach(chat => {
-            list.appendChild(createChatElement(chat));
-        });
-
-        // Add a small divider if we have other groups coming
-        if (Object.keys(groups).length > 0) {
-            const divider = document.createElement('div');
-            divider.className = 'chat-section-divider';
-            list.appendChild(divider);
-        }
-    }
-
-    // --- 3. Sort Remaining Groups ---
-    // Convert to array for sorting
-    let groupEntries = Object.entries(groups);
-
-    // Sort Alphabetically by Display Name
-    groupEntries.sort((a, b) => {
-        const nameA = a[1].info.handler.label(a[1].info.name);
-        const nameB = b[1].info.handler.label(b[1].info.name);
-        return nameA.localeCompare(nameB);
-    });
-
-    // --- 4. Render Remaining Groups ---
-    groupEntries.forEach(([rawKey, groupData]) => {
-        const { info, chats: groupChats } = groupData;
-
-        // Create Header
-        const header = createGroupHeader(
-            info.handler.label(info.name),
-                                         info.handler.icon,
-                                         info.handler.class
-        );
-        list.appendChild(header);
-
-        // Create Container
-        const container = createGroupContainer();
-
-        // Add chats
-        groupChats.forEach(chat => {
-            container.appendChild(createChatElement(chat));
-        });
-
-        list.appendChild(container);
-    });
-
-    // Apply active tag filter
+    // Re-apply active tag filter
     if (activeTagFilter) {
         filterChatsByTag();
     }
 
-    // Apply text search if active
+    // Re-apply text search if active
     if (currentSearchQuery) {
         filterChats(currentSearchQuery);
     }

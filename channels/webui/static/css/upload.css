@@ -1,0 +1,37 @@
+/* Image upload styles */
+.uploaded-image-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-width: 400px;
+}
+
+.uploaded-image-preview {
+    max-width: 100%;
+    max-height: 300px;
+    border-radius: 8px;
+    object-fit: contain;
+    background: var(--bg-secondary, #1a1a2e);
+    border: 1px solid var(--border-color, #333);
+}
+
+.uploaded-image-caption {
+    font-size: 0.85em;
+    color: var(--text-muted, #888);
+    text-align: center;
+}
+
+/* Style for AI messages that reference images */
+.message.ai img {
+    max-width: 100%;
+    max-height: 400px;
+    border-radius: 8px;
+    margin: 8px 0;
+}
+
+/* Markdown image styling */
+.message img {
+    max-width: 100%;
+    border-radius: 8px;
+    margin: 8px 0;
+}

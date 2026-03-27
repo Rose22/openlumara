@@ -72,6 +72,271 @@
     height: 18px;
 }
 
+/* =============================================================================
+ *  Two-Pane Sidebar Layout (Updated for Fullscreen Mobile)
+ *  ============================================================================= */
+
+.sidebar-inner-container {
+    display: flex;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    background: var(--bg);
+}
+
+/* -----------------------------------------------------------------------------
+ *  Pane 1: Category Navigator
+ *  ----------------------------------------------------------------------------- */
+.category-pane {
+    width: 160px; /* Slightly wider for desktop readability */
+    min-width: 160px;
+    background: var(--bg-dark);
+    border-right: 1px solid var(--border-sidebar);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: transform 0.3s ease; /* Smooth slide */
+}
+
+.category-header {
+    padding: 16px 12px;
+    border-bottom: 1px solid var(--border-sidebar);
+}
+
+.category-header h3 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.category-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+}
+
+.category-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 12px;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.15s ease;
+    margin-bottom: 4px;
+}
+
+.category-item:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.category-item.active {
+    background: rgba(var(--primary-rgb), 0.15);
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.category-item-icon {
+    width: 18px;
+    height: 18px;
+    opacity: 0.9;
+    flex-shrink: 0;
+}
+
+.category-item-name {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* -----------------------------------------------------------------------------
+ *  Pane 2: Chat List
+ *  ----------------------------------------------------------------------------- */
+.chat-pane {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    position: relative;
+    background: var(--bg-sidebar);
+    transition: transform 0.3s ease; /* Smooth slide */
+}
+
+/* The Header is now the navigation button on mobile */
+.chat-pane-header {
+    height: 56px; /* Taller for touch */
+    display: flex;
+    align-items: center;
+    justify-content: center; /* Center content */
+    padding: 0 16px;
+    border-bottom: 1px solid var(--border-sidebar);
+    flex-shrink: 0;
+    cursor: pointer; /* Indicate clickable */
+    user-select: none;
+    position: relative;
+    transition: background 0.2s;
+}
+
+.chat-pane-header:hover {
+    background: var(--bg-tertiary);
+}
+
+/* The "Back" Arrow (Hidden on Desktop, shows on Mobile) */
+.category-back-arrow {
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    display: none; /* Hidden by default */
+}
+
+#chat-pane-title {
+font-size: 1rem;
+font-weight: 600;
+color: var(--text-primary);
+white-space: nowrap;
+overflow: hidden;
+text-overflow: ellipsis;
+pointer-events: none; /* Let click pass to header */
+}
+
+/* Category Group Header */
+.category-group-header {
+    display: flex;
+    align-items: center;
+    padding: 10px 12px 5px;
+    margin-top: 5px;
+    cursor: pointer;
+    user-select: none;
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.category-group-header .chevron {
+    margin-right: 6px;
+    transition: transform 0.2s ease;
+    opacity: 0.5;
+}
+
+.category-group-header .chevron.collapsed {
+    transform: rotate(-90deg);
+}
+
+/* Category Group Content */
+.category-group-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+/* Indent items slightly to show hierarchy */
+.category-group-content .category-item {
+    margin-left: 4px; /* Small indent */
+}
+
+/* -----------------------------------------------------------------------------
+ *  RESPONSIVE: Mobile (< 768px) - "Push" Effect
+ *  ----------------------------------------------------------------------------- */
+@media (max-width: 768px) {
+    /* 1. Sidebar Container */
+    .sidebar {
+        position: fixed;
+        left: 0; top: 0; bottom: 0;
+        width: 100%;
+        transform: translateX(-100%);
+        z-index: 1000;
+        background-color: var(--bg-sidebar);
+    }
+
+    .sidebar.open {
+        transform: translateX(0);
+    }
+
+    /* 2. Inner Container: Acts as the masking window */
+    .sidebar-inner-container {
+        position: relative;
+        height: 100%;
+        width: 100%;
+        overflow: hidden; /* Hides the pane pushed off-screen */
+        background-color: var(--bg-sidebar);
+    }
+
+    /* 3. Base State for BOTH Panes */
+    .category-pane,
+    .chat-pane {
+        position: absolute;
+        top: 0; left: 0; bottom: 0;
+        width: 100%;
+        /* Smooth transition for both sliding in/out */
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* 4. Category Pane (Left Layer) */
+    .category-pane {
+        background-color: var(--bg-primary); /* Solid background */
+        z-index: 1;
+        /* Default: Hidden off-screen left */
+        transform: translateX(-100%);
+    }
+
+    /* 5. Chat Pane (Right Layer) */
+    .chat-pane {
+        background-color: var(--bg-sidebar);
+        z-index: 2;
+        /* Default: Visible */
+        transform: translateX(0);
+    }
+
+    /* 6. ACTIVE STATE: The "Push" */
+
+    /* When Category is OPEN... slide it in */
+    .category-pane.open {
+        transform: translateX(0);
+    }
+
+    /* ...AND push the Chat Pane out to the right */
+    .category-pane.open ~ .chat-pane {
+        transform: translateX(100%);
+    }
+
+    /* Header Interaction Styles */
+    .chat-pane-header {
+        background: linear-gradient(180deg, var(--bg-tertiary) 0%, var(--bg-sidebar) 100%);
+    }
+
+    .category-back-arrow {
+        display: block;
+    }
+}
+
+/* Desktop: Hide the category header to save space (looks like a navigation rail) */
+@media (min-width: 769px) {
+    .chat-pane-header {
+        display: none;
+    }
+}
+
+/* Mobile: Ensure the header is visible when the pane slides in */
+@media (max-width: 768px) {
+    .chat-pane-header {
+        display: flex; /* or flex, depending on your layout */
+    }
+}
+
 .chat-list {
     display: flex;
     flex-direction: column;
@@ -407,44 +672,51 @@
 }
 
 /* ==========================================================================
- *  Sidebar Search
+ *  Sidebar Search & Tags
  *  ========================================================================== */
+
 .sidebar-search {
-    padding: 0.5rem 0.75rem;
+    padding: 10px;
     border-bottom: 1px solid var(--border-sidebar);
+    position: relative; /* Anchor for dropdown */
     display: flex;
-    gap: 0.5rem;
-    align-items: center;
-    min-height: max-content;
+    flex-wrap: wrap; /* Allow wrapping if needed, or just stack */
+    gap: 8px;
 }
 
 .sidebar-search-input {
     flex: 1;
-    min-width: 0; /* Allow input to shrink if needed */
-    padding: 0.625em 0.875em;
+    min-width: 0;
+    padding: 8px 12px;
     background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-md);
     color: var(--text-primary);
     font-size: 0.85rem;
-    line-height: 1.4;
     outline: none;
-    transition: all 0.2s;
-    min-height: 2.25rem; /* Minimum touch target */
+    transition: border-color 0.2s;
+    height: 36px; /* Fixed height for alignment */
 }
 
 .sidebar-search-input:focus {
     border-color: var(--accent);
-    box-shadow: 0 0 0 2px var(--accent-glow);
 }
 
-.sidebar-search-input::placeholder {
-    color: var(--text-muted);
+.chat-item.hidden-by-search,
+.chat-item.hidden-by-tag {
+    display: none;
 }
 
-.search-toggle {
-    width: 2.25rem;
-    height: 2.25rem;
+
+/* Button Group next to input */
+.search-btn-group {
+    display: flex;
+    gap: 4px;
+}
+
+.search-action-btn {
+    width: 36px;
+    height: 36px;
     padding: 0;
     background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
@@ -458,206 +730,76 @@
     flex-shrink: 0;
 }
 
-
-.search-toggle:hover {
+.search-action-btn:hover {
     background: var(--bg-secondary);
-    color: var(--text-secondary);
+    color: var(--text-primary);
     border-color: var(--border-color);
 }
 
-.search-toggle.active {
+.search-action-btn.active {
     background: var(--accent);
     border-color: var(--accent);
     color: var(--bg-primary);
 }
 
-.search-toggle.active:hover {
-    filter: brightness(1.1);
-}
-
-.chat-item.hidden-by-search,
-.chat-item.hidden-by-tag {
-    display: none;
-}
-
-.chat-snippet {
-    font-size: 0.75rem;
-    color: var(--text-muted);
+/* Tag Dropdown */
+.tag-dropdown {
+    width: 100%;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
     margin-top: 4px;
-    padding: 6px 8px;
-    background: var(--bg-primary);
-    border-radius: var(--radius-sm);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    border-left: 2px solid var(--accent);
+    padding: 8px;
+    box-shadow: var(--shadow-soft);
+    z-index: 50;
+    max-height: 250px;
+    overflow-y: auto;
 }
 
-.chat-snippet mark {
-    background: var(--accent);
-    color: var(--bg-primary);
-    padding: 0 2px;
-    border-radius: 2px;
-}
-
-/* ==========================================================================
- *  Tag Filter Section - Scrollable
- *  ========================================================================== */
-/* Tag filter collapsible header */
-.tag-filter-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px 16px;
-    cursor: pointer;
-    user-select: none;
-    transition: background-color 0.2s ease;
-    border-bottom: 1px solid var(--border-color);
-}
-
-.tag-filter-header:hover {
-    background-color: var(--bg-hover);
-}
-
-.tag-filter-header-text {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.tag-filter-arrow {
-    transition: transform 0.2s ease;
-    color: var(--text-muted);
-    flex-shrink: 0;
-}
-
-.tag-filter-arrow.expanded {
-    transform: rotate(180deg);
-}
-
-/* Collapsed tag list */
-#tag-list.collapsed {
-display: none;
-}
-
-/* Keep no-tags hint visible even when collapsed (optional - remove if you want it hidden) */
-#tag-list.collapsed .no-tags-hint {
-display: none;
-}
-
-/* Hidden by search (for tags) */
-.tag-chip.hidden-by-search {
+.tag-dropdown.hidden {
     display: none;
 }
 
-/* ==========================================================================
- *  Tag Filter Section
- *  ========================================================================== */
-.tag-filter {
-    border-bottom: 1px solid var(--border-color);
-    flex-shrink: 0;
-}
-
-.tag-filter-header {
+.tag-dropdown-header {
     display: flex;
-    align-items: center;
     justify-content: space-between;
-    padding: 12px 16px;
-    cursor: pointer;
-    user-select: none;
-    transition: background-color 0.2s ease;
-}
-
-.tag-filter-header:hover {
-    background-color: var(--bg-tertiary);
-}
-
-.tag-filter-header-text {
-    font-size: 0.85rem;
+    align-items: center;
+    padding: 4px 4px 8px 4px;
+    font-size: 0.75rem;
     font-weight: 600;
-    color: var(--text-secondary);
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.tag-filter-arrow {
-    transition: transform 0.2s ease;
     color: var(--text-muted);
-    flex-shrink: 0;
-}
-
-.tag-filter-arrow.expanded {
-    transform: rotate(180deg);
-}
-
-.tag-list-container {
-    max-height: 200px;
-    overflow-y: auto;
-    overflow-x: hidden;
-    /* Firefox scrollbar */
-    scrollbar-width: thin;
-    scrollbar-color: var(--scrollbar) var(--bg-sidebar);
-}
-
-/* WebKit scrollbar (Chrome, Safari, Edge) */
-.tag-list-container::-webkit-scrollbar {
-    width: 6px;
-}
-
-.tag-list-container::-webkit-scrollbar-track {
-    background: var(--bg-sidebar);
-    border-radius: 3px;
-}
-
-.tag-list-container::-webkit-scrollbar-thumb {
-    background: var(--scrollbar);
-    border-radius: 3px;
-}
-
-.tag-list-container::-webkit-scrollbar-thumb:hover {
-    background: var(--scrollbar-hover);
+    border-bottom: 1px solid var(--border-light);
+    margin-bottom: 8px;
 }
 
 .tag-list {
-    padding: 8px 16px;
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
 }
 
-.tag-list.collapsed {
-    display: none;
-}
-
-.clear-filter-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
+/* Clear button inside dropdown */
+.tag-dropdown .clear-filter-btn {
+    display: none; /* Controlled by JS */
+    width: 20px;
+    height: 20px;
     padding: 0;
-    margin: 8px 16px;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    cursor: pointer;
+    background: transparent;
+    border: none;
     color: var(--text-muted);
-    transition: all 0.2s ease;
+}
+.tag-dropdown .clear-filter-btn:hover {
+    color: var(--error);
 }
 
-.clear-filter-btn:hover {
-    background: var(--bg-tertiary);
-    color: var(--text-primary);
-}
-
+/* Tag Chips */
 .tag-chip {
     display: inline-flex;
     align-items: center;
     padding: 4px 10px;
     font-size: 0.75rem;
-    background: var(--bg-secondary);
+    background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
     border-radius: 12px;
     cursor: pointer;
@@ -666,22 +808,12 @@ display: none;
 }
 
 .tag-chip:hover {
-    background: var(--bg-tertiary);
+    background: var(--bg);
     border-color: var(--text-muted);
 }
 
 .tag-chip.active {
     background: var(--accent);
     border-color: var(--accent);
-    color: white;
-}
-
-.tag-chip.hidden-by-search {
-    display: none;
-}
-
-.no-tags-hint {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    padding: 8px 0;
+    color: var(--bg-primary);
 }

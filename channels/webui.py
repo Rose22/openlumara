@@ -393,7 +393,6 @@ def stream_message():
         }), 503
 
     data = request.get_json()
-    user_message = data.get('message', '')
     stream_id = str(uuid.uuid4())[:8]
 
     def generate():
@@ -402,7 +401,7 @@ def stream_message():
 
         async def collect_tokens():
             try:
-                async for token_data in channel_instance.send_stream({"role": "user", "content": user_message}):
+                async for token_data in channel_instance.send_stream(data):
                     if token_data.get("type") == "tool_calls":
                         # these get handled by the channel base class
                         continue
@@ -479,10 +478,9 @@ def send_message():
         }), 503
 
     data = request.get_json()
-    user_message = data.get('message', '')
 
     future = asyncio.run_coroutine_threadsafe(
-        channel_instance.send({"role": "user", "content": user_message}),
+        channel_instance.send(data),
         channel_instance.main_loop
     )
     response = future.result()
@@ -576,25 +574,62 @@ def upload_file():
     filename = data.get('filename', '')
     content_b64 = data.get('content', '')
     mimetype = data.get('mimetype', '')
+    is_image = data.get('is_image', False)
 
     try:
-        content = base64.b64decode(content_b64).decode('utf-8', errors='replace')
+        if is_image:
+            # Store image in OpenAI vision format
+            # The base64 data is already pure data (no prefix)
+            image_url = f"data:{mimetype};base64,{content_b64}"
 
-        async def insert_file():
-            await channel_instance.context.chat.add({
+            message = {
                 "role": "user",
-                "content": f"[File: {filename}]\n{content}..."
-            })
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"[Image: {filename}]"
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": image_url
+                        }
+                    }
+                ]
+            }
 
-        asyncio.run_coroutine_threadsafe(
-            insert_file(),
-            channel_instance.main_loop
-        ).result()
+            async def insert_image():
+                await channel_instance.context.chat.add(message)
 
-        total = len(_run_async(channel_instance.context.chat.get()))
-        return jsonify({'success': True, 'total': total})
+            asyncio.run_coroutine_threadsafe(
+                insert_image(),
+                channel_instance.main_loop
+            ).result()
+
+            total = len(_run_async(channel_instance.context.chat.get()))
+            return jsonify({'success': True, 'total': total, 'type': 'image'})
+
+        else:
+            # Handle text files as before
+            content = base64.b64decode(content_b64).decode('utf-8', errors='replace')
+
+            async def insert_file():
+                await channel_instance.context.chat.add({
+                    "role": "user",
+                    "content": f"[File: {filename}]\n{content}..."
+                })
+
+            asyncio.run_coroutine_threadsafe(
+                insert_file(),
+                channel_instance.main_loop
+            ).result()
+
+            total = len(_run_async(channel_instance.context.chat.get()))
+            return jsonify({'success': True, 'total': total, 'type': 'file'})
+
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
+        core.log("webui", f"Upload error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 # =============================================================================
 # Chat Management Routes

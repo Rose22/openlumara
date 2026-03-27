@@ -15,8 +15,12 @@ class Chat:
         self.channel = channel
         self.current = None
 
-        # find any missing metadata fields and add them
         for index, chat in enumerate(self.data):
+            # find any blank chats and delete them
+            if not chat.get("messages"):
+                self.data.pop(index)
+
+            # find any missing metadata fields and add them
             for key, default_value in self.DEFAULT_DATA.items():
                 if key not in chat.keys():
                     self.data[index][key] = default_value
@@ -119,6 +123,13 @@ class Chat:
         if self.current is None:
             return False
         return self.data[self.current].get("category", "")
+    async def get_categories(self):
+        collected_categories = []
+        for chat in self.data:
+            if chat.get("category") not in collected_categories:
+                collected_categories.append(chat.get("category"))
+            continue
+        return collected_categories
 
     async def set_tags(self, tags: list):
         if self.current is None:

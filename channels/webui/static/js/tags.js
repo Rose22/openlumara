@@ -13,6 +13,24 @@ async function loadTags() {
     }
 }
 
+function toggleTagDropdown() {
+    const dropdown = document.getElementById('tag-dropdown');
+    const btn = document.getElementById('tag-filter-toggle');
+
+    if (!dropdown || !btn) return;
+
+    const isHidden = dropdown.classList.contains('hidden');
+
+    if (isHidden) {
+        dropdown.classList.remove('hidden');
+        btn.classList.add('active');
+    } else {
+        dropdown.classList.add('hidden');
+        btn.classList.remove('active');
+    }
+}
+
+
 function toggleTagFilterSection() {
     tagFilterCollapsed = !tagFilterCollapsed;
 
@@ -33,57 +51,52 @@ function toggleTagFilterSection() {
     localStorage.setItem('tagFilterCollapsed', tagFilterCollapsed);
 }
 
-function renderTagFilter() {
-    const tagList = document.getElementById('tag-list');
-    const clearBtn = document.getElementById('clear-tag-filter');
-    const arrow = document.querySelector('.tag-filter-arrow');
+function renderTagFilter(tagsToRender = null) {
+    const list = document.getElementById('tag-list');
+    if (!list) return;
 
-    if (!tagList) return;
+    // Use provided tags, or fall back to all known tags
+    const tags = tagsToRender !== null ? tagsToRender : allTags;
 
-    // Update arrow state
-    if (arrow) {
-        arrow.classList.toggle('expanded', !tagFilterCollapsed);
+    list.innerHTML = '';
+
+    if (tags.length === 0) {
+        const hint = document.createElement('div');
+        hint.className = 'no-tags-hint';
+        hint.textContent = 'No tags in this category';
+        list.appendChild(hint);
+        return;
     }
 
-    tagList.innerHTML = '';
-
-    if (allTags.length === 0) {
-        const emptyHint = document.createElement('span');
-        emptyHint.className = 'no-tags-hint';
-        emptyHint.textContent = 'No tags yet';
-        tagList.appendChild(emptyHint);
-    } else {
-        allTags.forEach(tag => {
-            const chip = document.createElement('button');
-            chip.className = 'tag-chip' + (activeTagFilter === tag ? ' active' : '');
-            chip.textContent = tag;
-            chip.onclick = (e) => {
-                e.stopPropagation();
-                toggleTagFilter(tag);
-            };
-            tagList.appendChild(chip);
-        });
-    }
-
-    // Show/hide clear button
-    if (clearBtn) {
-        clearBtn.style.display = activeTagFilter ? 'flex' : 'none';
-    }
-
-    // Apply collapsed state
-    tagList.classList.toggle('collapsed', tagFilterCollapsed);
+    tags.forEach(tag => {
+        const chip = document.createElement('button');
+        chip.className = 'tag-chip';
+        if (tag === activeTagFilter) {
+            chip.classList.add('active');
+        }
+        chip.textContent = tag;
+        chip.onclick = () => toggleTagFilter(tag);
+        list.appendChild(chip);
+    });
 }
 
+
+// Update toggleTagFilter to also handle button active state visual
 function toggleTagFilter(tag) {
     if (activeTagFilter === tag) {
-        // Clicking active tag clears the filter
         activeTagFilter = null;
+        document.getElementById('clear-tag-filter').style.display = 'none';
     } else {
         activeTagFilter = tag;
+        document.getElementById('clear-tag-filter').style.display = 'block';
     }
 
-    renderTagFilter();
+    updateTagsForCategory(activeCategory);
     filterChatsByTag();
+
+    // Keep dropdown open or close it?
+    // Usually keep open to allow multi-select (if implemented later) or easy switching.
+    // But for single select, maybe keep open. Let's leave it open.
 }
 
 function clearTagFilter() {
@@ -93,28 +106,18 @@ function clearTagFilter() {
 }
 
 function filterChatsByTag() {
+    // This function should filter the DOM elements, not re-render everything
     const items = document.querySelectorAll('.chat-item');
-
     items.forEach(item => {
-        if (activeTagFilter) {
-            const chatData = JSON.parse(item.dataset.chatData || '{}');
-            const tags = chatData.tags || [];
+        const chatData = JSON.parse(item.dataset.chatData || '{}');
+        const tags = chatData.tags || [];
 
-            if (tags.includes(activeTagFilter)) {
-                item.classList.remove('hidden-by-tag');
-            } else {
-                item.classList.add('hidden-by-tag');
-            }
+        if (activeTagFilter && !tags.includes(activeTagFilter)) {
+            item.classList.add('hidden-by-tag');
         } else {
             item.classList.remove('hidden-by-tag');
         }
     });
-
-    // Also apply text search filter if active
-    const searchInput = document.getElementById('chat-search');
-    if (searchInput && searchInput.value) {
-        filterChats(searchInput.value);
-    }
 }
 
 // Load saved preference on init

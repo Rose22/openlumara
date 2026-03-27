@@ -1,34 +1,84 @@
 // =============================================================================
+// Content Helpers
+// =============================================================================
+
+/**
+ * Extracts plain text from message content (handles multi-modal arrays)
+ */
+function extractTextContent(content) {
+    if (typeof content === 'string') return content;
+    if (Array.isArray(content)) {
+        return content
+        .filter(part => part.type === 'text')
+        .map(part => part.text)
+        .join('\n');
+    }
+    return '';
+}
+
+/**
+ * Renders message content - handles both text strings and multi-modal arrays
+ */
+function renderContentBody(content) {
+    // Handle multi-modal content (images + text)
+    if (Array.isArray(content)) {
+        return content.map(part => {
+            if (part.type === 'text') {
+                return renderMarkdown(part.text);
+            } else if (part.type === 'image_url') {
+                const url = part.image_url?.url || '';
+                if (url.startsWith('data:image') || url.startsWith('http')) {
+                    return `
+                    <div class="uploaded-image-container">
+                    <img src="${escapeHtml(url)}" class="uploaded-image-preview" alt="Uploaded image">
+                    </div>`;
+                }
+                return '';
+            }
+            return '';
+        }).join('');
+    }
+
+    // Standard string content
+    return renderMarkdown(content || '');
+}
+
+// =============================================================================
 // Parse message content to determine display type
 // =============================================================================
 
 function parseMessageContent(content) {
-    const systemMatch = content.match(/^\[System (\w+)\]:\s*/i);
+    // Normalize content to string for parsing logic
+    const textContent = extractTextContent(content);
+
+    const systemMatch = textContent.match(/^\[System (\w+)\]:\s*/i);
     if (systemMatch) {
         const type = systemMatch[1].toLowerCase();
         return {
             type: `announce_${type}`,
-            displayContent: content.substring(systemMatch[0].length),
+            displayContent: textContent.substring(systemMatch[0].length),
             isAnnouncement: true
         };
     }
 
-    const cmdMatch = content.match(/^\[Command Output\]:\s*/i);
+    const cmdMatch = textContent.match(/^\[Command Output\]:\s*/i);
     if (cmdMatch) {
         return {
             type: 'command_response',
-            displayContent: content.substring(cmdMatch[0].length),
+            displayContent: textContent.substring(cmdMatch[0].length),
             isCommandOutput: true
         };
     }
 
     return {
         type: null,
-        displayContent: content
+        displayContent: textContent
     };
 }
 
 function getRoleClass(role, content) {
+    // Use text extraction for checking logic
+    const textContent = extractTextContent(content);
     const parsed = parseMessageContent(content);
 
     if (parsed.isAnnouncement) {
@@ -38,7 +88,7 @@ function getRoleClass(role, content) {
         return 'command_response';
     }
 
-    if (role === 'user' && content.trim().startsWith('/')) {
+    if (role === 'user' && textContent.trim().startsWith('/')) {
         return 'user_command';
     }
 
@@ -51,6 +101,7 @@ function getRoleClass(role, content) {
 }
 
 function getRoleDisplay(role, content) {
+    const textContent = extractTextContent(content);
     const parsed = parseMessageContent(content);
 
     if (parsed.isAnnouncement) {
@@ -60,7 +111,7 @@ function getRoleDisplay(role, content) {
     if (parsed.isCommandOutput) {
         return 'Command';
     }
-    if (role === 'user' && content.trim().startsWith('/')) {
+    if (role === 'user' && textContent.trim().startsWith('/')) {
         return 'Command';
     }
 
@@ -124,27 +175,30 @@ function toggleReasoningBlock(headerElement) {
 
 function createMessageElement(msg, index, animate = false) {
     const role = msg.role || 'user';
-    const rawContent = msg.content || '';
+    const rawContent = msg.content || ''; // Can be string or array
     const reasoningContent = msg.reasoning_content || null;
     const toolCalls = msg.tool_calls || null;
     const toolCallId = msg.tool_call_id || null;
     const timestamp = msg.timestamp || formatTime();
 
+    // Extract text for logic checks
+    const rawText = extractTextContent(rawContent);
+
     // Handle tool response - find and update existing tool call
     if (role === 'tool' && toolCallId) {
         const existingWrapper = document.querySelector(`[data-tool-call-id="${toolCallId}"]`);
         if (existingWrapper) {
-            updateToolCallWithResponse(existingWrapper, rawContent);
+            updateToolCallWithResponse(existingWrapper, rawText);
             return existingWrapper.closest('.message-wrapper');
         }
     }
 
     const parsed = parseMessageContent(rawContent);
-    const displayContent = parsed.displayContent || rawContent;
+    const displayContent = parsed.displayContent || rawText;
 
     let wrapperClass, msgClass;
 
-    if (rawContent === '[SYSTEM_TICK]') {
+    if (rawText === '[SYSTEM_TICK]') {
         wrapperClass = 'system-tick';
         msgClass = 'system-tick';
     } else if (parsed.isAnnouncement) {
@@ -163,7 +217,7 @@ function createMessageElement(msg, index, animate = false) {
         wrapperClass = 'schedule';
         msgClass = 'schedule';
     } else if (role === 'user') {
-        if (rawContent.trim().startsWith('/')) {
+        if (rawText.trim().startsWith('/')) {
             wrapperClass = 'user_command';
             msgClass = 'user_command';
         } else {
@@ -200,7 +254,7 @@ function createMessageElement(msg, index, animate = false) {
     if (parsed.isAnnouncement) {
         messageHtml += escapeHtml(displayContent);
     } else if (role === 'tool' && !toolCallId) {
-        messageHtml += renderStandaloneToolResponse(rawContent);
+        messageHtml += renderStandaloneToolResponse(rawText);
     } else if (toolCalls && toolCalls.length > 0) {
         // Render tool decision text with proper styling
         if (displayContent && displayContent.trim()) {
@@ -208,13 +262,12 @@ function createMessageElement(msg, index, animate = false) {
         }
         messageHtml += renderToolCalls(toolCalls);
     } else if (role === 'schedule') {
-        messageHtml += renderScheduleMessage(rawContent);
+        messageHtml += renderScheduleMessage(rawText);
     } else if (parsed.isCommandOutput || wrapperClass === 'user_command') {
         messageHtml += `<pre>${escapeHtml(displayContent)}</pre>`;
-    } else if (role === 'user') {
-        messageHtml += renderMarkdown(displayContent);
     } else {
-        messageHtml += renderMarkdown(displayContent);
+        // MODIFIED: Use renderContentBody which handles images
+        messageHtml += renderContentBody(rawContent);
     }
 
     msgDiv.innerHTML = messageHtml;
@@ -249,7 +302,8 @@ function createMessageElement(msg, index, animate = false) {
 
     // Only add action buttons for regular user/assistant messages, not tool messages
     if ((role === 'user' || role === 'assistant') && !isToolMessage && !parsed.isAnnouncement && !parsed.isCommandOutput) {
-        const actions = createActionButtons(role, index, displayContent);
+        // Pass the extracted text (rawText) to action buttons for copying/editing
+        const actions = createActionButtons(role, index, rawText);
         wrapper.appendChild(actions);
     }
 

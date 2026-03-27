@@ -26,60 +26,91 @@
 
     <div class="app-wrapper">
         <aside class="sidebar" id="sidebar">
-            <div class="sidebar-header">
-                <span class="sidebar-title">Chats</span>
-            </div>
-            <div class="sidebar-search">
-                <input type="text"
-                       class="sidebar-search-input"
-                       id="chat-search"
-                       placeholder="Search chats..."
-                       oninput="filterChats(this.value)"
-                       aria-label="Search chats">
-                <button class="search-toggle"
-                        id="search-toggle"
-                        onclick="toggleSearchMode()"
-                        title="Toggle content search"
-                        aria-label="Toggle search in content"
-                        aria-pressed="false">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                        <polyline points="14 2 14 8 20 8"></polyline>
-                        <line x1="16" y1="13" x2="8" y2="13"></line>
-                        <line x1="16" y1="17" x2="8" y2="17"></line>
-                        <polyline points="10 9 9 9 8 9"></polyline>
-                    </svg>
-                </button>
-            </div>
-            <div id="tag-filter" class="tag-filter">
-                <div class="tag-filter-header" onclick="toggleTagFilterSection()">
-                    <span class="tag-filter-header-text">Filter by Tag</span>
-                    <svg class="tag-filter-arrow" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="6 9 12 15 18 9"></polyline>
-                    </svg>
-                </div>
-                <div class="tag-list-container">
-                    <div id="tag-list" class="tag-list collapsed">
-                        <!-- Tags will be populated here -->
+            <!-- New Container -->
+            <div class="sidebar-inner-container">
+
+                <!-- PANE 1: Category Navigator -->
+                <div id="category-pane" class="category-pane">
+                    <div class="category-list" id="category-list">
+                        <!-- JS will populate this -->
                     </div>
-                    <button id="clear-tag-filter" class="clear-filter-btn" title="Clear filter" style="display: none;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="18" y1="6" x2="6" y2="18"></line>
-                            <line x1="6" y1="6" x2="18" y2="18"></line>
-                        </svg>
-                    </button>
                 </div>
-            </div>
-            <div class="sidebar-content">
-                <div class="chat-list" id="chat-list"></div>
-            </div>
-            <div class="sidebar-footer">
-                <button class="new-chat-btn" onclick="newChat()">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                    </svg>
-                    New Chat
-                </button>
+
+                <!-- PANE 2: Chat List (Wrapper for existing content) -->
+                <div id="chat-pane" class="chat-pane">
+                    <!-- NEW: Clickable Header -->
+                    <div class="chat-pane-header" onclick="handlePaneHeaderClick()">
+                        <!-- Back Arrow (Visible on Mobile) -->
+                        <div class="category-back-arrow">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                        </div>
+
+                        <h2 id="chat-pane-title">General</h2>
+                    </div>
+
+                    <!-- Existing Sidebar Content Moved Here -->
+                    <!-- Search Row with Buttons -->
+                    <div class="sidebar-search">
+                        <input type="text"
+                            class="sidebar-search-input"
+                            id="chat-search"
+                            placeholder="Search..."
+                            oninput="filterChats(this.value)"
+                            aria-label="Search chats">
+
+                        <div class="search-btn-group">
+                            <!-- New Tag Filter Button -->
+                            <button class="search-action-btn"
+                                    id="tag-filter-toggle"
+                                    onclick="toggleTagDropdown()"
+                                    title="Filter by Tag"
+                                    aria-label="Filter by Tag">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+                            </button>
+
+                            <!-- Existing Content Search Toggle -->
+                            <button class="search-action-btn search-toggle"
+                                    id="search-toggle"
+                                    onclick="toggleSearchMode()"
+                                    title="Search in content"
+                                    aria-label="Toggle search in content"
+                                    aria-pressed="false">
+                                <!-- Icon here (File text) -->
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                    <polyline points="14 2 14 8 20 8"></polyline>
+                                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <!-- Dropdown Container (Hidden by default) -->
+                        <div id="tag-dropdown" class="tag-dropdown hidden">
+                            <div class="tag-dropdown-header">
+                                <span>Filter by Tag</span>
+                                <button id="clear-tag-filter" class="clear-filter-btn" title="Clear filter" style="display: none;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                                    </svg>
+                                </button>
+                            </div>
+                            <div id="tag-list" class="tag-list"></div>
+                        </div>
+                    </div>
+                    <div class="sidebar-content">
+                        <div class="chat-list" id="chat-list"></div>
+                    </div>
+                    <div class="sidebar-footer">
+                        <button class="new-chat-btn" onclick="newChat()">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                            </svg>
+                            New Chat
+                        </button>
+                    </div>
+                </div>
             </div>
         </aside>
 

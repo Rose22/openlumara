@@ -39,7 +39,7 @@
     --scrollbar-hover: #3a3a3a;
     --shadow-soft: 0 2px 8px rgba(0, 0, 0, 0.3);
     --shadow-glow: 0 0 20px var(--accent-glow);
-    --sidebar-width: 280px;
+    --sidebar-width: 420px;
 
     /* === TYPOGRAPHY === */
     --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;

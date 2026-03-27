@@ -3,6 +3,22 @@ import core
 class Chats(core.module.Module):
     """manage your chat history"""
 
+    async def on_system_prompt(self):
+        categories = await self.channel.context.chat.get_categories()
+        filtered_categories = []
+        for index, category in enumerate(categories):
+            # get rid of special categories
+            if len(category.split(":")) > 1:
+                continue
+
+            if not category:
+                # if we somehow end up with a blank category.. filter it out
+                continue
+
+            filtered_categories.append(category)
+
+        return f"Available categories to categorise chat into: {', '.join(filtered_categories)}"
+
     @core.module.command("new", temporary=True)
     async def new_chat(self, args):
         """starts a new session"""
@@ -62,7 +78,12 @@ class Chats(core.module.Module):
 
     # AI tool version
     async def tag_chat(self, new_name: str, category: str, tags: list):
-        """lets you rename, categorize, and tag the current chat"""
+        """
+        Lets you rename, categorize, and tag the current chat.
+
+        If the chat fits within an existing category (defined in your system prompt), use that one.
+        If a fitting category does not exist, create a new one.
+        """
 
         if not new_name:
             return self.result("name must not be blank", False)
