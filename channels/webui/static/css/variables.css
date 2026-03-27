@@ -39,10 +39,21 @@
     --scrollbar-hover: #3a3a3a;
     --shadow-soft: 0 2px 8px rgba(0, 0, 0, 0.3);
     --shadow-glow: 0 0 20px var(--accent-glow);
+    --sidebar-width: 280px;
+
+    /* === TYPOGRAPHY === */
+    --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-display: 'Inter', sans-serif; /* Used for headers/Names */
+
+    /* === SHAPES & FEEL === */
     --radius-sm: 4px;
     --radius-md: 8px;
     --radius-lg: 12px;
     --radius-xl: 16px;
     --radius-full: 24px;
-    --sidebar-width: 280px;
+
+    /* === DECORATIVE TOUCHES === */
+    --bg-pattern: none; /* For sparkles, grids, etc. */
+    --bg-pattern-size: 200px 200px;
+    --message-decoration: none; /* For fun borders or glows */
 }

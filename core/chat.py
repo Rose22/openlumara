@@ -5,6 +5,7 @@ import datetime
 class Chat:
     DEFAULT_DATA = {
         "title": "",
+        "category": "general",
         "tags": []
     }
 
@@ -28,13 +29,14 @@ class Chat:
 
         return None
 
-    async def new(self, title: str = "New chat"):
+    async def new(self, category: str = "general", title: str = ""):
         """create a new chat"""
         now = datetime.datetime.utcnow().isoformat()
 
         self.data.append({
             "id": str(ulid.ULID())[:8],
             "title": title,
+            "category": category,
             "tags": [],
             "messages": [],
             "created": now,
@@ -106,6 +108,18 @@ class Chat:
         await self.save()
         return True
 
+    async def set_category(self, category: str):
+        if self.current is None:
+            return False
+
+        self.data[self.current]["category"] = category
+        await self.save()
+        return True
+    async def get_category(self):
+        if self.current is None:
+            return False
+        return self.data[self.current].get("category", "")
+
     async def set_tags(self, tags: list):
         if self.current is None:
             return False
@@ -166,6 +180,12 @@ class Chat:
         """add message to current chat"""
         if self.current is None:
             await self.new()
+
+        print(self.data[self.current]["title"])
+        if not self.data[self.current]["title"].strip():
+            # auto-set title
+            msg_content = message.get("content", "")
+            self.data[self.current]["title"] = msg_content[100:]+".." if len(msg_content) > 100 else msg_content
 
         # if temporary, set the flag. gets handled in self.trim()
         if temporary:

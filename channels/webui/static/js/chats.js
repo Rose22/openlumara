@@ -2,6 +2,54 @@
 // Chats
 // =============================================================================
 
+// Define behaviors for specific category prefixes
+const CATEGORY_REGISTRY = {
+    'char': {
+        icon: ICONS.user, // Assuming you have a user icon in your ICONS object
+        class: 'category-character',
+        label: (name) => name // Just display the name "Luna", not "char:Luna"
+    },
+    // You can add more later!
+    // 'world': {
+    //     icon: ICONS.globe,
+    //     class: 'category-world',
+    //     label: (name) => `World: ${name}`
+    // }
+};
+
+// Default fallback for categories without a prefix
+const DEFAULT_CATEGORY_HANDLER = {
+    icon: ICONS.folder, // A standard folder icon
+    class: 'category-default',
+    label: (name) => name
+};
+
+function parseCategory(categoryString) {
+    if (!categoryString) return { prefix: null, name: 'General', handler: DEFAULT_CATEGORY_HANDLER };
+
+    const parts = categoryString.split(':');
+
+    // Case 1: Special "prefix:name" format
+    if (parts.length === 2 && CATEGORY_REGISTRY[parts[0]]) {
+        const prefix = parts[0];
+        const name = parts[1];
+        return {
+            prefix: prefix,
+            name: name,
+            fullKey: categoryString,
+            handler: CATEGORY_REGISTRY[prefix]
+        };
+    }
+
+    // Case 2: Standard "name" format
+    return {
+        prefix: null,
+        name: categoryString,
+        fullKey: categoryString,
+        handler: DEFAULT_CATEGORY_HANDLER
+    };
+}
+
 async function loadChats() {
     try {
         const [chatResponse, tagsResponse] = await Promise.all([
@@ -70,6 +118,115 @@ async function getCurrentChatId() {
     }
 }
 
+// Helper to create header (Updated to accept icon/class)
+function createGroupHeader(name, icon, extraClass = '') {
+    const header = document.createElement('div');
+    header.className = `chat-group-header ${extraClass}`;
+
+    // Use provided icon or default arrow
+    const iconHtml = icon
+    ? `<span class="header-icon">${icon}</span>`
+    : `<svg class="chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>`;
+
+    header.innerHTML = `
+    ${iconHtml}
+    <span class="chat-group-title">${escapeHtml(name)}</span>
+    `;
+
+    header.onclick = () => {
+        const content = header.nextElementSibling;
+        // Toggle logic...
+        // If you want clicking "Luna" to open character settings, handle that here
+        // Otherwise, just toggle collapse
+        const isHidden = content.style.display === 'none';
+        content.style.display = isHidden ? 'block' : 'none';
+    };
+
+    return header;
+}
+
+// Helper to create the container for a group's chats
+function createGroupContainer() {
+    const container = document.createElement('div');
+    container.className = 'chat-group-content';
+    return container;
+}
+
+// Extracted helper to create a single chat item element
+function createChatElement(chat) {
+    const item = document.createElement('div');
+    item.className = 'chat-item' + (chat.id === currentChatId ? ' active' : '');
+
+    item.dataset.chatId = chat.id;
+    item.dataset.chatData = JSON.stringify(chat);
+
+    item.onclick = (e) => {
+        // Don't trigger load if clicking on action buttons or editing
+        if (e.target.closest('.chat-item-actions') ||
+            e.target.closest('.inline-rename-container')) {
+            return;
+            }
+            loadChat(chat.id);
+    };
+
+    const title = document.createElement('div');
+    title.className = 'chat-item-title';
+    title.textContent = chat.title || 'New chat';
+
+    // Tags container
+    const tagsContainer = document.createElement('div');
+    tagsContainer.className = 'chat-tags';
+
+    const tags = chat.tags || [];
+    const meta = document.createElement('div');
+    meta.className = 'chat-item-meta';
+
+    const date = document.createElement('span');
+    date.textContent = formatDate(chat.updated || chat.created);
+
+    const actions = document.createElement('div');
+    actions.className = 'chat-item-actions';
+
+    const editBtn = document.createElement('button');
+    editBtn.className = 'chat-action-btn edit';
+    editBtn.innerHTML = ICONS.edit;
+    editBtn.setAttribute('aria-label', 'Rename');
+    editBtn.setAttribute('title', 'Rename');
+    editBtn.onclick = (e) => {
+        e.stopPropagation();
+        renameChat(chat.id, chat.title || 'New chat');
+    };
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'chat-action-btn delete';
+    deleteBtn.innerHTML = ICONS.trash;
+    deleteBtn.setAttribute('aria-label', 'Delete');
+    deleteBtn.setAttribute('title', 'Delete');
+    deleteBtn.onclick = (e) => {
+        e.stopPropagation();
+        deleteChat(chat.id);
+    };
+
+    actions.appendChild(editBtn);
+    actions.appendChild(deleteBtn);
+    meta.appendChild(date);
+    meta.appendChild(actions);
+
+    if (tags.length > 0) {
+        renderFittedTags(tagsContainer, tags, {
+            maxStart: 3,
+            minTags: 1,
+            showTooltip: true
+        });
+        item.appendChild(tagsContainer);
+    }
+
+    item.appendChild(title);
+    item.appendChild(meta);
+
+    return item;
+}
+
 function renderChatList(chats) {
     allChats = chats;
 
@@ -88,75 +245,80 @@ function renderChatList(chats) {
         return;
     }
 
+    // --- 1. Group Chats ---
+    const groups = {};
+    const ungrouped = []; // General category
+
     chats.forEach(chat => {
-        const item = document.createElement('div');
-        item.className = 'chat-item' + (chat.id === currentChatId ? ' active' : '');
+        const catRaw = chat.category || null;
 
-        item.dataset.chatId = chat.id;
-        item.dataset.chatData = JSON.stringify(chat);
-
-        item.onclick = (e) => {
-            // Don't trigger load if clicking on action buttons or editing
-            if (e.target.closest('.chat-item-actions') ||
-                e.target.closest('.inline-rename-container')) {
-                return;
-                }
-                loadChat(chat.id);
-        };
-
-        const title = document.createElement('div');
-        title.className = 'chat-item-title';
-        title.textContent = chat.title || 'New chat';
-
-        // Tags container
-        const tagsContainer = document.createElement('div');
-        tagsContainer.className = 'chat-tags';
-
-        const tags = chat.tags || [];
-        const meta = document.createElement('div');
-        meta.className = 'chat-item-meta';
-
-        const date = document.createElement('span');
-        date.textContent = formatDate(chat.updated || chat.created);
-
-        const actions = document.createElement('div');
-        actions.className = 'chat-item-actions';
-
-        const editBtn = document.createElement('button');
-        editBtn.className = 'chat-action-btn edit';
-        editBtn.innerHTML = ICONS.edit;
-        editBtn.setAttribute('aria-label', 'Rename');
-        editBtn.setAttribute('title', 'Rename');
-        editBtn.onclick = (e) => {
-            e.stopPropagation();
-            renameChat(chat.id, chat.title || 'New chat');
-        };
-
-        const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'chat-action-btn delete';
-        deleteBtn.innerHTML = ICONS.trash;
-        deleteBtn.setAttribute('aria-label', 'Delete');
-        deleteBtn.setAttribute('title', 'Delete');
-        deleteBtn.onclick = (e) => {
-            e.stopPropagation();
-            deleteChat(chat.id);
-        };
-
-        actions.appendChild(editBtn);
-        actions.appendChild(deleteBtn);
-        meta.appendChild(date);
-        meta.appendChild(actions);
-        if (tags.length > 0) {
-            renderFittedTags(tagsContainer, tags, {
-                maxStart: 3,
-                minTags: 1,
-                showTooltip: true
-            });
-            item.appendChild(tagsContainer);
+        if (catRaw) {
+            if (!groups[catRaw]) {
+                groups[catRaw] = {
+                    info: parseCategory(catRaw),
+                  chats: []
+                };
+            }
+            groups[catRaw].chats.push(chat);
+        } else {
+            ungrouped.push(chat);
         }
-        item.appendChild(title);
-        item.appendChild(meta);
-        list.appendChild(item);
+    });
+
+    // --- 2. Render General (Ungrouped) FIRST ---
+    if (ungrouped.length > 0) {
+        // Optional: Add a "General" header if you want it labeled explicitly
+        // const header = createGroupHeader('General', ICONS.folder, 'category-default');
+        // list.appendChild(header);
+        // const container = createGroupContainer();
+        // ungrouped.forEach(c => container.appendChild(createChatElement(c)));
+        // list.appendChild(container);
+
+        // OR (Cleaner look): Just render them flat at the top
+        ungrouped.forEach(chat => {
+            list.appendChild(createChatElement(chat));
+        });
+
+        // Add a small divider if we have other groups coming
+        if (Object.keys(groups).length > 0) {
+            const divider = document.createElement('div');
+            divider.className = 'chat-section-divider';
+            list.appendChild(divider);
+        }
+    }
+
+    // --- 3. Sort Remaining Groups ---
+    // Convert to array for sorting
+    let groupEntries = Object.entries(groups);
+
+    // Sort Alphabetically by Display Name
+    groupEntries.sort((a, b) => {
+        const nameA = a[1].info.handler.label(a[1].info.name);
+        const nameB = b[1].info.handler.label(b[1].info.name);
+        return nameA.localeCompare(nameB);
+    });
+
+    // --- 4. Render Remaining Groups ---
+    groupEntries.forEach(([rawKey, groupData]) => {
+        const { info, chats: groupChats } = groupData;
+
+        // Create Header
+        const header = createGroupHeader(
+            info.handler.label(info.name),
+                                         info.handler.icon,
+                                         info.handler.class
+        );
+        list.appendChild(header);
+
+        // Create Container
+        const container = createGroupContainer();
+
+        // Add chats
+        groupChats.forEach(chat => {
+            container.appendChild(createChatElement(chat));
+        });
+
+        list.appendChild(container);
     });
 
     // Apply active tag filter
@@ -170,6 +332,43 @@ function renderChatList(chats) {
     }
 }
 
+// Helper to create the group header element (Refined)
+function createGroupHeader(name, icon, extraClass = '') {
+    const header = document.createElement('div');
+    header.className = `chat-group-header ${extraClass}`;
+
+    const iconHtml = icon
+    ? `<span class="header-icon">${icon}</span>`
+    : `<svg class="chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>`;
+
+    header.innerHTML = `
+    ${iconHtml}
+    <span class="chat-group-title">${escapeHtml(name)}</span>
+    `;
+
+    header.onclick = () => {
+        const content = header.nextElementSibling;
+        if (!content || !content.classList.contains('chat-group-content')) return;
+
+        const isHidden = content.style.display === 'none';
+        content.style.display = isHidden ? 'block' : 'none';
+
+        // Toggle chevron rotation if using default icon
+        const chevron = header.querySelector('.chevron');
+        if(chevron) chevron.classList.toggle('collapsed', !isHidden);
+    };
+
+        return header;
+}
+
+// Helper to create the container (Crucial for spacing)
+function createGroupContainer() {
+    const container = document.createElement('div');
+    container.className = 'chat-group-content';
+    // Ensure it matches the flat list behavior
+    return container;
+}
+
 
 async function newChat() {
     if (isStreaming) {
@@ -180,7 +379,7 @@ async function newChat() {
         const response = await fetch('/chat/new', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title: 'New chat' })
+            body: JSON.stringify({ title: '' })
         });
 
         const data = await response.json();

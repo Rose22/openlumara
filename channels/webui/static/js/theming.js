@@ -38,6 +38,22 @@ function getThemeFamilies() {
     return families;
 }
 
+// Helper to load Google Fonts dynamically
+function loadGoogleFont(fontName, weights = [400, 600, 700]) {
+    const id = `font-${fontName.replace(/\s+/g, '-').toLowerCase()}`;
+    if (document.getElementById(id)) return; // Already loaded
+
+    const link = document.createElement('link');
+    link.id = id;
+    link.rel = 'stylesheet';
+    // Construct the Google Fonts URL
+    const weightStr = weights.join(';');
+    link.href = `https://fonts.googleapis.com/css2?family=${fontName.replace(/ /g, '+')}:wght@${weightStr}&display=swap`;
+
+    document.head.appendChild(link);
+}
+
+
 // Apply the current theme based on family and mode
 function applyTheme(family, mode) {
     const themeId = buildThemeId(family, mode);
@@ -63,11 +79,32 @@ function applyTheme(family, mode) {
     }
 
     const root = document.documentElement;
-    for (const [varName, value] of Object.entries(finalTheme.vars)) {
+
+    // === STEP 1: RESET TO DEFAULTS ===
+    // This ensures advanced vars (like fonts/patterns) don't stick if the new theme doesn't define them
+    for (const [varName, value] of Object.entries(BASE_THEME_VARS)) {
         root.style.setProperty(varName, value);
     }
 
+    // === STEP 2: APPLY NEW THEME VARIABLES ===
+    if (finalTheme.vars) {
+        for (const [varName, value] of Object.entries(finalTheme.vars)) {
+            root.style.setProperty(varName, value);
+        }
+    }
+    // === LOAD CUSTOM FONT ===
+    const savedFont = localStorage.getItem('fontFamily');
+    if (savedFont && savedFont !== 'default') {
+        // 1. Load the font stylesheet from Google
+        loadGoogleFont(savedFont, [400, 500, 600, 700]);
+
+        // 2. Apply it to the CSS variables
+        const root = document.documentElement;
+        root.style.setProperty('--font-family', `'${savedFont}', sans-serif`);
+    }
+
     currentThemeFamily = family;
+
     localStorage.setItem('themeFamily', family);
     localStorage.setItem('themeMode', currentThemeMode);
     updateThemeButtons();
@@ -117,13 +154,14 @@ function createThemeButtons() {
 
         // Display name
         const displayName = family.charAt(0).toUpperCase() + family.slice(1);
+        const hasCustomFont = previewTheme.fonts && previewTheme.fonts.length > 0;
 
         btn.innerHTML = `
-        <div class="theme-preview"
-        style="background: linear-gradient(135deg, ${bgColor} 50%, ${accentColor} 50%);">
+        <div class="theme-preview" style="background: linear-gradient(135deg, ${bgColor} 50%, ${accentColor} 50%);">
         ${hasBothModes ? '<span class="theme-badge">◐</span>' : ''}
+        ${hasCustomFont ? '<span class="theme-font-badge">Aa</span>' : ''}
         </div>
-        <span class="theme-name">${displayName}</span>
+        <span class="theme-name" style="${hasCustomFont ? `font-family: '${previewTheme.fonts[0].name}', sans-serif;` : ''}">${displayName}</span>
         `;
 
         btn.onclick = () => {

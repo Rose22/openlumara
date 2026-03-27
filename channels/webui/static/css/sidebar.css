@@ -149,13 +149,6 @@
     color: var(--error);
 }
 
-.sidebar-content::-webkit-scrollbar { width: 4px; }
-.sidebar-content::-webkit-scrollbar-track { background: transparent; }
-.sidebar-content::-webkit-scrollbar-thumb {
-    background: var(--scrollbar);
-    border-radius: 2px;
-}
-
 .sidebar-overlay {
     position: fixed;
     inset: 0;
@@ -169,6 +162,190 @@
 .sidebar-overlay.show {
     opacity: 1;
     visibility: visible;
+}
+
+/* =============================================================================
+   Hybrid Sidebar Layout
+   ============================================================================= */
+
+.sidebar-container {
+    display: flex;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    background: var(--bg);
+}
+
+/* -----------------------------------------------------------------------------
+   Panel A: Category Strip
+   ----------------------------------------------------------------------------- */
+#sidebar-nav-strip {
+    width: 60px;
+    min-width: 60px;
+    background: var(--bg-dark); /* Slightly darker to separate */
+    border-right: 1px solid var(--border-light);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px 0;
+    gap: 5px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    z-index: 5;
+}
+
+.category-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    background: var(--bg);
+    border: 2px solid transparent;
+    color: var(--text-muted);
+    transition: all 0.2s;
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+.category-btn:hover {
+    background: var(--hover-bg);
+    color: var(--text-primary);
+}
+
+.category-btn.active {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+    background: rgba(var(--primary-rgb), 0.1);
+}
+
+.category-btn svg {
+    width: 20px;
+    height: 20px;
+}
+
+/* -----------------------------------------------------------------------------
+   Panel B: Chat Panel
+   ----------------------------------------------------------------------------- */
+#sidebar-chat-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0; /* Prevents overflow issues */
+    position: relative;
+}
+
+.chat-panel-header {
+    height: 50px;
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    border-bottom: 1px solid var(--border-light);
+    background: var(--bg);
+    flex-shrink: 0;
+}
+
+#chat-panel-title {
+    flex: 1;
+    font-weight: 600;
+    font-size: 1rem;
+    padding: 0 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#chat-list-wrapper {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* Mobile Toggle Button (Hidden on Desktop) */
+#mobile-nav-toggle {
+    display: none;
+}
+
+
+/* Make the group container layout match the main list */
+.chat-group-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2px; /* Match the gap of the main list if any */
+    padding: 0;
+    margin: 0;
+}
+
+/* Ensure chat-items inside groups look identical to the top-level ones */
+.chat-group-content .chat-item {
+    /* If your original items had specific margins or border-radius, ensure they apply here */
+    /* Example: margin-bottom: 2px; */
+}
+
+/* Divider between General and Categories */
+.chat-section-divider {
+    height: 1px;
+    background: var(--border-light);
+    margin: 10px 15px;
+    opacity: 0.5;
+}
+
+/* Group Header Styling */
+.chat-group-header {
+    display: flex;
+    align-items: center;
+    padding: 10px 15px 5px;
+    cursor: pointer;
+    user-select: none;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.chat-group-header:hover {
+    color: var(--text-secondary);
+}
+
+.header-icon {
+    width: 14px;
+    height: 14px;
+    margin-right: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.7;
+}
+
+.chat-group-header .chevron {
+    margin-right: 8px;
+    transition: transform 0.2s ease;
+    opacity: 0.5;
+}
+
+.chat-group-header .chevron.collapsed {
+    transform: rotate(-90deg);
+}
+
+/* Default Folder styling */
+.chat-group-header.category-default {
+    color: var(--text-muted);
+}
+
+/* Character styling */
+.chat-group-header.category-character {
+    color: var(--primary-color); /* Make characters stand out */
+    background: rgba(var(--primary-rgb), 0.05);
+}
+
+.header-icon {
+    width: 16px;
+    height: 16px;
+    margin-right: 8px;
+    opacity: 0.8;
 }
 
 /* Sidebar - always animate */
@@ -233,23 +410,27 @@
  *  Sidebar Search
  *  ========================================================================== */
 .sidebar-search {
-    padding: 8px 12px;
+    padding: 0.5rem 0.75rem;
     border-bottom: 1px solid var(--border-sidebar);
     display: flex;
-    gap: 8px;
+    gap: 0.5rem;
     align-items: center;
+    min-height: max-content;
 }
 
 .sidebar-search-input {
     flex: 1;
-    padding: 10px 14px;
+    min-width: 0; /* Allow input to shrink if needed */
+    padding: 0.625em 0.875em;
     background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-full);
     color: var(--text-primary);
     font-size: 0.85rem;
+    line-height: 1.4;
     outline: none;
     transition: all 0.2s;
+    min-height: 2.25rem; /* Minimum touch target */
 }
 
 .sidebar-search-input:focus {
@@ -262,8 +443,8 @@
 }
 
 .search-toggle {
-    width: 36px;
-    height: 36px;
+    width: 2.25rem;
+    height: 2.25rem;
     padding: 0;
     background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
@@ -276,6 +457,7 @@
     justify-content: center;
     flex-shrink: 0;
 }
+
 
 .search-toggle:hover {
     background: var(--bg-secondary);

@@ -52,6 +52,12 @@ async function init() {
         scheduleReconnect();
     }
 
+    // Apply saved font size on load
+    const savedFontSize = localStorage.getItem('fontSize');
+    if (savedFontSize) {
+        document.documentElement.style.setProperty('--font-size-base', `${savedFontSize}px`);
+    }
+
     loadTheme();
     loadChats();
     initTagFilterState();

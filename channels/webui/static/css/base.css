@@ -10,30 +10,109 @@
 html, body {
     height: 100%;
     width: 100%;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
-    Oxygen, Ubuntu, Cantarell, sans-serif;
-    background: var(--bg-primary);
+    font-family: var(--font-family);
+    font-size: var(--font-size-base);
+    /* The pattern overlay allows for transparency effects */
+    background-image: var(--bg-pattern);
+    background-size: var(--bg-pattern-size); /* Adjust pattern size as needed */
     color: var(--text-primary);
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overflow: hidden;
+
 }
 
-.skip-link {
+h1, h2, h3 {
+    font-family: var(--font-family);
+}
+
+#chat::before {
+    content: '';
     position: absolute;
-    top: -40px;
+    top: 0;
     left: 0;
-    padding: 8px 16px;
-    background: var(--accent);
-    color: var(--bg-primary);
-    z-index: 2000;
-    text-decoration: none;
-    font-weight: 600;
-    border-radius: 0 0 var(--radius-md) 0;
-    transition: top 0.2s;
+    right: 0;
+    bottom: 0;
+    background-image: var(--bg-pattern);
+    background-size: var(--bg-pattern-size); /* Size of the dots/grid */
+    opacity: 0.5; /* Subtlety is key! */
+    pointer-events: none; /* Let clicks pass through */
+    z-index: 0;
 }
 
-.skip-link:focus {
-    top: 0;
+/* ==========================================================================
+ *  Global Scrollbar Styling (Theme Aware)
+ *  ========================================================================== */
+
+/* Webkit browsers (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--scrollbar);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-hover);
+}
+
+/* Optional: Corner styling for boxes with both scrollbars */
+::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
+/* Firefox */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar) transparent;
+}
+
+/* Force scrollbar visibility in key containers */
+.settings-sidebar,
+.settings-content,
+.modal,
+.setting-array-items,
+.toggle-list-grid,
+.custom-font-options,
+.settings-nav {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar) transparent;
+}
+
+/* Webkit overrides for specific scrollable areas */
+.settings-sidebar::-webkit-scrollbar,
+.settings-content::-webkit-scrollbar,
+.modal::-webkit-scrollbar,
+.setting-array-items::-webkit-scrollbar,
+.toggle-list-grid::-webkit-scrollbar,
+.settings-nav::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.settings-sidebar::-webkit-scrollbar-thumb,
+.settings-content::-webkit-scrollbar-thumb,
+.modal::-webkit-scrollbar-thumb,
+.setting-array-items::-webkit-scrollbar-thumb,
+.toggle-list-grid::-webkit-scrollbar-thumb,
+.settings-nav::-webkit-scrollbar-thumb {
+    background: var(--scrollbar);
+    border-radius: 4px;
+}
+
+.settings-sidebar::-webkit-scrollbar-thumb:hover,
+.settings-content::-webkit-scrollbar-thumb:hover,
+.modal::-webkit-scrollbar-thumb:hover,
+.setting-array-items::-webkit-scrollbar-thumb:hover,
+.toggle-list-grid::-webkit-scrollbar-thumb:hover,
+.settings-nav::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-hover);
 }

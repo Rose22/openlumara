@@ -623,7 +623,8 @@ def list_chats():
 
         chats.append({
             'id': conv.get('id'),
-            'title': conv.get('title', 'New Chat'),
+            'title': conv.get('title', ''),
+            'category': conv.get('category', ''),
             'tags': conv.get('tags', []),
             'created': conv.get('created'),
             'updated': conv.get('updated'),
@@ -653,6 +654,7 @@ def load_chat():
     messages = _run_async(channel_instance.context.chat.get()) or []
     title = _run_async(channel_instance.context.chat.get_title())
     loaded_id = _run_async(channel_instance.context.chat.get_id())
+    category = _run_async(channel_instance.context.chat.get_category())
     tags = _run_async(channel_instance.context.chat.get_tags()) or []
 
     # Add index to each message
@@ -672,7 +674,8 @@ def load_chat():
         'success': True,
         'chat': {
             'id': loaded_id,
-            'title': title or 'New Chat',
+            'title': title,
+            "category": category,
             'tags': tags,
             'messages': result,
             'total': len(result)
@@ -700,6 +703,7 @@ def get_current_chat():
     messages = _run_async(chat.get()) or []
     title = _run_async(chat.get_title())
     tags = _run_async(chat.get_tags()) or []
+    category = _run_async(channel_instance.context.chat.get_category())
 
     # Add index to each message
     result = []
@@ -718,7 +722,8 @@ def get_current_chat():
         'success': True,
         'chat': {
             'id': conv_id,
-            'title': title or 'New Chat',
+            'title': title or 'New chat',
+            'category': category or 'general',
             'tags': tags,
             'messages': result,
             'total': len(result)
@@ -763,7 +768,7 @@ def new_chat():
         return jsonify({'success': False, 'error': 'Channel not available'})
 
     data = request.get_json() or {}
-    title = data.get('title', 'New Chat')
+    title = data.get('title', '')
 
     _run_async(channel_instance.context.chat.new(title))
 

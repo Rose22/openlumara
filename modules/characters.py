@@ -102,7 +102,13 @@ class Characters(core.module.Module):
             return self.result("character not found", False)
         character = self.characters.get(name)
         self.active_character.set(name)
-        return self.result(str({"instructions": f"Write your next reply as the character {name}.", "character": self._rewrite_character(name, character.get("identity"))}))
+
+        # set the chat's current category to the character
+        await self.channel.context.chat.set_category(f"char:{name}")
+
+        user_name = self.user_profile.get("name", "User")
+        preferences = self.user_profile.get("preferences", "")
+        return self.result(str({"instructions": f"Write your next reply as {name} in a chat between {name} and {user_name}. {preferences}", "character": self._rewrite_character(name, character.get("identity"))}))
     
     async def switch_to_default(self):
         """Switches you back to your default identity."""

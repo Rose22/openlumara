@@ -37,7 +37,9 @@
 .message {
     max-width: 85%;
     padding: 12px 16px;
-    border-radius: var(--radius-xl);
+    border-radius: var(--radius-lg);
+    border: var(--message-decoration);
+    box-shadow: var(--shadow-soft);
     word-wrap: break-word;
     position: relative;
 }
@@ -564,20 +566,6 @@
 
 .tool-call-status-icon.done {
     color: #4ade80;
-}
-
-/* Scrollbar for tool call body */
-.tool-call-body::-webkit-scrollbar {
-    width: 4px;
-}
-
-.tool-call-body::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.tool-call-body::-webkit-scrollbar-thumb {
-    background: var(--scrollbar);
-    border-radius: 2px;
 }
 
 /* Message actions */

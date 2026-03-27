@@ -1,3 +1,19 @@
+// Default values for "standard" themes
+// If a theme doesn't specify a variable, it falls back to this.
+const BASE_THEME_VARS = {
+    // Shapes
+    '--radius-sm': '4px',
+    '--radius-md': '8px',
+    '--radius-lg': '12px',
+    '--radius-xl': '16px',
+
+    // Decorations (Reset these so patterns don't stick)
+    '--bg-pattern': 'none',
+    '--bg-pattern-size': '24px 24px',
+    '--message-decoration': 'none',
+    '--avatar-shape': '50%'
+};
+
 const themes = {
     'dark-monochrome': {
         name: 'Monochrome',
@@ -2163,6 +2179,615 @@ const themes = {
             '--tool-pending-color': '#475569',
             '--tool-completed-bg': 'rgba(100, 116, 139, 0.1)',
             '--tool-completed-color': '#64748b',
+        }
+    },
+    'light-sakura': {
+        name: 'Sakura Light',
+        mode: 'light',
+        vars: {
+            // === TYPOGRAPHY ===
+            '--font-primary': "'Indie Flower', sans-serif",
+            '--font-display': "'Indie Flower', sans-serif", // Or use a script font here
+
+            // === SHAPES (Bubbly) ===
+            '--radius-sm': '12px',
+            '--radius-md': '20px',
+            '--radius-lg': '30px', // Very round!
+            '--radius-xl': '999px', // Pill shape for buttons
+
+            // === COLORS (Hot Pink Palette) ===
+            '--bg-primary': '#ffeef5', // Very light pink
+            '--bg-secondary': '#fff0f5',
+            '--bg-tertiary': '#ffd6e7',
+            '--bg-message-user': 'linear-gradient(135deg, #ff9ecc 0%, #ff85c0 100%)',
+            '--bg-message-ai': '#ffffff',
+            '--bg-message-announce': 'linear-gradient(135deg, #fff0f5 0%, #ffe0eb 100%)',
+            '--bg-input': '#ffffff',
+            '--bg-code': '#fff5f8',
+            '--bg-sidebar': '#ffe8f0',
+
+            '--border-color': '#ffb8d9',
+            '--border-message': '#ffc8e2',
+            '--border-user': '#ff69b4', // Hot Pink
+
+            '--text-primary': '#d63384', // Deep Pink text
+            '--text-secondary': '#e066a0',
+            '--text-muted': '#f090c0',
+
+            '--accent': '#ff1493', // Deep Pink
+            '--accent-glow': 'rgba(255, 20, 147, 0.5)',
+            '--accent-secondary': '#c71585', // Medium Violet Red
+
+            '--error': '#ff69b4',
+            '--error-bg': 'linear-gradient(135deg, #ffe0eb 0%, #ffd0e0 100%)',
+
+            '--button-bg': 'linear-gradient(135deg, #ff69b4 0%, #ff1493 100%)',
+            '--button-hover': 'linear-gradient(135deg, #ff85c0 0%, #ff69b4 100%)',
+
+            '--scrollbar': '#ffb8d9',
+            '--scrollbar-hover': '#ff99cc',
+
+            '--shadow-soft': '0 4px 15px rgba(255, 20, 147, 0.15)',
+            '--shadow-glow': '0 0 25px var(--accent-glow)',
+
+            // === DECORATION ===
+            // A subtle grid pattern or noise
+            '--bg-pattern': 'radial-gradient(#ffb8d9 1px, transparent 1px)',
+
+            // Fun borders for messages
+            '--message-decoration': '2px solid rgba(255, 182, 193, 0.5)',
+
+            // Avatar Shape (Optional: make them diamonds or rounded squares)
+            '--avatar-shape': '30%',
+        }
+    },
+    'dark-sakura': {
+        name: 'Sakura Dark',
+        mode: 'dark',
+        vars: {
+            // === SHAPES (Bubbly) ===
+            '--radius-sm': '12px',
+            '--radius-md': '20px',
+            '--radius-lg': '30px',
+            '--radius-xl': '999px',
+
+            // === COLORS (Official Barbie Pink #DA1884) ===
+            '--bg-primary': '#12080c',       // Dark Pink-Black (not purple!)
+            '--bg-secondary': '#1e0a14',     // Deep Cherry
+            '--bg-tertiary': '#3a1025',      // Dark Rose highlight
+            '--bg-message-user': 'linear-gradient(135deg, #da1884 0%, #a01570 100%)', // Full Barbie Pink gradient
+            '--bg-message-ai': '#180810',    // Very dark pink
+            '--bg-message-announce': 'linear-gradient(135deg, #2a0c1a 0%, #1a0810 100%)',
+            '--bg-message-command': 'linear-gradient(135deg, #1a2a1a 0%, #0f1f0f 100%)', // Keeping standard green for contrast or change to pink?
+            '--bg-message-command-response': 'linear-gradient(135deg, #2a1828 0%, #1a1020 100%)',
+            '--bg-input': '#1a0812',         // Dark input
+            '--bg-code': '#0e0608',
+            '--bg-sidebar': '#0c0408',       // Darkest pink-black
+
+            '--border-color': '#4a1840',
+            '--border-message': '#642050',
+            '--border-user': '#da1884',      // Barbie Pink Borders
+            '--border-sidebar': '#2a0818',
+
+            '--text-primary': '#ffeef4',     // Soft White-Pink
+            '--text-secondary': '#f8a0d0',   // Bright Pink text
+            '--text-muted': '#b06090',
+            '--text-code': '#ffd0e8',
+
+            '--accent': '#da1884',           // OFFICIAL BARBIE PINK
+            '--accent-glow': 'rgba(218, 24, 132, 0.6)',
+            '--accent-secondary': '#ff69b4', // Hot Pink secondary
+
+            '--error': '#ff69b4',
+            '--error-bg': 'linear-gradient(135deg, #3a1020 0%, #2a0818 100%)',
+            '--error-border': '#da1884',
+
+            '--info': '#da1884',
+            '--info-bg': 'linear-gradient(135deg, #2a0820 0%, #1a0410 100%)',
+            '--info-border': '#a01570',
+
+            '--button-bg': 'linear-gradient(135deg, #da1884 0%, #c4157a 100%)',
+            '--button-hover': 'linear-gradient(135deg, #ff40a0 0%, #da1884 100%)',
+            '--button-stop': 'linear-gradient(135deg, #401020 0%, #300818 100%)',
+            '--button-stop-hover': 'linear-gradient(135deg, #5a1830 0%, #401020 100%)',
+            '--button-stop-glow': 'rgba(255, 105, 180, 0.4)',
+
+            '--scrollbar': '#5a1850',
+            '--scrollbar-hover': '#8a2080',
+
+            '--shadow-soft': '0 4px 20px rgba(218, 24, 132, 0.2)',
+            '--shadow-glow': '0 0 25px var(--accent-glow)',
+
+            // === DECORATION ===
+            // Pink Sparkle Pattern
+            /* '--bg-pattern': 'radial-gradient(circle, rgba(218, 24, 132, 0.15) 1px, transparent 1px)', */
+            /* '--bg-pattern': `url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg' fill='none' stroke='%23da1884' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z'%3E%3C/path%3E%3C/svg%3E")`, */
+            // "Glitter" Sparkle Pattern: Tiny white/pink crosses
+            '--bg-pattern': `
+                radial-gradient(1.5px 1.5px at 10% 20%, #ffffff, transparent),
+                radial-gradient(1px 1px at 30% 65%, #ff69b4, transparent),
+                radial-gradient(1.5px 1.5px at 70% 10%, #ffffff, transparent),
+                radial-gradient(1px 1px at 90% 50%, #da1884, transparent),
+                radial-gradient(2px 2px at 50% 80%, #ffffff, transparent)
+            `,
+            '--bg-pattern-size': '200px 200px',
+
+            '--message-decoration': '1px solid rgba(218, 24, 132, 0.3)',
+            '--avatar-shape': '30%'
+        }
+    },
+    'light-lavender': {
+        name: 'Lavender',
+        mode: 'light',
+        vars: {
+            // === SHAPES (Soft & Round) ===
+            '--radius-sm': '10px',
+            '--radius-md': '18px',
+            '--radius-lg': '24px',
+            '--radius-xl': '999px',
+
+            // === COLORS (Soft Purple/Cream) ===
+            '--bg-primary': '#fcfaff',      // Ghost White
+            '--bg-secondary': '#f8f5ff',    // Lilac Snow
+            '--bg-tertiary': '#ede7ff',     // Pale Lavender
+            '--bg-message-user': 'linear-gradient(135deg, #e0c3fc 0%, #d4a5ff 100%)', // Soft Violet Gradient
+            '--bg-message-ai': '#ffffff',
+            '--bg-message-announce': 'linear-gradient(135deg, #f3e8ff 0%, #faf5ff 100%)',
+            '--bg-message-command': 'linear-gradient(135deg, #e8fcf0 0%, #dcf8e8 100%)', // Minty accent
+            '--bg-message-command-response': 'linear-gradient(135deg, #f0e8fc 0%, #f5f0ff 100%)',
+            '--bg-input': '#ffffff',
+            '--bg-code': '#faf8ff',
+            '--bg-sidebar': '#faf5ff',
+
+            '--border-color': '#e0d4f0',
+            '--border-message': '#dcd0f0',
+            '--border-user': '#a78bfa',     // Medium Purple
+            '--border-sidebar': '#f0e8ff',
+
+            '--text-primary': '#4c3b66',    // Dark Grape
+            '--text-secondary': '#7c6a9c',  // Muted Purple
+            '--text-muted': '#a898c0',
+            '--text-code': '#6b4c9a',
+
+            '--accent': '#8b5cf6',          // Vibrant Violet
+            '--accent-glow': 'rgba(139, 92, 246, 0.35)',
+            '--accent-secondary': '#ec4899',// Pink accent
+
+            '--error': '#f472b6',
+            '--error-bg': 'linear-gradient(135deg, #fff0f5 0%, #ffe0eb 100%)',
+
+            '--button-bg': 'linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%)',
+            '--button-hover': 'linear-gradient(135deg, #c4b5fd 0%, #a78bfa 100%)',
+
+            '--scrollbar': '#e0d4f0',
+            '--scrollbar-hover': '#c8b8e0',
+
+            '--shadow-soft': '0 4px 12px rgba(139, 92, 246, 0.1)',
+            '--shadow-glow': '0 0 20px var(--accent-glow)',
+
+            // === DECORATION ===
+            '--bg-pattern': 'radial-gradient(#e0d4f0 1px, transparent 1px)',
+            '--message-decoration': '1px solid rgba(167, 139, 250, 0.2)',
+            '--avatar-shape': '30%'
+        }
+    },
+    'light-cupcake': {
+        name: 'Strawberry',
+        mode: 'light',
+        vars: {
+            // === SHAPES (Bubbly) ===
+            '--radius-sm': '14px',
+            '--radius-md': '22px',
+            '--radius-lg': '30px',
+            '--radius-xl': '999px',
+
+            // === COLORS (Cream & Red) ===
+            '--bg-primary': '#fffaf0',      // Cream
+            '--bg-secondary': '#fff5eb',
+            '--bg-tertiary': '#ffe4e1',     // Misty Rose
+            '--bg-message-user': 'linear-gradient(135deg, #ff6b6b 0%, #ee5253 100%)', // Strawberry Red
+            '--bg-message-ai': '#ffffff',
+            '--bg-message-announce': 'linear-gradient(135deg, #ffeaa7 0%, #fff5e6 100%)', // Vanilla custard
+            '--bg-input': '#ffffff',
+            '--bg-code': '#fffbf5',
+            '--bg-sidebar': '#fff8f2',
+
+            '--border-color': '#f2d7d5',
+            '--border-message': '#f5b7b1',
+            '--border-user': '#e74c3c',
+            '--border-sidebar': '#fdebd0',
+
+            '--text-primary': '#641e16',    // Dark Red Brown
+            '--text-secondary': '#a04030',
+            '--text-muted': '#c08878',
+            '--text-code': '#c0392b',
+
+            '--accent': '#e74c3c',          // Cinnabar Red
+            '--accent-glow': 'rgba(231, 76, 60, 0.3)',
+            '--accent-secondary': '#27ae60', // Leaf Green
+
+            '--error': '#c0392b',
+            '--error-bg': 'linear-gradient(135deg, #fdecea 0%, #fadbd8 100%)',
+
+            '--button-bg': 'linear-gradient(135deg, #ff7979 0%, #e74c3c 100%)',
+            '--button-hover': 'linear-gradient(135deg, #ff9999 0%, #ff7979 100%)',
+
+            '--scrollbar': '#f5b7b1',
+            '--scrollbar-hover': '#e6b0aa',
+
+            '--shadow-soft': '0 4px 15px rgba(231, 76, 60, 0.15)',
+            '--shadow-glow': '0 0 20px var(--accent-glow)',
+
+            // === DECORATION ===
+            '--bg-pattern': 'none',
+            '--message-decoration': '2px dashed rgba(255, 255, 255, 0.8)', // Dashed white line on message bg
+            '--avatar-shape': '40%'
+        }
+    },
+    'light-heart': {
+        name: 'Heart',
+        mode: 'light',
+        vars: {
+            // === SHAPES (Curly/Elegant) ===
+            '--radius-sm': '12px',
+            '--radius-md': '18px',
+            '--radius-lg': '25px',
+            '--radius-xl': '999px',
+
+            // === COLORS (Dusty Pink/Ballet Slipper) ===
+            '--bg-primary': '#fdf2f8',      // Pink Lace
+            '--bg-secondary': '#fce4ec',
+            '--bg-tertiary': '#f8bbd0',
+            '--bg-message-user': 'linear-gradient(135deg, #f8bbd0 0%, #f48fb1 100%)',
+            '--bg-message-ai': '#ffffff',
+            '--bg-message-announce': 'linear-gradient(135deg, #fff0f5 0%, #fce4ec 100%)',
+            '--bg-input': '#ffffff',
+            '--bg-code': '#fdf2f8',
+            '--bg-sidebar': '#fce4ec',
+
+            '--border-color': '#f2d0db',
+            '--border-message': '#ecc8d8',
+            '--border-user': '#ad1457',     // Ruby Red
+            '--border-sidebar': '#f8bbd0',
+
+            '--text-primary': '#4a1a2c',    // Dark Maroon
+            '--text-secondary': '#88506a',
+            '--text-muted': '#bf809a',
+            '--text-code': '#880e4f',
+
+            '--accent': '#d81b60',          // Pink 600
+            '--accent-glow': 'rgba(216, 27, 96, 0.3)',
+            '--accent-secondary': '#e91e63',
+
+            '--error': '#e91e63',
+            '--error-bg': 'linear-gradient(135deg, #fce4ec 0%, #f8bbd0 100%)',
+
+            '--button-bg': 'linear-gradient(135deg, #ec407a 0%, #d81b60 100%)',
+            '--button-hover': 'linear-gradient(135deg, #f48fb1 0%, #ec407a 100%)',
+
+            '--scrollbar': '#f2d0db',
+            '--scrollbar-hover': '#ecc8d8',
+
+            '--shadow-soft': '0 4px 10px rgba(216, 27, 96, 0.15)',
+            '--shadow-glow': '0 0 20px var(--accent-glow)',
+
+            // === DECORATION ===
+            // Very subtle houndstooth or hearts if possible, using simple dots for now
+            '--bg-pattern': 'radial-gradient(#f8bbd0 1px, transparent 1px)',
+            '--bg-pattern-size': '24px 24px',
+            '--message-decoration': '1px solid rgba(216, 27, 96, 0.15)',
+            '--avatar-shape': '50%'
+        }
+    },
+    'dark-lavender': {
+        name: 'Lavender Dark',
+        mode: 'dark',
+        vars: {
+            // === SHAPES (Matching Light) ===
+            '--radius-sm': '10px',
+            '--radius-md': '18px',
+            '--radius-lg': '24px',
+            '--radius-xl': '999px',
+
+            // === COLORS (Deep Purple/Grape) ===
+            '--bg-primary': '#0c0a14',      // Deep Void
+            '--bg-secondary': '#140e1e',    // Dark Violet
+            '--bg-tertiary': '#201830',
+            '--bg-message-user': 'linear-gradient(135deg, #4c2875 0%, #381850 100%)',
+            '--bg-message-ai': '#180e20',
+            '--bg-message-announce': 'linear-gradient(135deg, #281838 0%, #1c1028 100%)',
+            '--bg-message-command': 'linear-gradient(135deg, #1a281e 0%, #142014 100%)',
+            '--bg-message-command-response': 'linear-gradient(135deg, #2a1830 0%, #201428 100%)',
+            '--bg-input': '#0e0816',
+            '--bg-code': '#0a0610',
+            '--bg-sidebar': '#08060e',
+
+            '--border-color': '#3a2050',
+            '--border-message': '#482860',
+            '--border-user': '#6b4090',
+            '--border-sidebar': '#201430',
+
+            '--text-primary': '#e8e0f8',
+            '--text-secondary': '#b8a0d0',
+            '--text-muted': '#786088',
+            '--text-code': '#c8b0e0',
+
+            '--accent': '#a78bfa',         // Soft Violet Glow
+            '--accent-glow': 'rgba(167, 139, 250, 0.4)',
+            '--accent-secondary': '#f472b6',// Pink accent
+
+            '--error': '#f87171',
+            '--error-bg': 'linear-gradient(135deg, #3a1a1a 0%, #2a0e0e 100%)',
+
+            '--button-bg': 'linear-gradient(135deg, #4c2875 0%, #381850 100%)',
+            '--button-hover': 'linear-gradient(135deg, #603090 0%, #4c2875 100%)',
+
+            '--scrollbar': '#3a2050',
+            '--scrollbar-hover': '#482860',
+
+            '--shadow-soft': '0 2px 8px rgba(0, 0, 0, 0.4)',
+            '--shadow-glow': '0 0 20px var(--accent-glow)',
+
+            // === DECORATION ===
+            '--bg-pattern': 'radial-gradient(circle, rgba(167, 139, 250, 0.1) 1px, transparent 1px)',
+            '--message-decoration': '1px solid rgba(167, 139, 250, 0.3)',
+            '--avatar-shape': '30%'
+        }
+    },
+    'dark-cyberpink': {
+        name: 'Cyberpink',
+        mode: 'dark',
+        vars: {
+            // === SHAPES (Sleek but slightly rounded for Sakura feel) ===
+            '--radius-sm': '6px',
+            '--radius-md': '12px',
+            '--radius-lg': '18px',
+            '--radius-xl': '24px',
+
+            // === COLORS (Neon Barbie Cyberpunk) ===
+            '--bg-primary': '#050208',      // Deep Void
+            '--bg-secondary': '#0a0012',    // Dark Magenta Black
+            '--bg-tertiary': '#180020',     // Dark Neon Purple
+            '--bg-message-user': 'linear-gradient(135deg, #da1884 0%, #a01570 100%)', // Barbie Pink Gradient (Sakura style)
+            '--bg-message-ai': '#08000c',   // Almost black pink
+            '--bg-message-announce': 'linear-gradient(135deg, #150015 0%, #0a000a 100%)',
+            '--bg-message-command': 'linear-gradient(135deg, #001810 0%, #000f08 100%)', // Matrix Green tint
+            '--bg-message-command-response': 'linear-gradient(135deg, #1a0018 0%, #100015 100%)',
+            '--bg-input': '#060008',        // Darkest input
+            '--bg-code': '#040006',
+            '--bg-sidebar': '#030005',
+
+            '--border-color': '#3a0030',     // Dark Neon Border
+            '--border-message': '#500040',
+            '--border-user': '#da1884',      // Barbie Pink Border
+            '--border-sidebar': '#1a0015',
+
+            '--text-primary': '#ffffff',     // Pure White for max contrast
+            '--text-secondary': '#ffaad5',   // Soft Neon Pink
+            '--text-muted': '#906090',       // Desaturated Purple
+            '--text-code': '#00ffff',        // CYAN Code (Cyberpunk accent)
+
+            '--accent': '#ff0080',           // ELECTRIC CYBER PINK
+            '--accent-glow': 'rgba(255, 0, 128, 0.6)', // Heavy Glow
+            '--accent-secondary': '#00ffff', // Cyan for Cyberpunk contrast
+
+            '--error': '#ff0055',
+            '--error-bg': 'linear-gradient(135deg, #200010 0%, #100008 100%)',
+            '--error-border': '#ff0055',
+
+            '--info': '#00ffff',
+            '--info-bg': 'linear-gradient(135deg, #001020 0%, #000810 100%)',
+            '--info-border': '#00ffff',
+
+            '--button-bg': 'linear-gradient(135deg, #da1884 0%, #a01570 100%)', // Sakura Button
+            '--button-hover': 'linear-gradient(135deg, #ff40a0 0%, #da1884 100%)',
+            '--button-stop': 'linear-gradient(135deg, #200010 0%, #100008 100%)',
+            '--button-stop-hover': 'linear-gradient(135deg, #300018 0%, #200010 100%)',
+            '--button-stop-glow': 'rgba(255, 0, 85, 0.5)',
+
+            '--scrollbar': '#3a0030',
+            '--scrollbar-hover': '#500040',
+
+            '--shadow-soft': '0 4px 12px rgba(255, 0, 128, 0.2)',
+            '--shadow-glow': '0 0 25px var(--accent-glow)',
+
+            // === DECORATION ===
+            // CYBERPUNK GRID: Increased opacity to 0.1 (was 0.03) + added Sakura Sparkles
+            '--bg-pattern': `
+            linear-gradient(rgba(255, 0, 128, 0.10) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 0, 128, 0.10) 1px, transparent 1px),
+            radial-gradient(1px 1px at 10% 20%, #ffffff, transparent),
+            radial-gradient(1.5px 1.5px at 30% 65%, #ff69b4, transparent),
+            radial-gradient(1px 1px at 70% 10%, #ffffff, transparent),
+            radial-gradient(1.2px 1.2px at 90% 40%, #da1884, transparent)
+            `,
+            // Grid size + Sparkle placement
+            '--bg-pattern-size': '30px 30px, 30px 30px, 200px 200px, 150px 150px, 180px 180px, 220px 220px',
+
+            '--message-decoration': '1px solid rgba(255, 0, 128, 0.2)',
+            '--avatar-shape': '15%' // Squarish for sci-fi feel
+        }
+    },
+    'light-cyberpink': {
+        name: 'Cyberpink Light',
+        mode: 'light',
+        vars: {
+            // === SHAPES (Matching Dark) ===
+            '--radius-sm': '6px',
+            '--radius-md': '12px',
+            '--radius-lg': '18px',
+            '--radius-xl': '24px',
+
+            // === COLORS (Neon on Sterile White) ===
+            '--bg-primary': '#ffffff',      // Sterile White
+            '--bg-secondary': '#fff0f5',    // Ghost Pink
+            '--bg-tertiary': '#ffe0ef',     // Pale Pink
+            '--bg-message-user': 'linear-gradient(135deg, #da1884 0%, #ff40a0 100%)', // Sakura Gradient
+            '--bg-message-ai': '#ffffff',
+            '--bg-message-announce': 'linear-gradient(135deg, #fff5f8 0%, #ffffff 100%)',
+            '--bg-message-command': 'linear-gradient(135deg, #e0fff8 0%, #f0fffd 100%)', // Cyan tint
+            '--bg-message-command-response': 'linear-gradient(135deg, #f8f0ff 0%, #fef8ff 100%)', // Lavender tint
+            '--bg-input': '#fff5f8',
+            '--bg-code': '#fff0f5',
+            '--bg-sidebar': '#fffbfd',
+
+            '--border-color': '#ffc0d0',    // Soft Pink border
+            '--border-message': '#ffc8d8',
+            '--border-user': '#ff0080',     // Neon Pink
+            '--border-sidebar': '#ffd8e4',
+
+            '--text-primary': '#2a0030',    // Deep Magenta/Black
+            '--text-secondary': '#a00050',  // Dark Pink
+            '--text-muted': '#e060a0',
+            '--text-code': '#00b8d4',       // Cyan Code
+
+            '--accent': '#ff0080',          // ELECTRIC BARBIE PINK
+            '--accent-glow': 'rgba(255, 0, 128, 0.3)',
+            '--accent-secondary': '#00d4ff',// Cyan for Cyberpunk contrast
+
+            '--error': '#ff0055',
+            '--error-bg': 'linear-gradient(135deg, #fff0f5 0%, #ffe0eb 100%)',
+            '--error-border': '#ff0080',
+
+            '--info': '#00b8d4',
+            '--info-bg': 'linear-gradient(135deg, #e0fcff 0%, #f0ffff 100%)',
+            '--info-border': '#00d4ff',
+
+            '--button-bg': 'linear-gradient(135deg, #da1884 0%, #ff0080 100%)', // Sakura Button
+            '--button-hover': 'linear-gradient(135deg, #ff40a0 0%, #da1884 100%)',
+            '--button-stop': 'linear-gradient(135deg, #ffe0eb 0%, #ffc8d8 100%)',
+            '--button-stop-hover': 'linear-gradient(135deg, #ffc8d8 0%, #ffa8c0 100%)',
+            '--button-stop-glow': 'rgba(255, 0, 85, 0.2)',
+
+            '--scrollbar': '#ffd8e8',
+            '--scrollbar-hover': '#ffb0d0',
+
+            '--shadow-soft': '0 4px 12px rgba(255, 0, 128, 0.08)',
+            '--shadow-glow': '0 0 15px var(--accent-glow)',
+
+            // === DECORATION ===
+            // Subtle Cyberpunk Grid on Light + Sakura Sparkles
+            '--bg-pattern': `
+            linear-gradient(rgba(255, 0, 128, 0.05) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 0, 128, 0.05) 1px, transparent 1px),
+            radial-gradient(1px 1px at 15% 25%, #ffb8d9, transparent),
+            radial-gradient(1.5px 1.5px at 60% 70%, #ff69b4, transparent),
+            radial-gradient(1px 1px at 80% 10%, #da1884, transparent)
+            `,
+            '--bg-pattern-size': '30px 30px, 30px 30px, 200px 200px, 180px 180px, 150px 150px',
+
+            '--message-decoration': '1px solid rgba(255, 0, 128, 0.1)',
+            '--avatar-shape': '15%' // Matching Dark
+        }
+    },
+    'dark-cupcake': {
+        name: 'Cupcake Dark',
+        mode: 'dark',
+        vars: {
+            // === SHAPES (Bubbly) ===
+            '--radius-sm': '14px',
+            '--radius-md': '22px',
+            '--radius-lg': '30px',
+            '--radius-xl': '999px',
+
+            // === COLORS (Dark Chocolate & Strawberry) ===
+            '--bg-primary': '#0f0806',      // Dark Chocolate
+            '--bg-secondary': '#1a0e0a',
+            '--bg-tertiary': '#281814',
+            '--bg-message-user': 'linear-gradient(135deg, #4a1818 0%, #381414 100%)', // Strawberry Red
+            '--bg-message-ai': '#140c0a',
+            '--bg-message-announce': 'linear-gradient(135deg, #281814 0%, #180e0a 100%)',
+            '--bg-message-command': 'linear-gradient(135deg, #1a2a1a 0%, #142014 100%)',
+            '--bg-message-command-response': 'linear-gradient(135deg, #2a1830 0%, #201428 100%)',
+            '--bg-input': '#120806',
+            '--bg-code': '#0c0604',
+            '--bg-sidebar': '#0a0604',
+
+            '--border-color': '#381818',
+            '--border-message': '#482424',
+            '--border-user': '#683838',
+            '--border-sidebar': '#201414',
+
+            '--text-primary': '#f0e4d8',    // Cream
+            '--text-secondary': '#c8a090',
+            '--text-muted': '#805040',
+            '--text-code': '#e8b0a0',
+
+            '--accent': '#e74c3c',          // Cinnabar Red
+            '--accent-glow': 'rgba(231, 76, 60, 0.4)',
+            '--accent-secondary': '#27ae60',
+
+            '--error': '#f87171',
+            '--error-bg': 'linear-gradient(135deg, #4a1818 0%, #381010 100%)',
+
+            '--button-bg': 'linear-gradient(135deg, #4a1818 0%, #381414 100%)',
+            '--button-hover': 'linear-gradient(135deg, #582424 0%, #4a1818 100%)',
+
+            '--scrollbar': '#381818',
+            '--scrollbar-hover': '#482424',
+
+            '--shadow-soft': '0 2px 8px rgba(0, 0, 0, 0.5)',
+            '--shadow-glow': '0 0 20px var(--accent-glow)',
+
+            // === DECORATION ===
+            '--bg-pattern': 'none',
+            '--message-decoration': '1px dashed rgba(255, 255, 255, 0.1)',
+            '--avatar-shape': '40%'
+        }
+    },
+    'dark-heart': {
+        name: 'Heart Dark',
+        mode: 'dark',
+        vars: {
+            // === SHAPES (Curly/Elegant) ===
+            '--radius-sm': '12px',
+            '--radius-md': '18px',
+            '--radius-lg': '25px',
+            '--radius-xl': '999px',
+
+            // === COLORS (Dark Burgundy/Lace) ===
+            '--bg-primary': '#14060c',      // Dark Wine
+            '--bg-secondary': '#1e0e14',
+            '--bg-tertiary': '#2c141e',
+            '--bg-message-user': 'linear-gradient(135deg, #3a1020 0%, #2a0c18 100%)',
+            '--bg-message-ai': '#180c10',
+            '--bg-message-announce': 'linear-gradient(135deg, #281418 0%, #1c0e12 100%)',
+            '--bg-message-command': 'linear-gradient(135deg, #1a2a1a 0%, #142014 100%)',
+            '--bg-message-command-response': 'linear-gradient(135deg, #2a1830 0%, #201428 100%)',
+            '--bg-input': '#100608',
+            '--bg-code': '#0c0406',
+            '--bg-sidebar': '#0a0406',
+
+            '--border-color': '#381828',
+            '--border-message': '#482838',
+            '--border-user': '#803050',
+            '--border-sidebar': '#1c1018',
+
+            '--text-primary': '#f0d0d8',
+            '--text-secondary': '#c890a0',
+            '--text-muted': '#805068',
+            '--text-code': '#e8a0b8',
+
+            '--accent': '#d81b60',          // Pink 600
+            '--accent-glow': 'rgba(216, 27, 96, 0.4)',
+            '--accent-secondary': '#e91e63',
+
+            '--error': '#f87171',
+            '--error-bg': 'linear-gradient(135deg, #4a1818 0%, #381010 100%)',
+
+            '--button-bg': 'linear-gradient(135deg, #4a1830 0%, #3a1424 100%)',
+            '--button-hover': 'linear-gradient(135deg, #582440 0%, #4a1830 100%)',
+
+            '--scrollbar': '#3a1828',
+            '--scrollbar-hover': '#482838',
+
+            '--shadow-soft': '0 2px 8px rgba(0, 0, 0, 0.5)',
+            '--shadow-glow': '0 0 20px var(--accent-glow)',
+
+            // === DECORATION ===
+            '--bg-pattern': 'radial-gradient(circle, rgba(216, 27, 96, 0.05) 1px, transparent 1px)',
+            '--message-decoration': '1px solid rgba(216, 27, 96, 0.3)',
+            '--avatar-shape': '50%'
         }
     }
 };

@@ -111,14 +111,3 @@ box-shadow: 0 0 15px rgba(248, 113, 113, 0.3);
 
 #stop:active { transform: scale(0.96); }
 #stop.show { display: block; }
-
-/* Scrollbar styling */
-.chat-container::-webkit-scrollbar { width: 6px; }
-.chat-container::-webkit-scrollbar-track { background: var(--bg-primary); }
-.chat-container::-webkit-scrollbar-thumb {
-    background: var(--scrollbar);
-    border-radius: 3px;
-}
-.chat-container::-webkit-scrollbar-thumb:hover {
-    background: var(--scrollbar-hover);
-}

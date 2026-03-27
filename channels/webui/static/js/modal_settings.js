@@ -1495,60 +1495,415 @@ function escapeHtml(str) {
     return div.innerHTML;
 }
 
-// Theme section
+// =============================================================================
+// Theme Management
+// =============================================================================
+
+// System fonts that don't need external loading
+const SYSTEM_FONTS = new Set([
+    'default',
+    'Arial',
+    'Helvetica',
+    'Calibri',
+    'Segoe UI',
+    'Times New Roman',
+    'Georgia',
+    'Verdana',
+    'Trebuchet MS',
+    'Palatino Linotype',
+    'Tahoma',
+    'Century Gothic',
+    'Lucida Console',
+    'Consolas',
+    'Courier New',
+    'Comic Sans MS'
+]);
+
+// Check if a font is a system font
+function isSystemFont(fontId) {
+    return fontId === 'default' || SYSTEM_FONTS.has(fontId);
+}
+
+// Load a font - handles both system fonts and Google Fonts
+async function loadFont(fontId, weights = [400, 500, 600, 700]) {
+    // System fonts don't need loading
+    if (isSystemFont(fontId)) {
+        return { success: true, type: 'system' };
+    }
+
+    // Try to load as Google Font
+    if (typeof loadGoogleFont === 'function') {
+        try {
+            await loadGoogleFont(fontId, weights);
+            return { success: true, type: 'google' };
+        } catch (err) {
+            console.warn(`Failed to load ${fontId} as Google Font, treating as system font`);
+        }
+    }
+
+    // Fallback: assume it's a system font
+    return { success: true, type: 'system' };
+}
+
+// Apply custom font to the page (persists the selected font)
+function applyCustomFont(fontId) {
+    const root = document.documentElement;
+
+    // 1. Update CSS Variable
+    if (!fontId || fontId === 'default') {
+        root.style.removeProperty('--font-family');
+    } else {
+        // Add fallbacks
+        const fontFamily = `'${fontId}', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`;
+        root.style.setProperty('--font-family', fontFamily);
+    }
+
+    // 2. Save to LocalStorage
+    localStorage.setItem('fontFamily', fontId || 'default');
+
+    // 3. Ensure the font is actually loaded and persists (separate from preview links)
+    // We remove all previous "active" links and add the specific one for the chosen font
+    const existingActiveLink = document.getElementById('font-active-link');
+    if (existingActiveLink) existingActiveLink.remove();
+
+    if (!isSystemFont(fontId)) {
+        const link = document.createElement('link');
+        link.id = 'font-active-link'; // Specific ID for the actively selected font
+        link.rel = 'stylesheet';
+        link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(fontId)}:wght@400;500;600;700&display=swap`;
+        document.head.appendChild(link);
+    }
+}
+
+// Create custom font family dropdown with preview loading logic
+function createFontFamilyDropdown(fontOptions, selectedFont, onChange) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'custom-font-select';
+
+    // Internal state to track selection changes
+    let currentSelection = selectedFont;
+
+    // --- Trigger Button ---
+    const trigger = document.createElement('div');
+    trigger.className = 'custom-font-trigger';
+    trigger.setAttribute('tabindex', '0');
+    trigger.setAttribute('role', 'combobox');
+    trigger.setAttribute('aria-expanded', 'false');
+    trigger.setAttribute('aria-haspopup', 'listbox');
+
+    const selectedOption = fontOptions.find(f => f.value === currentSelection) || fontOptions[0];
+    const triggerFontFamily = currentSelection === 'default' ? 'inherit' : `'${currentSelection}', sans-serif`;
+
+    // Structure: Value text + Arrow
+    trigger.innerHTML = `
+    <span class="custom-font-value" style="font-family: ${triggerFontFamily}">${selectedOption.label}</span>
+    <svg class="custom-font-arrow" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <polyline points="6 9 12 15 18 9"></polyline>
+    </svg>
+    `;
+
+    // --- Dropdown List ---
+    const dropdown = document.createElement('div');
+    dropdown.className = 'custom-font-dropdown';
+    dropdown.setAttribute('role', 'listbox');
+
+    // Search Input
+    const searchWrapper = document.createElement('div');
+    searchWrapper.className = 'custom-font-search';
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.placeholder = 'Search fonts...';
+    searchInput.className = 'custom-font-search-input';
+    searchWrapper.appendChild(searchInput);
+    dropdown.appendChild(searchWrapper);
+
+    // Options Container
+    const optionsContainer = document.createElement('div');
+    optionsContainer.className = 'custom-font-options';
+
+    let filteredOptions = [...fontOptions];
+
+    function renderOptions(options) {
+        optionsContainer.innerHTML = '';
+
+        options.forEach(opt => {
+            const item = document.createElement('div');
+            item.className = 'custom-font-option' + (opt.value === currentSelection ? ' selected' : '');
+            item.dataset.value = opt.value;
+            item.setAttribute('role', 'option');
+            item.setAttribute('aria-selected', opt.value === currentSelection);
+
+            // Apply the font style to the item
+            const fontFamily = opt.value === 'default' ? 'inherit' : `'${opt.value}', sans-serif`;
+            item.style.fontFamily = fontFamily;
+
+            // FIX: Wrap text in a span so it flexes correctly with the badge
+            item.innerHTML = `<span class="option-text">${opt.label}</span>`;
+
+            // Add Badges
+            if (opt.value !== 'default') {
+                if (isSystemFont(opt.value)) {
+                    const badge = document.createElement('span');
+                    badge.className = 'font-badge system';
+                    badge.textContent = 'System';
+                    item.appendChild(badge);
+                } else {
+                    // It's a Google Font
+                    const badge = document.createElement('span');
+                    badge.className = 'font-badge google';
+                    badge.textContent = 'Google';
+                    item.appendChild(badge);
+                }
+            }
+
+            item.onclick = () => {
+                // 1. Update internal state immediately
+                currentSelection = opt.value;
+
+                // 2. Update Visuals in list
+                optionsContainer.querySelectorAll('.custom-font-option').forEach(el => {
+                    el.classList.remove('selected');
+                    el.setAttribute('aria-selected', 'false');
+                });
+                item.classList.add('selected');
+                item.setAttribute('aria-selected', 'true');
+
+                // 3. Update Trigger Display
+                const valueSpan = trigger.querySelector('.custom-font-value');
+                valueSpan.textContent = opt.label;
+                valueSpan.style.fontFamily = fontFamily;
+
+                // 4. Fire Callback (updates localStorage & main CSS)
+                if (onChange) onChange(opt.value);
+
+                // 5. Close Dropdown (triggers cleanup)
+                closeDropdown();
+            };
+
+            optionsContainer.appendChild(item);
+        });
+    }
+
+    renderOptions(filteredOptions);
+
+    // Search Logic
+    searchInput.addEventListener('input', (e) => {
+        const query = e.target.value.toLowerCase();
+        filteredOptions = query
+        ? fontOptions.filter(opt => opt.label.toLowerCase().includes(query) || opt.value.toLowerCase().includes(query))
+        : [...fontOptions];
+        renderOptions(filteredOptions);
+    });
+
+    searchInput.addEventListener('mousedown', (e) => e.stopPropagation());
+
+    dropdown.appendChild(optionsContainer);
+
+    // --- Open/Close Logic ---
+
+
+    function openDropdown() {
+        dropdown.classList.add('show');
+        trigger.setAttribute('aria-expanded', 'true');
+
+        // Load the fonts for preview
+        loadPreviewFonts(fontOptions);
+
+        // Reset search and render full list every time we open
+        searchInput.value = '';
+        filteredOptions = [...fontOptions];
+        renderOptions(filteredOptions);
+
+        // Focus and scroll
+        setTimeout(() => searchInput.focus(), 50);
+        const selectedEl = optionsContainer.querySelector('.custom-font-option.selected');
+        if (selectedEl) selectedEl.scrollIntoView({ block: 'nearest' });
+    }
+
+    function closeDropdown() {
+        dropdown.classList.remove('show');
+        trigger.setAttribute('aria-expanded', 'false');
+
+        // Reset Search & Re-render (uses currentSelection state)
+        searchInput.value = '';
+    }
+
+    trigger.addEventListener('click', () => {
+        dropdown.classList.contains('show') ? closeDropdown() : openDropdown();
+    });
+
+    trigger.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            dropdown.classList.contains('show') ? closeDropdown() : openDropdown();
+        } else if (e.key === 'Escape') {
+            closeDropdown();
+        }
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!wrapper.contains(e.target)) closeDropdown();
+    });
+
+        wrapper.appendChild(trigger);
+        wrapper.appendChild(dropdown);
+
+        return wrapper;
+}
+
+// Helper: Load all fonts needed for the preview panel
+function loadPreviewFonts(options) {
+    // Identify Google Fonts
+    const googleFonts = options
+    .filter(opt => !isSystemFont(opt.value))
+    .map(opt => opt.value);
+
+    if (googleFonts.length === 0) return;
+
+    // Create a single URL to load all fonts at once (efficient)
+    const familyParam = googleFonts.map(f => `family=${f}:wght@400;500;700`).join('&');
+    const href = `https://fonts.googleapis.com/css2?${familyParam}&display=swap`;
+
+    // Check if preview link already exists
+    if (document.getElementById('font-preview-batch')) return;
+
+    const link = document.createElement('link');
+    link.id = 'font-preview-batch';
+    link.rel = 'stylesheet';
+    link.href = href;
+    document.head.appendChild(link);
+}
+
+// Theme section with custom font dropdown
 function createThemeSection() {
     const wrapper = document.createElement('div');
     wrapper.className = 'settings-theme-section';
 
     const savedFamily = localStorage.getItem('themeFamily') || 'monochrome';
     const savedMode = localStorage.getItem('themeMode') || 'dark';
+    const savedFontSize = localStorage.getItem('fontSize') || '16';
+    const savedFontFamily = localStorage.getItem('fontFamily') || 'default';
     const families = getThemeFamilies();
 
-    const themeLabel = document.createElement('h4');
-    themeLabel.textContent = 'Color Theme';
-    wrapper.appendChild(themeLabel);
+    // Font options with display names
+    const fontOptions = [
+        { value: 'default', label: 'System Default' },
+        // System fonts
+        { value: 'Arial', label: 'Arial' },
+        { value: 'Helvetica', label: 'Helvetica' },
+        { value: 'Calibri', label: 'Calibri' },
+        { value: 'Segoe UI', label: 'Segoe UI' },
+        { value: 'Georgia', label: 'Georgia' },
+        { value: 'Verdana', label: 'Verdana' },
+        { value: 'Trebuchet MS', label: 'Trebuchet MS' },
+        { value: 'Tahoma', label: 'Tahoma' },
+        { value: 'Consolas', label: 'Consolas' },
+        { value: 'Courier New', label: 'Courier New' },
+        { value: 'Comic Sans MS', label: 'Comic Sans MS' },
+        // Google Fonts - Sans Serif
+        { value: 'Inter', label: 'Inter' },
+        { value: 'Roboto', label: 'Roboto' },
+        { value: 'Roboto Mono', label: 'Roboto Mono' },
+        { value: 'Lato', label: 'Lato' },
+        { value: 'Open Sans', label: 'Open Sans' },
+        { value: 'Ubuntu', label: 'Ubuntu' },
+        { value: 'Arimo', label: 'Arimo' },
+        { value: 'Poppins', label: 'Poppins' },
+        { value: 'Montserrat', label: 'Montserrat' },
+        { value: 'Nunito', label: 'Nunito' },
+        { value: 'Source Sans 3', label: 'Source Sans 3' },
+        { value: 'Inconsolata', label: 'Inconsolata' },
+        { value: 'Raleway', label: 'Raleway' },
+        // Google Fonts - Display & Fancy
+        { value: 'Audiowide', label: 'Audiowide' },
+        { value: 'Quantico', label: 'Quantico' },
+        { value: 'Anta', label: 'Anta' },
+        // Google Fonts - Rounded & Bubbly
+        { value: 'Quicksand', label: 'Quicksand' },
+        { value: 'Delius', label: 'Delius' },
+        { value: 'Comfortaa', label: 'Comfortaa' },
+        { value: 'Short Stack', label: 'Short Stack' },
+        { value: 'Bubblegum Sans', label: 'Bubblegum Sans' },
+        { value: 'Varela Round', label: 'Varela Round' },
+        { value: 'Comic Relief', label: 'Comic Relief' },
+        { value: 'Leckerli One', label: 'Leckerli One' },
+        { value: 'Baloo 2', label: 'Baloo 2' },
+        { value: 'Fredoka', label: 'Fredoka' },
+        { value: 'Chewy', label: 'Chewy' },
+        { value: 'Chonk', label: 'Chonk' },
+        // Google Fonts - Handwriting
+        { value: 'Indie Flower', label: 'Indie Flower' },
+        { value: 'Architects Daughter', label: 'Architects Daughter' },
+        { value: 'Caveat', label: 'Caveat' },
+        { value: 'Gochi Hand', label: 'Gochi Hand' },
+        { value: 'Kalam', label: 'Kalam' },
+        { value: 'Yellowtail', label: 'Yellowtail' },
+        { value: 'Patrick Hand', label: 'Patrick Hand' },
+        { value: 'Sour Gummy', label: 'Sour Gummy' },
+        { value: 'Homemade Apple', label: 'Homemade Apple' },
+        // Google Fonts - Cursive & Script
+        { value: 'Allura', label: 'Allura' },
+        { value: 'Amatic SC', label: 'Amatic SC' },
+        { value: 'Pacifico', label: 'Pacifico' },
+        { value: 'Lobster', label: 'Lobster' },
+        { value: 'Satisfy', label: 'Satisfy' },
+        { value: 'Cookie', label: 'Cookie' },
+        { value: 'Dancing Script', label: 'Dancing Script' },
+        { value: 'Meow Script', label: 'Meow Script' },
+        { value: 'Sacramento', label: 'Sacramento' },
+        { value: 'Shadows Into Light', label: 'Shadows Into Light' },
+        { value: 'Emilys Candy', label: 'Emilys Candy' },
+    ];
 
-    const themeGrid = document.createElement('div');
-    themeGrid.className = 'theme-grid';
-    themeGrid.id = 'theme-grid-settings';
+    // 1. Font Family - Custom Dropdown with Preview
+    const fontFamilyLabel = document.createElement('h4');
+    fontFamilyLabel.textContent = 'Font Family';
+    fontFamilyLabel.style.marginTop = '20px';
+    wrapper.appendChild(fontFamilyLabel);
 
-    families.forEach((variants, family) => {
-        const previewThemeId = variants.dark || variants.light;
-        const previewTheme = themes[previewThemeId];
-        if (!previewTheme) return;
+    const fontContainer = document.createElement('div');
+    fontContainer.className = 'font-family-container';
 
-        const btn = document.createElement('button');
-        btn.className = 'theme-btn' + (family === savedFamily ? ' active' : '');
-        btn.dataset.family = family;
-        btn.type = 'button';
-
-        const bgColor = previewTheme.vars['--bg-primary'];
-        const accentColor = previewTheme.vars['--accent'];
-        const hasBothModes = variants.dark && variants.light;
-
-        btn.innerHTML = `
-        <div class="theme-preview" style="background: linear-gradient(135deg, ${bgColor} 50%, ${accentColor} 50%);">
-        ${hasBothModes ? '<span class="theme-badge">◐</span>' : ''}
-        </div>
-        <span class="theme-name">${family.charAt(0).toUpperCase() + family.slice(1)}</span>
-        `;
-
-        btn.onclick = () => {
-            currentThemeFamily = family;
-            applyTheme(family, currentThemeMode);
-            updateThemeButtonsInSettings();
-        };
-
-        themeGrid.appendChild(btn);
+    const fontDropdown = createFontFamilyDropdown(fontOptions, savedFontFamily, (font) => {
+        applyCustomFont(font);
     });
 
-    wrapper.appendChild(themeGrid);
+    fontContainer.appendChild(fontDropdown);
+    wrapper.appendChild(fontContainer);
 
-    const modeLabel = document.createElement('h4');
-    modeLabel.textContent = 'Appearance Mode';
-    modeLabel.style.marginTop = '20px';
-    wrapper.appendChild(modeLabel);
+    // 2. Font Size Slider
+    const fontSizeLabel = document.createElement('h4');
+    fontSizeLabel.textContent = 'Font Size';
+    fontSizeLabel.style.marginTop = '20px';
+    wrapper.appendChild(fontSizeLabel);
 
+    const fontSizeContainer = document.createElement('div');
+    fontSizeContainer.className = 'font-size-container';
+
+    fontSizeContainer.innerHTML = `
+    <input type="range"
+    class="font-size-slider"
+    id="font-size-slider-settings"
+    min="12"
+    max="24"
+    value="${savedFontSize}"
+    aria-label="Font size slider">
+    <span class="font-size-value" id="font-size-value-settings">${savedFontSize}px</span>
+    `;
+
+    const slider = fontSizeContainer.querySelector('#font-size-slider-settings');
+    const valueDisplay = fontSizeContainer.querySelector('#font-size-value-settings');
+
+    slider.addEventListener('input', function() {
+        const size = this.value;
+        valueDisplay.textContent = `${size}px`;
+        document.documentElement.style.setProperty('--font-size-base', `${size}px`);
+        localStorage.setItem('fontSize', size);
+    });
+
+    wrapper.appendChild(fontSizeContainer);
+
+    // 3. Appearance Mode (Dark/Light)
     const modeToggle = document.createElement('div');
     modeToggle.className = 'theme-mode-toggle';
 
@@ -1576,6 +1931,49 @@ function createThemeSection() {
     });
 
     wrapper.appendChild(modeToggle);
+
+    // 4. Color Theme
+    const themeLabel = document.createElement('h4');
+    themeLabel.textContent = 'Color Theme';
+    themeLabel.style.marginTop = '20px';
+    wrapper.appendChild(themeLabel);
+
+    const themeGrid = document.createElement('div');
+    themeGrid.className = 'theme-grid';
+    themeGrid.id = 'theme-grid-settings';
+
+    families.forEach((variants, family) => {
+        const previewThemeId = variants.dark || variants.light;
+        const previewTheme = themes[previewThemeId];
+        if (!previewTheme) return;
+
+        const btn = document.createElement('button');
+        btn.className = 'theme-btn' + (family === savedFamily ? ' active' : '');
+        btn.dataset.family = family;
+        btn.type = 'button';
+
+        const bgColor = previewTheme.vars['--bg-primary'];
+        const accentColor = previewTheme.vars['--accent'];
+        const textColor = previewTheme.vars['--text-primary'] || '#ffffff';
+        const hasBothModes = variants.dark && variants.light;
+
+        btn.innerHTML = `
+        <div class="theme-preview" style="background: linear-gradient(135deg, ${bgColor} 50%, ${accentColor} 50%);">
+        </div>
+        <span class="theme-name" style="display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: min(13px, 0.7rem); max-width: 100%; line-height: 1.2; padding: 4px 2px;">${family.charAt(0).toUpperCase() + family.slice(1)}</span>
+        `;
+
+        btn.onclick = () => {
+            currentThemeFamily = family;
+            applyTheme(family, currentThemeMode);
+            updateThemeButtonsInSettings();
+        };
+
+        themeGrid.appendChild(btn);
+    });
+
+    wrapper.appendChild(themeGrid);
+
     return wrapper;
 }
 

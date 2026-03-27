@@ -1153,6 +1153,241 @@
     margin: 4px 0 0 0;
 }
 
+.font-size-container {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-top: 8px;
+}
+
+.font-size-slider {
+    flex: 1;
+    height: 6px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--border-color);
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+}
+
+.font-size-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    background: var(--accent);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform 0.15s ease;
+}
+
+.font-size-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+}
+
+.font-size-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    background: var(--accent);
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+}
+
+.font-size-value {
+    min-width: 45px;
+    text-align: right;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ==========================================================================
+ * Custom Font Select (Theme Aware)
+ * ========================================================================== */
+
+.custom-font-select {
+    position: relative;
+    width: 100%;
+    font-family: var(--font-primary);
+}
+
+/* Trigger Button */
+.custom-font-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-height: 42px;
+    color: var(--text-primary);
+}
+
+.custom-font-trigger:hover {
+    border-color: var(--accent);
+}
+
+.custom-font-trigger:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: var(--shadow-glow); /* Uses theme glow */
+}
+
+.custom-font-value {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.custom-font-arrow {
+    flex-shrink: 0;
+    margin-left: 8px;
+    transition: transform 0.2s ease;
+    color: var(--text-muted);
+}
+
+.custom-font-dropdown.show + .custom-font-trigger .custom-font-arrow {
+    transform: rotate(180deg);
+}
+
+/* Dropdown Panel */
+.custom-font-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-soft);
+    z-index: 1000;
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: all 0.2s ease;
+}
+
+.custom-font-dropdown.show {
+    max-height: 320px;
+    opacity: 1;
+    overflow-y: visible; /* Allow scrollbar to show */
+}
+
+/* Search Input */
+.custom-font-search {
+    position: sticky;
+    top: 0;
+    padding: 8px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    z-index: 1;
+}
+
+.custom-font-search-input {
+    width: 100%;
+    padding: 8px 12px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 13px;
+    outline: none;
+    font-family: var(--font-primary);
+}
+
+.custom-font-search-input:focus {
+    border-color: var(--accent);
+}
+
+.custom-font-search-input::placeholder {
+    color: var(--text-muted);
+}
+
+/* Options List */
+.custom-font-options {
+    padding: 4px 0;
+    max-height: 250px;
+    overflow-y: auto;
+}
+
+/* Option Item */
+.custom-font-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    font-size: 14px;
+    color: var(--text-primary);
+    gap: 12px;
+}
+
+.custom-font-option:hover {
+    background: var(--bg-tertiary);
+}
+
+.custom-font-option.selected {
+    background: var(--bg-tertiary);
+    color: var(--accent);
+}
+
+.custom-font-option .option-text {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Badges */
+.font-badge {
+    flex-shrink: 0;
+    font-size: 9px;
+    padding: 3px 6px;
+    border-radius: var(--radius-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+    /* Reset font to system default for readability */
+    font-family: var(--font-primary);
+}
+
+.font-badge.system {
+    background: rgba(74, 222, 128, 0.1); /* Fallback */
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+    color: var(--accent);
+}
+
+.font-badge.google {
+    background: rgba(66, 133, 244, 0.1); /* Fallback */
+    background: color-mix(in srgb, var(--info) 10%, transparent);
+    color: var(--info);
+}
+
+/* Scrollbar for dropdown */
+.custom-font-options::-webkit-scrollbar {
+    width: 6px;
+}
+
+.custom-font-options::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.custom-font-options::-webkit-scrollbar-thumb {
+    background: var(--border-color, #444);
+    border-radius: 3px;
+}
+
+.custom-font-options::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted, #666);
+}
+
 /* Light theme overrides */
 [data-theme="light"] .model-select,
 .theme-light .model-select {

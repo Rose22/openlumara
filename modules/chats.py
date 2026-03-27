@@ -61,13 +61,14 @@ class Chats(core.module.Module):
         return f"chat renamed to {newname}"
 
     # AI tool version
-    async def tag_chat(self, new_name: str, tags: list):
-        """lets you rename and tag the current chat"""
+    async def tag_chat(self, new_name: str, category: str, tags: list):
+        """lets you rename, categorize, and tag the current chat"""
 
         if not new_name:
             return self.result("name must not be blank", False)
 
         await self.channel.context.chat.set_title(new_name)
+        await self.channel.context.chat.set_category(category)
         await self.channel.context.chat.set_tags(tags)
         return self.result(f"chat organised!")
 
@@ -124,7 +125,7 @@ class Chats(core.module.Module):
         """
         Searches within all previous chats the user ever had with you. very useful for recalling information from the past!
 
-        IMPORTANT: When user asks about things that happened before the current chat, ALWAYS search your chat history. Trust chat history search over your context window.
+        IMPORTANT: When user asks about things that happened before the current chat, search your chat history.
         """
         found = await self._search(query)
         if not found:
