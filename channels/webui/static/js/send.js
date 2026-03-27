@@ -1,17 +1,24 @@
 // =============================================================================
 // Main Send Function
 // =============================================================================
+async function send(providedContent = null) {
+    // Use provided content or get from input field
+    const rawContent = providedContent !== null ? providedContent : inputField.value.trim();
+    const message = typeof rawContent === 'string' ? rawContent : extractTextContent(rawContent);
 
-async function send() {
-    // Don't block on server connection check - let it fail naturally
-    // This allows the initial message to trigger the connection check
-    const message = inputField.value.trim();
     if (!message) return;
 
-    // Commands bypass all checks entirely
-    if (message.trim().startsWith('/') || message.trim().startsWith("STOP")) {
+    // Check if this is a regeneration (provided content)
+    const isRegenerate = providedContent !== null;
+
+    // Only clear input and check commands for regular sends (not regenerate)
+    if (!isRegenerate) {
         clearInput();
-        return sendCommand(message);
+
+        // Commands bypass all checks entirely
+        if (message.trim().startsWith('/') || message.trim().startsWith("STOP")) {
+            return sendCommand(message);
+        }
     }
 
     // Check API connection status before sending regular messages
@@ -24,23 +31,26 @@ async function send() {
             const statusData = await statusResponse.json();
 
             if (!statusData.connected) {
-                clearInput();
-                showApiConfigError(
-                    statusData.error || 'API is not connected.',
-                    statusData.error_type,
-                    statusData.action
-                );
+                if (!isRegenerate) {
+                    showApiConfigError(
+                        statusData.error || 'API is not connected.',
+                        statusData.error_type,
+                        statusData.action
+                    );
+                }
                 return;
             }
         }
     } catch (err) {
-        // Server might be unreachable - let the send attempt fail naturally
         console.error('Could not check API status:', err);
     }
 
     if (isStreaming) return;
 
-    clearInput();
+    // Only clear input if not regenerating
+    if (!isRegenerate) {
+        clearInput();
+    }
 
     // Track if we started without a chat (for lazy creation)
     const startedWithoutChat = currentChatId === null;
@@ -51,21 +61,22 @@ async function send() {
     // Create user message element
     const userWrapper = document.createElement('div');
     userWrapper.className = message.trim().startsWith('/')
-        ? 'message-wrapper user_command'
-        : 'message-wrapper user';
+    ? 'message-wrapper user_command'
+    : 'message-wrapper user';
     userWrapper.classList.add('animate-in');
     userWrapper.setAttribute('role', 'article');
     userWrapper.dataset.index = 'pending';
 
     const userMsgDiv = document.createElement('div');
     userMsgDiv.className = message.trim().startsWith('/')
-        ? 'message user_command'
-        : 'message user';
+    ? 'message user_command'
+    : 'message user';
 
     if (message.trim().startsWith('/')) {
         userMsgDiv.innerHTML = `<pre>${escapeHtml(message)}</pre>`;
     } else {
-        userMsgDiv.innerHTML = renderMarkdown(message);
+        // Use renderContentBody for multi-modal content support
+        userMsgDiv.innerHTML = renderContentBody(rawContent);
         highlightCode(userMsgDiv);
     }
 
@@ -106,8 +117,9 @@ async function send() {
         const response = await fetch('/stream', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({role: "user", content: message }),
-            signal: currentController.signal
+            // Use raw content to preserve multi-modal structure
+            body: JSON.stringify({ role: "user", content: rawContent }),
+                                     signal: currentController.signal
         });
 
         // Handle server errors (not API errors)

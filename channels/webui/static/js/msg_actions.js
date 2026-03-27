@@ -101,3 +101,69 @@ async function deleteMessage(index) {
         console.error('Failed to delete message:', err);
     }
 }
+
+async function regenerateMessage(aiIndex) {
+    // Validate index
+    if (typeof aiIndex !== 'number' || aiIndex < 0) {
+        console.error('Invalid index for regeneration');
+        return;
+    }
+
+    if (isStreaming) {
+        console.log('Cannot regenerate while streaming');
+        return;
+    }
+
+    try {
+        // Get current messages
+        const response = await fetch('/messages');
+        const data = await response.json();
+        const messages = data.messages;
+
+        if (aiIndex >= messages.length) {
+            console.error('Invalid index for regeneration');
+            return;
+        }
+
+        // Verify this is an assistant message
+        if (messages[aiIndex].role !== 'assistant') {
+            console.error('Can only regenerate assistant messages');
+            return;
+        }
+
+        // Find the user message before this AI message
+        let userMsgIndex = aiIndex - 1;
+        while (userMsgIndex >= 0 && messages[userMsgIndex].role !== 'user') {
+            userMsgIndex--;
+        }
+
+        if (userMsgIndex < 0) {
+            console.error('No user message found before this AI message');
+            return;
+        }
+
+        const userMsg = messages[userMsgIndex];
+
+        // Delete from the user message onwards
+        const deleteResponse = await fetch('/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ index: userMsgIndex })
+        });
+
+        if (!deleteResponse.ok) {
+            console.error('Failed to delete messages for regeneration');
+            return;
+        }
+
+        // Sync to update UI
+        await syncMessages();
+
+        // Re-send the user message to generate new response
+        await send(userMsg.content);
+
+    } catch (err) {
+        console.error('Failed to regenerate message:', err);
+    }
+}
+

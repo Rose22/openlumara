@@ -344,6 +344,17 @@ function createActionButtons(role, index, content, disabled = false) {
         actions.appendChild(editBtn);
     }
 
+    if (role === 'assistant') {
+        const regenBtn = document.createElement('button');
+        regenBtn.className = 'message-action-btn regenerate';
+        regenBtn.innerHTML = ICONS.regenerate;
+        regenBtn.setAttribute('aria-label', 'Regenerate response');
+        regenBtn.setAttribute('title', 'Regenerate');
+        regenBtn.disabled = disabled;
+        regenBtn.onclick = () => regenerateMessage(index);
+        actions.appendChild(regenBtn);
+    }
+
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'message-action-btn delete';
     deleteBtn.innerHTML = ICONS.trash;
@@ -355,6 +366,7 @@ function createActionButtons(role, index, content, disabled = false) {
 
     return actions;
 }
+
 
 function escapeHtml(text) {
     const div = document.createElement('div');
