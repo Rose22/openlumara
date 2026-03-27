@@ -804,18 +804,19 @@ def new_chat():
 
     data = request.get_json() or {}
     title = data.get('title', '')
+    category = data.get('category', '')  # Accept category from frontend
 
-    _run_async(channel_instance.context.chat.new(title))
+    _run_async(channel_instance.context.chat.new(title=title, category=category))
 
     return jsonify({
         'success': True,
         'chat': {
             'id': _run_async(channel_instance.context.chat.get_id()),
             'title': title,
+            'category': category,
             'messages': []
         }
     })
-
 @app.route("/chat/clear", methods=["POST"])
 def clear_chat():
     global channel_instance
