@@ -315,17 +315,12 @@ function createActionButtons(role, index, content, disabled = false) {
     const actions = document.createElement('div');
     actions.className = 'message-actions';
 
-    // Check global streaming state
-    const isCurrentlyStreaming = typeof isStreaming !== 'undefined' && isStreaming;
-    const disableActions = disabled || isCurrentlyStreaming;
-
-    // 1. COPY BUTTON (Always enabled)
     const copyBtn = document.createElement('button');
-    copyBtn.className = 'message-action-btn copy-btn'; // Added specific class
+    copyBtn.className = 'message-action-btn';
     copyBtn.innerHTML = ICONS.copy;
     copyBtn.setAttribute('aria-label', 'Copy message');
     copyBtn.setAttribute('title', 'Copy');
-    copyBtn.disabled = false; // Never disable copy
+    copyBtn.disabled = disabled;
     copyBtn.onclick = () => {
         navigator.clipboard.writeText(content).then(() => {
             copyBtn.innerHTML = ICONS.check;
@@ -338,61 +333,38 @@ function createActionButtons(role, index, content, disabled = false) {
     };
     actions.appendChild(copyBtn);
 
-    // 2. EDIT BUTTON (Disabled while streaming)
     if (role === 'user') {
         const editBtn = document.createElement('button');
         editBtn.className = 'message-action-btn';
         editBtn.innerHTML = ICONS.edit;
         editBtn.setAttribute('aria-label', 'Edit message');
         editBtn.setAttribute('title', 'Edit');
-        editBtn.disabled = disableActions;
+        editBtn.disabled = disabled;
         editBtn.onclick = () => editMessage(index, content);
         actions.appendChild(editBtn);
     }
 
-    // 3. REGENERATE BUTTON (Disabled while streaming)
     if (role === 'assistant') {
         const regenBtn = document.createElement('button');
         regenBtn.className = 'message-action-btn regenerate';
         regenBtn.innerHTML = ICONS.regenerate;
         regenBtn.setAttribute('aria-label', 'Regenerate response');
         regenBtn.setAttribute('title', 'Regenerate');
-        regenBtn.disabled = disableActions;
+        regenBtn.disabled = disabled;
         regenBtn.onclick = () => regenerateMessage(index);
         actions.appendChild(regenBtn);
     }
 
-    // 4. DELETE BUTTON (Disabled while streaming)
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'message-action-btn delete';
     deleteBtn.innerHTML = ICONS.trash;
     deleteBtn.setAttribute('aria-label', 'Delete message');
     deleteBtn.setAttribute('title', 'Delete');
-    deleteBtn.disabled = disableActions;
+    deleteBtn.disabled = disabled;
     deleteBtn.onclick = () => deleteMessage(index);
     actions.appendChild(deleteBtn);
 
     return actions;
-}
-
-/**
- * Toggles the disabled state of action buttons for all existing messages.
- * Copy buttons remain enabled. Edit/Regenerate/Delete are toggled.
- */
-function setMessageButtonsDisabled(disabled) {
-    // Select all action buttons inside the chat
-    const buttons = chat.querySelectorAll('.message-action-btn');
-
-    buttons.forEach(btn => {
-        // Skip copy buttons - we want them always enabled
-        if (btn.classList.contains('copy-btn')) {
-            btn.disabled = false;
-            return;
-        }
-
-        // Set disabled state for Edit, Regenerate, Delete
-        btn.disabled = disabled;
-    });
 }
 
 
