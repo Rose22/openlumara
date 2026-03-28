@@ -887,3 +887,10 @@
     color: var(--text-primary);
     border-color: var(--accent-primary);
 }
+
+/* Storage Editor Mobile Visibility */
+@media (max-width: 768px) {
+    button[onclick="showStorageEditor()"] {
+        display: none !important;
+    }
+}

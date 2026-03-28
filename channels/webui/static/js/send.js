@@ -433,7 +433,10 @@ function updateStreamingContent(msgDiv, content, reasoning) {
 
     // Add reasoning block if present (collapsed during streaming)
     if (reasoning) {
-        html += renderReasoningBlock(reasoning, false);
+        // Check if 'expanded by default' is enabled (defaults to false/collapsed)
+        const expandByDefault = localStorage.getItem('reasoningExpandedByDefault') === 'true';
+        isCollapsed = !expandByDefault;
+        html += renderReasoningBlock(reasoning, isCollapsed);
     }
 
     // Add main content

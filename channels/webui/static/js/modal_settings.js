@@ -1903,6 +1903,49 @@ function createThemeSection() {
 
     wrapper.appendChild(fontSizeContainer);
 
+    // Reasoning Blocks Toggle
+    const savedReasoningCollapsed = localStorage.getItem('reasoningCollapsedByDefault');
+    const reasoningExpandedByDefault = localStorage.getItem('reasoningExpandedByDefault') === 'true';
+    const reasoningLabel = document.createElement('h4');
+    reasoningLabel.textContent = 'Reasoning Blocks';
+    reasoningLabel.style.marginTop = '20px';
+    wrapper.appendChild(reasoningLabel);
+
+    const reasoningToggle = document.createElement('div');
+    reasoningToggle.className = 'setting-toggle-wrapper';
+
+    const reasoningCheckbox = document.createElement('input');
+    reasoningCheckbox.type = 'checkbox';
+    reasoningCheckbox.id = 'reasoning-expanded-checkbox';
+    reasoningCheckbox.checked = reasoningExpandedByDefault; // ON = Expanded
+
+    const reasoningSwitch = document.createElement('label');
+    reasoningSwitch.className = 'toggle-switch';
+    reasoningSwitch.appendChild(reasoningCheckbox);
+
+    const reasoningSlider = document.createElement('span');
+    reasoningSlider.className = 'toggle-slider';
+    reasoningSwitch.appendChild(reasoningSlider);
+
+    const reasoningLabelSpan = document.createElement('span');
+    reasoningLabelSpan.className = 'setting-toggle-label';
+    reasoningLabelSpan.textContent = reasoningExpandedByDefault ? 'Expanded by default' : 'Collapsed by default';
+
+    reasoningCheckbox.addEventListener('change', function() {
+        const isExpanded = this.checked;
+        localStorage.setItem('reasoningExpandedByDefault', isExpanded ? 'true' : 'false');
+        reasoningLabelSpan.textContent = isExpanded ? 'Expanded by default' : 'Collapsed by default';
+    });
+
+    reasoningToggle.appendChild(reasoningSwitch);
+    reasoningToggle.appendChild(reasoningLabelSpan);
+    wrapper.appendChild(reasoningToggle);
+
+    const reasoningDesc = document.createElement('p');
+    reasoningDesc.className = 'setting-description';
+    reasoningDesc.textContent = 'Set whether reasoning/thinking blocks appear expanded (on) or collapsed (off) by default';
+    wrapper.appendChild(reasoningDesc);
+
     // 3. Appearance Mode (Dark/Light)
     const modeToggle = document.createElement('div');
     modeToggle.className = 'theme-mode-toggle';

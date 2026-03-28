@@ -379,13 +379,18 @@ function toggleJsonTree() {
         columns.classList.toggle('tree-hidden', jsonTreeHidden);
     }
 
-    // Update button icon
+    // Update button icon - Maximize (expand) when visible, Minimize (contract) when hidden
     const btn = document.querySelector('.storage-json-toggle-btn');
     if (btn) {
-        btn.innerHTML = jsonTreeHidden
-        ? `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>`
-        : `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>`;
-        btn.title = jsonTreeHidden ? 'Show keys' : 'Hide keys';
+        if (jsonTreeHidden) {
+            // Tree is hidden - show "minimize/contract" icon to restore
+            btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 14 10 14 10 20"></polyline><polyline points="20 10 14 10 14 4"></polyline><line x1="14" y1="10" x2="21" y2="3"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>`;
+            btn.title = 'Show keys';
+        } else {
+            // Tree is visible - show "maximize/expand" icon to hide
+            btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>`;
+            btn.title = 'Hide keys';
+        }
     }
 }
 
@@ -521,10 +526,10 @@ function showInJsonEditor(value, key) {
     const typeInfo = getValueTypeInfo(value);
     const keyLabel = key !== null ? escapeHtml(String(key)) : 'value';
 
-    // Toggle button icon based on state
+    // Icons: Maximize (arrows to corners) when tree visible, Minimize (arrows inward) when tree hidden
     const toggleIcon = jsonTreeHidden
-    ? `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>`
-    : `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>`;
+    ? `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 14 10 14 10 20"></polyline><polyline points="20 10 14 10 14 4"></polyline><line x1="14" y1="10" x2="21" y2="3"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>`
+    : `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>`;
 
     let html = `
     <div class="storage-json-editor-header">
