@@ -69,9 +69,11 @@ def reload_config():
 
 
 default_config = {
+    "data_dir": "data",
     "api": {
         "url": "http://localhost:5001/v1",
         "key": "KEY_HERE",
+        "insecure_skip_tls_verify": False,
         "max_context": 8192,
         "max_messages": 200
     },

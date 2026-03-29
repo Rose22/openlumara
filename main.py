@@ -19,17 +19,26 @@ import subprocess
 
 # Parse CLI arguments BEFORE importing core
 parser = argparse.ArgumentParser(description="OptiClaw - Modular AI Agent Framework")
-parser.add_argument("--data-dir", type=str, default=None, help="Path to data directory (default: ./data)")
+parser.add_argument("--data-dir", type=str, default=None, help="Path to data directory (precedence: CLI arg > config data_dir > ./data)")
 parser.add_argument("--config", type=str, default=None, help="Path to config.yml file (default: ./config/config.yml)")
 args = parser.parse_args()
 
 # Now import core and set overrides
 import core
-if args.data_dir:
-    core.set_data_path(args.data_dir)
 if args.config:
     core.set_config_path(args.config)
     core.config.reload_config()  # Re-initialize config with the new path
+
+# Data directory precedence:
+# 1) --data-dir argument
+# 2) config.yml value: data_dir
+# 3) default core.get_path("data")
+if args.data_dir:
+    core.set_data_path(args.data_dir)
+else:
+    configured_data_dir = core.config.get("data_dir")
+    if configured_data_dir:
+        core.set_data_path(configured_data_dir)
 
 async def main():
     # the manager class connects everything together

@@ -42,11 +42,14 @@ class APIClient():
         self._connection_attempts += 1
 
         api_config = core.config.get("api")
+        insecure_skip_tls_verify = api_config.get("insecure_skip_tls_verify", False)
 
         # initialize connection to the API
         try:
-            # Intentionally disable TLS verification to allow self-signed certs and hostname mismatches.
-            self._http_client = httpx.AsyncClient(verify=False)
+            # Allow opting out of TLS validation for self-signed certs or hostname mismatches.
+            self._http_client = httpx.AsyncClient(verify=(not insecure_skip_tls_verify))
+            if insecure_skip_tls_verify:
+                core.log("API", "WARNING: TLS certificate and hostname verification are disabled")
             self._AI = openai.AsyncOpenAI(
                 base_url=api_config.get("url"),
                 api_key=api_config.get("key"),
