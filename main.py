@@ -13,9 +13,23 @@
 
 import os
 import sys
+import argparse
 import asyncio
-import core
 import subprocess
+
+# Parse CLI arguments BEFORE importing core
+parser = argparse.ArgumentParser(description="OptiClaw - Modular AI Agent Framework")
+parser.add_argument("--data-dir", type=str, default=None, help="Path to data directory (default: ./data)")
+parser.add_argument("--config", type=str, default=None, help="Path to config.yml file (default: ./config/config.yml)")
+args = parser.parse_args()
+
+# Now import core and set overrides
+import core
+if args.data_dir:
+    core.set_data_path(args.data_dir)
+if args.config:
+    core.set_config_path(args.config)
+    core.config.reload_config()  # Re-initialize config with the new path
 
 async def main():
     # the manager class connects everything together

@@ -10,15 +10,14 @@ class StorageList(list):
         super().__init__(*args)
 
         if not data_dir:
-            data_dir = "data"
-
-        # ensure it's relative to the opticlaw root directory
-        data_dir = core.get_path(data_dir)
+            data_dir = core.get_data_path()
+        else:
+            data_dir = core.get_path(data_dir)
 
         if not os.path.exists(data_dir):
-            os.mkdir(data_dir)
+            os.makedirs(data_dir, exist_ok=True)
 
-        self.path = core.get_path(os.path.join(data_dir, file_path))
+        self.path = os.path.join(data_dir, file_path)
         self.name = os.path.basename(self.path)
         self.binary = False
 
@@ -123,15 +122,14 @@ class StorageDict(dict):
         super().__init__(*args)
 
         if not data_dir:
-            data_dir = "data"
-
-        # ensure it's relative to the opticlaw root directory
-        data_dir = core.get_path(data_dir)
+            data_dir = core.get_data_path()
+        else:
+            data_dir = core.get_path(data_dir)
 
         if not os.path.exists(data_dir):
-            os.mkdir(data_dir)
+            os.makedirs(data_dir, exist_ok=True)
 
-        self.path = core.get_path(os.path.join(data_dir, file_path))
+        self.path = os.path.join(data_dir, file_path)
         self.name = os.path.basename(self.path)
         self.binary = False
         self.autoreload = autoreload
@@ -313,18 +311,17 @@ class StorageText:
         super().__init__(*args)
 
         if not data_dir:
-            data_dir = "data"
-
-        # ensure it's relative to the opticlaw root directory
-        data_dir = core.get_path(data_dir)
+            data_dir = core.get_data_path()
+        else:
+            data_dir = core.get_path(data_dir)
 
         if not os.path.exists(data_dir):
-            os.mkdir(data_dir)
+            os.makedirs(data_dir, exist_ok=True)
 
         self._data = ""
         self.autoreload = autoreload
 
-        self.path = core.get_path(os.path.join(data_dir, file_path))
+        self.path = os.path.join(data_dir, file_path)
         if os.path.exists(self.path):
             self.load()
         else:
