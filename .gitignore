@@ -1,0 +1,5 @@
+.vscode/*
+config/*
+data/*
+**/__pycache__/*
+
