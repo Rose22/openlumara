@@ -66,7 +66,7 @@ class Scheduler(core.module.Module):
                                     if not channel:
                                         channel = self.channel
                                     
-                                    channel.announce(final_content, "schedule")
+                                    await channel.announce(final_content, "schedule")
 
                             self.schedule.pop(self._get_index(job.get("id")))
                             self.schedule.save()
@@ -226,7 +226,6 @@ class Scheduler(core.module.Module):
     async def add_job(
         self,
         action: str,
-        channel: str = None,
         weeks: int = 0,
         days: int = 0,
         hours: int = 0,
@@ -237,7 +236,8 @@ class Scheduler(core.module.Module):
         target_second: int = 0,
         target_weekday: int | None = None,
         weekdays_only: bool = False,
-        recurring: bool = False
+        recurring: bool = False,
+        channel: str = None,
     ):
         """
         Adds a scheduled job to the scheduler.
