@@ -249,6 +249,9 @@ class Commands:
                                 if isinstance(module_inst, registered_cls):
                                     # Bind the method to the instance and call it
                                     bound_method = method.__get__(module_inst, registered_cls)
-                                    return await bound_method(cmd[1:])
+                                    try:
+                                        return await bound_method(cmd[1:])
+                                    except Exception as e:
+                                        return f"error while executing command: {e}"
 
-                return await self._get_help()
+                return "that's not a valid command!"

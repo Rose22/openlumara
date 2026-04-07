@@ -36,7 +36,6 @@ default_config = {
                 "homeserver": "https://matrix.org",
                 "user_id": "@your_bot:matrix.org",
                 "password": "your_password_here",
-                "device_id": "opticlaw-bot",
                 "device_name": "Opticlaw"
             }
         }

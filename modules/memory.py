@@ -27,10 +27,10 @@ class Memory(core.module.Module):
         pinned_memories = []
         for index, mem in enumerate(self._mem):
             if mem.get("pinned"):
-                mem_filtered = f"{mem.get("id")}: {mem.get("content")}"
+                mem_filtered = f"[ID:{mem.get("id")}]\n{mem.get("content")}"
                 pinned_memories.append(mem_filtered)
 
-        pinned_memories_str = "\n".join(pinned_memories)
+        pinned_memories_str = "\n\n".join(pinned_memories)
         sysprompt = f"{pinned_memories_str}\n\nThis is your persistent memory system. When you need to remember something, ALWAYS store it in memory using the memory_create() tool."
 
         return sysprompt

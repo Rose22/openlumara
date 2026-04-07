@@ -150,10 +150,10 @@ def load(packages, base_class, respect_config: bool = True):
 
                     discovered.append(attr)
 
-            except Exception:
+            except Exception as e:
                 # Catching Exception prevents the program from crashing on faulty modules.
                 # We simply log the warning and continue to the next module.
-                core.log("core", f"failed to load module {modname}")
+                core.log("core", f"failed to load module {modname}: {e}")
                 continue
 
     return tuple(discovered)

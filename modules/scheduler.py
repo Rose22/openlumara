@@ -227,8 +227,9 @@ class Scheduler(core.module.Module):
         for job in self.schedule:
             job_id = job.get("id")
             action = job.get("action", "")
+            chan_str = job.get("channel")
             time_str = self._format_job_time(job)
-            result.append(f"{job_id}: {time_str}: {action}")
+            result.append(f"{job_id}: {time_str} on {chan_str}: {action}")
         return "\n".join(result)
 
     def _format_job_time(self, job: dict) -> str:
