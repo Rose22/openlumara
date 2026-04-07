@@ -194,7 +194,6 @@ class Commands:
                 found = False
                 for module in modules.get_all(respect_config=False):
                     module_name = core.modules.get_name(module)
-                    print(module_name)
                     if args[0].lower().strip() == module_name:
                         found = True
 

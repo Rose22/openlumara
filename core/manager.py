@@ -90,8 +90,6 @@ class Manager:
         # run everything
         core.log("core", "startup complete")
 
-        print(repr(self.channels))
-
         if "webui" in core.config.get("channels").get("enabled"):
             host = core.config.get("channels").get("settings").get("webui").get("host")
             port = core.config.get("channels").get("settings").get("webui").get("port")
@@ -217,6 +215,13 @@ class Manager:
             return ""
 
     async def get_end_prompt(self):
+        # don't return endprompt if characters module is active
+        active_character = None
+        if self.channel:
+            active_character = await self.channel.context.chat.get_data("character")
+        if active_character:
+            return None
+
         # automatically insert system prompts returned by modules (such as memory)
         histend_prompt = []
         for module_name, module in self.modules.items():

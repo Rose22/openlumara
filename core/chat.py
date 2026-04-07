@@ -211,7 +211,6 @@ class Chat:
         if self.current is None:
             await self.new()
 
-        print(self.data[self.current]["title"])
         if not self.data[self.current]["title"].strip():
             # auto-set title
             msg_content = message.get("content", "")
