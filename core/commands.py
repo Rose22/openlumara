@@ -170,6 +170,14 @@ class Commands:
                 if status['error']:
                     lines.append(f"Last error: {status['error']}")
 
+                lines.append("")
+                lines.append("== Context Size ==")
+                context_size = await self.channel.context.get_size()
+                ctx_string = ""
+                for key, value in context_size.items():
+                    ctx_string += f"{key}: {value}\n"
+                lines.append(ctx_string)
+
                 return "\n".join(lines)
             case "modules":
                 modules_str = "\n".join(core.config.get("modules").get("enabled"))

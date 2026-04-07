@@ -277,11 +277,23 @@ async function loadChats() {
         allTags = tagsData.tags || [];
         allChats = chatData.chats || [];
 
-        // Extract Unique Categories
+        // Extract Unique Categories AND Characters
         const categories = new Set();
+
         allChats.forEach(chat => {
+            // 1. Handle Standard Categories
+            // Ignore old 'char:' categories in the main list to avoid duplicates/confusion
             if (chat.category && chat.category !== 'general') {
-                categories.add(chat.category);
+                if (!chat.category.startsWith('char:')) {
+                    categories.add(chat.category);
+                }
+            }
+
+            // 2. Handle Characters from custom_data
+            // If the chat has a character assigned, add it to the virtual 'char:' category list
+            const characterName = chat.custom_data?.character;
+            if (characterName) {
+                categories.add(`char:${characterName}`);
             }
         });
 

@@ -9,10 +9,8 @@ class Identity(core.module.Module):
 
     async def on_system_prompt(self):
         # dont use identity if the characters module is enabled and a character is currently active
-        if "characters" in core.config.get("modules").get("enabled"):
-            active_character = core.storage.StorageText("character_current")
-            if active_character.get():
-                return None
+        if await self.channel.context.chat.get_data("character"):
+            return None
 
         identity = self.identity[0] if len(self.identity) > 0 else None
         sysprompt = None

@@ -173,6 +173,10 @@ class Manager:
         nonagentic_modules = ("characters", "time")
         system_prompt = []
 
+        active_character = None
+        if self.channel:
+            active_character = await self.channel.context.chat.get_data("character")
+
         # automatically insert system prompts returned by modules (such as memory)
         sysprompt_top = []
         sysprompt_middle = []
@@ -180,6 +184,10 @@ class Manager:
         for module_name, module in self.modules.items():
             if not core.config.get("model").get("use_tools", False) and module_name not in nonagentic_modules:
                 # skip most prompts if tools are turned off
+                continue
+
+            if active_character and module_name != "characters":
+                # if a character is currently active, display ONLY the character system prompt
                 continue
 
             module_sysprompt = await module.on_system_prompt()

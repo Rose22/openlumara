@@ -5,6 +5,10 @@ class Channel(core.module.Module):
         if not self.channel:
             return None
 
+        if await self.channel.context.chat.get_data("character"):
+            # don't add this to the system prompt if a character from the character module is active
+            return None
+
         chan = core.module.get_name(self.channel)
         chan_instr = None
         match chan:

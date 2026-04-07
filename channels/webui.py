@@ -665,6 +665,7 @@ def list_chats():
             'title': conv.get('title', ''),
             'category': conv.get('category', ''),
             'tags': conv.get('tags', []),
+            'custom_data': conv.get('custom_data', {}),
             'created': conv.get('created'),
             'updated': conv.get('updated'),
             'message_count': len(conv.get('messages', [])),
@@ -695,6 +696,7 @@ def load_chat():
     loaded_id = _run_async(channel_instance.context.chat.get_id())
     category = _run_async(channel_instance.context.chat.get_category())
     tags = _run_async(channel_instance.context.chat.get_tags()) or []
+    custom_data = _run_async(channel_instance.context.chat.get_data())
 
     # Add index to each message
     result = []
@@ -716,6 +718,7 @@ def load_chat():
             'title': title,
             "category": category,
             'tags': tags,
+            'custom_data': custom_data,
             'messages': result,
             'total': len(result)
         }
@@ -743,6 +746,7 @@ def get_current_chat():
     title = _run_async(chat.get_title())
     tags = _run_async(chat.get_tags()) or []
     category = _run_async(channel_instance.context.chat.get_category())
+    custom_data = _run_async(channel_instance.context.chat.get_data())
 
     # Add index to each message
     result = []
@@ -764,6 +768,7 @@ def get_current_chat():
             'title': title or 'New chat',
             'category': category or 'general',
             'tags': tags,
+            'custom_data': custom_data,
             'messages': result,
             'total': len(result)
         }

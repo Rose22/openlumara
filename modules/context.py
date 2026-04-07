@@ -18,9 +18,6 @@ class Context(core.module.Module):
         if disabled_prompts:
             sysprompt += "\n\n=== disabled prompts ===\n"
             sysprompt += "\n".join([mod_name for mod_name in disabled_prompts])
-        endprompt = await self.channel.manager.get_end_prompt()
-        if endprompt:
-            sysprompt += f"\n\n=== end prompts ===\n{endprompt}"
 
         return sysprompt if sysprompt else "BLANK"
 
