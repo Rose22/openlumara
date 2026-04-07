@@ -1,3 +1,4 @@
+
 import datetime
 import asyncio
 import core
@@ -61,7 +62,11 @@ class Scheduler(core.module.Module):
                                         assistant_msg["reasoning_content"] = response["reasoning"]
 
                                 if final_content:
-                                    await self.channel.announce(final_content, "schedule")
+                                    channel = self.manager.channels.get(job.get("channel"))
+                                    if not channel:
+                                        channel = self.channel
+                                    
+                                    channel.announce(final_content, "schedule")
 
                             self.schedule.pop(self._get_index(job.get("id")))
                             self.schedule.save()
@@ -221,6 +226,7 @@ class Scheduler(core.module.Module):
     async def add_job(
         self,
         action: str,
+        channel: str = None,
         weeks: int = 0,
         days: int = 0,
         hours: int = 0,
@@ -258,6 +264,8 @@ class Scheduler(core.module.Module):
 
         If the job is a reminder to the user, start with "Remind user to".
         If the job is a task for you (the AI assistant) to perform, start with "You must"
+        
+        Channel defaults to the current channel by default. ONLY provide a different channel name if user explicitely asks for it! Ex. "remind me on telegram every day at 10am to do my morning routine"
         """
 
         try:
@@ -282,6 +290,7 @@ class Scheduler(core.module.Module):
             sched = {
                 "id": str(ulid.ULID()),
                 "action": action,
+                "channel": channel or self.channel.name,
                 "trigger_time": trigger_time.isoformat(),
                 "recurring": recurring,
                 "recurs_in": recur if recurring else None
