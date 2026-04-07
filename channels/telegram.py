@@ -25,7 +25,20 @@ class Telegram(core.channel.Channel):
                 pass
 
         self.app = None
+
+        # Initialize StorageText to handle the authorized chat ID
+        self.auth_storage = core.storage.StorageText("telegram_chat_id")
+
+        # Load the stored chat ID from disk
+        stored_id = self.auth_storage.get()
         self.authorized_chat_id = None
+        if stored_id and stored_id.strip():
+            try:
+                self.authorized_chat_id = int(stored_id)
+                core.log("telegram", f"Restored authorized chat ID: {self.authorized_chat_id}")
+            except ValueError:
+                core.log("telegram", "Failed to parse stored chat ID.")
+
         self._shutting_down = False
 
     async def run(self):
@@ -75,6 +88,9 @@ class Telegram(core.channel.Channel):
 
         if self.authorized_chat_id is None:
             self.authorized_chat_id = chat_id
+            # Save the new authorized chat ID to disk
+            self.auth_storage.set(str(chat_id))
+
             await update.message.reply_text(
                 "✅ Session started.\n"
             )
@@ -138,6 +154,8 @@ class Telegram(core.channel.Channel):
 
         if not self.authorized_chat_id:
             self.authorized_chat_id = chat_id
+            # Save the authorized chat ID to disk if set here
+            self.auth_storage.set(str(chat_id))
 
         user_msg = update.message.text.strip()
 
@@ -251,5 +269,5 @@ class Telegram(core.channel.Channel):
             }
             emoji = emoji_map.get(type, "🔔")
             safe_msg = message.replace("*", "").replace("_", "")
-            text = f"{emoji} *{type.upper()}*: {safe_msg}"
+            text = f"{emoji} *{type.upper()}:* {safe_msg}"
             asyncio.create_task(self._send_telegram_message(text))

@@ -90,6 +90,8 @@ class Manager:
         # run everything
         core.log("core", "startup complete")
 
+        print(repr(self.channels))
+
         if "webui" in core.config.get("channels").get("enabled"):
             host = core.config.get("channels").get("settings").get("webui").get("host")
             port = core.config.get("channels").get("settings").get("webui").get("port")
