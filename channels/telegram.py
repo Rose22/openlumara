@@ -65,7 +65,7 @@ class Telegram(core.channel.Channel):
             await self.app.shutdown()
 
     def shutdown(self):
-        self._announce("Shutting down Telegram channel...", "status")
+        await self.announce("Shutting down Telegram channel...", "status")
         self.running = False
         self._shutting_down = True
         return True
