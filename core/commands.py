@@ -254,4 +254,4 @@ class Commands:
                                     except Exception as e:
                                         return f"error while executing command: {e}"
 
-                return "that's not a valid command!"
+                return "no such command! check /help"
