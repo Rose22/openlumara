@@ -59,9 +59,17 @@ class Scheduler(core.module.Module):
         try:
             await self._execute_job(job)
 
+            # Check if the job still exists in storage before rescheduling.
+            # If remove_job was called during execution, this index will be -1.
+            if self._get_index(job_id) == -1:
+                return
+
             if job.get("recurring"):
-                # Update the existing job in place and reschedule
-                self._reschedule_job(job)
+                # Refresh job data from storage to catch any edits made during execution
+                idx = self._get_index(job_id)
+                if idx >= 0:
+                    current_job = self.schedule[idx]
+                    self._reschedule_job(current_job)
             else:
                 # One-time job: remove from storage
                 self._remove_job_from_storage(job_id)
@@ -309,8 +317,7 @@ class Scheduler(core.module.Module):
             Optionally set target_weekday (0=Monday) or weekdays_only=True.
             Example: "every weekday at 9am" -> target_hour=9, weekdays_only=True, recurring=True
 
-        If the job is a reminder, start with "Remind user to".
-        Channel defaults to the current channel.
+        Action is what action should be performed at the scheduled time. This is an instruction/prompt for the AI to follow, so write this in second person form.
         """
         try:
             recur = {
@@ -349,7 +356,7 @@ class Scheduler(core.module.Module):
     async def edit_job(
         self,
         id: str,
-        action: str,
+        action: str | None = None,
         channel: str | None = None,
         weeks: int = 0, days: int = 0, hours: int = 0, minutes: int = 0, seconds: int = 0,
         target_hour: int | None = None, target_minute: int = 0, target_second: int = 0,
@@ -364,22 +371,12 @@ class Scheduler(core.module.Module):
         existing = self.schedule[index]
 
         try:
-            recur = {
-                "weeks": weeks, "days": days, "hours": hours, "minutes": minutes, "seconds": seconds,
-                "target_hour": target_hour, "target_minute": target_minute, "target_second": target_second,
-                "target_weekday": target_weekday, "weekdays_only": weekdays_only
-            }
-
-            trigger_time = self._calculate_next_trigger(recur)
-            if trigger_time is None:
-                return self.result("error: invalid schedule parameters", False)
-
             # Update in place
             updated_job = {
                 "id": id,
-                "action": action,
+                "action": action or existing.get("action"),
                 "channel": channel or existing.get("channel"),
-                "trigger_time": trigger_time.isoformat(),
+                "trigger_time": existing.get("trigger_time"),
                 "recurring": recurring,
                 "recurs_in": recur if recurring else None
             }

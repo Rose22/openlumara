@@ -54,7 +54,6 @@ default_config = {
 
 # Define defaults for auto-enabling
 DEFAULT_MODULES = (
-    "modules",
     "models",
     "channel",
     "identity",

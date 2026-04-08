@@ -35,8 +35,18 @@ Features only available while channel is WebUI:
 - User can click or tap the `filter by tag` header in the sidebar to select tags to filter by.
 - User can stop text generation by pressing the stop button, or typing /stop.
                 """.strip()
+            case "telegram":
+                chan_instr = """
+Type /help for help.
+
+Type /stop to stop the AI at any time, even while it's generating text or calling tools!
+                """.strip()
             case "discord":
-                chan_instr = "say `/help` to me for a list of commands."
+                chan_instr = """
+Type /help for help.
+
+Type /stop to stop the AI at any time, even while it's generating text or calling tools!
+                """.strip()
             case _:
                 pass
 
@@ -53,7 +63,9 @@ Features only available while channel is WebUI:
         chan_transl = {
             "cli": "Command Line Interface (CLI)",
             "webui": "WebUI",
-            "discord": "Discord"
+            "discord": "Discord",
+            "telegram": "Telegram",
+            "matrix": "Matrix"
         }
 
         chan_display = chan_transl.get(chan, chan)
