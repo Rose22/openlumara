@@ -59,17 +59,19 @@ class Client(discord.Client):
         """streams a message to discord in steps"""
         message_obj = await discord_channel.send("...")
 
-        message_content = []
+        # Buffers for the CURRENT active discord message
+        current_text_buffer = []
+        current_tool_buffer = []
+
+        # Buffer for the full response text (for return value)
+        full_response_text = []
 
         next_edit_time = datetime.datetime.now()
-        message_content_full = []
-        max_tokens_per_message = 400
-        shown_reasoning_text = False
-        shown_tool_use = False
 
-        # Buffers for visual formatting
-        tool_calls_display = []
-        response_buffer = []
+        # Discord limit is 2000, leave some room for formatting/newlines
+        MAX_CHARS = 1900
+
+        shown_reasoning_text = False
 
         async with message_obj.channel.typing():
             async for token in token_stream:
@@ -77,57 +79,81 @@ class Client(discord.Client):
                 content = token.get("content", "")
 
                 if token.get("type") == "reasoning":
-                    # reasoning would be very hard to show on discord lol
                     if not shown_reasoning_text:
                         await message_obj.edit(content="thinking..")
                         shown_reasoning_text = True
                     continue
 
-                # Handle Tool Calls: Format and store
+                # Handle Tool Calls
                 if t_type == "tool_calls":
                     if content:
                         if isinstance(content, list):
                             for tool in content:
-                                tool_calls_display.append(self._format_tool_call(tool))
+                                current_tool_buffer.append(self._format_tool_call(tool))
                         else:
-                            tool_calls_display.append(self._format_tool_call(content))
-                    if not shown_tool_use:
-                        shown_tool_use = True
+                            current_tool_buffer.append(self._format_tool_call(content))
                     continue
 
-                # Handle Content/Errors: Store text
+                # Handle Content/Errors
                 if content:
-                    response_buffer.append(content)
+                    current_text_buffer.append(content)
+                    full_response_text.append(content)
 
-                # Construct the visual message
-                tools_text = "\n".join(tool_calls_display)
-                text_part = "".join(response_buffer)
+                # Construct the visual message for the CURRENT message
+                tools_text = "\n".join(current_tool_buffer)
+                text_part = "".join(current_text_buffer)
 
-                # Add spacing if we have both tools and text
                 if tools_text and text_part:
                     visual_buffer = f"{tools_text}\n\n{text_part}"
                 else:
                     visual_buffer = tools_text + text_part
 
-                # if tokens exceed 200, add a new message to target for the edits
-                if len(message_content) >= max_tokens_per_message:
-                    message_content = []
+                # Check if we need to split
+                # We split if the current buffer exceeds the character limit
+                if len(visual_buffer) >= MAX_CHARS:
+                    # Finalize current message
+                    if visual_buffer:
+                        await message_obj.edit(content=visual_buffer)
+
+                    # Start a new message
                     message_obj = await discord_channel.send("...")
 
-                message_content.append(content)
-                message_content_full.append(content)
+                    # CLEAR the buffers for the new message so we don't repeat text
+                    current_text_buffer = []
+                    current_tool_buffer = []
 
-                # edit message every few seconds or if token limit reached
-                if datetime.datetime.now() >= next_edit_time or len(message_content) >= max_tokens_per_message:
+                    # Reset reasoning state for the new message if needed
+                    shown_reasoning_text = False
+
+                    # Update next edit time to avoid rate limits
+                    next_edit_time = datetime.datetime.now() + datetime.timedelta(seconds=1)
+
+                # Edit message periodically (throttled)
+                if datetime.datetime.now() >= next_edit_time:
+                    # Re-calculate visual buffer for the edit (it might be empty after a split)
+                    tools_text = "\n".join(current_tool_buffer)
+                    text_part = "".join(current_text_buffer)
+                    if tools_text and text_part:
+                        visual_buffer = f"{tools_text}\n\n{text_part}"
+                    else:
+                        visual_buffer = tools_text + text_part
+
                     if visual_buffer:
                         await message_obj.edit(content=visual_buffer)
                     next_edit_time = datetime.datetime.now() + datetime.timedelta(seconds=1)
 
-        if message_content:
-            await message_obj.edit(content=visual_buffer)
-            return "".join(message_content)
+        # Final edit for the last message
+        tools_text = "\n".join(current_tool_buffer)
+        text_part = "".join(current_text_buffer)
+        if tools_text and text_part:
+            visual_buffer = f"{tools_text}\n\n{text_part}"
         else:
-            return "..come again?"
+            visual_buffer = tools_text + text_part
+
+        if visual_buffer:
+            await message_obj.edit(content=visual_buffer)
+
+        return "".join(full_response_text)
 
     async def on_ready(self):
         core.log("discord", "logged in.")
@@ -155,6 +181,7 @@ class Client(discord.Client):
                         for mention in message.raw_mentions:
                            content = content.replace(str(mention), "")
                            content = content.replace("<@>", "")
+                           content = content.strip()
 
                         response_obj = self.ai_channel.send_stream({"role": "user", "content": content})
                     except Exception as e:
