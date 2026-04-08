@@ -716,15 +716,26 @@ class Matrix(core.channel.Channel):
     # ── message handling / streaming ──────────────────────────────────────
 
     async def _handle_message(self, room_id: str, message: str):
-        typing_task = asyncio.create_task(self._keep_typing(room_id))
+        """
+        Handles incoming messages, streams response, and manages typing indicator
+        so it stays on during edits and turns off only when finished.
+        """
+        # 1. Turn typing ON at the start
+        try:
+            await self.client.room_typing(room_id, True)
+        except Exception:
+            pass
 
         last_event_id: Optional[str] = None
         last_edit_time: float = 0
         tool_calls_display: list[str] = []
         response_parts: list[str] = []
+        shown_reasoning_text = False
 
         try:
             async for token in self.send_stream({"role": "user", "content": message}):
+                visual = None
+
                 t_type = token.get("type")
                 content = token.get("content", "")
 
@@ -732,20 +743,30 @@ class Matrix(core.channel.Channel):
                     tools = content if isinstance(content, list) else [content]
                     for tool in tools:
                         tool_calls_display.append(self._format_tool_call(tool))
+                elif t_type == "reasoning":
+                    if not shown_reasoning_text:
+                        visual = "thinking.."
+                        shown_reasoning_text = True
+                    else:
+                        continue
                 elif t_type in ("content", "error"):
                     response_parts.append(content)
 
                 tools_text = "\n".join(tool_calls_display)
                 body_text = "".join(response_parts)
-                if tools_text and body_text:
-                    visual = f"{tools_text}\n\n{body_text}"
-                else:
-                    visual = tools_text or body_text
+
+                if not visual:
+                    if tools_text and body_text:
+                        visual = f"{tools_text}\n\n{body_text}"
+                    else:
+                        visual = tools_text or body_text
 
                 if not visual:
                     continue
 
                 now = time.time()
+
+                # 2. Send or Edit the message
                 if last_event_id is None:
                     resp = await self._send_room_message(room_id, visual)
                     if isinstance(resp, RoomSendResponse):
@@ -755,7 +776,7 @@ class Matrix(core.channel.Channel):
                     await self._edit_room_message(room_id, last_event_id, visual)
                     last_edit_time = now
 
-            # ── final update ──────────────────────────────────────────
+            # 4. Final update (if loop finished but we have content left or need final polish)
             tools_text = "\n".join(tool_calls_display)
             body_text = "".join(response_parts)
             if tools_text and body_text:
@@ -773,10 +794,10 @@ class Matrix(core.channel.Channel):
             core.log("matrix", f"Message handling error: {e}")
             await self._send_room_message(room_id, f"❌ Error: {e}")
         finally:
-            typing_task.cancel()
+            # 5. Turn typing OFF only when completely finished
             try:
-                await typing_task
-            except asyncio.CancelledError:
+                await self.client.room_typing(room_id, False)
+            except Exception:
                 pass
 
     def _format_tool_call(self, tool_data) -> str:
