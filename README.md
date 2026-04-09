@@ -14,8 +14,8 @@ AI Disclaimer: OpenLumara's core framework (everything in the core/ folder) was 
 Features:
 - Connects to any OpenAI API-compatible backend. That includes local AI (llamacpp, ollama, koboldcpp, and so on) and many cloud AI providers.
 - Fully private and self-hosted, if you want it to be. You could also run it on a cloud server.
-- Modular. You can turn any component on or off, including what other claw clones consider core components. Shell access is just a module and is disabled by default for security. Memory, the scheduler, time-awareness, token-awareness, and so on, are all modules and can all be turned off. You can turn absolutely everything off to the point your system prompt is empty and you're just talking to the base model!
-- To turn modules on and off, you can use the `/module` command. Or, if the `modules` module is enabled (disabled by default for security), you can simply ask the AI to toggle a module for you.
+- Modular. You can turn any component on or off, including what other AI agent frameworks consider core components. Shell access is just a module and is disabled by default for security. Memory, the scheduler, time-awareness, token-awareness, and so on, are all modules and can all be turned off. You can turn absolutely everything off to the point your system prompt is empty and you're just talking to the base model!
+- To turn modules on and off, you can use the `/module` command, or edit the config file. Or, if the `modules` module is enabled (disabled by default for security), you can simply ask the AI to toggle a module for you.
 - Supports multiple communication channels. Right now that's the terminal, web UI, telegram, discord, and Matrix (with encryption support!), but i'll be adding more.
 - Scheduler system that allows you to schedule tasks for the AI to do. Like openclaw's cronjobs but written from scratch!
 - Laser focused on token efficiency. You can see how big the context window (input tokens) is at any time using `/status`, and even see exactly what's being sent using `/context`. Oh, also, your AI can see your token use too.
@@ -23,7 +23,7 @@ Features:
 - The file management module is sandboxed by default. You can unsandbox it by setting the sandbox folder (in the config) to your home folder or somewhere else you'd want it to have full access to.
 > [!CAUTION]
 > i did my best to sandbox the file management tool as deeply as i could, but that's not a guarantee that it's 100% secure. it's using a ton of layers for security, but it's not a professionally audited system. Check `modules/files.py` and judge for yourself whether you trust it with your data.
-- Optional character system module. First, enable the `character` module. Then you can add, edit and remove characters, switch between them, and set your user profile! Just ask the AI to do those things, or use the `/character` command. Can be used as a replacement to Character.AI, Janitor AI, SillyTavern, and so on.
+- Optional character system module. First, enable the `character` module. Then you can add, edit and remove characters, switch between them, and set your user profile! Just ask the AI to do those things, or use the `/character` command. Can be used as a replacement to Character.AI, Janitor AI, SillyTavern, and so on. When a character is active, it disables all other prompts, so that the system prompt is purely your character! They are tied to your current chat session, so if you have a character active in the webUI for example, it won't mess with your telegram session. And if you load a chat that had a character active, it'll auto-load it again.
 - Memory system! Works by letting the AI save memories, or having you ask it to. Also a module, so you can simply turn it off! Saves data in messagepack format, which is compact and very fast.
 - Command system that bypasses the AI completely. Lets you do things like force restart the server using `/restart` no matter what the AI is doing.
 - Modules are simple python classes with a few custom functions. Very easy to develop for! A proper plugin downloading system is coming later.
@@ -123,12 +123,13 @@ class MyModule(core.module.Module):
         """This method will be added as a background task that will run contineously in the background. Use it for things like schedulers, cronjobs, etc!"""
         return False
 
-    async def on_command(self, args: list):
+    @core.module.command("my_command", help={
+        "": "the command without any arguments",
+        "name": "perform this command on that name"
+    })
+    async def my_command(self, args: list):
         """Lets you define custom commands! The args are the string provided to the command, split into words."""
         return None
-
-    async def on_command_help(self):
-        return "/my_command         do the thing!"
 ```
 
 ## ⛔⛔⛔ THIS IS A LOBSTER-FREE ZONE ⛔⛔⛔
