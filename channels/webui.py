@@ -1,5 +1,5 @@
 """
-OptiClaw WebUI - A modern chat interface for AI interactions.
+OpenLumara WebUI - A modern chat interface for AI interactions.
 
 This module provides a Flask-based web interface that polls the backend
 for messages, treating the backend (chat.get()) as the single

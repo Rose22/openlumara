@@ -33,7 +33,7 @@ class Manager:
     async def run(self):
         """main loop"""
 
-        core.log("core", "starting opticlaw..")
+        core.log("core", "starting openlumara..")
 
         # load channels
         if not core.config.get("channels").get("enabled"):
@@ -132,7 +132,7 @@ class Manager:
         if not connected:
             error = self.API.get_last_error() or "Unknown error"
             core.log("API", f"Failed to connect: {error}")
-            core.log("API", "OptiClaw will continue in disconnected mode.")
+            core.log("API", "OpenLumara will continue in disconnected mode.")
             core.log("API", "Use the /reconnect command to retry after fixing your configuration.")
 
     async def reconnect_api(self):
