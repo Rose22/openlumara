@@ -11,12 +11,13 @@ class Channel(core.module.Module):
 
         chan = core.module.get_name(self.channel)
         chan_instr = None
-        disable_markdown = f"While in the {chan} channel, **DO NOT USE MARKDOWN**. Format every response in plaintext!"
+        style_nomarkdown = f"While in the {chan} channel, **DO NOT USE MARKDOWN**. Do not use any rich-text formatting. Do not use bold or italic text. Do not generate tables. Format every response in plaintext!"
+        style_chat = f"{chan} is a chat-style channel, so write your replies as if you're texting the user on a chat platform. No long paragraphs or essays. A few sentences at most - just simple, conversational flow."
 
         match chan:
             case "cli":
                 chan_instr = f"""
-{disable_markdown}
+{style_nomarkdown}
 
 Instructions for user:
 
@@ -47,7 +48,8 @@ Features only available while channel is WebUI:
                 """.strip()
             case "telegram":
                 chan_instr = f"""
-{disable_markdown}
+{style_nomarkdown}
+{style_chat}
 
 Instructions for user:
 
@@ -57,7 +59,7 @@ Type /stop to stop the AI at any time, even while it's generating text or callin
                 """.strip()
             case "discord":
                 chan_instr = f"""
-{disable_markdown}
+{style_chat}
 
 Instructions for user:
 
@@ -67,7 +69,8 @@ Type /stop to stop the AI at any time, even while it's generating text or callin
                 """.strip()
             case "matrix":
                 chan_instr = f"""
-{disable_markdown}
+{style_nomarkdown}
+{style_chat}
 
 Instructions for user:
 
