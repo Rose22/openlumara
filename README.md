@@ -1,6 +1,6 @@
 # OpenLumara
 
-OpenLumara is a modular, token-efficient AI agent framework written from scratch in Python. Unlike many other AI agents out there, this one is **local-first**, lightweight, modular, and very fast. The system prompt can be extremely small, as little as 1000 tokens with normal use. This makes it very well-suited for local use, but it also results in drastically reduced token use when used with public API's.
+OpenLumara is a modular, token-efficient AI agent framework written from scratch in Python. Unlike many other AI agents out there, this one is **local-first**, lightweight, modular, and very fast. The system prompt can be extremely small, as little as around 2000 tokens with normal use. This makes it very well-suited for local use, but it also results in drastically reduced token use when used with public API's.
 
 It pairs well with `llamacpp` and `koboldcpp`.
 
