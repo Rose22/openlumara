@@ -118,9 +118,10 @@ default_config = {
 
 # Define defaults for auto-enabling
 DEFAULT_MODULES = (
+    "agent_framework_awareness",
+    "identity",
     "models",
     "channel",
-    "identity",
     "chats",
     "context",
     "memory",

@@ -200,7 +200,7 @@ class Manager:
                     sysprompt_header = module._header
                 prompt_chunk = f"# {sysprompt_header}\n{str(module_sysprompt).strip()}"
 
-                if module_name in ("memory", "identity"):
+                if module_name in ("agent_framework_awareness", "identity", "memory"):
                     sysprompt_top.append(prompt_chunk)
                 elif module_name in ("time", "system"):
                     sysprompt_bottom.append(prompt_chunk)
