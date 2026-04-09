@@ -15,16 +15,15 @@ Features:
 - Connects to any OpenAI API-compatible backend. That includes local AI (llamacpp, ollama, koboldcpp, and so on) and many cloud AI providers.
 - Fully private and self-hosted, if you want it to be. You could also run it on a cloud server.
 - Modular. You can turn any component on or off, including what other claw clones consider core components. Shell access is just a module and is disabled by default for security. Memory, the scheduler, time-awareness, token-awareness, and so on, are all modules and can all be turned off. You can turn absolutely everything off to the point your system prompt is empty and you're just talking to the base model!
-- To turn modules on and off, you can either ask the AI to do it, or use the `/module` command.
-- Supports multiple communication channels. Right now that's the terminal, web UI, and discord, but i'll be adding more.
+- To turn modules on and off, you can use the `/module` command. Or, if the `modules` module is enabled (disabled by default for security), you can simply ask the AI to toggle a module for you.
+- Supports multiple communication channels. Right now that's the terminal, web UI, telegram, discord, and Matrix (with encryption support!), but i'll be adding more.
 - Scheduler system that allows you to schedule tasks for the AI to do. Like openclaw's cronjobs but written from scratch!
 - Laser focused on token efficiency. You can see how big the context window (input tokens) is at any time using `/status`, and even see exactly what's being sent using `/context`. Oh, also, your AI can see your token use too.
 - You can switch between models on the fly. The AI can see what models are available to it on your chosen API provider, and you can ask it to switch to a different model. You can also do it manually using the `/model` command, which is great if you've turned tools off.
 - The file management module is sandboxed by default. You can unsandbox it by setting the sandbox folder (in the config) to your home folder or somewhere else you'd want it to have full access to.
 > [!CAUTION]
 > i did my best to sandbox the file management tool as deeply as i could, but that's not a guarantee that it's 100% secure. it's using a ton of layers for security, but it's not a professionally audited system. Check `modules/files.py` and judge for yourself whether you trust it with your data.
-- Optional character system module. Ask the AI to enable the `character` module. You can add, edit and remove characters, switch between them, and set your user profile! Just ask the AI to do those things, or use the `/character` command. Can be used as a replacement to Character.AI, Janitor AI, SillyTavern, and so on.
-    - If your model of choice doesn't support tool calling, just use `/set tools off`, and it'll turn all the fancy agentic features off. Perfect for character roleplays because if you turn on only the character module and turn tools off, you have a pure experience where the system prompt only contains the character profile and your user profile.
+- Optional character system module. First, enable the `character` module. Then you can add, edit and remove characters, switch between them, and set your user profile! Just ask the AI to do those things, or use the `/character` command. Can be used as a replacement to Character.AI, Janitor AI, SillyTavern, and so on.
 - Memory system! Works by letting the AI save memories, or having you ask it to. Also a module, so you can simply turn it off! Saves data in messagepack format, which is compact and very fast.
 - Command system that bypasses the AI completely. Lets you do things like force restart the server using `/restart` no matter what the AI is doing.
 - Modules are simple python classes with a few custom functions. Very easy to develop for! A proper plugin downloading system is coming later.
