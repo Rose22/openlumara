@@ -240,6 +240,7 @@ class Telegram(core.channel.Channel):
                     if tools_text and text_part:
                         visual_buffer = f"{tools_text}\n\n{text_part}"
                     else:
+
                         visual_buffer = tools_text + text_part
 
                 # 4. Throttled Editing

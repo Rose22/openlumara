@@ -159,7 +159,7 @@ class Scheduler(core.module.Module):
     # Time Calculations
     # ---------------------------------------------------------
 
-    def _calculate_next_trigger(self, recur: dict) -> datetime.datetime | None:
+    def _calculate_next_trigger(self, recur: dict) -> datetime.datetime:
         """Calculates the next trigger datetime based on recurrence dict."""
         now = datetime.datetime.now()
 
@@ -287,7 +287,7 @@ class Scheduler(core.module.Module):
         days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
         return days[weekday] if 0 <= weekday < 7 else "Unknown"
 
-    async def on_system_prompt(self) -> str | None:
+    async def on_system_prompt(self) -> str:
         if self.schedule:
             return f"Your scheduler system will trigger these events at the specified times:\n{self}"
         return None
@@ -299,10 +299,10 @@ class Scheduler(core.module.Module):
     async def add_job(
         self,
         action: str,
-        channel: str | None = None,
+        channel: str = None,
         weeks: int = 0, days: int = 0, hours: int = 0, minutes: int = 0, seconds: int = 0,
-        target_hour: int | None = None, target_minute: int = 0, target_second: int = 0,
-        target_weekday: int | None = None, weekdays_only: bool = False,
+        target_hour: int = None, target_minute: int = 0, target_second: int = 0,
+        target_weekday: int = None, weekdays_only: bool = False,
         recurring: bool = False,
     ):
         """
@@ -356,11 +356,11 @@ class Scheduler(core.module.Module):
     async def edit_job(
         self,
         id: str,
-        action: str | None = None,
-        channel: str | None = None,
+        action: str = None,
+        channel: str = None,
         weeks: int = 0, days: int = 0, hours: int = 0, minutes: int = 0, seconds: int = 0,
-        target_hour: int | None = None, target_minute: int = 0, target_second: int = 0,
-        target_weekday: int | None = None, weekdays_only: bool = False,
+        target_hour: int = None, target_minute: int = 0, target_second: int = 0,
+        target_weekday: int = None, weekdays_only: bool = False,
         recurring: bool = False
     ):
         """Edits an existing job by ID."""
@@ -371,14 +371,21 @@ class Scheduler(core.module.Module):
         existing = self.schedule[index]
 
         try:
+            existing_recur = existing.get("recurs_in", {})
+            recur = {
+                "weeks": weeks or existing_recur.get("weeks", 0), "days": days or existing_recur.get("days", 0), "hours": hours or existing_recur.get("hours", 0), "minutes": minutes or existing_recur.get("minutes", 0), "seconds": seconds or existing_recur.get("seconds", 0),
+                "target_hour": target_hour or existing_recur.get("target_hour"), "target_minute": target_minute or existing_recur.get("target_minute", 0), "target_second": target_second or existing_recur.get("target_second", 0),
+                "target_weekday": target_weekday or existing_recur.get("target_weekday"), "weekdays_only": weekdays_only or existing_recur.get("weekdays_only", False)
+            }
+
             # Update in place
             updated_job = {
                 "id": id,
                 "action": action or existing.get("action"),
                 "channel": channel or existing.get("channel"),
                 "trigger_time": existing.get("trigger_time"),
-                "recurring": recurring,
-                "recurs_in": recur if recurring else None
+                "recurring": recurring or existing.get("recurring"),
+                "recurs_in": recur if (recurring or existing.get("recurring")) else None
             }
 
             self.schedule[index] = updated_job
