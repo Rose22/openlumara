@@ -37,6 +37,7 @@ Features only available while channel is WebUI:
                 """.strip()
             case "telegram":
                 chan_instr = """
+While on Telegram, **DO NOT USE MARKDOWN**. Format every response in plaintext!
 Type /help for help.
 
 Type /stop to stop the AI at any time, even while it's generating text or calling tools!
