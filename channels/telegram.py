@@ -12,6 +12,9 @@ class Telegram(core.channel.Channel):
     """
     A Telegram channel with live streaming, command pass-through,
     and pretty-printed tool call visualization.
+
+    Commands are processed immediately to allow /stop to interrupt streams.
+    Normal messages are queued to ensure sequential processing.
     """
     running = False
 
@@ -25,8 +28,25 @@ class Telegram(core.channel.Channel):
                 pass
 
         self.app = None
+
+        # Initialize StorageText to handle the authorized chat ID
+        self.auth_storage = core.storage.StorageText("telegram_chat_id")
+
+        # Load the stored chat ID from disk
+        stored_id = self.auth_storage.get()
         self.authorized_chat_id = None
+        if stored_id and stored_id.strip():
+            try:
+                self.authorized_chat_id = int(stored_id)
+                core.log("telegram", f"Restored authorized chat ID: {self.authorized_chat_id}")
+            except ValueError:
+                core.log("telegram", "Failed to parse stored chat ID.")
+
         self._shutting_down = False
+
+        # Queue for sequential processing of standard messages
+        self.message_queue = asyncio.Queue()
+        self.queue_task = None
 
     async def run(self):
         if not self.token:
@@ -43,6 +63,10 @@ class Telegram(core.channel.Channel):
             await self.app.updater.start_polling(drop_pending_updates=True)
 
             self.running = True
+
+            # Start the queue processor worker
+            self.queue_task = asyncio.create_task(self._process_queue_worker())
+
             await self._announce("Telegram channel connected.", "status")
 
             while self.running and not self._shutting_down:
@@ -52,6 +76,9 @@ class Telegram(core.channel.Channel):
             core.log("telegram", f"Critical Error: {str(e)}")
             return False
         finally:
+            # Clean up the queue task
+            if self.queue_task:
+                self.queue_task.cancel()
             await self._cleanup()
 
         return True
@@ -64,8 +91,8 @@ class Telegram(core.channel.Channel):
                 await self.app.stop()
             await self.app.shutdown()
 
-    def shutdown(self):
-        self._announce("Shutting down Telegram channel...", "status")
+    async def shutdown(self):
+        await self.announce("Shutting down Telegram channel...", "status")
         self.running = False
         self._shutting_down = True
         return True
@@ -75,31 +102,24 @@ class Telegram(core.channel.Channel):
 
         if self.authorized_chat_id is None:
             self.authorized_chat_id = chat_id
-            await update.message.reply_text(
-                "✅ Session started.\n"
-            )
+            self.auth_storage.set(str(chat_id))
+            await update.message.reply_text("✅ Session started.\n")
             core.log("telegram", f"Authorized chat ID: {chat_id}")
         elif self.authorized_chat_id != chat_id:
             await update.message.reply_text("⚠️ This bot is already in use.")
 
     def _format_tool_call(self, tool_data):
-        """
-        Parses raw tool call data into a friendly string.
-        Example: 🔧 scheduler_add_job(action="Remind user...", seconds=5)
-        """
+        # (Formatting logic remains the same)
         try:
-            # Handle OpenAI style pydantic objects
             if hasattr(tool_data, 'function'):
                 func_name = getattr(tool_data.function, 'name', 'unknown')
                 raw_args = getattr(tool_data.function, 'arguments', '{}')
-            # Handle dictionary style
             elif isinstance(tool_data, dict) and 'function' in tool_data:
                 func_name = tool_data['function'].get('name', 'unknown')
                 raw_args = tool_data['function'].get('arguments', '{}')
             else:
                 return "🔧 Calling tool..."
 
-            # Parse arguments safely using json_repair
             if isinstance(raw_args, str):
                 try:
                     args_dict = json_repair.loads(raw_args)
@@ -110,25 +130,25 @@ class Telegram(core.channel.Channel):
             else:
                 args_dict = {}
 
-            # Build arg string: key="value", key2="value2"
             arg_strs = []
             for k, v in args_dict.items():
                 v_str = str(v)
-                # Truncate long values
                 if len(v_str) > 30:
                     v_str = v_str[:30] + ".."
-                # Escape quotes for display
                 v_str = v_str.replace('"', "'")
                 arg_strs.append(f'{k}="{v_str}"')
 
-            args_display = ", ".join(arg_strs)
-            return f"🔧 {func_name}({args_display})"
-
+            return f"🔧 {func_name}({', '.join(arg_strs)})"
         except Exception as e:
             core.log("telegram", f"Error formatting tool call: {e}")
             return "🔧 Calling tool..."
 
     async def _tg_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """
+        Routes incoming messages:
+        - Commands (/stop, /help) -> Process immediately (concurrently).
+        - Normal text -> Add to queue (sequentially).
+        """
         if not update.message or not update.message.text:
             return
 
@@ -138,7 +158,46 @@ class Telegram(core.channel.Channel):
 
         if not self.authorized_chat_id:
             self.authorized_chat_id = chat_id
+            self.auth_storage.set(str(chat_id))
 
+        text = update.message.text.strip()
+        cmd_prefix = core.config.get("cmd_prefix", "/")
+
+        # Check if it is a command
+        if text.startswith(cmd_prefix):
+            # Execute commands immediately in a separate task to allow interruption
+            # This allows /stop to cancel an ongoing stream processed by the queue worker
+            asyncio.create_task(self._process_stream(update, context))
+        else:
+            # Queue normal messages for sequential processing
+            await self.message_queue.put((update, context))
+
+    async def _process_queue_worker(self):
+        """
+        Worker that processes messages from the queue one by one.
+        This ensures normal messages don't overlap.
+        """
+        while self.running and not self._shutting_down:
+            try:
+                # Wait for a message from the queue
+                update, context = await self.message_queue.get()
+
+                # Process the message (this waits for the stream to finish)
+                await self._process_stream(update, context)
+
+                # Mark the task as done
+                self.message_queue.task_done()
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                core.log("telegram", f"Queue worker error: {e}")
+                await asyncio.sleep(1) # Prevent tight loop on error
+
+    async def _process_stream(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """
+        Contains the logic for streaming AI responses to the user.
+        """
+        chat_id = update.effective_chat.id
         user_msg = update.message.text.strip()
 
         # 1. Start Typing Indicator
@@ -146,18 +205,17 @@ class Telegram(core.channel.Channel):
 
         message = None
         last_edit_time = 0
-
-        # Buffers for visual formatting
-        tool_calls_display = [] # Stores "🔧 func()" strings
-        response_buffer = []    # Stores normal text tokens
+        tool_calls_display = []
+        response_buffer = []
+        shown_reasoning_text = False
 
         try:
             # 2. Consume the stream
             async for token in self.send_stream({"role": "user", "content": user_msg}):
                 t_type = token.get("type")
                 content = token.get("content", "")
+                visual_buffer = None
 
-                # Handle Tool Calls: Format and store
                 if t_type == "tool_calls":
                     if content:
                         if isinstance(content, list):
@@ -165,21 +223,24 @@ class Telegram(core.channel.Channel):
                                 tool_calls_display.append(self._format_tool_call(tool))
                         else:
                             tool_calls_display.append(self._format_tool_call(content))
-
-                # Handle Content/Errors: Store text
+                elif t_type == "reasoning":
+                    if not shown_reasoning_text:
+                        visual_buffer = "thinking.."
+                        shown_reasoning_text = True
+                    else:
+                        continue
                 elif t_type in ["content", "error"]:
                     response_buffer.append(content)
 
                 # 3. Construct the visual message
-                # Combine tools + text for the Telegram preview
                 tools_text = "\n".join(tool_calls_display)
                 text_part = "".join(response_buffer)
 
-                # Add spacing if we have both tools and text
-                if tools_text and text_part:
-                    visual_buffer = f"{tools_text}\n\n{text_part}"
-                else:
-                    visual_buffer = tools_text + text_part
+                if not visual_buffer:
+                    if tools_text and text_part:
+                        visual_buffer = f"{tools_text}\n\n{text_part}"
+                    else:
+                        visual_buffer = tools_text + text_part
 
                 # 4. Throttled Editing
                 now = time.time()
@@ -194,14 +255,7 @@ class Telegram(core.channel.Channel):
                         except BadRequest:
                             pass
 
-            # 5. Stop Typing & Finalize
-            typing_task.cancel()
-            try:
-                await typing_task
-            except asyncio.CancelledError:
-                pass
-
-            # Final clean edit
+            # 5. Finalize
             if message:
                 try:
                     await message.edit_text(visual_buffer[:4000])
@@ -210,10 +264,18 @@ class Telegram(core.channel.Channel):
                 await context.bot.send_message(chat_id, visual_buffer)
 
         except Exception as e:
+            core.log("telegram", f"Error processing stream: {e}")
+            try:
+                await context.bot.send_message(chat_id, f"❌ Error: {str(e)}")
+            except:
+                pass
+        finally:
             if not typing_task.done():
                 typing_task.cancel()
-            core.log("telegram", f"Error processing stream: {e}")
-            await context.bot.send_message(chat_id, f"❌ Error: {str(e)}")
+                try:
+                    await typing_task
+                except asyncio.CancelledError:
+                    pass
 
     async def _keep_typing(self, chat_id: int):
         try:
@@ -251,5 +313,5 @@ class Telegram(core.channel.Channel):
             }
             emoji = emoji_map.get(type, "🔔")
             safe_msg = message.replace("*", "").replace("_", "")
-            text = f"{emoji} *{type.upper()}*: {safe_msg}"
+            text = f"{emoji} *{type.upper()}:* {safe_msg}"
             asyncio.create_task(self._send_telegram_message(text))

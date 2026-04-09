@@ -3,26 +3,40 @@ import core
 class Context(core.module.Module):
     """Helps you manage your context window"""
 
-    @core.module.command("sysprompt", temporary=True)
-    async def show_sysprompt(self, args):
+    @core.module.command("prompt", temporary=True, help={
+        "": "shows the entire system prompt being sent to the AI",
+        "<module name>": "shows a module's system prompt part"
+    })
+    async def show_sysprompt(self, args: list):
         """shows only the system prompt"""
 
         if not core.config.get("api").get("context_window", True):
             return "CONTEXT DISABLED"
 
-        _sysprompt = await self.channel.manager.get_system_prompt()
-        if not _sysprompt:
-            _sysprompt = "BLANK"
-        sysprompt = f"=== system prompt ===\n{_sysprompt}"
-        disabled_prompts = core.config.get("modules").get("disabled_prompts")
-        if disabled_prompts:
-            sysprompt += "\n\n=== disabled prompts ===\n"
-            sysprompt += "\n".join([mod_name for mod_name in disabled_prompts])
-        endprompt = await self.channel.manager.get_end_prompt()
-        if endprompt:
-            sysprompt += f"\n\n=== end prompts ===\n{endprompt}"
+        if not len(args):
+            _sysprompt = await self.channel.manager.get_system_prompt()
+            if not _sysprompt:
+                _sysprompt = "BLANK"
+            sysprompt = f"=== system prompt ===\n{_sysprompt}"
+            disabled_prompts = core.config.get("modules").get("disabled_prompts")
+            if disabled_prompts:
+                sysprompt += "\n\n=== disabled prompts ===\n"
+                sysprompt += "\n".join([mod_name for mod_name in disabled_prompts])
+            endprompt = await self.channel.manager.get_end_prompt()
+            if endprompt:
+                sysprompt += f"\n\n=== end prompts ===\n{endprompt}"
 
-        return sysprompt if sysprompt else "BLANK"
+            return sysprompt if sysprompt else "BLANK"
+        else:
+            module_name = args[0].strip().replace(" ", "_")
+            module_obj = self.manager.modules.get(module_name, None)
+            if module_obj:
+                if hasattr(module_obj, "on_system_prompt"):
+                    return await module_obj.on_system_prompt() or "BLANK"
+                else:
+                    return "module does not have a system prompt defined"
+
+            return "module not found"
 
     @core.module.command("context", temporary=True, help={
         "": "show current context window",

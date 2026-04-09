@@ -5,13 +5,28 @@ class Channel(core.module.Module):
         if not self.channel:
             return None
 
+        if await self.channel.context.chat.get_data("character"):
+            # don't add this to the system prompt if a character from the character module is active
+            return None
+
         chan = core.module.get_name(self.channel)
         chan_instr = None
+        style_nomarkdown = f"While in the {chan} channel, **DO NOT USE MARKDOWN**. Do not use any rich-text formatting. Do not use bold or italic text. Do not generate tables. Format every response in plaintext!"
+        style_chat = f"{chan} is a chat-style channel, so write your replies as if you're texting the user on a chat platform. No long paragraphs or essays. A few sentences at most - just simple, conversational flow."
+
         match chan:
             case "cli":
-                chan_instr = "type /help for help. /stop is not available here."
+                chan_instr = f"""
+{style_nomarkdown}
+
+Instructions for user:
+
+type /help for help. /stop is not available here.
+"""
             case "webui":
                 chan_instr = """
+Instructions for user:
+
 Type /help for help.
 
 Features only available while channel is WebUI:
@@ -31,13 +46,43 @@ Features only available while channel is WebUI:
 - User can click or tap the `filter by tag` header in the sidebar to select tags to filter by.
 - User can stop text generation by pressing the stop button, or typing /stop.
                 """.strip()
+            case "telegram":
+                chan_instr = f"""
+{style_nomarkdown}
+{style_chat}
+
+Instructions for user:
+
+Type /help for help.
+
+Type /stop to stop the AI at any time, even while it's generating text or calling tools!
+                """.strip()
             case "discord":
-                chan_instr = "say `/help` to me for a list of commands."
+                chan_instr = f"""
+{style_chat}
+
+Instructions for user:
+
+Type /help for help.
+
+Type /stop to stop the AI at any time, even while it's generating text or calling tools!
+                """.strip()
+            case "matrix":
+                chan_instr = f"""
+{style_nomarkdown}
+{style_chat}
+
+Instructions for user:
+
+Type /help for help.
+
+Type /stop to stop the AI at any time, even while it's generating text or calling tools!
+                """.strip()
             case _:
                 pass
 
         if chan_instr:
-            chan_instr = f"instructions for user: {chan_instr}\n\nNOTE: if the channel has changed, discard instructions about previous channels."
+            chan_instr = f"{chan_instr}\n\nNOTE: if the channel has changed, discard instructions about previous channels."
 
         return chan_instr
 
@@ -49,7 +94,9 @@ Features only available while channel is WebUI:
         chan_transl = {
             "cli": "Command Line Interface (CLI)",
             "webui": "WebUI",
-            "discord": "Discord"
+            "discord": "Discord",
+            "telegram": "Telegram",
+            "matrix": "Matrix"
         }
 
         chan_display = chan_transl.get(chan, chan)

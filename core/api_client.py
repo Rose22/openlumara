@@ -247,6 +247,9 @@ class APIClient():
 
         try:
             async for token in self._recv_stream(response):
+                if self.cancel_request:
+                    break
+
                 yield token
         except Exception as e:
             core.log_error("error while sending request to AI", e)

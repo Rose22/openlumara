@@ -54,27 +54,48 @@ class Chats(core.module.Module):
 
         return result
 
-    @core.module.command("chat", temporary=True)
+    @core.module.command("chat", temporary=True, help={
+        "": "show information about current chat",
+        "<ID>": "load chat using its ID",
+        "rename <new_name>": "rename chat to <new_name>",
+        "category <category>": "put chat in category <category>"
+    })
     async def load(self, args: list):
         """load chat using its ID"""
         if not args:
-            return "please provide a chat ID"
+            chat_title = await self.channel.context.chat.get_title()
+            chat_category = await self.channel.context.chat.get_category()
+            chat_tags = await self.channel.context.chat.get_tags()
+            chat_tags_str = "None"
+            if chat_tags:
+                chat_tags_str = ", ".join(chat_tags)
+            chat_data = await self.channel.context.chat.get_data() or {}
+            if chat_data:
+                chat_data_str = "\n"
+                chat_data_str += "\n".join([f"  {key}: {value}" for key, value in chat_data.items()])
+            else:
+                chat_data_str = "None"
 
-        print(args[0])
-        result = await self.channel.context.chat.load(args[0])
-        if not result:
-            return "failed to load chat"
-        return "chat loaded"
+            return f"== chat info ==\ntitle: {chat_title}\ncategory: {chat_category}\ntags: {chat_tags_str}\ndata: {chat_data_str}"
 
-    @core.module.command("rename")
-    async def cmd_rename(self, args: list):
-        """rename current chat"""
-
-        newname = " ".join(args)
-        result = await self.channel.context.chat.set_title(newname)
-        if not result:
-            return "rename failed"
-        return f"chat renamed to {newname}"
+        match args[0].lower().strip():
+            case "rename":
+                newname = " ".join(args[1:])
+                result = await self.channel.context.chat.set_title(newname)
+                if not result:
+                    return "rename failed"
+                return f"chat renamed to {newname}"
+            case "category":
+                newcat = " ".join(args[1:])
+                result = await self.channel.context.chat.set_category(newcat)
+                if not result:
+                    return "setting category failed"
+                return f"chat categorised into {newcat}"
+            case _:
+                result = await self.channel.context.chat.load(args[0])
+                if not result:
+                    return "failed to load chat"
+                return "chat loaded"
 
     # AI tool version
     async def organize(self, new_name: str, category: str, tags: list = []):

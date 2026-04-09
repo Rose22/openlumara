@@ -6,7 +6,8 @@ class Chat:
     DEFAULT_DATA = {
         "title": "",
         "category": "general",
-        "tags": []
+        "tags": [],
+        "custom_data": {},
     }
 
     """contains openAI messages array, and can save and load sets of messages from files"""
@@ -43,6 +44,7 @@ class Chat:
             "category": category,
             "tags": [],
             "messages": [],
+            "custom_data": {},
             "created": now,
             "updated": now
         })
@@ -131,6 +133,23 @@ class Chat:
             continue
         return collected_categories
 
+    async def get_data(self, data_key: str = None):
+        if self.current is None:
+            return False
+
+        if not data_key:
+            return self.data[self.current].get("custom_data", {})
+
+        # return the data, or None if not found
+        return self.data[self.current].get("custom_data", {}).get(data_key, None)
+    async def set_data(self, data_key: str, data_value):
+        if self.current is None:
+            return False
+
+        self.data[self.current]["custom_data"][data_key] = data_value
+        self.data.save()
+        return True
+
     async def set_tags(self, tags: list):
         if self.current is None:
             return False
@@ -192,7 +211,6 @@ class Chat:
         if self.current is None:
             await self.new()
 
-        print(self.data[self.current]["title"])
         if not self.data[self.current]["title"].strip():
             # auto-set title
             msg_content = message.get("content", "")

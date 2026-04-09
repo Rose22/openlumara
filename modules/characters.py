@@ -6,7 +6,6 @@ class Characters(core.module.Module):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.characters = core.storage.StorageDict("characters", type="json")
-        self.active_character = core.storage.StorageText("character_current")
         self.user_profile = core.storage.StorageDict("character_user", "json")
         self._header = "Profiles"
 
@@ -54,13 +53,13 @@ class Characters(core.module.Module):
     async def cmd_switch(self, args: list):
         name = " ".join(args)
         if not name:
-            char = self.active_character.get()
+            char = await self.channel.context.chat.get_data("character")
             if char:
                 return f"currently active character: {char}"
             else:
                 return "please provide a character name."
         elif name in("reset", "default"):
-                self.active_character.set("")
+                await self.channel.context.chat.set_data("character", "")
                 return "character has been reset to default"
 
         character = self._find_character(name)
@@ -70,10 +69,10 @@ class Characters(core.module.Module):
         return f"character switched to {character}"
 
     async def on_system_prompt(self):
-        curr_char = self.characters.get(self.active_character.get())
+        curr_char = self.characters.get(await self.channel.context.chat.get_data("character"))
 
         tool_text = ""
-        if core.config.get("model").get("use_tools", False):
+        if core.config.get("model").get("use_tools", False) and not curr_char:
             tool_text = f"You can switch between identities using character_switch(). User can switch characters using the `/character` command. Characters available to switch yourself to:\n{await self._list_characters()}"
 
         if not curr_char:
@@ -81,7 +80,7 @@ class Characters(core.module.Module):
             return tool_text
 
         character_text = ""
-        character_name = self.active_character.get()
+        character_name = await self.channel.context.chat.get_data("character")
         character_profile = self.characters.get(character_name, "").get("identity", "")
         character_text = f"Name: {character_name}\nProfile: {character_profile}\n\n"
 
@@ -101,10 +100,7 @@ class Characters(core.module.Module):
         if not name:
             return self.result("character not found", False)
         character = self.characters.get(name)
-        self.active_character.set(name)
-
-        # set the chat's current category to the character
-        await self.channel.context.chat.set_category(f"char:{name}")
+        await self.channel.context.chat.set_data("character", name)
 
         user_name = self.user_profile.get("name", "User")
         preferences = self.user_profile.get("preferences", "")
@@ -112,7 +108,7 @@ class Characters(core.module.Module):
     
     async def switch_to_default(self):
         """Switches you back to your default identity."""
-        self.active_character.set("")
+        await self.channel.context.chat.set_data("character", "")
         return "success"
 
     def _case_insensitive_replace(self, text, old, new):

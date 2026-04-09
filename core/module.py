@@ -93,13 +93,15 @@ def get_command_description(command_name):
         return getattr(method, '_command_description', '')
     return None
 
-def load(package, base_class, respect_config: bool = True):
+def load(packages, base_class, respect_config: bool = True):
     """
-    Dynamically discovers classes in a package.
+    Dynamically discovers classes in a package or list of packages.
+    Catches errors in faulty modules to prevent application crash.
 
     Args:
-        package: The root package module (e.g., `import channels; channels`).
+        packages: A single package module or a list of package modules.
         base_class: Only collect classes inheriting from this base.
+        respect_config: Check config for enabled modules.
 
     Returns:
         A tuple of discovered classes.
@@ -107,41 +109,52 @@ def load(package, base_class, respect_config: bool = True):
     import importlib
     import pkgutil
 
+    # Allow passing a single package or a list of packages
+    if not isinstance(packages, (list, tuple)):
+        packages = [packages]
+
     discovered = []
 
-    # Ensure the package has a path to iterate
-    if not hasattr(package, '__path__'):
-        return tuple(discovered)
-
-    for importer, modname, ispkg in pkgutil.iter_modules(package.__path__):
-        try:
-            # Import the module relative to the package
-            module = importlib.import_module(f"{package.__name__}.{modname}")
-
-            for attr_name in dir(module):
-                attr = getattr(module, attr_name)
-
-                # Ensure it is a class
-                if not isinstance(attr, type):
-                    continue
-
-                # Filter by base class if provided (skip the base class itself)
-                if base_class:
-                    if attr is base_class:
-                        continue
-                    if not issubclass(attr, base_class):
-                        continue
-
-                # only load enabled modules into memory
-                if respect_config:
-                    if get_name(attr) not in core.config.get("modules").get("enabled", [])+core.config.get("channels").get("enabled", []):
-                        continue
-
-                discovered.append(attr)
-
-        except ImportError as e:
-            core.log("warning", f"failed to import {modname}: {e}")
+    for package in packages:
+        # Ensure the package has a path to iterate
+        if not hasattr(package, '__path__'):
             continue
+
+        for importer, modname, ispkg in pkgutil.iter_modules(package.__path__):
+            try:
+                # Import the module relative to the package
+                module = importlib.import_module(f"{package.__name__}.{modname}")
+
+                for attr_name in dir(module):
+                    attr = getattr(module, attr_name)
+
+                    # Ensure it is a class
+                    if not isinstance(attr, type):
+                        continue
+
+                    # Filter by base class if provided
+                    if base_class:
+                        if attr is base_class:
+                            continue
+                        if not issubclass(attr, base_class):
+                            continue
+
+                    # Check config
+                    if respect_config:
+                        # We use get() with defaults to be safe
+                        enabled_modules = core.config.get("modules", {}).get("enabled", [])
+                        enabled_channels = core.config.get("channels", {}).get("enabled", [])
+
+                        if get_name(attr) not in enabled_modules + enabled_channels:
+                            continue
+
+                    discovered.append(attr)
+
+            except Exception as e:
+                # Catching Exception prevents the program from crashing on faulty modules.
+                # We simply log the warning and continue to the next module.
+                core.log("core", f"failed to load module {modname}: {e}")
+                continue
 
     return tuple(discovered)
 

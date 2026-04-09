@@ -170,6 +170,14 @@ class Commands:
                 if status['error']:
                     lines.append(f"Last error: {status['error']}")
 
+                lines.append("")
+                lines.append("== Context Size ==")
+                context_size = await self.channel.context.get_size()
+                ctx_string = ""
+                for key, value in context_size.items():
+                    ctx_string += f"{key}: {value}\n"
+                lines.append(ctx_string)
+
                 return "\n".join(lines)
             case "modules":
                 modules_str = "\n".join(core.config.get("modules").get("enabled"))
@@ -186,7 +194,6 @@ class Commands:
                 found = False
                 for module in modules.get_all(respect_config=False):
                     module_name = core.modules.get_name(module)
-                    print(module_name)
                     if args[0].lower().strip() == module_name:
                         found = True
 
@@ -242,6 +249,9 @@ class Commands:
                                 if isinstance(module_inst, registered_cls):
                                     # Bind the method to the instance and call it
                                     bound_method = method.__get__(module_inst, registered_cls)
-                                    return await bound_method(cmd[1:])
+                                    try:
+                                        return await bound_method(cmd[1:])
+                                    except Exception as e:
+                                        return f"error while executing command: {e}"
 
-                return await self._get_help()
+                return "no such command! check /help"
