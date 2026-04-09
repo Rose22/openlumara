@@ -1,4 +1,4 @@
-# OptiClaw
+# OpenLumaia
 
 This is not your average claw agent! This is a modular, token-efficient AI agent framework written from scratch in Python by hand.
 
