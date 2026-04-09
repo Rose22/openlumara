@@ -27,7 +27,7 @@ class Memory(core.module.Module):
         pinned_memories = []
         for index, mem in enumerate(self._mem):
             if mem.get("pinned"):
-                mem_filtered = f"[ID:{mem.get("id")}]\n{mem.get("content")}"
+                mem_filtered = f"{mem.get("id")}:\n{mem.get("content")}"
                 pinned_memories.append(mem_filtered)
 
         pinned_memories_str = "\n\n".join(pinned_memories)

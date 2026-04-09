@@ -8,7 +8,7 @@ if [ ! -d "venv" ]; then
 fi
 
 # auto update
-echo "auto updating from opticlaw github.."
+echo "auto updating from openlumara github.."
 git pull
 # aaand run!
 source venv/bin/activate

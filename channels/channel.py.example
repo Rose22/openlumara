@@ -2,7 +2,7 @@ import core
 
 class ExampleChannel(core.channel.Channel):
     async def run(self):
-        """main loop. this gets launched as a background task by the framework when opticlaw boots"""
+        """main loop. this gets launched as a background task by the framework when openlumara boots"""
         while True:
             user_input = input("User> ")
             response = self.send_stream({"role": "user", "content": user_input})

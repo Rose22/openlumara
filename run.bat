@@ -11,6 +11,7 @@ if not exist "venv" (
 )
 
 :: Update the code (requires Git to be installed and in PATH)
+echo auto-updating from openlumara github..
 git pull
 
 :: Run the main script

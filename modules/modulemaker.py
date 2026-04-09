@@ -39,7 +39,7 @@ class ModuleMaker(core.module.Module):
                 return "Return a string here, and it'll appear in your system prompt!"
 
             async def on_background(self):
-                \"\"\"This will be automatically ran as an asyncio background task by the opticlaw framework\"\"\"
+                \"\"\"This will be automatically ran as an asyncio background task by the openlumara framework\"\"\"
                 await self.channel.announce("This message pops up every minute. Very annoying!")
                 await asyncio.sleep(60)
 
