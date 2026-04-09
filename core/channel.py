@@ -56,7 +56,7 @@ class Channel:
             cmd_response = await self.commands.process_input(message)
 
         if cmd_response:
-            return cmd_response
+            return {"role": "assistant", "content": cmd_response}
         else:
             # if not a command, send the message to the AI and return it's response
 
@@ -65,7 +65,7 @@ class Channel:
                 # Try to reconnect automatically once
                 reconnected = await self.manager.API.connect()
                 if not reconnected:
-                    return self._get_disconnection_message()
+                    return {"role": "assistant", "content": self._get_disconnection_message()}
 
             # add sent message to context
             await self.context.chat.add(message)
@@ -74,7 +74,7 @@ class Channel:
 
             # Check if context generation failed (can happen if disconnected)
             if context is None:
-                return self._get_disconnection_message()
+                return {"role": "assistant", "content": self._get_disconnection_message()}
 
             # then request AI response and add it to context
             response = await self.manager.API.send(context)
@@ -83,9 +83,29 @@ class Channel:
             if isinstance(response, dict) and "error" in response:
                 await self.context.chat.pop()  # Remove the user message we just added
                 error_msg = response.get("message", "Unknown error occurred")
-                return f"API Error: {error_msg}\n\nUse /connect to retry."
+                return {"role": "assistant", "content": f"API Error: {error_msg}\n\nUse /connect to retry."}
 
-            await self.context.chat.add({"role": "assistant", "content": response})
+            tool_calls = response.get("tool_calls")
+            if tool_calls:
+                toolcall_text = []
+                async for sub_token in self.tc_manager.process(tool_calls):
+                    toolcall_text.append(sub_token.get("content"))
+
+            # if no content, try the toolcall response text first
+            if not response.get("content") and tool_calls:
+                response["content"] = "".join(toolcall_text)
+
+            # otherwise fall back to reasoning content
+            if not response.get("content"):
+                reasoning_content = response.get("reasoning")
+                response["content"] = reasoning_content
+
+            # still no content? fuck it, lol
+            if not response.get("content"):
+                response["content"] = "AI returned a blank response."
+
+            await self.context.chat.add({"role": "assistant", "content": response.get("content")})
+
             return response
 
     async def send_stream(self, message: dict):
