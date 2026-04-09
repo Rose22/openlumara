@@ -11,9 +11,15 @@ class Channel(core.module.Module):
 
         chan = core.module.get_name(self.channel)
         chan_instr = None
+        disable_markdown = f"While in the {chan} channel, **DO NOT USE MARKDOWN**. Format every response in plaintext!"
+
         match chan:
             case "cli":
-                chan_instr = "type /help for help. /stop is not available here."
+                chan_instr = f"""
+{disable_markdown}
+
+type /help for help. /stop is not available here.
+"""
             case "webui":
                 chan_instr = """
 Type /help for help.
@@ -36,14 +42,25 @@ Features only available while channel is WebUI:
 - User can stop text generation by pressing the stop button, or typing /stop.
                 """.strip()
             case "telegram":
-                chan_instr = """
-While on Telegram, **DO NOT USE MARKDOWN**. Format every response in plaintext!
+                chan_instr = f"""
+{disable_markdown}
+
 Type /help for help.
 
 Type /stop to stop the AI at any time, even while it's generating text or calling tools!
                 """.strip()
             case "discord":
-                chan_instr = """
+                chan_instr = f"""
+{disable_markdown}
+
+Type /help for help.
+
+Type /stop to stop the AI at any time, even while it's generating text or calling tools!
+                """.strip()
+            case "matrix":
+                chan_instr = f"""
+{disable_markdown}
+
 Type /help for help.
 
 Type /stop to stop the AI at any time, even while it's generating text or calling tools!
