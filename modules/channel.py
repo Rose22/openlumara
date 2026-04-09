@@ -18,10 +18,14 @@ class Channel(core.module.Module):
                 chan_instr = f"""
 {disable_markdown}
 
+Instructions for user:
+
 type /help for help. /stop is not available here.
 """
             case "webui":
                 chan_instr = """
+Instructions for user:
+
 Type /help for help.
 
 Features only available while channel is WebUI:
@@ -45,6 +49,8 @@ Features only available while channel is WebUI:
                 chan_instr = f"""
 {disable_markdown}
 
+Instructions for user:
+
 Type /help for help.
 
 Type /stop to stop the AI at any time, even while it's generating text or calling tools!
@@ -52,6 +58,8 @@ Type /stop to stop the AI at any time, even while it's generating text or callin
             case "discord":
                 chan_instr = f"""
 {disable_markdown}
+
+Instructions for user:
 
 Type /help for help.
 
@@ -61,6 +69,8 @@ Type /stop to stop the AI at any time, even while it's generating text or callin
                 chan_instr = f"""
 {disable_markdown}
 
+Instructions for user:
+
 Type /help for help.
 
 Type /stop to stop the AI at any time, even while it's generating text or calling tools!
@@ -69,7 +79,7 @@ Type /stop to stop the AI at any time, even while it's generating text or callin
                 pass
 
         if chan_instr:
-            chan_instr = f"instructions for user: {chan_instr}\n\nNOTE: if the channel has changed, discard instructions about previous channels."
+            chan_instr = f"{chan_instr}\n\nNOTE: if the channel has changed, discard instructions about previous channels."
 
         return chan_instr
 
