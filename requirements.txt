@@ -11,5 +11,3 @@ flask
 discord.py
 python-telegram-bot
 matrix-nio[e2e]
-websockets
-beautifulsoup4
