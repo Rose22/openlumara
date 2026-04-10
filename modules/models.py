@@ -25,13 +25,16 @@ class Models(core.module.Module):
          if not args:
             return f"Current model: {self.manager.API.get_model()}"
 
-         return await self.switch(args[0].strip())
+         return await self.switch(" ".join(args).strip())
 
     @core.module.command("models")
     async def models(self, args: list):
         """list models"""
         if not self.models:
-            return "Failed to fetch models"
+            models = await self.manager.API.list_models()
+            if not models:
+                return "Failed to fetch models"
+            self.models = models
 
         model_list = "\n".join([model.id for model in self.models.data])
         return model_list
