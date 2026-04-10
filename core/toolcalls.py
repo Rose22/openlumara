@@ -43,8 +43,6 @@ class ToolcallManager:
             tool_call['function']['arguments'] = json.dumps(modified_args)
             repaired_tool_calls.append(tool_call)
 
-        print(repaired_tool_calls)
-
         # Build assistant message with both content and tool_calls
         assistant_message = {
             "role": "assistant",

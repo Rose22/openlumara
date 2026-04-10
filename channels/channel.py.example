@@ -5,8 +5,11 @@ class ExampleChannel(core.channel.Channel):
         """main loop. this gets launched as a background task by the framework when openlumara boots"""
         while True:
             user_input = input("User> ")
-            response = self.send_stream({"role": "user", "content": user_input})
-            print(f"AI:\n{response}")
+            response = self.send({"role": "user", "content": user_input})
+            print("AI:")
+            async for token in response:
+                if response.get("type") == "content":
+                    print(token.get("content"), end="", flush=True)
 
     async def _announce(self, message: str, type: str):
         """handles "announcements", which are basically messages emitted by the framework without having to prompt the AI into it"""
