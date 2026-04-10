@@ -130,12 +130,16 @@ class Chats(core.module.Module):
             found = False
 
             # search within title
-            if chat.get("title", "").find(query) != -1:
+            if chat.get("title", "").lower().strip().find(query.lower().strip()) != -1:
                 found = True
 
             # search within content
             for message in chat.get("messages", []):
-                if message.get("content", "").find(query) != -1:
+                content = message.get("content", "")
+                if not isinstance(content, str):
+                    continue
+
+                if content.lower().find(query.lower().strip())!= -1:
                     filtered_chat["messages"].append({"role": message.get("role"), "content": message.get("content")})
                     found = True
 
