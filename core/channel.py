@@ -104,6 +104,17 @@ class Channel:
             if not response.get("content"):
                 response["content"] = "AI returned a blank response."
 
+            # convert any toolcalls to a dict so that JSON serialization doesnt die
+            if tool_calls:
+                toolcalls_converted = []
+
+                for tool_call in tool_calls:
+                    if not isinstance(tool_call, dict):
+                        tool_call = tool_call.model_dump(warnings=False)
+                    toolcalls_converted.append(tool_call)
+
+                response["tool_calls"] = toolcalls_converted
+
             await self.context.chat.add({"role": "assistant", "content": response.get("content")})
 
             return response

@@ -343,7 +343,12 @@ class APIClient():
 
             if use_tools:
                 for index in sorted(tool_call_buffer.keys()):
-                    final_tool_calls.append(tool_call_buffer[index])
+                    # filter out blank tool calls
+                    tool_call = tool_call_buffer[index]
+                    if not tool_call.function.name:
+                        continue
+
+                    final_tool_calls.append(tool_call)
 
                 if final_tool_calls and core.config.get("model").get("use_tools", False):
                     yield {"type": "tool_calls", "content": final_tool_calls}
