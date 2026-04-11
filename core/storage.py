@@ -10,10 +10,10 @@ class StorageList(list):
         super().__init__(*args)
 
         if not data_dir:
-            data_dir = "data"
-
-        # ensure it's relative to the opticlaw root directory
-        data_dir = core.get_path(data_dir)
+            data_dir = core.get_data_path()
+        else:
+            # ensure it's relative to the opticlaw root directory
+            data_dir = core.get_path(data_dir)
 
         if not os.path.exists(data_dir):
             os.mkdir(data_dir)
@@ -123,10 +123,10 @@ class StorageDict(dict):
         super().__init__(*args)
 
         if not data_dir:
-            data_dir = "data"
-
-        # ensure it's relative to the opticlaw root directory
-        data_dir = core.get_path(data_dir)
+            data_dir = core.get_data_path()
+        else:
+            # ensure it's relative to the opticlaw root directory
+            data_dir = core.get_path(data_dir)
 
         if not os.path.exists(data_dir):
             os.mkdir(data_dir)

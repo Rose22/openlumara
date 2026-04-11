@@ -16,6 +16,7 @@ import sys
 import asyncio
 import core
 import subprocess
+import argparse
 
 async def main():
     # the manager class connects everything together
@@ -40,6 +41,71 @@ def do_restart():
     else:
         # unix: replace process, inherits TTY automatically
         os.execv(sys.executable, args)
+
+def add_arguments_recursive(parser, config, prefix=""):
+    """
+    Recursively traverses the config dict and adds arguments to the parser.
+    """
+    for key, value in config.items():
+        # Build the argument name (e.g., --channels.settings.webui.port)
+        arg_name = f"{prefix}.{key}" if prefix else key
+        arg_flag = f"--{arg_name}"
+
+        if isinstance(value, dict):
+            # If it's a dict, we drill down deeper
+            add_arguments_recursive(parser, value, prefix=arg_name)
+        else:
+            # We reached a leaf node (a real value)
+            # We try to infer the type from the default value
+            arg_type = type(value) if value is not None else str
+
+            # Special handling for lists (like your 'enabled' keys)
+            if isinstance(value, list):
+                parser.add_argument(arg_flag, type=str, metavar="list", help=f"Comma-separated list for {arg_name}")
+            else:
+                parser.add_argument(arg_flag, type=arg_type, default=None, metavar=key.lower())
+
+def override_config_with_args(live_config, args_namespace):
+    """
+    Walks through the flat argparse namespace and updates the
+    nested live_config dictionary in-place.
+    """
+    # Convert Namespace to dict
+    args_dict = vars(args_namespace)
+
+    for flat_key, value in args_dict.items():
+        # IMPORTANT: Only override if the user actually provided the argument
+        # argparse fills missing args with the 'default' we provided (None)
+        if value is None:
+            continue
+
+        parts = flat_key.split('.')
+
+        # Traverse the live_config dict to the target location
+        current_level = live_config
+        try:
+            for part in parts[:-1]:
+                current_level = current_level[part]
+
+            target_key = parts[-1]
+
+            # Logic for handling comma-separated lists (e.g., --channels.enabled=a,b)
+            # We check if the current value in the live config is a list
+            if isinstance(current_level.get(target_key), list) and isinstance(value, str):
+                current_level[target_key] = [item.strip() for item in value.split(',')]
+            else:
+                current_level[target_key] = value
+
+        except KeyError as e:
+            print(f"Warning: Argument {flat_key} provided, but path not found in config: {e}")
+
+# parse arguments
+arg_parser = argparse.ArgumentParser()
+add_arguments_recursive(arg_parser, core.config.default_config)
+args = arg_parser.parse_args(sys.argv[1:])
+
+# by this point, the config is already loaded by core.__init__.py, so we can just override the values
+override_config_with_args(core.config.config, args)
 
 while True:
     result = None

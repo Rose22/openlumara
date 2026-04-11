@@ -12,4 +12,4 @@ echo "auto updating from openlumara github.."
 git pull
 # aaand run!
 source venv/bin/activate
-python main.py
+python main.py $*

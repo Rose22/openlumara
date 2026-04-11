@@ -620,7 +620,7 @@ def upload_file():
             async def insert_file():
                 await channel_instance.context.chat.add({
                     "role": "user",
-                    "content": f"[File: {filename}]\n{content}..."
+                    "content": f"[File: {filename}]\n```\n{content}\n```"
                 })
 
             asyncio.run_coroutine_threadsafe(
