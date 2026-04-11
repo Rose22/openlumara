@@ -68,36 +68,42 @@ def add_arguments_recursive(parser, config, prefix=""):
 def override_config_with_args(live_config, args_namespace):
     """
     Walks through the flat argparse namespace and updates the
-    nested live_config dictionary in-place.
+    nested live_config dictionary in-place, ONLY if the path exists.
     """
-    # Convert Namespace to dict
     args_dict = vars(args_namespace)
 
     for flat_key, value in args_dict.items():
-        # IMPORTANT: Only override if the user actually provided the argument
-        # argparse fills missing args with the 'default' we provided (None)
+        # 1. Skip if the user didn't provide a value
         if value is None:
             continue
 
         parts = flat_key.split('.')
 
-        # Traverse the live_config dict to the target location
+        # 2. Attempt to traverse the config path
         current_level = live_config
-        try:
-            for part in parts[:-1]:
-                current_level = current_level[part]
+        path_exists = True
 
+        for part in parts[:-1]:
+            if isinstance(current_level, dict) and part in current_level:
+                current_level = current_level[part]
+            else:
+                path_exists = False
+                break
+
+        # 3. Check if the final target key exists in the current level
+        if path_exists and isinstance(current_level, dict) and parts[-1] in current_level:
             target_key = parts[-1]
 
-            # Logic for handling comma-separated lists (e.g., --channels.enabled=a,b)
-            # We check if the current value in the live config is a list
-            if isinstance(current_level.get(target_key), list) and isinstance(value, str):
+            # Logic for handling comma-separated lists
+            if isinstance(current_level[target_key], list) and isinstance(value, str):
                 current_level[target_key] = [item.strip() for item in value.split(',')]
             else:
                 current_level[target_key] = value
+        else:
+            # If it's not in the config, it's likely an app flag (like --pure or --cli)
+            # We do nothing and let the rest of the program handle it via 'args'
+            continue
 
-        except KeyError as e:
-            print(f"Warning: Argument {flat_key} provided, but path not found in config: {e}")
 
 # parse arguments
 arg_parser = argparse.ArgumentParser()
@@ -106,6 +112,7 @@ add_arguments_recursive(arg_parser, core.config.default_config)
 # custom arguments
 arg_parser.add_argument("--config", help="config file to load. defaults to config.yml in the openlumara main folder", metavar="path")
 arg_parser.add_argument("--pure", help="disables all non-essential modules so that system prompt is blank and you're talking to the bare model", action="store_true")
+arg_parser.add_argument("--tmp", help="temporary session, discards all data after shutdown", action="store_true")
 arg_parser.add_argument("--cli", help="CLI-only mode", action="store_true")
 arg_parser.add_argument("--quiet", help="surpress logs", action="store_true")
 
@@ -114,6 +121,9 @@ args = arg_parser.parse_args(sys.argv[1:])
 
 # by this point, the config is already loaded by core.__init__.py, so we can just override the values
 override_config_with_args(core.config.config, args)
+
+if args.tmp:
+    core.storage.TEMPORARY = True
 
 while True:
     result = None

@@ -383,6 +383,9 @@ class Manager:
         class_display_name = core.modules.get_name(module)
         self.modules[class_display_name] = loaded_module
 
+        if self.pure_mode:
+            return loaded_module
+
         for func_name in dir(module):
             if func_name.startswith("_"):
                 # skip private methods and other private properties
