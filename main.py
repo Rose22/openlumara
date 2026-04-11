@@ -61,9 +61,9 @@ def add_arguments_recursive(parser, config, prefix=""):
 
             # Special handling for lists (like your 'enabled' keys)
             if isinstance(value, list):
-                parser.add_argument(arg_flag, type=str, metavar="list", help=f"Comma-separated list for {arg_name}")
+                parser.add_argument(arg_flag, type=str, metavar="LIST", help=f"Comma-separated list for {arg_name}")
             else:
-                parser.add_argument(arg_flag, type=arg_type, default=None, metavar=key.lower())
+                parser.add_argument(arg_flag, type=arg_type, default=None, metavar="VALUE")
 
 def override_config_with_args(live_config, args_namespace):
     """
