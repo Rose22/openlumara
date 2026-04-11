@@ -32,7 +32,7 @@ def get_path(path: str = ""):
 def get_data_path():
     """get path to the data directory. contains all persistent data used by the framework"""
 
-    data_path = core.config.get("data_folder", "data")
+    data_path = core.config.get("core", {}).get("data_folder", "data")
     if data_path.startswith(os.path.sep):
         # is an absolute path
         return data_path
