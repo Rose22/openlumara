@@ -97,7 +97,7 @@ async function send(providedContent = null) {
 
     // Create AI message wrapper (hidden until first token)
     const aiWrapper = document.createElement('div');
-    aiWrapper.className = 'message-wrapper ai hidden';
+    aiWrapper.className = 'message-wrapper ai hidden streaming';
     aiWrapper.dataset.index = 'streaming';
     chat.insertBefore(aiWrapper, typing);
 
@@ -346,6 +346,7 @@ async function send(providedContent = null) {
             // For errors, just remove the pending user message
             // but keep the error visible in the AI message
             userWrapper.remove();
+            aiWrapper.classList.remove('streaming');
             // Update the actions to not be disabled
             const actions = aiWrapper.querySelector('.message-actions');
             if (actions) {

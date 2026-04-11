@@ -103,10 +103,12 @@
 /* Reasoning block - only the content area */
 .reasoning-block {
     background: var(--bg-tertiary);
-    overflow: hidden;
-    max-height: 2000px;
     opacity: 1;
     transition: max-height 0.3s ease, opacity 0.25s ease;
+}
+
+.streaming .reasoning-block {
+    max-height: none;  /* Also allow block to grow during streaming */
 }
 
 .reasoning-content {
