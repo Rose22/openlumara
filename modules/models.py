@@ -15,9 +15,15 @@ class Models(core.module.Module):
                 return None
             self.models = models
 
-        models_str = ", ".join([model.id for model in self.models.data])
         current_model = self.manager.API.get_model()
-        return f"Current model: {current_model}\nModels you can switch to using the models_switch() toolcall: {models_str}"
+        if len(self.models.data) > 1:
+            output = f"Current model: {current_model}\nModels you can switch to using the models_switch() toolcall: "
+            output += ", ".join([model.id for model in self.models.data])
+        else:
+            self._header = "current model"
+            output = current_model
+
+        return output
 
     @core.module.command("model")
     async def model(self, args: list):

@@ -5,6 +5,9 @@ class Chats(core.module.Module):
 
     async def on_system_prompt(self):
         categories = await self.channel.context.chat.get_categories()
+        if len(categories) <= 1:
+            return None
+
         filtered_categories = []
         for index, category in enumerate(categories):
             # get rid of special categories

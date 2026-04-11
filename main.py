@@ -102,10 +102,22 @@ def override_config_with_args(live_config, args_namespace):
 # parse arguments
 arg_parser = argparse.ArgumentParser()
 add_arguments_recursive(arg_parser, core.config.default_config)
+
+# custom arguments
+arg_parser.add_argument("--pure", help="disables all non-essential modules so that system prompt is blank and you're talking to the bare model", action="store_true")
+arg_parser.add_argument("--cli", help="CLI-only mode", action="store_true")
+
+# do the arg parsing
 args = arg_parser.parse_args(sys.argv[1:])
 
 # by this point, the config is already loaded by core.__init__.py, so we can just override the values
 override_config_with_args(core.config.config, args)
+
+if args.pure:
+    # mode that lets you easily talk to the bare model
+    core.config.config["modules"]["enabled"] = ["context"]
+if args.cli:
+    core.config.config["channels"]["enabled"] = ["cli"]
 
 while True:
     result = None
