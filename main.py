@@ -18,11 +18,11 @@ import core
 import subprocess
 import argparse
 
-async def main():
+async def main(args):
     # the manager class connects everything together
     manager = core.manager.Manager()
     # run main loop
-    return await manager.run()
+    return await manager.run(args=args)
 
 def do_restart():
     """cross-platform restart with TTY/console inheritance"""
@@ -104,8 +104,10 @@ arg_parser = argparse.ArgumentParser()
 add_arguments_recursive(arg_parser, core.config.default_config)
 
 # custom arguments
+arg_parser.add_argument("--config", help="config file to load. defaults to config.yml in the openlumara main folder", metavar="path")
 arg_parser.add_argument("--pure", help="disables all non-essential modules so that system prompt is blank and you're talking to the bare model", action="store_true")
 arg_parser.add_argument("--cli", help="CLI-only mode", action="store_true")
+arg_parser.add_argument("--quiet", help="surpress logs", action="store_true")
 
 # do the arg parsing
 args = arg_parser.parse_args(sys.argv[1:])
@@ -113,16 +115,10 @@ args = arg_parser.parse_args(sys.argv[1:])
 # by this point, the config is already loaded by core.__init__.py, so we can just override the values
 override_config_with_args(core.config.config, args)
 
-if args.pure:
-    # mode that lets you easily talk to the bare model
-    core.config.config["modules"]["enabled"] = ["context"]
-if args.cli:
-    core.config.config["channels"]["enabled"] = ["cli"]
-
 while True:
     result = None
     try:
-        result = asyncio.run(main())
+        result = asyncio.run(main(args))
     except KeyboardInterrupt:
         pass
 

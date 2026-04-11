@@ -6,7 +6,8 @@ import traceback
 
 def log(category: str, msg: str):
     """simple console log"""
-    print(f"[{category.upper()}] {msg}")
+    if not core.quiet:
+        print(f"[{category.upper()}] {msg}")
 
 def log_error(msg: str, e: Exception):
     """console log but with extra spice for errors"""

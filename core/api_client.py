@@ -63,7 +63,7 @@ class APIClient():
         self.connected = True
         self._connection_error = None
         self._connection_attempts = 0
-        core.log("API", "Successfully connected to API")
+        core.log("API", "Successfully connected to AI")
         return True
 
     def _validate_config(self):
