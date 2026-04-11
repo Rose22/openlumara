@@ -232,4 +232,4 @@ class Channel:
 
     async def ask(self, message: str):
         """sends a message in the channel and then intercepts communication for one message so that user can be asked for input without that input being sent to the LLM. useful for menus."""
-        pass
+        raise NotImplementedError

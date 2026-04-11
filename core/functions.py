@@ -30,7 +30,15 @@ def get_path(path: str = ""):
     ))
 
 def get_data_path():
-    return get_path("data")
+    """get path to the data directory. contains all persistent data used by the framework"""
+
+    data_path = core.config.get("data_folder", "data")
+    if data_path.startswith(os.path.sep):
+        # is an absolute path
+        return data_path
+    else:
+        # is a relative path
+        return get_path(data_path)
 
 def remove_duplicates(lst: list):
     # removes duplicates from a list
