@@ -72,6 +72,7 @@ async function pollMessages() {
             }
             lastMessageIndex = data.total;
             scrollToBottom();
+            updateTokenUsage();
         }
     } catch (err) {
         // Connection issues handled elsewhere

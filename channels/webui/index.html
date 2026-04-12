@@ -36,6 +36,8 @@
                     </div>
                 </div>
 
+                <div class="category-handle" onclick="toggleCategoryStrip()" title="Toggle Category Strip"></div>
+
                 <!-- PANE 2: Chat List (Wrapper for existing content) -->
                 <div id="chat-pane" class="chat-pane">
                     <!-- NEW: Clickable Header -->
@@ -496,6 +498,13 @@
                     <div class="typing-indicator" id="typing" aria-label="AI is typing">
                         <span></span><span></span><span></span>
                     </div>
+                </div>
+
+                <div id="token-usage-container" class="token-usage-container">
+                    <div class="token-usage-bar-bg">
+                        <div id="token-usage-fill" class="token-usage-bar-fill"></div>
+                    </div>
+                    <span id="token-usage-text" class="token-usage-text"></span>
                 </div>
 
                 <div class="input-area">

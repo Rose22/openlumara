@@ -4,7 +4,6 @@
 .input-area {
     padding: 16px;
     background: var(--bg-primary);
-    border-top: 1px solid var(--border-color);
     display: flex;
     gap: 12px;
     align-items: flex-end;
@@ -111,3 +110,53 @@ box-shadow: 0 0 15px rgba(248, 113, 113, 0.3);
 
 #stop:active { transform: scale(0.96); }
 #stop.show { display: block; }
+
+.token-usage-container {
+    position: relative; /* Added: This allows the text to anchor to this container */
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0px;
+    height: 8px;
+    background: var(--bg-primary);
+}
+
+/* This class will be added by JS when usage is high */
+.token-usage-container.active {
+    opacity: 1;
+}
+
+.token-usage-bar-bg {
+    flex-grow: 1;
+    height: 2px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 0px;
+    overflow: hidden;
+}
+
+.token-usage-bar-fill {
+    height: 100%;
+    width: 0%;
+    background: #10b981; /* Green */
+    transition: width 0.5s ease, background-color 0.5s ease;
+}
+
+.token-usage-text {
+    position: absolute;
+    right: 12px;        /* Offsets it from the right edge */
+    transform: translateY(-5px); /* Nudges it up slightly so it "floats" with breathing room */
+
+    font-size: 9px;
+    line-height: 1;
+    white-space: nowrap;
+    min-width: fit-content;
+}
+
+/* High usage text color */
+.token-usage-container.active .token-usage-text {
+    color: rgba(255, 255, 255, 1);
+}
+
+

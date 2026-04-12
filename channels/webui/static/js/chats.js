@@ -102,6 +102,9 @@ function filterChatsByCategory(chats, categoryKey) {
 function renderCategoryList(categories) {
     const list = document.getElementById('category-list');
 
+    // FIX: Load collapsed state from localStorage instead of scanning DOM
+    const collapsedGroups = new Set(JSON.parse(localStorage.getItem('sidebar_collapsed_categories') || '[]'));
+
     // OPTIMIZATION: Use DocumentFragment to reduce reflows
     const fragment = document.createDocumentFragment();
     const groups = {};
@@ -124,6 +127,13 @@ function renderCategoryList(categories) {
 
         const content = document.createElement('div');
         content.className = 'category-group-content';
+
+        // FIX: Apply collapsed state if found in localStorage
+        if (collapsedGroups.has(groupName)) {
+            content.style.display = 'none';
+            const chevron = header.querySelector('.chevron');
+            if (chevron) chevron.classList.add('collapsed');
+        }
 
         const items = groups[groupName].sort((a, b) =>
         a.parsed.name.localeCompare(b.parsed.name)
@@ -167,6 +177,15 @@ function createCategoryGroupHeader(name) {
         const isHidden = content.style.display === 'none';
         content.style.display = isHidden ? 'block' : 'none';
         header.querySelector('.chevron').classList.toggle('collapsed', !isHidden);
+
+        // FIX: Update localStorage when user toggles
+        const collapsed = new Set(JSON.parse(localStorage.getItem('sidebar_collapsed_categories') || '[]'));
+        if (isHidden) {
+            collapsed.delete(name); // Opening it, so remove from set
+        } else {
+            collapsed.add(name); // Closing it, so add to set
+        }
+        localStorage.setItem('sidebar_collapsed_categories', JSON.stringify(Array.from(collapsed)));
     };
     return header;
 }
@@ -267,6 +286,7 @@ async function restoreCurrentChat() {
 
             if (messages.length > 0) {
                 renderAllMessages(messages);
+                updateTokenUsage();
                 lastMessageIndex = messages.length;
             } else {
                 clearChatUI();
@@ -447,6 +467,7 @@ async function newChat() {
             currentChatId = data.chat.id;
             lastMessageIndex = 0;
             updateChatTitleBar(data.chat.title);
+            updateTokenUsage();
 
             const wrappers = chat.querySelectorAll('.message-wrapper');
             wrappers.forEach(wrapper => wrapper.remove());
@@ -484,6 +505,47 @@ async function loadChatInternal(chatId, cachedMessages = null) {
     }
 }
 
+async function updateTokenUsage() {
+    try {
+        const response = await fetch('/api/token_usage');
+        const data = await response.json();
+
+        if (data.current !== undefined && data.max !== undefined) {
+            const container = document.getElementById('token-usage-container');
+            const fill = document.getElementById('token-usage-fill');
+            const text = document.getElementById('token-usage-text');
+
+            const percentage = (data.current / data.max) * 100;
+            const NOTIFY_THRESHOLD = 70;
+
+            // 1. Always update the numbers and the width
+            fill.style.width = `${Math.min(percentage, 100)}%`;
+            text.textContent = `${data.current.toLocaleString()} / ${data.max.toLocaleString()}`;
+
+            // 2. Handle "Notification" (Visual Prominence)
+            if (percentage >= NOTIFY_THRESHOLD) {
+                // Make it bright and "active"
+                container.classList.add('active');
+
+                // Change color based on urgency
+                if (percentage >= 90) {
+                    fill.style.backgroundColor = '#ef4444'; // Red
+                } else if (percentage >= 75) {
+                    fill.style.backgroundColor = '#f59e0b'; // Amber
+                } else {
+                    fill.style.backgroundColor = '#10b981'; // Green
+                }
+            } else {
+                // Keep it "quiet" (dimmed)
+                container.classList.remove('active');
+                fill.style.backgroundColor = '#10b981'; // Reset to green
+            }
+        }
+    } catch (e) {
+        console.error('Token usage update failed:', e);
+    }
+}
+
 async function loadChat(chatId) {
     if (chatId === currentChatId) {
         closeSidebar();
@@ -503,6 +565,7 @@ async function loadChat(chatId) {
             lastMessageIndex = data.chat.total || (messages.length > 0 ? messages[messages.length - 1].index + 1 : 0);
 
             updateChatTitleBar(data.chat.title, data.chat.tags || []);
+            updateTokenUsage();
             closeSidebar();
 
             // Only reload list, don't restore current chat again

@@ -1799,12 +1799,12 @@ function createThemeSection() {
     const savedFamily = localStorage.getItem('themeFamily') || 'monochrome';
     const savedMode = localStorage.getItem('themeMode') || 'dark';
     const savedFontSize = localStorage.getItem('fontSize') || '16';
-    const savedFontFamily = localStorage.getItem('fontFamily') || 'default';
+    const savedFontFamily = localStorage.getItem('fontFamily') || 'sans-serif';
     const families = getThemeFamilies();
 
     // Font options with display names
     const fontOptions = [
-        { value: 'default', label: 'System Default' },
+        { value: 'sans-serif', label: 'System Default' },
         // System fonts
         { value: 'Arial', label: 'Arial' },
         { value: 'Helvetica', label: 'Helvetica' },

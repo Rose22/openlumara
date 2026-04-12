@@ -305,13 +305,13 @@
     font-weight: 600;
     color: var(--accent);
     font-size: 0.9rem;
-    font-family: 'Consolas', 'Monaco', 'Menlo', monospace;
+    font-family: var(--font-family);
     flex-shrink: 0;
 }
 
 .tool-call-inline-arg {
     color: var(--text-muted);
-    font-family: 'Consolas', 'Monaco', 'Menlo', monospace;
+    font-family: var(--font-family);
     font-size: 0.85rem;
     flex: 1;
     min-width: 0;
@@ -360,7 +360,7 @@
     font-weight: 600;
     color: var(--accent);
     font-size: 0.9rem;
-    font-family: 'Consolas', 'Monaco', 'Menlo', monospace;
+    font-family: var(--font-family);
     flex: 1;
     min-width: 0;
     overflow: hidden;
@@ -423,7 +423,7 @@
     padding: 6px 10px;
     background: rgba(0, 0, 0, 0.3);
     border-radius: var(--radius-sm);
-    font-family: 'Consolas', 'Monaco', 'Menlo', monospace;
+    font-family: var(--font-family);
     font-size: 0.85rem;
 }
 
@@ -481,7 +481,7 @@
 }
 
 .tool-response-content {
-    font-family: 'Consolas', 'Monaco', 'Menlo', monospace;
+    font-family: var(--font-family);
     font-size: 0.85rem;
 }
 

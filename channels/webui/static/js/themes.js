@@ -3218,5 +3218,165 @@ const themes = {
             '--message-decoration': '1px solid rgba(0, 255, 255, 0.15)',
             '--avatar-shape': '0%'
         }
+    },
+    'dark-stardew': {
+        name: 'Stardew Valley',
+        mode: 'dark',
+        vars: {
+            // === SHAPES (Pixel-art style) ===
+            '--radius-sm': '2px',
+            '--radius-md': '4px',
+            '--radius-lg': '8px',
+            '--radius-xl': '12px',
+
+            // === COLORS (Warm Wood & Firelight) ===
+            '--bg-primary': '#0d0b08',      // Dark Roast / Charred Wood
+            '--bg-secondary': '#241c14',    // Dark Bark
+            '--bg-tertiary': '#322818',     // Walnut
+            '--bg-message-user': 'linear-gradient(135deg, #5b3f32 0%, #3f2418 100%)', // Dark Leather/Wood
+            '--bg-message-ai': '#2a2219',   // Oak
+            '--bg-message-announce': 'linear-gradient(135deg, #302018 0%, #201408 100%)',
+            '--bg-message-command': 'linear-gradient(135deg, #283018 0%, #1c240c 100%)', // Forest
+            '--bg-message-command-response': 'linear-gradient(135deg, #302028 0%, #201418 100%)', // Berry
+            '--bg-input': '#1c1510',
+            '--bg-code': '#141008',
+            '--bg-sidebar': '#161208',
+
+            '--border-color': '#4a3828',    // Wood Border
+            '--border-message': '#584030',
+            '--border-user': '#d97c34',     // Copper / Hearth Glow
+            '--border-sidebar': '#2a2018',
+
+            '--text-primary': '#f0e8d8',    // Parchment
+            '--text-secondary': '#c8b8a0',  // Light Wood
+            '--text-muted': '#807060',      // Stone Gray
+            '--text-code': '#f5a623',       // Gold Ore
+
+            '--accent': '#e8a030',          // Firelight Orange
+            '--accent-glow': 'rgba(232, 160, 48, 0.4)',
+            '--accent-secondary': '#4a9c4d', // Crop Green
+
+            '--error': '#e85a4f',
+            '--error-bg': 'linear-gradient(135deg, #401818 0%, #2a0c0c 100%)',
+            '--error-border': '#c05048',
+
+            '--important': '#f5c842',       // Gold Bar
+            '--important-bg': 'linear-gradient(135deg, #3a3018 0%, #2a2008 100%)',
+            '--important-border': '#f5c842',
+
+            '--info': '#4a9cc4',            // River Blue
+            '--info-bg': 'linear-gradient(135deg, #183040 0%, #102030 100%)',
+            '--info-border': '#4a9cc4',
+
+            '--button-bg': 'linear-gradient(135deg, #5a4030 0%, #4a3020 100%)', // Wood Plank
+            '--button-hover': 'linear-gradient(135deg, #6a5040 0%, #5a4030 100%)',
+            '--button-stop': 'linear-gradient(135deg, #501818 0%, #380c0c 100%)',
+            '--button-stop-hover': 'linear-gradient(135deg, #602020 0%, #501818 100%)',
+            '--button-stop-glow': 'rgba(232, 90, 79, 0.3)',
+
+            '--scrollbar': '#4a3828',
+            '--scrollbar-hover': '#5a4838',
+
+            '--shadow-soft': '0 2px 8px rgba(0, 0, 0, 0.6)',
+            '--shadow-glow': '0 0 15px var(--accent-glow)',
+
+            '--tool-bg': '#241c14',
+            '--tool-bg-secondary': '#1c1510',
+            '--tool-border': '#4a3828',
+            '--tool-border-hover': '#5a4838',
+            '--tool-pending-bg': 'rgba(232, 160, 48, 0.15)',
+            '--tool-pending-color': '#e8a030',
+            '--tool-completed-bg': 'rgba(74, 156, 77, 0.15)',
+            '--tool-completed-color': '#4a9c4d',
+
+            // === DECORATION (Subtle Pixel Grid Texture) ===
+            '--bg-pattern': `
+            linear-gradient(rgba(90, 64, 48, 0.08) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(90, 64, 48, 0.08) 1px, transparent 1px)
+            `,
+            '--bg-pattern-size': '16px 16px',
+            '--message-decoration': '2px solid rgba(232, 160, 48, 0.25)',
+            '--avatar-shape': '10%'
+        }
+    },
+    'light-stardew': {
+        name: 'Stardew Valley',
+        mode: 'light',
+        vars: {
+            // === SHAPES (Boxy/Pixel-art feel) ===
+            '--radius-sm': '2px',
+            '--radius-md': '4px',
+            '--radius-lg': '8px',
+            '--radius-xl': '12px',
+
+            // === COLORS (Farm, Soil, & Wood) ===
+            '--bg-primary': '#f0e6c8',      // Sand/Dried Hay
+            '--bg-secondary': '#e8dcb0',    // Light Wood
+            '--bg-tertiary': '#d8c898',     // Darker Wood
+            '--bg-message-user': 'linear-gradient(135deg, #c8e8c0 0%, #b8dca8 100%)', // Grassy Green
+            '--bg-message-ai': '#f8f4e8',   // Parchment
+            '--bg-message-announce': 'linear-gradient(135deg, #e8e0c8 0%, #f0e8d0 100%)',
+            '--bg-message-command': 'linear-gradient(135deg, #d8e8f0 0%, #c8dce8 100%)', // River Blue
+            '--bg-message-command-response': 'linear-gradient(135deg, #f0e8c8 0%, #e8dcb0 100%)',
+            '--bg-input': '#fffdf5',
+            '--bg-code': '#f8f0dc',
+            '--bg-sidebar': '#e8dcc0',
+
+            '--border-color': '#a08060',    // Wood Border
+            '--border-message': '#b8a878',
+            '--border-user': '#5dc460',     // Crop Green
+            '--border-sidebar': '#c0a870',
+
+            '--text-primary': '#3a2a18',    // Dark Soil
+            '--text-secondary': '#604820',  // Brown
+            '--text-muted': '#8a7050',
+            '--text-code': '#1a5020',       // Forest Green
+
+            '--accent': '#4a9c4d',          // Parrot/Leaf Green
+            '--accent-glow': 'rgba(74, 156, 77, 0.3)',
+            '--accent-secondary': '#e85a4f', // Salmon/Poppy Red
+
+            '--error': '#e85a4f',
+            '--error-bg': 'linear-gradient(135deg, #fde8e5 0%, #fcded8 100%)',
+            '--error-border': '#e85a4f',
+
+            '--important': '#f5a623',       // Copper/Ore
+            '--important-bg': 'linear-gradient(135deg, #fff4e0 0%, #ffecc8 100%)',
+            '--important-border': '#f5a623',
+
+            '--info': '#4a9cc4',            // Blue Chickens!
+            '--info-bg': 'linear-gradient(135deg, #e0f0f8 0%, #d4eaf5 100%)',
+            '--info-border': '#4a9cc4',
+
+            '--button-bg': 'linear-gradient(135deg, #a0c070 0%, #8cac58 100%)', // Fertile Green
+            '--button-hover': 'linear-gradient(135deg, #b0d080 0%, #a0c070 100%)',
+            '--button-stop': 'linear-gradient(135deg, #e8a098 0%, #e09088 100%)',
+            '--button-stop-hover': 'linear-gradient(135deg, #f0b0a8 0%, #e8a098 100%)',
+            '--button-stop-glow': 'rgba(232, 90, 79, 0.3)',
+
+            '--scrollbar': '#c0b088',
+            '--scrollbar-hover': '#a89868',
+
+            '--shadow-soft': '0 2px 8px rgba(58, 42, 24, 0.15)',
+            '--shadow-glow': '0 0 15px var(--accent-glow)',
+
+            '--tool-bg': '#e8dcb0',
+            '--tool-bg-secondary': '#f0e8d0',
+            '--tool-border': '#a08060',
+            '--tool-border-hover': '#8a6840',
+            '--tool-pending-bg': 'rgba(74, 156, 77, 0.15)',
+            '--tool-pending-color': '#4a9c4d',
+            '--tool-completed-bg': 'rgba(232, 90, 79, 0.1)',
+            '--tool-completed-color': '#e85a4f',
+
+            // === DECORATION (Pixel Grid) ===
+            '--bg-pattern': `
+            linear-gradient(rgba(58, 42, 24, 0.05) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(58, 42, 24, 0.05) 1px, transparent 1px)
+            `,
+            '--bg-pattern-size': '16px 16px',
+            '--message-decoration': '2px solid rgba(74, 156, 77, 0.3)',
+            '--avatar-shape': '10%'
+        }
     }
 };

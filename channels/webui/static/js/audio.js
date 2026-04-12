@@ -5,6 +5,7 @@
 const TypewriterAudioManager = {
     db: null,
     audioContext: null,
+    masterGainNode: null, // Reusable gain node for performance
     buffers: {
         typewriter: null,
         completion: null
@@ -74,6 +75,12 @@ const TypewriterAudioManager = {
     getAudioContext: function() {
         if (!this.audioContext) {
             this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+            // Create a single master gain node once to avoid creating
+            // new nodes for every sound play event
+            this.masterGainNode = this.audioContext.createGain();
+            this.masterGainNode.gain.value = this.volume;
+            this.masterGainNode.connect(this.audioContext.destination);
         }
         return this.audioContext;
     },
@@ -82,6 +89,11 @@ const TypewriterAudioManager = {
     setVolume: function(vol) {
         this.volume = vol;
         localStorage.setItem('typewriterVolume', vol);
+
+        // Update the master gain node immediately if it exists
+        if (this.masterGainNode) {
+            this.masterGainNode.gain.value = vol;
+        }
     },
 
     // Save a file to IndexedDB
@@ -121,31 +133,34 @@ const TypewriterAudioManager = {
         }
     },
 
-    // Play the sound with volume control
+    // Play the sound asynchronously to avoid UI blocking
     play: function(id) {
         const buffer = this.buffers[id];
         if (!buffer) return;
 
-        try {
-            const ctx = this.getAudioContext();
-            // Resume context if suspended (browser autoplay policy)
-            if (ctx.state === 'suspended') {
-                ctx.resume();
+        // Use setTimeout(..., 0) to push execution to the next event loop tick.
+        // This ensures the audio logic does not block the typewriter animation frame.
+        setTimeout(() => {
+            try {
+                const ctx = this.getAudioContext();
+
+                // Resume context if suspended (browser autoplay policy)
+                if (ctx.state === 'suspended') {
+                    ctx.resume();
+                }
+
+                const source = ctx.createBufferSource();
+                source.buffer = buffer;
+
+                // Connect source directly to the cached master gain node.
+                // This avoids creating a new GainNode on every keystroke.
+                source.connect(this.masterGainNode);
+
+                source.start(0);
+            } catch (e) {
+                console.warn('Error playing sound:', e);
             }
-
-            const source = ctx.createBufferSource();
-            source.buffer = buffer;
-
-            // Create GainNode to control volume
-            const gainNode = ctx.createGain();
-            gainNode.gain.value = this.volume; // Apply current volume
-            gainNode.connect(ctx.destination);
-
-            source.connect(gainNode);
-            source.start(0);
-        } catch (e) {
-            console.warn('Error playing sound:', e);
-        }
+        }, 0);
     }
 };
 

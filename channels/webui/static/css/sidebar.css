@@ -491,6 +491,113 @@ pointer-events: none; /* Let click pass to header */
     height: 20px;
 }
 
+/* =============================================================================
+ *  Category Pane Collapse (Desktop Only)
+ *  ============================================================================= */
+
+@media (min-width: 769px) {
+    .sidebar-inner-container {
+        display: flex;
+        align-items: stretch;
+    }
+
+    /* The handle is now a flex item between the two panes */
+    .category-handle {
+        width: 6px;
+        cursor: pointer; /* Changed to pointing hand as requested */
+        background: transparent;
+        transition: all 0.2s ease;
+        z-index: 30;
+        flex-shrink: 0; /* Prevents the handle from squishing */
+        border-left: 1px solid transparent;
+        border-right: 1px solid transparent;
+    }
+
+    .category-handle:hover {
+        /* Visual cue: a subtle glow/line on the border */
+        background: rgba(var(--accent-rgb, 0, 123, 255), 0.1);
+        border-left: 1px solid var(--accent);
+        border-right: 1px solid var(--accent);
+    }
+
+    /* When the pane is collapsed, it shrinks to 0,
+     *       leaving the handle at the leftmost edge of the chat pane */
+    .category-pane.collapsed {
+        width: 0 !important;
+        min-width: 0 !important;
+        overflow: hidden;
+        border: none;
+        margin: 0;
+        padding: 0;
+    }
+}
+
+/* Hide the handle on mobile to avoid interfering with swipe gestures */
+@media (max-width: 768px) {
+    .category-handle {
+        display: none;
+    }
+}
+
+/* =============================================================================
+ *  Sidebar Layout Adjustments
+ *  ============================================================================= */
+
+.sidebar {
+    /* 1. Change width to fit-content so the sidebar shrinks when children shrink */
+    width: fit-content;
+    min-width: 0;
+    height: 100%;
+    background: var(--bg-sidebar);
+    border-right: 1px solid var(--border-sidebar);
+    display: flex;
+    flex-direction: column;
+    z-index: 100;
+    /* Keep your existing transition for smoothness */
+    transition: width 0.3s ease, min-width 0.3s ease;
+}
+
+/* -----------------------------------------------------------------------------
+ *  Pane 1: Category Navigator
+ *  ----------------------------------------------------------------------------- */
+.category-pane {
+    width: 160px;
+    min-width: 160px;
+    background: var(--bg-dark);
+    border-right: 1px solid var(--border-sidebar);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    flex-shrink: 0; /* 2. Prevent flexbox from trying to squish this */
+}
+
+/* 3. When collapsed, width goes to 0, and because the parent is 'fit-content',
+ *      the entire sidebar will shrink */
+.category-pane.collapsed {
+    width: 0 !important;
+    min-width: 0 !important;
+    border: none;
+    overflow: hidden;
+}
+
+/* -----------------------------------------------------------------------------
+ *  Pane 2: Chat List
+ *  ----------------------------------------------------------------------------- */
+.chat-pane {
+    /* 4. IMPORTANT: Remove flex: 1 and give it a fixed width.
+     *          This prevents it from expanding to fill the vacated space. */
+    flex: none;
+    width: 300px; /* Adjust this value to your preferred chat list width */
+
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    position: relative;
+    background: var(--bg-sidebar);
+    transition: transform 0.3s ease;
+}
+
+
 /* -----------------------------------------------------------------------------
    Panel B: Chat Panel
    ----------------------------------------------------------------------------- */
