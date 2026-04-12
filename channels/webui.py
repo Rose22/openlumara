@@ -74,6 +74,7 @@ CSS_FILES = [
     "input",
     "keyboard",
     "responsive",
+    "typewriter",
     "settings",
     "storage_editor"
 ]

@@ -1774,7 +1774,7 @@ function loadPreviewFonts(options) {
     document.head.appendChild(link);
 }
 
-// Theme section with custom font dropdown
+// Theme section with custom font dropdown (updated createThemeSection function)
 function createThemeSection() {
     const wrapper = document.createElement('div');
     wrapper.className = 'settings-theme-section';
@@ -1800,7 +1800,7 @@ function createThemeSection() {
         { value: 'Consolas', label: 'Consolas' },
         { value: 'Courier New', label: 'Courier New' },
         { value: 'Comic Sans MS', label: 'Comic Sans MS' },
-        // Google Fonts - Sans Serif
+        // Google Fonts
         { value: 'Inter', label: 'Inter' },
         { value: 'Roboto', label: 'Roboto' },
         { value: 'Roboto Mono', label: 'Roboto Mono' },
@@ -1814,11 +1814,9 @@ function createThemeSection() {
         { value: 'Source Sans 3', label: 'Source Sans 3' },
         { value: 'Inconsolata', label: 'Inconsolata' },
         { value: 'Raleway', label: 'Raleway' },
-        // Google Fonts - Display & Fancy
         { value: 'Audiowide', label: 'Audiowide' },
         { value: 'Quantico', label: 'Quantico' },
         { value: 'Anta', label: 'Anta' },
-        // Google Fonts - Rounded & Bubbly
         { value: 'Quicksand', label: 'Quicksand' },
         { value: 'Delius', label: 'Delius' },
         { value: 'Comfortaa', label: 'Comfortaa' },
@@ -1831,7 +1829,6 @@ function createThemeSection() {
         { value: 'Fredoka', label: 'Fredoka' },
         { value: 'Chewy', label: 'Chewy' },
         { value: 'Chonk', label: 'Chonk' },
-        // Google Fonts - Handwriting
         { value: 'Indie Flower', label: 'Indie Flower' },
         { value: 'Architects Daughter', label: 'Architects Daughter' },
         { value: 'Caveat', label: 'Caveat' },
@@ -1841,7 +1838,6 @@ function createThemeSection() {
         { value: 'Patrick Hand', label: 'Patrick Hand' },
         { value: 'Sour Gummy', label: 'Sour Gummy' },
         { value: 'Homemade Apple', label: 'Homemade Apple' },
-        // Google Fonts - Cursive & Script
         { value: 'Allura', label: 'Allura' },
         { value: 'Amatic SC', label: 'Amatic SC' },
         { value: 'Pacifico', label: 'Pacifico' },
@@ -1855,303 +1851,496 @@ function createThemeSection() {
         { value: 'Emilys Candy', label: 'Emilys Candy' },
     ];
 
-    // 1. Font Family - Custom Dropdown with Preview
-    const fontFamilyLabel = document.createElement('h4');
-    fontFamilyLabel.textContent = 'Font Family';
-    fontFamilyLabel.style.marginTop = '20px';
-    wrapper.appendChild(fontFamilyLabel);
+    // ==========================================================================
+    // TYPOGRAPHY SETTINGS SECTION (includes Reasoning Toggle)
+    // ==========================================================================
 
-    const fontContainer = document.createElement('div');
-    fontContainer.className = 'font-family-container';
+    const typographySection = document.createElement('div');
+    typographySection.className = 'typography-settings-section';
+
+    const typographyHeader = document.createElement('div');
+    typographyHeader.className = 'settings-section-header';
+    typographyHeader.innerHTML = `
+    <div class="settings-section-icon typography-icon">
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <polyline points="4 7 4 4 20 4 20 7"></polyline>
+    <line x1="9" y1="20" x2="15" y2="20"></line>
+    <line x1="12" y1="4" x2="12" y2="20"></line>
+    </svg>
+    </div>
+    <div class="settings-section-title">
+    <h4>Typography</h4>
+    <p>Customize fonts and text appearance</p>
+    </div>
+    `;
+    typographySection.appendChild(typographyHeader);
+
+    const typographyControls = document.createElement('div');
+    typographyControls.className = 'settings-control-group';
+
+    // Font Family Selection
+    const fontFamilyRow = document.createElement('div');
+    fontFamilyRow.className = 'font-family-row';
+    fontFamilyRow.innerHTML = `
+    <label class="control-label">Font Family</label>
+    <div class="font-family-wrapper" id="font-family-wrapper"></div>
+    `;
 
     const fontDropdown = createFontFamilyDropdown(fontOptions, savedFontFamily, (font) => {
         applyCustomFont(font);
     });
 
-    fontContainer.appendChild(fontDropdown);
-    wrapper.appendChild(fontContainer);
+    fontFamilyRow.querySelector('#font-family-wrapper').appendChild(fontDropdown);
+    typographyControls.appendChild(fontFamilyRow);
 
-    // 2. Font Size Slider
-    const fontSizeLabel = document.createElement('h4');
-    fontSizeLabel.textContent = 'Font Size';
-    fontSizeLabel.style.marginTop = '20px';
-    wrapper.appendChild(fontSizeLabel);
+    // Font Size Slider
+    const fontSizeRow = document.createElement('div');
+    fontSizeRow.className = 'font-size-row';
 
-    const fontSizeContainer = document.createElement('div');
-    fontSizeContainer.className = 'font-size-container';
+    const minSize = 12;
+    const maxSize = 24;
+    const sizePercentage = ((savedFontSize - minSize) / (maxSize - minSize)) * 100;
 
-    fontSizeContainer.innerHTML = `
-    <input type="range"
-    class="font-size-slider"
-    id="font-size-slider-settings"
-    min="12"
-    max="24"
-    value="${savedFontSize}"
-    aria-label="Font size slider">
-    <span class="font-size-value" id="font-size-value-settings">${savedFontSize}px</span>
+    fontSizeRow.innerHTML = `
+    <div class="slider-header">
+    <span class="slider-label">Font Size</span>
+    <span class="slider-value" id="font-size-display">${savedFontSize}px</span>
+    </div>
+    <div class="slider-track-wrapper">
+    <div class="slider-track">
+    <input type="range" class="slider-input" id="font-size-slider-settings"
+    min="${minSize}" max="${maxSize}" value="${savedFontSize}">
+    <div class="slider-fill" id="font-size-fill" style="width: ${sizePercentage}%"></div>
+    <div class="slider-handle" id="font-size-handle" style="left: ${sizePercentage}%"></div>
+    </div>
+    <div class="slider-labels">
+    <span>Small</span>
+    <span>Large</span>
+    </div>
+    </div>
+    <div class="font-preview" id="font-preview-text" style="font-size: ${savedFontSize}px;">
+    The quick brown fox jumps over the lazy dog.
+    </div>
     `;
 
-    const slider = fontSizeContainer.querySelector('#font-size-slider-settings');
-    const valueDisplay = fontSizeContainer.querySelector('#font-size-value-settings');
+    const fontSizeSlider = fontSizeRow.querySelector('#font-size-slider-settings');
+    const fontSizeDisplay = fontSizeRow.querySelector('#font-size-display');
+    const fontSizeFill = fontSizeRow.querySelector('#font-size-fill');
+    const fontSizeHandle = fontSizeRow.querySelector('#font-size-handle');
+    const fontPreview = fontSizeRow.querySelector('#font-preview-text');
 
-    slider.addEventListener('input', function() {
-        const size = this.value;
-        valueDisplay.textContent = `${size}px`;
+    fontSizeSlider.addEventListener('input', function() {
+        const size = parseInt(this.value);
+        const percentage = ((size - minSize) / (maxSize - minSize)) * 100;
+
+        fontSizeDisplay.textContent = `${size}px`;
+        fontSizeFill.style.width = `${percentage}%`;
+        fontSizeHandle.style.left = `${percentage}%`;
+        fontPreview.style.fontSize = `${size}px`;
+
         document.documentElement.style.setProperty('--font-size-base', `${size}px`);
         localStorage.setItem('fontSize', size);
     });
 
-    wrapper.appendChild(fontSizeContainer);
+    typographyControls.appendChild(fontSizeRow);
 
-    // 3. Reasoning Blocks Toggle
-    const savedReasoningCollapsed = localStorage.getItem('reasoningCollapsedByDefault');
+    // Reasoning Blocks Toggle (moved to Typography section)
     const reasoningExpandedByDefault = localStorage.getItem('reasoningExpandedByDefault') === 'true';
-    const reasoningLabel = document.createElement('h4');
-    reasoningLabel.textContent = 'Reasoning Blocks';
-    reasoningLabel.style.marginTop = '20px';
-    wrapper.appendChild(reasoningLabel);
 
-    const reasoningToggle = document.createElement('div');
-    reasoningToggle.className = 'setting-toggle-wrapper';
+    const reasoningToggleRow = document.createElement('div');
+    reasoningToggleRow.className = 'toggle-row';
+    reasoningToggleRow.innerHTML = `
+    <div class="toggle-info">
+    <span class="toggle-label">Expand Reasoning by Default</span>
+    <span class="toggle-description">Show full thinking/reasoning blocks when messages load</span>
+    </div>
+    <label class="toggle-switch">
+    <input type="checkbox" id="reasoning-expanded-checkbox" ${reasoningExpandedByDefault ? 'checked' : ''}>
+    <span class="toggle-slider"></span>
+    </label>
+    `;
 
-    const reasoningCheckbox = document.createElement('input');
-    reasoningCheckbox.type = 'checkbox';
-    reasoningCheckbox.id = 'reasoning-expanded-checkbox';
-    reasoningCheckbox.checked = reasoningExpandedByDefault;
-
-    const reasoningSwitch = document.createElement('label');
-    reasoningSwitch.className = 'toggle-switch';
-    reasoningSwitch.appendChild(reasoningCheckbox);
-
-    const reasoningSlider = document.createElement('span');
-    reasoningSlider.className = 'toggle-slider';
-    reasoningSwitch.appendChild(reasoningSlider);
-
-    const reasoningLabelSpan = document.createElement('span');
-    reasoningLabelSpan.className = 'setting-toggle-label';
-    reasoningLabelSpan.textContent = reasoningExpandedByDefault ? 'Expanded by default' : 'Collapsed by default';
+    const reasoningCheckbox = reasoningToggleRow.querySelector('#reasoning-expanded-checkbox');
 
     reasoningCheckbox.addEventListener('change', function() {
-        const isExpanded = this.checked;
-        localStorage.setItem('reasoningExpandedByDefault', isExpanded ? 'true' : 'false');
-        reasoningLabelSpan.textContent = isExpanded ? 'Expanded by default' : 'Collapsed by default';
+        localStorage.setItem('reasoningExpandedByDefault', this.checked ? 'true' : 'false');
     });
 
-    reasoningToggle.appendChild(reasoningSwitch);
-    reasoningToggle.appendChild(reasoningLabelSpan);
-    wrapper.appendChild(reasoningToggle);
+    typographyControls.appendChild(reasoningToggleRow);
+    typographySection.appendChild(typographyControls);
+    wrapper.appendChild(typographySection);
 
-    const reasoningDesc = document.createElement('p');
-    reasoningDesc.className = 'setting-description';
-    reasoningDesc.textContent = 'Set whether reasoning/thinking blocks appear expanded (on) or collapsed (off) by default';
-    wrapper.appendChild(reasoningDesc);
+    // ==========================================================================
+    // TYPEWRITER / AUDIO SETTINGS SECTION
+    // ==========================================================================
 
-    // --- Typewriter Effect Settings ---
-    const typewriterLabel = document.createElement('h4');
-    typewriterLabel.textContent = 'Typewriter Effect';
-    typewriterLabel.style.marginTop = '20px';
-    wrapper.appendChild(typewriterLabel);
+    const audioSection = document.createElement('div');
+    audioSection.className = 'audio-settings-section';
 
-    // Store references to disable/enable controls
-    let speedSlider, speedDisplay, soundFileBtn, soundFileInput, soundFileName;
-    let completionFileBtn, completionFileInput, completionFileName;
+    const audioHeader = document.createElement('div');
+    audioHeader.className = 'settings-section-header';
+    audioHeader.innerHTML = `
+    <div class="settings-section-icon audio-icon">
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+    <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+    <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+    </svg>
+    </div>
+    <div class="settings-section-title">
+    <h4>Typewriter Effect</h4>
+    <p>Configure text streaming animation and sounds</p>
+    </div>
+    `;
+    audioSection.appendChild(audioHeader);
 
-    // Toggle for enabling/disabling
+    // Enable/Disable Toggle
     const savedTypewriterEnabled = localStorage.getItem('typewriterEnabled') !== 'false';
 
-    const typewriterToggle = document.createElement('div');
-    typewriterToggle.className = 'setting-toggle-wrapper';
+    const twToggleRow = document.createElement('div');
+    twToggleRow.className = 'toggle-row';
+    twToggleRow.innerHTML = `
+    <div class="toggle-info">
+    <span class="toggle-label">Enable Effect</span>
+    <span class="toggle-description">Simulate typing by showing one character at a time</span>
+    </div>
+    <label class="toggle-switch">
+    <input type="checkbox" id="typewriter-enabled-checkbox" ${savedTypewriterEnabled ? 'checked' : ''}>
+    <span class="toggle-slider"></span>
+    </label>
+    `;
 
-    const twCheckbox = document.createElement('input');
-    twCheckbox.type = 'checkbox';
-    twCheckbox.id = 'typewriter-enabled-checkbox';
-    twCheckbox.checked = savedTypewriterEnabled;
+    const twCheckbox = twToggleRow.querySelector('#typewriter-enabled-checkbox');
 
-    const twSwitch = document.createElement('label');
-    twSwitch.className = 'toggle-switch';
-    twSwitch.appendChild(twCheckbox);
+    // Controls Container (show/hide based on toggle)
+    const twControls = document.createElement('div');
+    twControls.className = 'audio-control-group';
+    twControls.style.display = savedTypewriterEnabled ? 'flex' : 'none';
 
-    const twSlider = document.createElement('span');
-    twSlider.className = 'toggle-slider';
-    twSwitch.appendChild(twSlider);
-
-    const twLabelSpan = document.createElement('span');
-    twLabelSpan.className = 'setting-toggle-label';
-    twLabelSpan.textContent = savedTypewriterEnabled ? 'Enabled' : 'Disabled';
-
-    twCheckbox.addEventListener('change', function() {
-        const isEnabled = this.checked;
-        localStorage.setItem('typewriterEnabled', isEnabled ? 'true' : 'false');
-        twLabelSpan.textContent = isEnabled ? 'Enabled' : 'Disabled';
-
-        // Enable/disable related controls
-        if (speedSlider) speedSlider.disabled = !isEnabled;
-        if (soundFileBtn) soundFileBtn.disabled = !isEnabled;
-        if (completionFileBtn) completionFileBtn.disabled = !isEnabled;
-
-        // Update visual state
-        soundFileBtn?.classList.toggle('disabled', !isEnabled);
-        completionFileBtn?.classList.toggle('disabled', !isEnabled);
-    });
-
-    typewriterToggle.appendChild(twSwitch);
-    typewriterToggle.appendChild(twLabelSpan);
-    wrapper.appendChild(typewriterToggle);
-
-    // Speed Slider (1-200ms)
-    const speedContainer = document.createElement('div');
-    speedContainer.className = 'font-size-container';
+    // Speed Slider
     const currentSpeed = parseInt(localStorage.getItem("typewriterSpeed") ?? "30", 10);
-    speedContainer.innerHTML = `
-    <input type="range" class="font-size-slider" id="typewriter-speed-slider"
-    min="1" max="200" value="${currentSpeed}" ${!savedTypewriterEnabled ? 'disabled' : ''}>
-    <span class="font-size-value" id="typewriter-speed-value">${currentSpeed}ms</span>
-    `;
-    wrapper.appendChild(speedContainer);
+    const minSpeed = 1;
+    const maxSpeed = 200;
+    const speedPercentage = ((currentSpeed - minSpeed) / (maxSpeed - minSpeed)) * 100;
 
-    speedSlider = speedContainer.querySelector('#typewriter-speed-slider');
-    speedDisplay = speedContainer.querySelector('#typewriter-speed-value');
+    const speedRow = document.createElement('div');
+    speedRow.className = 'slider-row';
+    speedRow.innerHTML = `
+    <div class="slider-header">
+    <span class="slider-label">Speed</span>
+    <span class="slider-value" id="typewriter-speed-value">${currentSpeed}ms</span>
+    </div>
+    <div class="slider-track-wrapper">
+    <div class="slider-track">
+    <input type="range" class="slider-input" id="typewriter-speed-slider"
+    min="${minSpeed}" max="${maxSpeed}" value="${currentSpeed}">
+    <div class="slider-fill" id="speed-fill" style="width: ${speedPercentage}%"></div>
+    <div class="slider-handle" id="speed-handle" style="left: ${speedPercentage}%"></div>
+    </div>
+    <div class="slider-labels">
+    <span>Fast</span>
+    <span>Slow</span>
+    </div>
+    </div>
+    `;
+
+    const speedSlider = speedRow.querySelector('#typewriter-speed-slider');
+    const speedDisplay = speedRow.querySelector('#typewriter-speed-value');
+    const speedFill = speedRow.querySelector('#speed-fill');
+    const speedHandle = speedRow.querySelector('#speed-handle');
+
     speedSlider.addEventListener('input', function() {
-        const val = this.value;
+        const val = parseInt(this.value);
+        const percentage = ((val - minSpeed) / (maxSpeed - minSpeed)) * 100;
         speedDisplay.textContent = `${val}ms`;
-        localStorage.setItem('typewriterSpeed', parseInt(val));
+        speedFill.style.width = `${percentage}%`;
+        speedHandle.style.left = `${percentage}%`;
+        localStorage.setItem('typewriterSpeed', val);
     });
 
-    // --- Audio Settings Container ---
-    const audioSectionLabel = document.createElement('h4');
-    audioSectionLabel.textContent = 'Audio';
-    audioSectionLabel.style.marginTop = '20px';
-    wrapper.appendChild(audioSectionLabel);
+    twControls.appendChild(speedRow);
 
-    // --- Volume Slider (NEW) ---
-    const volumeContainer = document.createElement('div');
-    volumeContainer.className = 'font-size-container';
-    const currentVolume = Math.round((parseFloat(localStorage.getItem('typewriterVolume') || '1.0')) * 100);
+    // ==========================================================================
+    // SWEEP FADE TOGGLE (NEW SECTION)
+    // ==========================================================================
 
-    volumeContainer.innerHTML = `
-    Volume
-    <input type="range" class="font-size-slider" id="typewriter-volume-slider"
-    min="0" max="100" value="${currentVolume}" ${!savedTypewriterEnabled ? 'disabled' : ''}>
-    <span class="font-size-value" id="typewriter-volume-value">${currentVolume}%</span>
+    const fadeEnabled = localStorage.getItem('typewriterFadeEnabled') === 'true';
+
+    const fadeToggleRow = document.createElement('div');
+    fadeToggleRow.className = 'toggle-row';
+    fadeToggleRow.innerHTML = `
+    <div class="toggle-info">
+    <span class="toggle-label">Fade</span>
+    <span class="toggle-description">Letters fade in smoothly as they appear</span>
+    </div>
+    <label class="toggle-switch">
+    <input type="checkbox" id="typewriter-fade-checkbox" ${fadeEnabled ? 'checked' : ''}>
+    <span class="toggle-slider"></span>
+    </label>
     `;
-    wrapper.appendChild(volumeContainer);
 
-    volumeSlider = volumeContainer.querySelector('#typewriter-volume-slider');
-    const volumeDisplay = volumeContainer.querySelector('#typewriter-volume-value');
+    const fadeCheckbox = fadeToggleRow.querySelector('#typewriter-fade-checkbox');
+    fadeCheckbox.addEventListener('change', function() {
+        localStorage.setItem('typewriterFadeEnabled', this.checked ? 'true' : 'false');
+    });
+
+    twControls.appendChild(fadeToggleRow);
+
+
+    // Volume Control
+    const currentVolume = Math.round((parseFloat(localStorage.getItem('typewriterVolume') || '1.0')) * 100);
 
     // Sync volume with manager on load
     if (savedTypewriterEnabled) {
         TypewriterAudioManager.setVolume(currentVolume / 100);
     }
 
+    const volumeRow = document.createElement('div');
+    volumeRow.className = 'slider-row volume-row';
+
+    const getVolumeIcon = (vol) => {
+        if (vol === 0) {
+            return `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <line x1="23" y1="9" x2="17" y2="15"></line>
+            <line x1="17" y1="9" x2="23" y2="15"></line>
+            </svg>`;
+        } else if (vol < 50) {
+            return `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+            </svg>`;
+        }
+        return `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+        <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+        <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+        </svg>`;
+    };
+
+    volumeRow.innerHTML = `
+    <div class="slider-header">
+    <div class="volume-icon-wrapper" id="volume-icon">${getVolumeIcon(currentVolume)}</div>
+    <span class="slider-label">Volume</span>
+    <span class="slider-value" id="typewriter-volume-value">${currentVolume}%</span>
+    </div>
+    <div class="slider-track-wrapper">
+    <div class="slider-track">
+    <input type="range" class="slider-input" id="typewriter-volume-slider"
+    min="0" max="100" value="${currentVolume}">
+    <div class="slider-fill" id="volume-fill" style="width: ${currentVolume}%"></div>
+    <div class="slider-handle" id="volume-handle" style="left: ${currentVolume}%"></div>
+    </div>
+    <div class="slider-labels">
+    <span>Mute</span>
+    <span>Max</span>
+    </div>
+    </div>
+    `;
+
+    const volumeSlider = volumeRow.querySelector('#typewriter-volume-slider');
+    const volumeDisplay = volumeRow.querySelector('#typewriter-volume-value');
+    const volumeFill = volumeRow.querySelector('#volume-fill');
+    const volumeHandle = volumeRow.querySelector('#volume-handle');
+    const volumeIcon = volumeRow.querySelector('#volume-icon');
+
     volumeSlider.addEventListener('input', function() {
-        const val = this.value;
+        const val = parseInt(this.value);
         volumeDisplay.textContent = `${val}%`;
-        const vol = val / 100;
-        TypewriterAudioManager.setVolume(vol);
+        volumeFill.style.width = `${val}%`;
+        volumeHandle.style.left = `${val}%`;
+        volumeIcon.innerHTML = getVolumeIcon(val);
+        TypewriterAudioManager.setVolume(val / 100);
+        localStorage.setItem('typewriterVolume', val / 100);
     });
 
-    // Helper to create file input UI
-    const createAudioInputUI = (id, labelText, savedName) => {
+    twControls.appendChild(volumeRow);
+
+    // Sound File Inputs
+    const soundContainer = document.createElement('div');
+    soundContainer.className = 'sound-inputs-container';
+
+    // Helper function to check if audio is loaded in manager or localStorage
+    const isAudioLoaded = (id) => {
+        // Check if audio buffer exists in manager
+        if (TypewriterAudioManager.buffers && TypewriterAudioManager.buffers[id]) {
+            return true;
+        }
+        // Check localStorage for saved data
+        return !!localStorage.getItem(`${id}SoundData`);
+    };
+
+    const createSoundInput = (id, labelText, iconPath, savedName) => {
+        const hasAudio = isAudioLoaded(id);
+
         const container = document.createElement('div');
-        container.className = 'setting-item';
+        container.className = 'sound-input-card';
+        container.dataset.soundId = id;
 
-        const label = document.createElement('label');
-        label.className = 'setting-label';
-        label.textContent = labelText;
-        container.appendChild(label);
-
-        const fileContainer = document.createElement('div');
-        fileContainer.className = 'file-input-container';
-
-        const fileInput = document.createElement('input');
-        fileInput.type = 'file';
-        fileInput.accept = 'audio/*';
-        fileInput.style.display = 'none';
-
-        const fileBtn = document.createElement('button');
-        fileBtn.type = 'button';
-        fileBtn.className = 'file-input-btn' + (!savedTypewriterEnabled ? ' disabled' : '');
-        fileBtn.disabled = !savedTypewriterEnabled;
-        fileBtn.innerHTML = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-        <polyline points="17 8 12 3 7 8"/>
-        <line x1="12" y1="3" x2="12" y2="15"/>
+        container.innerHTML = `
+        <div class="sound-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        ${iconPath}
         </svg>
-        <span>Choose File</span>
-        `;
-
-        const fileName = document.createElement('span');
-        fileName.className = 'file-name';
-        fileName.textContent = savedName || 'No file selected';
-
-        const clearBtn = document.createElement('button');
-        clearBtn.type = 'button';
-        clearBtn.className = 'file-clear-btn';
-        clearBtn.title = 'Clear sound';
-        clearBtn.disabled = !savedTypewriterEnabled;
-        clearBtn.innerHTML = `
+        </div>
+        <div class="sound-info">
+        <span class="sound-label">${labelText}</span>
+        <span class="sound-filename ${hasAudio ? 'loaded' : ''}" id="${id}-filename">${savedName || 'No file selected'}</span>
+        </div>
+        <div class="sound-actions">
+        <button type="button" class="sound-action-btn preview" id="${id}-preview-btn" title="Preview sound" ${!hasAudio ? 'disabled' : ''}>
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+        </svg>
+        </button>
+        <button type="button" class="sound-action-btn upload" id="${id}-upload-btn" title="Upload sound">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+        <polyline points="17 8 12 3 7 8"></polyline>
+        <line x1="12" y1="3" x2="12" y2="15"></line>
+        </svg>
+        </button>
+        <button type="button" class="sound-action-btn clear" id="${id}-clear-btn" title="Remove sound" ${!hasAudio ? 'disabled' : ''}>
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <line x1="18" y1="6" x2="6" y2="18"></line>
         <line x1="6" y1="6" x2="18" y2="18"></line>
         </svg>
+        </button>
+        </div>
+        <input type="file" accept="audio/*" id="${id}-file-input" style="display: none;">
         `;
 
-        // Event Listeners
-        fileBtn.addEventListener('click', () => fileInput.click());
+        const previewBtn = container.querySelector(`#${id}-preview-btn`);
+        const uploadBtn = container.querySelector(`#${id}-upload-btn`);
+        const clearBtn = container.querySelector(`#${id}-clear-btn`);
+        const fileInput = container.querySelector(`#${id}-file-input`);
+        const filenameDisplay = container.querySelector(`#${id}-filename`);
+
+        // Pre-load audio from localStorage if available
+        if (hasAudio && !TypewriterAudioManager.buffers?.[id]) {
+            const savedData = localStorage.getItem(`${id}SoundData`);
+            if (savedData) {
+                // Decode and store in manager
+                try {
+                    TypewriterAudioManager.loadFromDataURL(id, savedData).catch(err => {
+                        console.warn('Failed to preload audio:', err);
+                    });
+                } catch (err) {
+                    console.warn('Failed to preload audio:', err);
+                }
+            }
+        }
+
+        uploadBtn.addEventListener('click', () => fileInput.click());
 
         fileInput.addEventListener('change', async (e) => {
             const file = e.target.files[0];
-            if (file) {
-                try {
-                    // Use manager to save and decode
-                    await TypewriterAudioManager.saveFile(id, file);
-                    localStorage.setItem(`${id}SoundName`, file.name);
-                    fileName.textContent = file.name;
-                } catch (err) {
-                    console.error(err);
-                    fileName.textContent = 'Error loading file';
-                }
+            if (!file) return;
+
+            try {
+                await TypewriterAudioManager.saveFile(id, file);
+                localStorage.setItem(`${id}SoundName`, file.name);
+                filenameDisplay.textContent = file.name;
+                filenameDisplay.classList.add('loaded');
+                filenameDisplay.classList.remove('error');
+                previewBtn.disabled = false;
+                clearBtn.disabled = false;
+            } catch (err) {
+                console.error('Failed to load audio:', err);
+                filenameDisplay.textContent = 'Error loading file';
+                filenameDisplay.classList.add('error');
+                filenameDisplay.classList.remove('loaded');
+                setTimeout(() => {
+                    filenameDisplay.classList.remove('error');
+                    filenameDisplay.textContent = savedName || 'No file selected';
+                }, 2000);
             }
+        });
+
+        previewBtn.addEventListener('click', () => {
+            // Try to play the sound
+            TypewriterAudioManager.play(id);
+            previewBtn.classList.add('playing');
+            setTimeout(() => previewBtn.classList.remove('playing'), 500);
         });
 
         clearBtn.addEventListener('click', () => {
             TypewriterAudioManager.deleteFile(id);
             localStorage.removeItem(`${id}SoundName`);
-            fileName.textContent = 'No file selected';
+            filenameDisplay.textContent = 'No file selected';
+            filenameDisplay.classList.remove('loaded');
+            previewBtn.disabled = true;
+            clearBtn.disabled = true;
             fileInput.value = '';
         });
 
-        fileContainer.appendChild(fileInput);
-        fileContainer.appendChild(fileBtn);
-        fileContainer.appendChild(fileName);
-        fileContainer.appendChild(clearBtn);
-        container.appendChild(fileContainer);
-
-        return { container, fileBtn, clearBtn };
+        return container;
     };
 
-    // Typewriter Sound
-    const savedSoundName = localStorage.getItem("typewriterSoundName");
-    const twUI = createAudioInputUI('typewriter', 'Typewriter Sound', savedSoundName);
-    wrapper.appendChild(twUI.container);
-    soundFileBtn = twUI.fileBtn;
-    soundClearBtn = twUI.clearBtn;
+    const typewriterIcon = '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>';
+    const completionIcon = '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>';
 
-    // Completion Sound
-    const savedCompletionName = localStorage.getItem("completionSoundName");
-    const compUI = createAudioInputUI('completion', 'Message Completed Sound', savedCompletionName);
-    wrapper.appendChild(compUI.container);
-    completionFileBtn = compUI.fileBtn;
-    completionClearBtn = compUI.clearBtn;
+    const twSoundInput = createSoundInput(
+        'typewriter',
+        'Typewriter Sound',
+        typewriterIcon,
+        localStorage.getItem("typewriterSoundName")
+    );
+    soundContainer.appendChild(twSoundInput);
 
-    // 4. Appearance Mode (Dark/Light)
+    const compSoundInput = createSoundInput(
+        'completion',
+        'Completion Sound',
+        completionIcon,
+        localStorage.getItem("completionSoundName")
+    );
+    soundContainer.appendChild(compSoundInput);
+
+    twControls.appendChild(soundContainer);
+    audioSection.appendChild(twToggleRow);
+    audioSection.appendChild(twControls);
+    wrapper.appendChild(audioSection);
+
+    // Toggle handler - show/hide controls with display: none
+    twCheckbox.addEventListener('change', function() {
+        const isEnabled = this.checked;
+        localStorage.setItem('typewriterEnabled', isEnabled ? 'true' : 'false');
+
+        // Show/hide controls with fade animation
+        if (isEnabled) {
+            twControls.style.display = 'flex';
+            // Trigger reflow for animation
+            twControls.offsetHeight;
+            twControls.classList.add('visible');
+        } else {
+            twControls.classList.remove('visible');
+            // Wait for fade out before hiding
+            setTimeout(() => {
+                if (!twCheckbox.checked) {
+                    twControls.style.display = 'none';
+                }
+            }, 200);
+        }
+    });
+
+    // Initialize visibility state
+    if (savedTypewriterEnabled) {
+        twControls.classList.add('visible');
+    }
+
+
+    // ==========================================================================
+    // THEME MODE TOGGLE
+    // ==========================================================================
+
+    const themeModeSection = document.createElement('div');
+    themeModeSection.className = 'theme-mode-section';
+
     const modeToggle = document.createElement('div');
     modeToggle.className = 'theme-mode-toggle';
 
     modeToggle.innerHTML = `
-    <span class="theme-mode-label">
+    <span class="theme-mode-label dark-label">
     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
     Dark
     </span>
@@ -2159,7 +2348,7 @@ function createThemeSection() {
     <input type="checkbox" id="theme-mode-checkbox-settings" ${savedMode === 'light' ? 'checked' : ''}>
     <span class="theme-slider"></span>
     </label>
-    <span class="theme-mode-label">
+    <span class="theme-mode-label light-label">
     Light
     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
     </span>
@@ -2173,13 +2362,20 @@ function createThemeSection() {
         updateThemeButtonsInSettings();
     });
 
-    wrapper.appendChild(modeToggle);
+    themeModeSection.appendChild(modeToggle);
+    wrapper.appendChild(themeModeSection);
 
-    // 4. Color Theme
+    // ==========================================================================
+    // COLOR THEME GRID
+    // ==========================================================================
+
+    const colorThemeSection = document.createElement('div');
+    colorThemeSection.className = 'color-theme-section';
+
     const themeLabel = document.createElement('h4');
     themeLabel.textContent = 'Color Theme';
-    themeLabel.style.marginTop = '20px';
-    wrapper.appendChild(themeLabel);
+    themeLabel.className = 'section-heading';
+    colorThemeSection.appendChild(themeLabel);
 
     const themeGrid = document.createElement('div');
     themeGrid.className = 'theme-grid';
@@ -2197,14 +2393,11 @@ function createThemeSection() {
 
         const bgColor = previewTheme.vars['--bg-primary'];
         const accentColor = previewTheme.vars['--accent'];
-        const textColor = previewTheme.vars['--text-primary'] || '#ffffff';
-        const hasBothModes = variants.dark && variants.light;
         const themeName = previewTheme.name;
 
         btn.innerHTML = `
-        <div class="theme-preview" style="background: linear-gradient(135deg, ${bgColor} 50%, ${accentColor} 50%);">
-        </div>
-        <span class="theme-name" style="display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: min(13px, 0.7rem); max-width: 100%; line-height: 1.2; padding: 4px 2px;">${themeName}</span>
+        <div class="theme-preview" style="background: linear-gradient(135deg, ${bgColor} 50%, ${accentColor} 50%);"></div>
+        <span class="theme-name">${themeName}</span>
         `;
 
         btn.onclick = () => {
@@ -2216,10 +2409,12 @@ function createThemeSection() {
         themeGrid.appendChild(btn);
     });
 
-    wrapper.appendChild(themeGrid);
+    colorThemeSection.appendChild(themeGrid);
+    wrapper.appendChild(colorThemeSection);
 
     return wrapper;
 }
+
 
 function getThemeFamilies() {
     const families = new Map();

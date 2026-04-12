@@ -1,0 +1,130 @@
+/* =============================================================================
+ *  Typewriter Animation Styles
+ *  ============================================================================= */
+
+/* Base character wrapper */
+.tw-char {
+    display: inline;
+    opacity: 1;
+}
+
+/* Fade effect - characters fade in */
+@keyframes tw-fade {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+}
+
+.tw-char.tw-fade {
+    opacity: 0;
+    animation: tw-fade var(--tw-duration, 300ms) ease-out forwards;
+}
+
+/* Slide effects - characters slide in from direction */
+@keyframes tw-slide-top {
+    0% {
+        transform: translateY(-15px);
+        opacity: 0;
+    }
+    100% {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes tw-slide-bottom {
+    0% {
+        transform: translateY(15px);
+        opacity: 0;
+    }
+    100% {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes tw-slide-left {
+    0% {
+        transform: translateX(-15px);
+        opacity: 0;
+    }
+    100% {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes tw-slide-right {
+    0% {
+        transform: translateX(15px);
+        opacity: 0;
+    }
+    100% {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+.tw-char.tw-slide-top {
+    opacity: 0;
+    animation: tw-slide-top var(--tw-duration, 300ms) ease-out forwards;
+}
+
+.tw-char.tw-slide-bottom {
+    opacity: 0;
+    animation: tw-slide-bottom var(--tw-duration, 300ms) ease-out forwards;
+}
+
+.tw-char.tw-slide-left {
+    opacity: 0;
+    animation: tw-slide-left var(--tw-duration, 300ms) ease-out forwards;
+}
+
+.tw-char.tw-slide-right {
+    opacity: 0;
+    animation: tw-slide-right var(--tw-duration, 300ms) ease-out forwards;
+}
+
+/* Combined fade + slide */
+.tw-char.tw-slide-top.tw-fade,
+.tw-char.tw-slide-bottom.tw-fade,
+.tw-char.tw-slide-left.tw-fade,
+.tw-char.tw-slide-right.tw-fade {
+    /* These already include opacity in their keyframes */
+}
+
+/* Wave/Spring effect - bouncy entrance */
+@keyframes tw-wave {
+    0% {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+    25% {
+        transform: translateY(-10px);  /* Overshoot up */
+        opacity: 1;
+    }
+    45% {
+        transform: translateY(6px);    /* Overshoot down */
+    }
+    60% {
+        transform: translateY(-3px);   /* Small overshoot up */
+    }
+    75% {
+        transform: translateY(2px);     /* Tiny overshoot down */
+    }
+    100% {
+        transform: translateY(0);       /* Settle */
+        opacity: 1;
+    }
+}
+
+.tw-char.tw-wave {
+    opacity: 0;
+    animation: tw-wave var(--tw-duration, 600ms) cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    animation-delay: var(--tw-delay, 0ms);
+}
+
+/* Ensure animations play only once and stay at final state */
+.tw-char {
+    animation-fill-mode: forwards;
+    animation-iteration-count: 1;
+}
