@@ -1903,7 +1903,7 @@ function createThemeSection() {
 
     wrapper.appendChild(fontSizeContainer);
 
-    // Reasoning Blocks Toggle
+    // 3. Reasoning Blocks Toggle
     const savedReasoningCollapsed = localStorage.getItem('reasoningCollapsedByDefault');
     const reasoningExpandedByDefault = localStorage.getItem('reasoningExpandedByDefault') === 'true';
     const reasoningLabel = document.createElement('h4');
@@ -1917,7 +1917,7 @@ function createThemeSection() {
     const reasoningCheckbox = document.createElement('input');
     reasoningCheckbox.type = 'checkbox';
     reasoningCheckbox.id = 'reasoning-expanded-checkbox';
-    reasoningCheckbox.checked = reasoningExpandedByDefault; // ON = Expanded
+    reasoningCheckbox.checked = reasoningExpandedByDefault;
 
     const reasoningSwitch = document.createElement('label');
     reasoningSwitch.className = 'toggle-switch';
@@ -1946,7 +1946,207 @@ function createThemeSection() {
     reasoningDesc.textContent = 'Set whether reasoning/thinking blocks appear expanded (on) or collapsed (off) by default';
     wrapper.appendChild(reasoningDesc);
 
-    // 3. Appearance Mode (Dark/Light)
+    // --- Typewriter Effect Settings ---
+    const typewriterLabel = document.createElement('h4');
+    typewriterLabel.textContent = 'Typewriter Effect';
+    typewriterLabel.style.marginTop = '20px';
+    wrapper.appendChild(typewriterLabel);
+
+    // Store references to disable/enable controls
+    let speedSlider, speedDisplay, soundFileBtn, soundFileInput, soundFileName;
+    let completionFileBtn, completionFileInput, completionFileName;
+
+    // Toggle for enabling/disabling
+    const savedTypewriterEnabled = localStorage.getItem('typewriterEnabled') !== 'false';
+
+    const typewriterToggle = document.createElement('div');
+    typewriterToggle.className = 'setting-toggle-wrapper';
+
+    const twCheckbox = document.createElement('input');
+    twCheckbox.type = 'checkbox';
+    twCheckbox.id = 'typewriter-enabled-checkbox';
+    twCheckbox.checked = savedTypewriterEnabled;
+
+    const twSwitch = document.createElement('label');
+    twSwitch.className = 'toggle-switch';
+    twSwitch.appendChild(twCheckbox);
+
+    const twSlider = document.createElement('span');
+    twSlider.className = 'toggle-slider';
+    twSwitch.appendChild(twSlider);
+
+    const twLabelSpan = document.createElement('span');
+    twLabelSpan.className = 'setting-toggle-label';
+    twLabelSpan.textContent = savedTypewriterEnabled ? 'Enabled' : 'Disabled';
+
+    twCheckbox.addEventListener('change', function() {
+        const isEnabled = this.checked;
+        localStorage.setItem('typewriterEnabled', isEnabled ? 'true' : 'false');
+        twLabelSpan.textContent = isEnabled ? 'Enabled' : 'Disabled';
+
+        // Enable/disable related controls
+        if (speedSlider) speedSlider.disabled = !isEnabled;
+        if (soundFileBtn) soundFileBtn.disabled = !isEnabled;
+        if (completionFileBtn) completionFileBtn.disabled = !isEnabled;
+
+        // Update visual state
+        soundFileBtn?.classList.toggle('disabled', !isEnabled);
+        completionFileBtn?.classList.toggle('disabled', !isEnabled);
+    });
+
+    typewriterToggle.appendChild(twSwitch);
+    typewriterToggle.appendChild(twLabelSpan);
+    wrapper.appendChild(typewriterToggle);
+
+    // Speed Slider (1-200ms)
+    const speedContainer = document.createElement('div');
+    speedContainer.className = 'font-size-container';
+    const currentSpeed = parseInt(localStorage.getItem("typewriterSpeed") ?? "30", 10);
+    speedContainer.innerHTML = `
+    <input type="range" class="font-size-slider" id="typewriter-speed-slider"
+    min="1" max="200" value="${currentSpeed}" ${!savedTypewriterEnabled ? 'disabled' : ''}>
+    <span class="font-size-value" id="typewriter-speed-value">${currentSpeed}ms</span>
+    `;
+    wrapper.appendChild(speedContainer);
+
+    speedSlider = speedContainer.querySelector('#typewriter-speed-slider');
+    speedDisplay = speedContainer.querySelector('#typewriter-speed-value');
+    speedSlider.addEventListener('input', function() {
+        const val = this.value;
+        speedDisplay.textContent = `${val}ms`;
+        localStorage.setItem('typewriterSpeed', parseInt(val));
+    });
+
+    // --- Audio Settings Container ---
+    const audioSectionLabel = document.createElement('h4');
+    audioSectionLabel.textContent = 'Audio';
+    audioSectionLabel.style.marginTop = '20px';
+    wrapper.appendChild(audioSectionLabel);
+
+    // --- Volume Slider (NEW) ---
+    const volumeContainer = document.createElement('div');
+    volumeContainer.className = 'font-size-container';
+    const currentVolume = Math.round((parseFloat(localStorage.getItem('typewriterVolume') || '1.0')) * 100);
+
+    volumeContainer.innerHTML = `
+    Volume
+    <input type="range" class="font-size-slider" id="typewriter-volume-slider"
+    min="0" max="100" value="${currentVolume}" ${!savedTypewriterEnabled ? 'disabled' : ''}>
+    <span class="font-size-value" id="typewriter-volume-value">${currentVolume}%</span>
+    `;
+    wrapper.appendChild(volumeContainer);
+
+    volumeSlider = volumeContainer.querySelector('#typewriter-volume-slider');
+    const volumeDisplay = volumeContainer.querySelector('#typewriter-volume-value');
+
+    // Sync volume with manager on load
+    if (savedTypewriterEnabled) {
+        TypewriterAudioManager.setVolume(currentVolume / 100);
+    }
+
+    volumeSlider.addEventListener('input', function() {
+        const val = this.value;
+        volumeDisplay.textContent = `${val}%`;
+        const vol = val / 100;
+        TypewriterAudioManager.setVolume(vol);
+    });
+
+    // Helper to create file input UI
+    const createAudioInputUI = (id, labelText, savedName) => {
+        const container = document.createElement('div');
+        container.className = 'setting-item';
+
+        const label = document.createElement('label');
+        label.className = 'setting-label';
+        label.textContent = labelText;
+        container.appendChild(label);
+
+        const fileContainer = document.createElement('div');
+        fileContainer.className = 'file-input-container';
+
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = 'audio/*';
+        fileInput.style.display = 'none';
+
+        const fileBtn = document.createElement('button');
+        fileBtn.type = 'button';
+        fileBtn.className = 'file-input-btn' + (!savedTypewriterEnabled ? ' disabled' : '');
+        fileBtn.disabled = !savedTypewriterEnabled;
+        fileBtn.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="17 8 12 3 7 8"/>
+        <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        <span>Choose File</span>
+        `;
+
+        const fileName = document.createElement('span');
+        fileName.className = 'file-name';
+        fileName.textContent = savedName || 'No file selected';
+
+        const clearBtn = document.createElement('button');
+        clearBtn.type = 'button';
+        clearBtn.className = 'file-clear-btn';
+        clearBtn.title = 'Clear sound';
+        clearBtn.disabled = !savedTypewriterEnabled;
+        clearBtn.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="18" y1="6" x2="6" y2="18"></line>
+        <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+        `;
+
+        // Event Listeners
+        fileBtn.addEventListener('click', () => fileInput.click());
+
+        fileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                try {
+                    // Use manager to save and decode
+                    await TypewriterAudioManager.saveFile(id, file);
+                    localStorage.setItem(`${id}SoundName`, file.name);
+                    fileName.textContent = file.name;
+                } catch (err) {
+                    console.error(err);
+                    fileName.textContent = 'Error loading file';
+                }
+            }
+        });
+
+        clearBtn.addEventListener('click', () => {
+            TypewriterAudioManager.deleteFile(id);
+            localStorage.removeItem(`${id}SoundName`);
+            fileName.textContent = 'No file selected';
+            fileInput.value = '';
+        });
+
+        fileContainer.appendChild(fileInput);
+        fileContainer.appendChild(fileBtn);
+        fileContainer.appendChild(fileName);
+        fileContainer.appendChild(clearBtn);
+        container.appendChild(fileContainer);
+
+        return { container, fileBtn, clearBtn };
+    };
+
+    // Typewriter Sound
+    const savedSoundName = localStorage.getItem("typewriterSoundName");
+    const twUI = createAudioInputUI('typewriter', 'Typewriter Sound', savedSoundName);
+    wrapper.appendChild(twUI.container);
+    soundFileBtn = twUI.fileBtn;
+    soundClearBtn = twUI.clearBtn;
+
+    // Completion Sound
+    const savedCompletionName = localStorage.getItem("completionSoundName");
+    const compUI = createAudioInputUI('completion', 'Message Completed Sound', savedCompletionName);
+    wrapper.appendChild(compUI.container);
+    completionFileBtn = compUI.fileBtn;
+    completionClearBtn = compUI.clearBtn;
+
+    // 4. Appearance Mode (Dark/Light)
     const modeToggle = document.createElement('div');
     modeToggle.className = 'theme-mode-toggle';
 

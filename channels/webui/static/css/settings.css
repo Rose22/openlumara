@@ -1424,6 +1424,90 @@
     }
 }
 
+/* File Input Button Styles */
+.file-input-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+}
+
+.file-input-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.file-input-btn:hover:not(:disabled) {
+    background: var(--bg-tertiary);
+    border-color: var(--accent);
+}
+
+.file-input-btn:disabled,
+.file-input-btn.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.file-input-btn svg {
+    flex-shrink: 0;
+}
+
+.file-clear-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.file-clear-btn:hover:not(:disabled) {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border-color: var(--danger-color, #f88);
+}
+
+.file-clear-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.file-name {
+    color: var(--text-muted);
+    font-size: 12px;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.setting-item {
+    margin-top: 12px;
+}
+
+.setting-label {
+    display: block;
+    font-weight: 500;
+    margin-bottom: 4px;
+    color: var(--text-primary);
+}
+
 /* ==========================================================================
  *  Utilities & Accessibility
  *  ========================================================================== */

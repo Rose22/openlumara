@@ -48,6 +48,7 @@ JS_FILES = [
     "send",
     "upload",
     "theming",
+    "audio",
     "modal_settings",
     "storage_editor",
     "responsive",
