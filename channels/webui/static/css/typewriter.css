@@ -19,6 +19,13 @@
     animation: tw-fade var(--tw-duration, 300ms) ease-out forwards;
 }
 
+/* Fade effect for typewriter */
+.typewriter-fade {
+    display: inline;
+    -webkit-mask-image: linear-gradient(to right, black 40%, transparent 100%);
+    mask-image: linear-gradient(to right, black 40%, transparent 100%);
+}
+
 /* Ensure animations play only once and stay at final state */
 .tw-char {
     animation-fill-mode: forwards;

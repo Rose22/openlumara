@@ -498,24 +498,22 @@ function updateStreamingContent(msgDiv, content, reasoning) {
     // Highlight code blocks
     highlightCode(msgDiv);
 
-    // Apply fade effect to the last text node if enabled
+    // Apply fade effect if enabled
     const fadeEnabled = localStorage.getItem('typewriterFadeEnabled') === 'true';
 
     if (fadeEnabled && content && content.length > 0) {
-        applyFadeToLastTextNode(msgDiv, content.length);
+        applyFastFade(msgDiv);
     }
 }
 
 /**
- * Traverses the DOM to find the last text node and applies the fade effect
- * to the last N characters by wrapping them in opacity spans.
+ * Optimized fade effect: wraps the last N characters in a single span
+ * with a CSS gradient mask.
  */
-function applyFadeToLastTextNode(rootElement, totalContentLength) {
+function applyFastFade(rootElement) {
     const fadeLength = 8;
-    const minOpacity = 0.1;
 
-    // Find the deepest last child (the tail of the content)
-    // We traverse specifically to find the last text node in the visual order.
+    // Find the deepest last text node in the DOM tree
     let lastTextNode = findLastTextNode(rootElement);
 
     if (!lastTextNode) return;
@@ -523,116 +521,60 @@ function applyFadeToLastTextNode(rootElement, totalContentLength) {
     const textContent = lastTextNode.textContent;
     const textLen = textContent.length;
 
-    // We can only fade as many characters as exist in this specific node.
-    // Usually, the last node contains the tail of the content.
-    // Calculate how many chars to fade in THIS node.
+    // Determine how many characters to fade
     const fadeCount = Math.min(fadeLength, textLen);
 
     if (fadeCount <= 0) return;
 
-    // Split the text node: [Stable Part] [Fade Part]
-    // We keep the stable part as a text node, and replace the fade part with spans.
+    // Split the text node at the boundary
+    // Example: "Hello World" (fade 5) -> Split at length-5
     const splitIndex = textLen - fadeCount;
 
-    // If splitIndex is 0, we are fading the whole node.
-    // If splitIndex > 0, we split the node.
+    // If splitIndex is 0, we fade the whole node.
+    // If splitIndex > 0, we need to separate the stable part from the fade part.
 
-    const stablePart = textContent.substring(0, splitIndex);
-    const fadePart = textContent.substring(splitIndex);
+    if (splitIndex > 0) {
+        // Split the node: "Hello " (stable) and "World" (fade)
+        lastTextNode.splitText(splitIndex);
+        // Now lastTextNode is the stable part. The fade part is lastTextNode.nextSibling.
+        // We want to wrap the *next* sibling.
+        const fadeNode = lastTextNode.nextSibling;
+        if (fadeNode) {
+            const span = document.createElement('span');
+            span.className = 'typewriter-fade';
+            // Wrap the fade text node in the span
+            fadeNode.parentNode.insertBefore(span, fadeNode);
+            span.appendChild(fadeNode);
+        }
+    } else {
+        // We fade the whole node (content is shorter than fadeLength)
+        // We wrap the current lastTextNode itself.
+        const span = document.createElement('span');
+        span.className = 'typewriter-fade';
+        lastTextNode.parentNode.insertBefore(span, lastTextNode);
+        span.appendChild(lastTextNode);
+    }
+}
 
-    // Create a fragment for the faded characters
-    const fragment = document.createDocumentFragment();
-
-    // 1. Add the stable text first (if any)
-    if (stablePart) {
-        fragment.appendChild(document.createTextNode(stablePart));
+/**
+ * Helper to find the last text node in a DOM tree (depth-first).
+ */
+function findLastTextNode(node) {
+    if (node.nodeType === Node.TEXT_NODE) {
+        // Skip empty whitespace nodes if they are the *only* thing,
+        // but usually the last text node has content in a streaming message.
+        if (node.textContent.trim().length === 0) return null;
+        return node;
     }
 
-    // 2. Add the faded characters
-    // To calculate opacity correctly relative to the entire message stream,
-    // we need to map local index to global index.
-    // However, since this node is strictly the LAST node, its characters are the last chars of the stream.
-    // So local position 'i' corresponds to global position 'i'.
+    // Iterate children backwards to find the last meaningful node
+    for (let i = node.childNodes.length - 1; i >= 0; i--) {
+        const child = node.childNodes[i];
+        const result = findLastTextNode(child);
+        if (result) return result;
+    }
 
-    const fadeChars = Array.from(fadePart); // Handle unicode
-
-    fadeChars.forEach((char, i) => {
-        // Calculate position relative to the fade window
-        // i=0 -> start of fade zone (oldest in fade zone)
-        // i=max -> end of fade zone (newest)
-
-        // Position from end of stream:
-        // The last char (i = length-1) is the newest.
-        // The char at i=0 in fadePart is the oldest within the fade part.
-
-        // Note: In a partial fade (e.g. fadeLength 8, but node only has 3 chars),
-        // we assume these 3 chars are the absolute newest characters.
-        // So the first char in this fadePart (i=0) should actually have opacity based on its position
-        // relative to the global fadeLength.
-
-        // If fadePart has 3 chars, they are positions -3, -2, -1.
-        // Global fadeLength is 8.
-        // Pos -3 should be opacity ~0.6?
-        // Or should we just treat them as the last 3?
-        // "most recent character is the lowest opacity... 8 characters back being full opacity"
-        // If we only have 3 chars in this node, we don't have the "8 chars back".
-        // We assume the "missing" earlier chars are in the stable text node we just created.
-
-        // So we map opacity based on the index within the fade window.
-        const progress = (fadeLength > 1) ? (i / (fadeLength - 1)) : 0;
-        // Clamp progress to [0, 1] just in case
-        const clampedProgress = Math.min(1, Math.max(0, progress));
-
-        // Opacity: 1.0 (old) -> minOpacity (new)
-        // i=0 is older (closer to stable). opacity = 1.0 - (0/7)*0.9 = 1.0
-        // i=7 is newer. opacity = 1.0 - (7/7)*0.9 = 0.1
-        // BUT, if we have only 3 chars, i=0,1,2.
-        // If we use i/7:
-        // i=0 -> 1.0
-        // i=2 -> 1.0 - (2/7)*0.9 = 0.74
-        // This makes them relatively brighter than they should be?
-        // Actually, if they are the last 3 chars of the whole stream, they are the newest.
-        // They should be the dimmest.
-        // Last 3 chars indices globally are -3, -2, -1.
-        // Positions in fade window of 8: indices 5, 6, 7.
-        // Opacities: 0.35, 0.22, 0.1
-
-        // Correct calculation:
-        // Global index relative to end:
-        // We need to know how many characters exist before this node in the DOM?
-        // That's hard to calculate efficiently (requires traversing previous siblings).
-
-        // Heuristic approach:
-        // If this node contains less than fadeLength, we assume it is the tail of the stream.
-        // We map the opacity such that the very last character is the dimmest.
-        // We scale the interpolation based on how many chars we have.
-
-        // Let's use the simple logic: The first char in 'fadePart' is the oldest among the fading ones.
-        // The last char is the newest.
-        // We map 0...len-1 to 1.0...minOpacity.
-
-        // i=0 (oldest in this chunk) -> 1.0
-        // i=len-1 (newest) -> minOpacity
-        // This is visually correct for a "sweep fade" effect on the tail, regardless of total length.
-
-        let opacity = 1.0;
-        if (fadeChars.length > 1) {
-            const localProgress = i / (fadeChars.length - 1);
-            opacity = 1.0 - (localProgress * (1.0 - minOpacity));
-        } else {
-            // Single char, so it's the newest.
-            opacity = minOpacity;
-        }
-
-        const span = document.createElement('span');
-        span.style.opacity = opacity.toFixed(2);
-        span.textContent = char;
-        fragment.appendChild(span);
-    });
-
-    // Replace the original text node with our fragment
-    // (We effectively remove the old node and insert the new structure)
-    lastTextNode.parentNode.replaceChild(fragment, lastTextNode);
+    return null;
 }
 
 /**
