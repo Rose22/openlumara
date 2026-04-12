@@ -2001,7 +2001,7 @@ function createThemeSection() {
     twToggleRow.className = 'toggle-row';
     twToggleRow.innerHTML = `
     <div class="toggle-info">
-    <span class="toggle-label">Enable Effect</span>
+    <span class="toggle-label">Enable</span>
     <span class="toggle-description">Simulate typing by showing one character at a time</span>
     </div>
     <label class="toggle-switch">
@@ -2016,6 +2016,32 @@ function createThemeSection() {
     const twControls = document.createElement('div');
     twControls.className = 'audio-control-group';
     twControls.style.display = savedTypewriterEnabled ? 'flex' : 'none';
+
+    // ==========================================================================
+    // SWEEP FADE TOGGLE
+    // ==========================================================================
+
+    const fadeEnabled = localStorage.getItem('typewriterFadeEnabled') === 'true';
+
+    const fadeToggleRow = document.createElement('div');
+    fadeToggleRow.className = 'toggle-row';
+    fadeToggleRow.innerHTML = `
+    <div class="toggle-info">
+    <span class="toggle-label">Fade</span>
+    <span class="toggle-description">Letters fade in smoothly as they appear</span>
+    </div>
+    <label class="toggle-switch">
+    <input type="checkbox" id="typewriter-fade-checkbox" ${fadeEnabled ? 'checked' : ''}>
+    <span class="toggle-slider"></span>
+    </label>
+    `;
+
+    const fadeCheckbox = fadeToggleRow.querySelector('#typewriter-fade-checkbox');
+    fadeCheckbox.addEventListener('change', function() {
+        localStorage.setItem('typewriterFadeEnabled', this.checked ? 'true' : 'false');
+    });
+
+    twControls.appendChild(fadeToggleRow);
 
     // Speed Slider
     const currentSpeed = parseInt(localStorage.getItem("typewriterSpeed") ?? "30", 10);
@@ -2059,33 +2085,6 @@ function createThemeSection() {
     });
 
     twControls.appendChild(speedRow);
-
-    // ==========================================================================
-    // SWEEP FADE TOGGLE (NEW SECTION)
-    // ==========================================================================
-
-    const fadeEnabled = localStorage.getItem('typewriterFadeEnabled') === 'true';
-
-    const fadeToggleRow = document.createElement('div');
-    fadeToggleRow.className = 'toggle-row';
-    fadeToggleRow.innerHTML = `
-    <div class="toggle-info">
-    <span class="toggle-label">Fade</span>
-    <span class="toggle-description">Letters fade in smoothly as they appear</span>
-    </div>
-    <label class="toggle-switch">
-    <input type="checkbox" id="typewriter-fade-checkbox" ${fadeEnabled ? 'checked' : ''}>
-    <span class="toggle-slider"></span>
-    </label>
-    `;
-
-    const fadeCheckbox = fadeToggleRow.querySelector('#typewriter-fade-checkbox');
-    fadeCheckbox.addEventListener('change', function() {
-        localStorage.setItem('typewriterFadeEnabled', this.checked ? 'true' : 'false');
-    });
-
-    twControls.appendChild(fadeToggleRow);
-
 
     // Volume Control
     const currentVolume = Math.round((parseFloat(localStorage.getItem('typewriterVolume') || '1.0')) * 100);
