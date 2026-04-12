@@ -157,7 +157,7 @@ class Chats(core.module.Module):
     # command version
     @core.module.command("search", temporary=True)
     async def cmd_search(self, args: list):
-        """searches within your chat history"""
+        """Searches within your chat history"""
         query = " ".join(args)
         found = await self._search(query)
         if not found:
@@ -173,8 +173,7 @@ class Chats(core.module.Module):
     async def search(self, query: str):
         """
         Searches within all previous chats the user ever had with you. very useful for recalling information from the past!
-
-        IMPORTANT: When user asks about things that happened before the current chat, search your chat history.
+        Use only if user explicitely requests it, or if you can't find a past event the user is referring to within your current context!
         """
         found = await self._search(query)
         if not found:

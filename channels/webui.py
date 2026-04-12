@@ -300,15 +300,7 @@ def list_models():
 
     try:
         models = _run_async(channel_instance.manager.API.list_models())
-        # Extract model IDs from the response
-        model_list = []
-        if models and hasattr(models, 'data'):
-            for model in models.data:
-                model_list.append({
-                    'id': model.id,
-                    'owned_by': getattr(model, 'owned_by', 'unknown')
-                })
-        return jsonify({'models': model_list})
+        return jsonify({'models': models})
     except Exception as e:
         return jsonify({
             'models': [],

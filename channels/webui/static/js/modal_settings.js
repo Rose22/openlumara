@@ -643,16 +643,16 @@ function createModelInput(key, value) {
         // Add models from cache
         cachedModels.forEach(model => {
             const option = document.createElement('option');
-            option.value = model.id;
-            option.textContent = model.id;
-            if (model.id === value) {
+            option.value = model;
+            option.textContent = model;
+            if (model === value) {
                 option.selected = true;
             }
             select.appendChild(option);
         });
 
         // If current value not in list, add it as custom
-        if (value && !cachedModels.find(m => m.id === value)) {
+        if (value && !cachedModels.find(m => m === value)) {
             const customOption = document.createElement('option');
             customOption.value = value;
             customOption.textContent = `${value} (custom)`;

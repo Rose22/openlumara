@@ -16,9 +16,9 @@ class Models(core.module.Module):
             self.models = models
 
         current_model = self.manager.API.get_model()
-        if len(self.models.data) > 1:
+        if len(self.models) > 1:
             output = f"Current model: {current_model}\nModels you can switch to using the models_switch() toolcall: "
-            output += ", ".join([model.id for model in self.models.data])
+            output += ", ".join(self.models)
         else:
             self._header = "current model"
             output = current_model
@@ -42,8 +42,7 @@ class Models(core.module.Module):
                 return "Failed to fetch models"
             self.models = models
 
-        model_list = "\n".join([model.id for model in self.models.data])
-        return model_list
+        return "\n".join(self.models)
 
     async def switch(self, name: str):
         if not self.models:
@@ -51,10 +50,10 @@ class Models(core.module.Module):
 
         found = False
         found_id = None
-        for model in self.models.data:
-            if model.id.lower() == name.strip().lower():
+        for model_id in self.models:
+            if model_id == name.strip().lower():
                 found = True
-                found_id = model.id
+                found_id = model_id
 
         if not found:
             return "model does not exist. use models_list() first"

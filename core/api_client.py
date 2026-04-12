@@ -365,8 +365,11 @@ class APIClient():
 
         try:
             models = await self._AI.models.list()
+            models_list = [model.id for model in models.data]
+            models_list.sort()
+
         except Exception as e:
             core.log_error("error while retrieving model list", e)
             return []
 
-        return models
+        return models_list
