@@ -935,7 +935,7 @@ const themes = {
         }
     },
     'dark-github': {
-        name: 'GitHub Dark',
+        name: 'GitHub',
         mode: 'dark',
         vars: {
             '--bg-primary': '#0d1117',
@@ -1102,7 +1102,7 @@ const themes = {
      * LIGHT THEMES
      * ------------ */
     'light-monochrome': {
-        name: 'Monochrome Light',
+        name: 'Monochrome',
         mode: 'light',
         vars: {
             '--bg-primary': '#fafafa',
@@ -1156,7 +1156,7 @@ const themes = {
         }
     },
     'light-pink': {
-        name: 'Pink Light',
+        name: 'Pink',
         mode: 'light',
         vars: {
             '--bg-primary': '#fdf5fa',
@@ -1210,7 +1210,7 @@ const themes = {
         }
     },
     'light-rose': {
-        name: 'Rose Light',
+        name: 'Rose',
         mode: 'light',
         vars: {
             '--bg-primary': '#fff5f7',
@@ -1264,7 +1264,7 @@ const themes = {
         }
     },
     'light-red': {
-        name: 'Red Light',
+        name: 'Red',
         mode: 'light',
         vars: {
             '--bg-primary': '#fef6f6',
@@ -1318,7 +1318,7 @@ const themes = {
         }
     },
     'light-purple': {
-        name: 'Purple Light',
+        name: 'Purple',
         mode: 'light',
         vars: {
             '--bg-primary': '#faf8fc',
@@ -1372,7 +1372,7 @@ const themes = {
         }
     },
     'light-blue': {
-        name: 'Blue Light',
+        name: 'Blue',
         mode: 'light',
         vars: {
             '--bg-primary': '#f8fafc',
@@ -1426,7 +1426,7 @@ const themes = {
         }
     },
     'light-cyan': {
-        name: 'Cyan Light',
+        name: 'Cyan',
         mode: 'light',
         vars: {
             '--bg-primary': '#f8fcfc',
@@ -1480,7 +1480,7 @@ const themes = {
         }
     },
     'light-teal': {
-        name: 'Teal Light',
+        name: 'Teal',
         mode: 'light',
         vars: {
             '--bg-primary': '#f8fcfa',
@@ -1534,7 +1534,7 @@ const themes = {
         }
     },
     'light-emerald': {
-        name: 'Emerald Light',
+        name: 'Emerald',
         mode: 'light',
         vars: {
             '--bg-primary': '#f8fdf8',
@@ -1588,7 +1588,7 @@ const themes = {
         }
     },
     'light-sepia': {
-        name: 'Sepia Light',
+        name: 'Sepia',
         mode: 'light',
         vars: {
             '--bg-primary': '#faf8f4',
@@ -1642,7 +1642,7 @@ const themes = {
         }
     },
     'light-catppuccin': {
-        name: 'Catppuccin Light',
+        name: 'Catppuccin',
         mode: 'light',
         vars: {
             '--bg-primary': '#fefaff',
@@ -1696,7 +1696,7 @@ const themes = {
         }
     },
     'light-dracula': {
-        name: 'Dracula Light',
+        name: 'Dracula',
         mode: 'light',
         vars: {
             '--bg-primary': '#faf8fc',
@@ -1750,7 +1750,7 @@ const themes = {
         }
     },
     'light-nord': {
-        name: 'Nord Light',
+        name: 'Nord',
         mode: 'light',
         vars: {
             '--bg-primary': '#f8fafc',
@@ -1804,7 +1804,7 @@ const themes = {
         }
     },
     'light-indigo': {
-        name: 'Indigo Light',
+        name: 'Indigo',
         mode: 'light',
         vars: {
             '--bg-primary': '#faf8ff',
@@ -1858,7 +1858,7 @@ const themes = {
         }
     },
     'light-gruvbox': {
-        name: 'Gruvbox Light',
+        name: 'Gruvbox',
         mode: 'light',
         vars: {
             '--bg-primary': '#faf8f5',
@@ -1912,7 +1912,7 @@ const themes = {
         }
     },
     'light-tokyo-night': {
-        name: 'Tokyo Night Light',
+        name: 'Tokyo Night',
         mode: 'light',
         vars: {
             '--bg-primary': '#f8fafc',
@@ -1966,7 +1966,7 @@ const themes = {
         }
     },
     'light-material': {
-        name: 'Material Light',
+        name: 'Material',
         mode: 'light',
         vars: {
             '--bg-primary': '#fafafa',
@@ -2020,7 +2020,7 @@ const themes = {
         }
     },
     'light-github': {
-        name: 'GitHub Light',
+        name: 'GitHub',
         mode: 'light',
         vars: {
             '--bg-primary': '#ffffff',
@@ -2074,7 +2074,7 @@ const themes = {
         }
     },
     'light-monokai': {
-        name: 'Monokai Light',
+        name: 'Monokai',
         mode: 'light',
         vars: {
             '--bg-primary': '#faf8f5',
@@ -2128,7 +2128,7 @@ const themes = {
         }
     },
     'light-slate': {
-        name: 'Slate Light',
+        name: 'Slate',
         mode: 'light',
         vars: {
             '--bg-primary': '#f8fafc',
@@ -2182,7 +2182,7 @@ const themes = {
         }
     },
     'light-sakura': {
-        name: 'Sakura Light',
+        name: 'Sakura',
         mode: 'light',
         vars: {
             // === TYPOGRAPHY ===
@@ -2260,7 +2260,7 @@ const themes = {
         }
     },
     'dark-sakura': {
-        name: 'Sakura Dark',
+        name: 'Sakura',
         mode: 'dark',
         vars: {
             // === SHAPES (Bubbly) ===
@@ -2276,7 +2276,7 @@ const themes = {
             '--bg-message-user': 'linear-gradient(135deg, #da1884 0%, #a01570 100%)',
             '--bg-message-ai': '#180810',
             '--bg-message-announce': 'linear-gradient(135deg, #2a0c1a 0%, #1a0810 100%)',
-            '--bg-message-command': 'linear-gradient(135deg, #4a1830 0%, #3a1020 100%)', // Dark Pink (Not Green!)
+            '--bg-message-command': 'linear-gradient(135deg, #4a1830 0%, #3a1020 100%)', // Pink (Not Green!)
             '--bg-message-command-response': 'linear-gradient(135deg, #2a1828 0%, #1a1020 100%)',
             '--bg-input': '#1a0812',
             '--bg-code': '#0e0608',
@@ -2370,7 +2370,7 @@ const themes = {
             '--border-user': '#a78bfa',     // Medium Purple
             '--border-sidebar': '#f0e8ff',
 
-            '--text-primary': '#4c3b66',    // Dark Grape
+            '--text-primary': '#4c3b66',    // Grape
             '--text-secondary': '#7c6a9c',  // Muted Purple
             '--text-muted': '#a898c0',
             '--text-code': '#6b4c9a',
@@ -2423,7 +2423,7 @@ const themes = {
             '--border-user': '#e74c3c',
             '--border-sidebar': '#fdebd0',
 
-            '--text-primary': '#641e16',    // Dark Red Brown
+            '--text-primary': '#641e16',    // Red Brown
             '--text-secondary': '#a04030',
             '--text-muted': '#c08878',
             '--text-code': '#c0392b',
@@ -2476,7 +2476,7 @@ const themes = {
             '--border-user': '#ad1457',     // Ruby Red
             '--border-sidebar': '#f8bbd0',
 
-            '--text-primary': '#4a1a2c',    // Dark Maroon
+            '--text-primary': '#4a1a2c',    // Maroon
             '--text-secondary': '#88506a',
             '--text-muted': '#bf809a',
             '--text-code': '#880e4f',
@@ -2506,10 +2506,10 @@ const themes = {
         }
     },
     'dark-lavender': {
-        name: 'Lavender Dark',
+        name: 'Lavender',
         mode: 'dark',
         vars: {
-            // === SHAPES (Matching Light) ===
+            // === SHAPES (Matching) ===
             '--radius-sm': '10px',
             '--radius-md': '18px',
             '--radius-lg': '24px',
@@ -2517,7 +2517,7 @@ const themes = {
 
             // === COLORS (Deep Purple/Grape) ===
             '--bg-primary': '#0c0a14',      // Deep Void
-            '--bg-secondary': '#140e1e',    // Dark Violet
+            '--bg-secondary': '#140e1e',    // Violet
             '--bg-tertiary': '#201830',
             '--bg-message-user': 'linear-gradient(135deg, #4c2875 0%, #381850 100%)',
             '--bg-message-ai': '#180e20',
@@ -2572,18 +2572,18 @@ const themes = {
 
             // === COLORS (Neon Barbie Cyberpunk) ===
             '--bg-primary': '#050208',      // Deep Void
-            '--bg-secondary': '#0a0012',    // Dark Magenta Black
-            '--bg-tertiary': '#180020',     // Dark Neon Purple
+            '--bg-secondary': '#0a0012',    // Magenta Black
+            '--bg-tertiary': '#180020',     // Neon Purple
             '--bg-message-user': 'linear-gradient(135deg, #da1884 0%, #a01570 100%)', // Barbie Pink Gradient (Sakura style)
             '--bg-message-ai': '#08000c',   // Almost black pink
             '--bg-message-announce': 'linear-gradient(135deg, #150015 0%, #0a000a 100%)',
             '--bg-message-command': 'linear-gradient(135deg, #001810 0%, #000f08 100%)', // Matrix Green tint
             '--bg-message-command-response': 'linear-gradient(135deg, #1a0018 0%, #100015 100%)',
-            '--bg-input': '#060008',        // Darkest input
+            '--bg-input': '#060008',        //est input
             '--bg-code': '#040006',
             '--bg-sidebar': '#030005',
 
-            '--border-color': '#3a0030',     // Dark Neon Border
+            '--border-color': '#3a0030',     // Neon Border
             '--border-message': '#500040',
             '--border-user': '#da1884',      // Barbie Pink Border
             '--border-sidebar': '#1a0015',
@@ -2635,10 +2635,10 @@ const themes = {
         }
     },
     'light-cyberpink': {
-        name: 'Cyberpink Light',
+        name: 'Cyberpink',
         mode: 'light',
         vars: {
-            // === SHAPES (Matching Dark) ===
+            // === SHAPES (Matching) ===
             '--radius-sm': '6px',
             '--radius-md': '12px',
             '--radius-lg': '18px',
@@ -2663,7 +2663,7 @@ const themes = {
             '--border-sidebar': '#ffd8e4',
 
             '--text-primary': '#2a0030',    // Deep Magenta/Black
-            '--text-secondary': '#a00050',  // Dark Pink
+            '--text-secondary': '#a00050',  // Pink
             '--text-muted': '#e060a0',
             '--text-code': '#00b8d4',       // Cyan Code
 
@@ -2692,7 +2692,7 @@ const themes = {
             '--shadow-glow': '0 0 15px var(--accent-glow)',
 
             // === DECORATION ===
-            // Subtle Cyberpunk Grid on Light + Sakura Sparkles
+            // Subtle Cyberpunk Grid on + Sakura Sparkles
             '--bg-pattern': `
             linear-gradient(rgba(255, 0, 128, 0.05) 1px, transparent 1px),
             linear-gradient(90deg, rgba(255, 0, 128, 0.05) 1px, transparent 1px),
@@ -2703,11 +2703,11 @@ const themes = {
             '--bg-pattern-size': '30px 30px, 30px 30px, 200px 200px, 180px 180px, 150px 150px',
 
             '--message-decoration': '1px solid rgba(255, 0, 128, 0.1)',
-            '--avatar-shape': '15%' // Matching Dark
+            '--avatar-shape': '15%' // Matching
         }
     },
     'dark-cupcake': {
-        name: 'Cupcake Dark',
+        name: 'Cupcake',
         mode: 'dark',
         vars: {
             // === SHAPES (Bubbly) ===
@@ -2717,7 +2717,7 @@ const themes = {
             '--radius-xl': '999px',
 
             // === COLORS (Dark Chocolate & Strawberry) ===
-            '--bg-primary': '#0f0806',      // Dark Chocolate
+            '--bg-primary': '#0f0806',      // Chocolate
             '--bg-secondary': '#1a0e0a',
             '--bg-tertiary': '#281814',
             '--bg-message-user': 'linear-gradient(135deg, #4a1818 0%, #381414 100%)', // Strawberry Red
@@ -2762,7 +2762,7 @@ const themes = {
         }
     },
     'dark-heart': {
-        name: 'Heart Dark',
+        name: 'Heart',
         mode: 'dark',
         vars: {
             // === SHAPES (Curly/Elegant) ===
@@ -2772,7 +2772,7 @@ const themes = {
             '--radius-xl': '999px',
 
             // === COLORS (Dark Burgundy/Lace) ===
-            '--bg-primary': '#14060c',      // Dark Wine
+            '--bg-primary': '#14060c',      // Wine
             '--bg-secondary': '#1e0e14',
             '--bg-tertiary': '#2c141e',
             '--bg-message-user': 'linear-gradient(135deg, #3a1020 0%, #2a0c18 100%)',
@@ -2814,6 +2814,409 @@ const themes = {
             '--bg-pattern': 'radial-gradient(circle, rgba(216, 27, 96, 0.05) 1px, transparent 1px)',
             '--message-decoration': '1px solid rgba(216, 27, 96, 0.3)',
             '--avatar-shape': '50%'
+        }
+    },
+    'dark-amber-terminal': {
+        name: 'Terminal Amber',
+        mode: 'dark',
+        vars: {
+            // === SHAPES ===
+            '--radius-sm': '0px',
+            '--radius-md': '0px',
+            '--radius-lg': '2px',
+            '--radius-xl': '2px',
+
+            // === COLORS (Classic Amber Phosphor CRT) ===
+            '--bg-primary': '#0a0800',
+            '--bg-secondary': '#100c00',
+            '--bg-tertiary': '#1a1400',
+            '--bg-message-user': 'linear-gradient(135deg, #1a1200 0%, #120c00 100%)',
+            '--bg-message-ai': '#060500',
+            '--bg-message-announce': 'linear-gradient(135deg, #100a00 0%, #0a0800 100%)',
+            '--bg-message-command': 'linear-gradient(135deg, #181000 0%, #100a00 100%)',
+            '--bg-message-command-response': 'linear-gradient(135deg, #1a1000 0%, #120c00 100%)',
+            '--bg-input': '#080600',
+            '--bg-code': '#050400',
+            '--bg-sidebar': '#040300',
+
+            '--border-color': '#3a2800',
+            '--border-message': '#2a1c00',
+            '--border-user': '#ffaa00',
+            '--border-sidebar': '#1a1200',
+
+            '--text-primary': '#ffb000',
+            '--text-secondary': '#e09800',
+            '--text-muted': '#806020',
+            '--text-code': '#ffc040',
+
+            '--accent': '#ffb000',
+            '--accent-glow': 'rgba(255, 176, 0, 0.7)',
+            '--accent-secondary': '#ff9500',
+
+            '--error': '#ff4422',
+            '--error-bg': 'linear-gradient(135deg, #1a0800 0%, #100400 100%)',
+            '--error-border': '#ff4422',
+
+            '--info': '#ffcc44',
+            '--info-bg': 'linear-gradient(135deg, #1a1000 0%, #100a00 100%)',
+            '--info-border': '#ffcc44',
+
+            '--button-bg': 'linear-gradient(135deg, #201800 0%, #180e00 100%)',
+            '--button-hover': 'linear-gradient(135deg, #302000 0%, #201800 100%)',
+            '--button-stop': 'linear-gradient(135deg, #200800 0%, #180400 100%)',
+            '--button-stop-hover': 'linear-gradient(135deg, #300c00 0%, #200800 100%)',
+            '--button-stop-glow': 'rgba(255, 68, 34, 0.5)',
+
+            '--scrollbar': '#2a1c00',
+            '--scrollbar-hover': '#3a2800',
+
+            '--shadow-soft': '0 4px 12px rgba(255, 176, 0, 0.15)',
+            '--shadow-glow': '0 0 30px var(--accent-glow), 0 0 60px rgba(255, 176, 0, 0.25)',
+
+            // === DECORATION ===
+            '--bg-pattern': `
+            repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0, 0, 0, 0.35) 2px,
+                                      rgba(0, 0, 0, 0.35) 4px
+            ),
+            linear-gradient(
+                90deg,
+                transparent,
+                rgba(255, 176, 0, 0.02) 50%,
+                            transparent
+            ),
+            radial-gradient(
+                ellipse at center,
+                transparent 0%,
+                rgba(0, 0, 0, 0.3) 90%,
+                            rgba(0, 0, 0, 0.6) 100%
+            )
+            `,
+            '--bg-pattern-size': '100% 100%, 100% 100%, 100% 100%',
+
+            '--message-decoration': '1px solid rgba(255, 176, 0, 0.15)',
+            '--avatar-shape': '0%'
+        }
+    },
+    'light-amber-terminal': {
+        name: 'Terminal Amber)',
+        mode: 'light',
+        vars: {
+            // === SHAPES ===
+            '--radius-sm': '0px',
+            '--radius-md': '0px',
+            '--radius-lg': '2px',
+            '--radius-xl': '2px',
+
+            // === COLORS (Amber on Cream) ===
+            '--bg-primary': '#faf5e8',
+            '--bg-secondary': '#f5f0d8',
+            '--bg-tertiary': '#f0e8c8',
+            '--bg-message-user': 'linear-gradient(135deg, #f5e8c8 0%, #f0e0b8 100%)',
+            '--bg-message-ai': '#fdf8f0',
+            '--bg-message-announce': 'linear-gradient(135deg, #f5f0d8 0%, #faf5e8 100%)',
+            '--bg-message-command': 'linear-gradient(135deg, #f8e8c0 0%, #f0e0b0 100%)',
+            '--bg-message-command-response': 'linear-gradient(135deg, #f5e8c5 0%, #f0e0b8 100%)',
+            '--bg-input': '#fcf8f0',
+            '--bg-code': '#faf5e8',
+            '--bg-sidebar': '#faf5e8',
+
+            '--border-color': '#c0a050',
+            '--border-message': '#d0b870',
+            '--border-user': '#b07010',
+            '--border-sidebar': '#e0d0a0',
+
+            '--text-primary': '#805000',
+            '--text-secondary': '#a06800',
+            '--text-muted': '#a08050',
+            '--text-code': '#905800',
+
+            '--accent': '#c07000',
+            '--accent-glow': 'rgba(192, 112, 0, 0.3)',
+            '--accent-secondary': '#d08010',
+
+            '--error': '#c02020',
+            '--error-bg': 'linear-gradient(135deg, #f8e0e0 0%, #f0d0d0 100%)',
+            '--error-border': '#c02020',
+
+            '--info': '#a06010',
+            '--info-bg': 'linear-gradient(135deg, #f5e8d0 0%, #f0e0c0 100%)',
+            '--info-border': '#a06010',
+
+            '--button-bg': 'linear-gradient(135deg, #f0d8a0 0%, #e8d090 100%)',
+            '--button-hover': 'linear-gradient(135deg, #e8d090 0%, #e0c880 100%)',
+            '--button-stop': 'linear-gradient(135deg, #f8d8d8 0%, #f0c8c8 100%)',
+            '--button-stop-hover': 'linear-gradient(135deg, #f0c8c8 0%, #e8b8b8 100%)',
+            '--button-stop-glow': 'rgba(192, 32, 32, 0.3)',
+
+            '--scrollbar': '#d0b870',
+            '--scrollbar-hover': '#c0a050',
+
+            '--shadow-soft': '0 4px 12px rgba(192, 112, 0, 0.1)',
+            '--shadow-glow': '0 0 20px rgba(192, 112, 0, 0.15)',
+
+            // === DECORATION ===
+            '--bg-pattern': `
+            repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(128, 80, 0, 0.03) 2px,
+                                      rgba(128, 80, 0, 0.03) 4px
+            )
+            `,
+            '--bg-pattern-size': '100% 100%',
+
+            '--message-decoration': '1px solid rgba(192, 112, 0, 0.2)',
+            '--avatar-shape': '0%'
+        }
+    },
+    'dark-retro-terminal': {
+        name: 'Terminal Green',
+        mode: 'dark',
+        vars: {
+            // === SHAPES (Blocky, no curves - pure terminal) ===
+            '--radius-sm': '0px',
+            '--radius-md': '0px',
+            '--radius-lg': '2px',
+            '--radius-xl': '2px',
+
+            // === COLORS (Classic Phosphor Green CRT) ===
+            '--bg-primary': '#0a0a0a',       // Near black CRT glass
+            '--bg-secondary': '#0d110d',     // Slight green tint
+            '--bg-tertiary': '#101a10',      // phosphor glow
+            '--bg-message-user': 'linear-gradient(135deg, #0f1a0f 0%, #0a120a 100%)',
+            '--bg-message-ai': '#050805',    // Deep CRT black
+            '--bg-message-announce': 'linear-gradient(135deg, #0a100a 0%, #060806 100%)',
+            '--bg-message-command': 'linear-gradient(135deg, #0a150a 0%, #061006 100%)',
+            '--bg-message-command-response': 'linear-gradient(135deg, #0d150d 0%, #080c08 100%)',
+            '--bg-input': '#080a08',         // Input black-green
+            '--bg-code': '#040604',
+            '--bg-sidebar': '#030503',
+
+            '--border-color': '#1a3a1a',     // Dim green border
+            '--border-message': '#0f250f',
+            '--border-user': '#00ff41',      // Bright phosphor green
+            '--border-sidebar': '#0a150a',
+
+            '--text-primary': '#00ff41',     // CLASSIC TERMINAL GREEN
+            '--text-secondary': '#00cc33',   // Slightly dimmer green
+            '--text-muted': '#008820',        // Dim green for less important
+            '--text-code': '#00ff41',
+
+            '--accent': '#00ff41',            // Phosphor green accent
+            '--accent-glow': 'rgba(0, 255, 65, 0.7)',
+            '--accent-secondary': '#00ff41',
+
+            '--error': '#ff3333',             // Red for system errors
+            '--error-bg': 'linear-gradient(135deg, #1a0505 0%, #0d0303 100%)',
+            '--error-border': '#ff3333',
+
+            '--info': '#33ff99',              // Bright info green
+            '--info-bg': 'linear-gradient(135deg, #051a0a 0%, #030d05 100%)',
+            '--info-border': '#33ff99',
+
+            '--button-bg': 'linear-gradient(135deg, #0a1f0a 0%, #061506 100%)',
+            '--button-hover': 'linear-gradient(135deg, #0f2a0f 0%, #0a1f0a 100%)',
+            '--button-stop': 'linear-gradient(135deg, #1a0505 0%, #0d0303 100%)',
+            '--button-stop-hover': 'linear-gradient(135deg, #250808 0%, #1a0505 100%)',
+            '--button-stop-glow': 'rgba(255, 51, 51, 0.5)',
+
+            '--scrollbar': '#0a200a',
+            '--scrollbar-hover': '#0f300f',
+
+            '--shadow-soft': '0 4px 12px rgba(0, 255, 65, 0.15)',
+            '--shadow-glow': '0 0 30px var(--accent-glow), 0 0 60px rgba(0, 255, 65, 0.3)',
+
+            // === DECORATION ===
+            // CRT SCANLINES + Screen Glow + Flicker Effect
+            '--bg-pattern': `
+            repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0, 0, 0, 0.35) 2px,
+                                      rgba(0, 0, 0, 0.35) 4px
+            ),
+            linear-gradient(
+                90deg,
+                transparent,
+                rgba(0, 255, 65, 0.02) 50%,
+                            transparent
+            ),
+            radial-gradient(
+                ellipse at center,
+                transparent 0%,
+                rgba(0, 0, 0, 0.3) 90%,
+                            rgba(0, 0, 0, 0.6) 100%
+            )
+            `,
+            // Scanlines + Vertical gradient + CRT vignette
+            '--bg-pattern-size': '100% 100%, 100% 100%, 100% 100%',
+
+            '--message-decoration': '1px solid rgba(0, 255, 65, 0.15)',
+            '--avatar-shape': '0%' // Square, no rounded corners
+        }
+    },
+    'light-retro-terminal': {
+        name: 'Terminal Green',
+        mode: 'light',
+        vars: {
+            // === SHAPES ===
+            '--radius-sm': '0px',
+            '--radius-md': '0px',
+            '--radius-lg': '2px',
+            '--radius-xl': '2px',
+
+            // === COLORS (Green on Cream - oldschool paper terminal) ===
+            '--bg-primary': '#f0f5e8',
+            '--bg-secondary': '#e8f0d8',
+            '--bg-tertiary': '#d8e8c8',
+            '--bg-message-user': 'linear-gradient(135deg, #e0f0c8 0%, #d0e8b8 100%)',
+            '--bg-message-ai': '#f5f8ef',
+            '--bg-message-announce': 'linear-gradient(135deg, #e8f0d8 0%, #f0f5e8 100%)',
+            '--bg-message-command': 'linear-gradient(135deg, #d8f0d0 0%, #c8e8c0 100%)',
+            '--bg-message-command-response': 'linear-gradient(135deg, #e0f0d0 0%, #d8e8c0 100%)',
+            '--bg-input': '#f8faf5',
+            '--bg-code': '#f5f8f0',
+            '--bg-sidebar': '#f5f8f0',
+
+            '--border-color': '#80a060',
+            '--border-message': '#a0c080',
+            '--border-user': '#206020',
+            '--border-sidebar': '#c0d8a0',
+
+            '--text-primary': '#1a4020',
+            '--text-secondary': '#306030',
+            '--text-muted': '#608050',
+            '--text-code': '#205020',
+
+            '--accent': '#208020',
+            '--accent-glow': 'rgba(32, 128, 32, 0.3)',
+            '--accent-secondary': '#408040',
+
+            '--error': '#c02020',
+            '--error-bg': 'linear-gradient(135deg, #f0d8d8 0%, #e8c8c8 100%)',
+            '--error-border': '#c02020',
+
+            '--info': '#2060a0',
+            '--info-bg': 'linear-gradient(135deg, #d8e8f8 0%, #c8d8f0 100%)',
+            '--info-border': '#2060a0',
+
+            '--button-bg': 'linear-gradient(135deg, #d0e8c0 0%, #c0d8b0 100%)',
+            '--button-hover': 'linear-gradient(135deg, #c0d8b0 0%, #b0c8a0 100%)',
+            '--button-stop': 'linear-gradient(135deg, #f0d8d8 0%, #e8c8c8 100%)',
+            '--button-stop-hover': 'linear-gradient(135deg, #e8c8c8 0%, #d8b8b8 100%)',
+            '--button-stop-glow': 'rgba(192, 32, 32, 0.3)',
+
+            '--scrollbar': '#a0c080',
+            '--scrollbar-hover': '#80a060',
+
+            '--shadow-soft': '0 4px 12px rgba(32, 128, 32, 0.1)',
+            '--shadow-glow': '0 0 20px rgba(32, 128, 32, 0.15)',
+
+            // === DECORATION (Subtle scanlines on light) ===
+            '--bg-pattern': `
+            repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0, 50, 0, 0.03) 2px,
+                                      rgba(0, 50, 0, 0.03) 4px
+            )
+            `,
+            '--bg-pattern-size': '100% 100%',
+
+            '--message-decoration': '1px solid rgba(32, 128, 32, 0.2)',
+            '--avatar-shape': '0%'
+        }
+    },
+    'dark-cyan-terminal': {
+        name: 'Terminal Cyan',
+        mode: 'dark',
+        vars: {
+            // === SHAPES (Blocky, no curves - pure terminal) ===
+            '--radius-sm': '0px',
+            '--radius-md': '0px',
+            '--radius-lg': '2px',
+            '--radius-xl': '2px',
+
+            // === COLORS (Classic Cyan/Blue Phosphor CRT) ===
+            '--bg-primary': '#000808',
+            '--bg-secondary': '#000c0c',
+            '--bg-tertiary': '#001414',
+            '--bg-message-user': 'linear-gradient(135deg, #001818 0%, #001010 100%)',
+            '--bg-message-ai': '#000404',
+            '--bg-message-announce': 'linear-gradient(135deg, #001010 0%, #000808 100%)',
+            '--bg-message-command': 'linear-gradient(135deg, #001a14 0%, #00100c 100%)',
+            '--bg-message-command-response': 'linear-gradient(135deg, #001618 0%, #000c10 100%)',
+            '--bg-input': '#000606',
+            '--bg-code': '#000404',
+            '--bg-sidebar': '#000303',
+
+            '--border-color': '#003838',
+            '--border-message': '#002525',
+            '--border-user': '#00ffff',
+            '--border-sidebar': '#001515',
+
+            '--text-primary': '#00ffff',       // Classic CRT cyan
+            '--text-secondary': '#00cccc',      // Slightly dimmer cyan
+            '--text-muted': '#006666',          // Dim cyan
+            '--text-code': '#00ffff',
+
+            '--accent': '#00ffff',
+            '--accent-glow': 'rgba(0, 255, 255, 0.7)',
+            '--accent-secondary': '#00ffff',
+
+            '--error': '#ff4040',
+            '--error-bg': 'linear-gradient(135deg, #180505 0%, #0c0303 100%)',
+            '--error-border': '#ff4040',
+
+            '--info': '#40ffff',
+            '--info-bg': 'linear-gradient(135deg, #051818 0%, #030c0c 100%)',
+            '--info-border': '#40ffff',
+
+            '--button-bg': 'linear-gradient(135deg, #001a1a 0%, #001010 100%)',
+            '--button-hover': 'linear-gradient(135deg, #002525 0%, #001a1a 100%)',
+            '--button-stop': 'linear-gradient(135deg, #180505 0%, #0c0303 100%)',
+            '--button-stop-hover': 'linear-gradient(135deg, #250808 0%, #180505 100%)',
+            '--button-stop-glow': 'rgba(255, 64, 64, 0.5)',
+
+            '--scrollbar': '#003030',
+            '--scrollbar-hover': '#004040',
+
+            '--shadow-soft': '0 4px 12px rgba(0, 255, 255, 0.15)',
+            '--shadow-glow': '0 0 30px var(--accent-glow), 0 0 60px rgba(0, 255, 255, 0.25)',
+
+            // === DECORATION ===
+            '--bg-pattern': `
+            repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0, 0, 0, 0.35) 2px,
+                                      rgba(0, 0, 0, 0.35) 4px
+            ),
+            linear-gradient(
+                90deg,
+                transparent,
+                rgba(0, 255, 255, 0.02) 50%,
+                            transparent
+            ),
+            radial-gradient(
+                ellipse at center,
+                transparent 0%,
+                rgba(0, 0, 0, 0.3) 90%,
+                            rgba(0, 0, 0, 0.6) 100%
+            )
+            `,
+            '--bg-pattern-size': '100% 100%, 100% 100%, 100% 100%',
+
+            '--message-decoration': '1px solid rgba(0, 255, 255, 0.15)',
+            '--avatar-shape': '0%'
         }
     }
 };

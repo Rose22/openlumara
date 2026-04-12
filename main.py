@@ -110,7 +110,6 @@ arg_parser = argparse.ArgumentParser()
 add_arguments_recursive(arg_parser, core.config.default_config)
 
 # custom arguments
-arg_parser.add_argument("--config", help="config file to load. defaults to config.yml in the openlumara main folder", metavar="path")
 arg_parser.add_argument("--pure", help="disables all non-essential modules so that system prompt is blank and you're talking to the bare model", action="store_true")
 arg_parser.add_argument("--tmp", help="temporary session, discards all data after shutdown", action="store_true")
 arg_parser.add_argument("--cli", help="CLI-only mode", action="store_true")

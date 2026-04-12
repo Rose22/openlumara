@@ -2199,11 +2199,12 @@ function createThemeSection() {
         const accentColor = previewTheme.vars['--accent'];
         const textColor = previewTheme.vars['--text-primary'] || '#ffffff';
         const hasBothModes = variants.dark && variants.light;
+        const themeName = previewTheme.name;
 
         btn.innerHTML = `
         <div class="theme-preview" style="background: linear-gradient(135deg, ${bgColor} 50%, ${accentColor} 50%);">
         </div>
-        <span class="theme-name" style="display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: min(13px, 0.7rem); max-width: 100%; line-height: 1.2; padding: 4px 2px;">${family.charAt(0).toUpperCase() + family.slice(1)}</span>
+        <span class="theme-name" style="display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: min(13px, 0.7rem); max-width: 100%; line-height: 1.2; padding: 4px 2px;">${themeName}</span>
         `;
 
         btn.onclick = () => {
