@@ -631,7 +631,6 @@ async function loadChat(chatId) {
                 data.chat.tags || []
             );
 
-            await loadChats();
             closeSidebar();
         } else {
             console.error('Failed to load chat:', data.error);
