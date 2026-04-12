@@ -1623,6 +1623,9 @@ function createFontFamilyDropdown(fontOptions, selectedFont, onChange) {
 
     let filteredOptions = [...fontOptions];
 
+    // FIX: Listener reference for cleanup
+    let outsideClickListener = null;
+
     function renderOptions(options) {
         optionsContainer.innerHTML = '';
 
@@ -1701,7 +1704,6 @@ function createFontFamilyDropdown(fontOptions, selectedFont, onChange) {
 
     // --- Open/Close Logic ---
 
-
     function openDropdown() {
         dropdown.classList.add('show');
         trigger.setAttribute('aria-expanded', 'true');
@@ -1718,6 +1720,16 @@ function createFontFamilyDropdown(fontOptions, selectedFont, onChange) {
         setTimeout(() => searchInput.focus(), 50);
         const selectedEl = optionsContainer.querySelector('.custom-font-option.selected');
         if (selectedEl) selectedEl.scrollIntoView({ block: 'nearest' });
+
+        // FIX: Add listener when opening
+        if (!outsideClickListener) {
+            outsideClickListener = (e) => {
+                if (!wrapper.contains(e.target)) {
+                    closeDropdown();
+                }
+            };
+            document.addEventListener('click', outsideClickListener);
+        }
     }
 
     function closeDropdown() {
@@ -1726,6 +1738,12 @@ function createFontFamilyDropdown(fontOptions, selectedFont, onChange) {
 
         // Reset Search & Re-render (uses currentSelection state)
         searchInput.value = '';
+
+        // FIX: Remove listener when closing to prevent accumulation
+        if (outsideClickListener) {
+            document.removeEventListener('click', outsideClickListener);
+            outsideClickListener = null;
+        }
     }
 
     trigger.addEventListener('click', () => {
@@ -1741,14 +1759,13 @@ function createFontFamilyDropdown(fontOptions, selectedFont, onChange) {
         }
     });
 
-    document.addEventListener('click', (e) => {
-        if (!wrapper.contains(e.target)) closeDropdown();
-    });
+    // Note: Removed the global document.addEventListener here to prevent memory leaks.
+    // It is now handled inside openDropdown/closeDropdown.
 
-        wrapper.appendChild(trigger);
-        wrapper.appendChild(dropdown);
+    wrapper.appendChild(trigger);
+    wrapper.appendChild(dropdown);
 
-        return wrapper;
+    return wrapper;
 }
 
 // Helper: Load all fonts needed for the preview panel
@@ -2216,17 +2233,20 @@ function createThemeSection() {
         const filenameDisplay = container.querySelector(`#${id}-filename`);
 
         // Pre-load audio from localStorage if available
+        // FIX: Defer loading to prevent UI lag
         if (hasAudio && !TypewriterAudioManager.buffers?.[id]) {
             const savedData = localStorage.getItem(`${id}SoundData`);
             if (savedData) {
-                // Decode and store in manager
-                try {
-                    TypewriterAudioManager.loadFromDataURL(id, savedData).catch(err => {
+                // Defer to next tick to avoid blocking main thread
+                setTimeout(() => {
+                    try {
+                        TypewriterAudioManager.loadFromDataURL(id, savedData).catch(err => {
+                            console.warn('Failed to preload audio:', err);
+                        });
+                    } catch (err) {
                         console.warn('Failed to preload audio:', err);
-                    });
-                } catch (err) {
-                    console.warn('Failed to preload audio:', err);
-                }
+                    }
+                }, 0);
             }
         }
 
