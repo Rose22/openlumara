@@ -8,6 +8,7 @@ aiofiles
 python-ulid
 requests
 flask
+Pillow
 discord.py
 python-telegram-bot
 matrix-nio[e2e]
