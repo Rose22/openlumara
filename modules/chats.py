@@ -53,7 +53,7 @@ class Chats(core.module.Module):
 
         result = f"Saved chats for {self.channel.name}:\n"
         for conv in chats[-20:]: # only the last 20 to avoid overwhelming the AI
-            result += f"- [{conv.get('id')}] {conv.get('title', 'Untitled')}\n"
+            result += f"- [{conv.get('id')}] {conv.get('title', 'Untitled')[:50]}\n"
 
         return result
 

@@ -67,6 +67,7 @@ class Commands:
 /status                 show status info
 /restart                restarts the server
 /stop                   stops the AI in it's tracks
+/ping                   test command that echoes "Pong!"
 /help                   this help
         """.strip()
 
@@ -143,6 +144,8 @@ class Commands:
             #     return "Turn undone."
             case "help":
                 return await self._get_help()
+            case "ping":
+                return "pong!"
             case "reconnect":
                     result = await self.channel.manager.reconnect_api()
 
