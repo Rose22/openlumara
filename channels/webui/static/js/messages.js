@@ -140,7 +140,8 @@ function renderAllMessages(messages, animate = false) {
     scrollToBottom();
 }
 
-function renderReasoningBlock(reasoningContent, isCollapsed = true) {
+// Added 'label' parameter, defaulting to 'Thinking'
+function renderReasoningBlock(reasoningContent, isCollapsed = true, label = 'Thinking') {
     if (!reasoningContent) return '';
 
     const escaped = escapeHtml(reasoningContent);
@@ -149,21 +150,23 @@ function renderReasoningBlock(reasoningContent, isCollapsed = true) {
     return `
     <div class="reasoning-wrapper ${collapsedClass}">
     <div class="reasoning-header" onclick="toggleReasoningBlock(this)">
-    <svg class="reasoning-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-    <circle cx="12" cy="12" r="3"/>
-    </svg>
-    <span>Thinking</span>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="24" height="24"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc. --><path fill="currentColor" d="M256 448c141.4 0 256-93.1 256-208S397.4 32 256 32S0 125.1 0 240c0 45.1 17.7 86.8 47.7 120.9c-1.9 24.5-11.4 46.3-21.4 62.9c-5.5 9.2-11.1 16.6-15.2 21.6c-2.1 2.5-3.7 4.4-4.9 5.7c-.6 .6-1 1.1-1.3 1.4l-.3 .3c0 0 0 0 0 0c0 0 0 0 0 0s0 0 0 0s0 0 0 0c-4.6 4.6-5.9 11.4-3.4 17.4c2.5 6 8.3 9.9 14.8 9.9c28.7 0 57.6-8.9 81.6-19.3c22.9-10 42.4-21.9 54.3-30.6c31.8 11.5 67 17.9 104.1 17.9zM128 208a32 32 0 1 1 0 64 32 32 0 1 1 0-64zm128 0a32 32 0 1 1 0 64 32 32 0 1 1 0-64zm96 32a32 32 0 1 1 64 0 32 32 0 1 1 -64 0z"/></svg>
+    <span class="reasoning-text">
+    <span class="reasoning-label">${label}</span>
+    <span class="reasoning-dots"><span aria-hidden="true">&nbsp;</span><span aria-hidden="true">&nbsp;</span><span aria-hidden="true">&nbsp;</span></span>
+    </span>
     <svg class="reasoning-toggle" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
     <polyline points="6 9 12 15 18 9"></polyline>
     </svg>
-    </div>
+    </div >
     <div class="reasoning-block">
-    <div class="reasoning-content">${escaped}</div>
-    </div>
-    </div>
+    <div class="reasoning-content">${escaped}</div >
+    </div >
+    </div >
     `;
 }
+
+
 
 function toggleReasoningBlock(headerElement) {
     const wrapper = headerElement.closest('.reasoning-wrapper');
@@ -247,7 +250,8 @@ function createMessageElement(msg, index, animate = false) {
 
     // Add reasoning block BEFORE the main content (only for assistant messages)
     if (role === 'assistant' && reasoningContent) {
-        messageHtml += renderReasoningBlock(reasoningContent);
+        // Pass 'Thoughts' here so history always uses the correct term
+        messageHtml += renderReasoningBlock(reasoningContent, true, 'Thoughts');
     }
 
     // Render based on message type

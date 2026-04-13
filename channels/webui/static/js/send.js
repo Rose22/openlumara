@@ -202,6 +202,12 @@ async function send(providedContent = null) {
 
                                 aiContent += token;
 
+                                // NEW: Stop the reasoning animation as soon as content arrives
+                                const reasoningWrapper = aiWrapper.querySelector('.reasoning-wrapper');
+                                if (reasoningWrapper) {
+                                    reasoningWrapper.classList.remove('is-reasoning-active');
+                                }
+
                                 if (useTypewriter) {
                                     // Push characters to the typewriter queue
                                     for (const char of token) {
@@ -231,6 +237,13 @@ async function send(providedContent = null) {
                             if (!streamFrozen) {
                                 aiReasoning += data.content || '';
                                 updateStreamingContent(aiMsgDiv, aiContent, aiReasoning);
+
+                                // NEW: Start the reasoning animation
+                                const reasoningWrapper = aiWrapper.querySelector('.reasoning-wrapper');
+                                if (reasoningWrapper) {
+                                    reasoningWrapper.classList.add('is-reasoning-active');
+                                }
+
                                 scrollToBottomDelayed();
                             }
                         }
@@ -479,32 +492,71 @@ async function sendCommand(message) {
 }
 
 function updateStreamingContent(msgDiv, content, reasoning) {
-    let html = '';
+    // 1. Handle Reasoning Block
+    let reasoningWrapper = msgDiv.querySelector('.reasoning-wrapper');
 
     if (reasoning) {
-        const expandByDefault = localStorage.getItem('reasoningExpandedByDefault') === 'true';
-        const isCollapsed = !expandByDefault;
-        html += renderReasoningBlock(reasoning, isCollapsed);
+        if (reasoningWrapper) {
+            // Update content
+            const contentDiv = reasoningWrapper.querySelector('.reasoning-content');
+            if (contentDiv) {
+                contentDiv.innerHTML = escapeHtml(reasoning);
+            }
+
+            // NEW: If main content has started streaming, change "Thinking" to "Thoughts"
+            if (content) {
+                const label = reasoningWrapper.querySelector('.reasoning-label');
+                if (label && label.textContent === 'Thinking') {
+                    label.textContent = 'Thoughts';
+                }
+            }
+        } else {
+            // Create new block (Note: we use 'Thinking' as default for the initial creation)
+            const expandByDefault = localStorage.getItem('reasoningExpandedByDefault') === 'true';
+            const isCollapsed = !expandByDefault;
+            const reasoningHtml = renderReasoningBlock(reasoning, isCollapsed, 'Thinking');
+
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = reasoningHtml;
+            const newBlock = tempDiv.firstElementChild;
+
+            msgDiv.insertBefore(newBlock, msgDiv.firstChild);
+            reasoningWrapper = newBlock;
+        }
     }
+
+    // 2. Handle Main Content
+    let contentContainer = msgDiv.querySelector('.message-content-container');
 
     if (content) {
-        // Render the full content as Markdown first
-        html += renderMarkdown(content);
+        if (contentContainer) {
+            // CONTENT EXISTS: Update only the markdown inside the container
+            contentContainer.innerHTML = renderMarkdown(content);
+        } else {
+            // CONTENT NEW: Create a stable wrapper for the main content
+            contentContainer = document.createElement('div');
+            contentContainer.className = 'message-content-container';
+            contentContainer.innerHTML = renderMarkdown(content);
+
+            // Insert it after the reasoning block if it exists, otherwise at the start
+            if (reasoningWrapper) {
+                msgDiv.insertBefore(contentContainer, reasoningWrapper.nextSibling);
+            } else {
+                msgDiv.insertBefore(contentContainer, msgDiv.firstChild);
+            }
+        }
     }
 
-    // Update the DOM
-    msgDiv.innerHTML = html;
-
-    // Highlight code blocks
+    // 3. Post-update updates (Highlighting/Fade)
+    // These work on the existing DOM elements now
     highlightCode(msgDiv);
 
-    // Apply fade effect if enabled
     const fadeEnabled = localStorage.getItem('typewriterFadeEnabled') === 'true';
-
-    if (fadeEnabled && content && content.length > 0) {
+    if (fadeEnabled && content) {
         applyFastFade(msgDiv);
     }
 }
+
 
 /**
  * Optimized fade effect: wraps the last N characters in a single span
