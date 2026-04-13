@@ -1545,30 +1545,32 @@ async function loadFont(fontId, weights = [400, 500, 600, 700]) {
     return { success: true, type: 'system' };
 }
 
-// Apply custom font to the page (persists the selected font)
 function applyCustomFont(fontId) {
     const root = document.documentElement;
 
-    // 1. Update CSS Variable
     if (!fontId || fontId === 'default') {
-        root.style.removeProperty('--font-family');
+        // Reset to system defaults
+        root.style.setProperty('--font-family', "sans-serif");
+        root.style.removeProperty('--code-font'); // This allows it to fall back to :root
     } else {
-        // Add fallbacks
         const fontFamily = `'${fontId}', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`;
+
+        // Update UI font
         root.style.setProperty('--font-family', fontFamily);
+
+        // OVERRIDE the code font with the user's selected font
+        root.style.setProperty('--code-font', fontFamily);
     }
 
-    // 2. Save to LocalStorage
+    // Update LocalStorage and the <link> tag as you already do...
     localStorage.setItem('fontFamily', fontId || 'default');
 
-    // 3. Ensure the font is actually loaded and persists (separate from preview links)
-    // We remove all previous "active" links and add the specific one for the chosen font
     const existingActiveLink = document.getElementById('font-active-link');
     if (existingActiveLink) existingActiveLink.remove();
 
     if (!isSystemFont(fontId)) {
         const link = document.createElement('link');
-        link.id = 'font-active-link'; // Specific ID for the actively selected font
+        link.id = 'font-active-link';
         link.rel = 'stylesheet';
         link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(fontId)}:wght@400;500;600;700&display=swap`;
         document.head.appendChild(link);
@@ -1799,12 +1801,12 @@ function createThemeSection() {
     const savedFamily = localStorage.getItem('themeFamily') || 'monochrome';
     const savedMode = localStorage.getItem('themeMode') || 'dark';
     const savedFontSize = localStorage.getItem('fontSize') || '16';
-    const savedFontFamily = localStorage.getItem('fontFamily') || 'sans-serif';
+    const savedFontFamily = localStorage.getItem('fontFamily') || 'default';
     const families = getThemeFamilies();
 
     // Font options with display names
     const fontOptions = [
-        { value: 'sans-serif', label: 'System Default' },
+        { value: 'default', label: 'System Default' },
         // System fonts
         { value: 'Arial', label: 'Arial' },
         { value: 'Helvetica', label: 'Helvetica' },
@@ -1996,6 +1998,38 @@ function createThemeSection() {
     });
 
     typographyControls.appendChild(reasoningToggleRow);
+
+    // --- NEW: Token Bar Visibility Toggle ---
+    const isTokenBarVisible = localStorage.getItem('tokenBarVisible') !== 'false'; // Default to true
+    const tokenBarToggleRow = document.createElement('div');
+    tokenBarToggleRow.className = 'toggle-row';
+    tokenBarToggleRow.innerHTML = `
+    <div class="toggle-info">
+    <span class="toggle-label">Token Usage Bar</span>
+    <span class="toggle-description">Show/hide the token usage bar near input</span>
+    </div>
+    <label class="toggle-switch">
+    <input type="checkbox" id="token-bar-visible-checkbox" ${isTokenBarVisible ? 'checked' : ''}>
+    <span class="toggle-slider"></span>
+    </label>
+    `;
+
+    const tokenBarCheckbox = tokenBarToggleRow.querySelector('#token-bar-visible-checkbox');
+    tokenBarCheckbox.addEventListener('change', function() {
+        const isVisible = this.checked;
+        localStorage.setItem('tokenBarVisible', isVisible);
+
+        const tokenBar = document.getElementById('token-usage-container');
+        if (tokenBar) {
+            tokenBar.style.display = isVisible ? 'flex' : 'none';
+        }
+
+        // Add this line to toggle the class on the body
+        document.body.classList.toggle('token-bar-hidden', !isVisible);
+    });
+    typographyControls.appendChild(tokenBarToggleRow);
+
+
     typographySection.appendChild(typographyControls);
     wrapper.appendChild(typographySection);
 
@@ -2497,3 +2531,14 @@ toggleModal = function(modalName) {
         originalToggleModal(modalName);
     }
 };
+
+// Apply token bar visibility on script load
+(function initTokenBarVisibility() {
+    const isVisible = localStorage.getItem('tokenBarVisible') !== 'false';
+    const tokenBar = document.getElementById('token-usage-container');
+    if (tokenBar) {
+        tokenBar.style.display = isVisible ? 'flex' : 'none';
+    }
+    // Add this line to ensure the body class is correct on page load
+    document.body.classList.toggle('token-bar-hidden', !isVisible);
+})();

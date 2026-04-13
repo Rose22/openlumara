@@ -44,6 +44,8 @@
     /* === TYPOGRAPHY === */
     --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     --font-display: 'Inter', sans-serif; /* Used for headers/Names */
+    --font-family: 'sans-serif';
+    --code-font: 'Consolas', 'Monaco', 'Menlo', monospace;
 
     /* === SHAPES & FEEL === */
     --radius-sm: 4px;

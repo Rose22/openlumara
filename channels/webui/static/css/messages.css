@@ -255,7 +255,7 @@
 .message.user_command {
     background: var(--bg-message-command);
     border: 1px solid var(--border-message);
-    font-family: 'Consolas', 'Monaco', 'Menlo', monospace;
+    font-family: var(--code-font);
     font-size: 0.85rem;
     border-bottom-right-radius: var(--radius-sm);
     max-width: 85%;
@@ -271,7 +271,7 @@
 .message.command_response {
     background: var(--bg-message-command-response);
     border: 1px solid var(--border-message);
-    font-family: 'Consolas', 'Monaco', 'Menlo', monospace;
+    font-family: var(--code-font);
     font-size: 0.85rem;
     border-bottom-left-radius: var(--radius-sm);
     max-width: 85%;
@@ -717,7 +717,7 @@
 }
 
 .message code {
-    font-family: 'Consolas', 'Monaco', 'Menlo', monospace;
+    font-family: var(--code-font);
     font-size: 0.9em;
 }
 

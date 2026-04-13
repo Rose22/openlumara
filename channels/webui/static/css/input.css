@@ -160,3 +160,8 @@ box-shadow: 0 0 15px rgba(248, 113, 113, 0.3);
 }
 
 
+/* Add a border to the input area when the token bar is hidden */
+body.token-bar-hidden .input-area {
+    border-top: 1px solid var(--border-color);
+}
+
