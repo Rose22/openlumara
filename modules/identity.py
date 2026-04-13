@@ -12,7 +12,7 @@ class Identity(core.module.Module):
         if await self.channel.context.chat.get_data("character"):
             return None
 
-        identity = self.identity[0] if len(self.identity) > 0 else None
+        identity = self.identity if len(self.identity) > 0 else None
         sysprompt = None
         if identity:
             sysprompt = f"{identity}\n\nYou can use the identity_set() tool to modify this identity if needed."
@@ -44,7 +44,7 @@ class Identity(core.module.Module):
     async def cmd_set(self, args):
         if not args:
             self.identity.load()
-            return self.identity[0] if len(self.identity) > 0 else "You have not yet set up an identity."
+            return self.identity if len(self.identity) > 0 else "You have not yet set up an identity."
 
         if args[0] == "set":
             text = " ".join(args[1:])
