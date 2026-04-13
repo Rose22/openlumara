@@ -266,9 +266,27 @@ async function loadChats() {
         renderTagFilter();
         renderCategoryList(Array.from(categories));
         selectCategory(activeCategory);
+        scrollToActiveChat();
 
     } catch (e) {
         console.error('Failed to load chats:', e);
+    }
+}
+
+/**
+ * Finds the currently active chat element in the sidebar and scrolls it into view.
+ */
+function scrollToActiveChat() {
+    if (!currentChatId) return;
+
+    // Use the data-chat-id attribute we set in createChatElement
+    const activeChatEl = document.querySelector(`.chat-item[data-chat-id="${currentChatId}"]`);
+
+    if (activeChatEl) {
+        activeChatEl.scrollIntoView({
+            behavior: 'smooth',
+            block: 'nearest'
+        });
     }
 }
 
@@ -279,6 +297,18 @@ async function restoreCurrentChat() {
 
         if (data.success && data.chat && data.chat.id) {
             currentChatId = data.chat.id;
+
+            // NEW: Sync the active category to match the current chat's category
+            // This ensures the sidebar is looking at the correct group/list
+            if (data.chat.category && data.chat.category !== 'general') {
+                activeCategory = data.chat.category;
+            } else {
+                activeCategory = 'general';
+            }
+
+            // NEW: Ensure the chat list is actually loaded/rendered in the sidebar
+            await loadChats();
+
             const messages = data.chat.messages || [];
             const tags = data.chat.tags || [];
 
@@ -291,6 +321,10 @@ async function restoreCurrentChat() {
             } else {
                 clearChatUI();
             }
+
+            // NEW: Scroll to the selected chat in the sidebar
+            scrollToActiveChat();
+
         } else {
             currentChatId = null;
             clearChatUI();
@@ -302,6 +336,7 @@ async function restoreCurrentChat() {
         updateChatTitleBar(null);
     }
 }
+
 
 function clearChatUI() {
     lastMessageIndex = 0;
