@@ -4,11 +4,15 @@ import core
 import modules
 import channels
 
-config = core.storage.StorageDict("config", "yaml", data_dir=".", autoreload=False)
+import globals
+
+pathToUse = globals.configPath if globals.configPath is not None else None
+nameToUse = os.path.splitext(os.path.basename(pathToUse))[0] if pathToUse is not None else "config"
+dataDir = os.path.dirname(pathToUse) if pathToUse is not None else "."
+config = core.storage.StorageDict(nameToUse, "yaml", data_dir=dataDir, autoreload=False)
 
 default_config = {
     "core": {
-        "config": "config/config.yml",
         "data_folder": "data"
     },
     "api": {
@@ -188,6 +192,8 @@ else:
 
     # save if changes occurred
     if synced_config != user_config:
+        if (synced_config["core"]["config"] is not None) and (user_config.path != synced_config["core"]["config"]):
+            config.path = os.path.abspath(synced_config["core"]["config"])
         config.clear()
         config.update(synced_config)
         config.save()

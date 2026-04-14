@@ -18,17 +18,6 @@ import asyncio
 import subprocess
 import argparse
 
-# Parse CLI arguments BEFORE importing core
-parser = argparse.ArgumentParser()
-parser.add_argument("--config", type=str, default=None, help="Path to config.yml file (default: ./config/config.yml)")
-args = parser.parse_args()
-
-# Now import core and set overrides
-import core
-if args.config:
-    core.set_config_path(args.config)
-    core.config.reload_config()  # Re-initialize config with the new path
-
 async def main(args):
     # the manager class connects everything together
     manager = core.manager.Manager()
@@ -116,8 +105,19 @@ def override_config_with_args(live_config, args_namespace):
             continue
 
 
-# parse arguments
+# Config loading argument (optional, since we have a default path in core.config)
+import globals
 arg_parser = argparse.ArgumentParser()
+arg_parser.add_argument("--config", type=str, default=None, help="Path to config.yml file (default: ./config/config.yml)")
+argsConfig, unknown = arg_parser.parse_known_args()
+coreConfig = getattr(argsConfig, "config")
+if coreConfig:
+    globals.configPath = coreConfig
+
+# parse arguments
+
+import core
+
 add_arguments_recursive(arg_parser, core.config.default_config)
 
 # custom arguments
