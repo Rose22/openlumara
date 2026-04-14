@@ -17,6 +17,3 @@ import core.modules
 import core.api_client
 
 import core.manager
-
-# Initialize config now that all imports are complete
-core.config.initialize_config()
