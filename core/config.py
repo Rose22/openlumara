@@ -1,105 +1,10 @@
 import os
 import yaml
-import core 
+import core
 import modules
 import channels
 
-# Config will be initialized after all core imports are ready
-config = None
-
-def _create_config():
-    """Create config StorageDict, respecting path override if set."""
-    config_path_override = core.get_config_path()
-    if config_path_override:
-        # User provided full path to config file
-        config_dir = os.path.dirname(config_path_override)
-        config_name = os.path.splitext(os.path.basename(config_path_override))[0]
-        if not config_dir:
-            config_dir = "."
-        core.log("config", f"Using custom config path: {config_path_override}")
-        return core.storage.StorageDict(config_name, "yaml", data_dir=config_dir, autoreload=True)
-    else:
-        # Use default location: config/config.yml
-        default_location = core.get_path("config/config")
-        core.log("config", f"Using default config path: {default_location}.yml")
-        return core.storage.StorageDict("config", "yaml", data_dir=".", autoreload=False)
-
-def initialize_config():
-    """Initialize config after all core imports are ready."""
-    global config
-    config = _create_config()
-    
-    # Build default config with channel/module lists
-    default_config_data = dict(default_config)
-    
-    # --- Main Setup Logic ---
-
-    # 1. Discover all available modules and channels on disk
-    # Note: We use respect_config=False to ensure we see EVERYTHING,
-    # not just what was previously enabled.
-    available_module_names = set()
-    for module in modules.get_all(respect_config=False):
-        available_module_names.add(core.module.get_name(module))
-
-    available_channel_names = set()
-    for channel in channels.get_all(respect_config=False):
-        channel_name = core.module.get_name(channel)
-        available_channel_names.add(channel_name)
-
-    # 2. Load or Create Config
-    if not config:
-        # Create new config from scratch
-        # Initialize lists based on availability and defaults
-        mods_state = reconcile_lists(available_module_names, DEFAULT_MODULES, {"enabled": [], "disabled": []})
-        chans_state = reconcile_lists(available_channel_names, DEFAULT_CHANNELS, {"enabled": [], "disabled": []})
-
-        default_config["modules"]["enabled"] = mods_state["enabled"]
-        default_config["modules"]["disabled"] = mods_state["disabled"]
-        default_config["channels"]["enabled"] = chans_state["enabled"]
-        default_config["channels"]["disabled"] = chans_state["disabled"]
-
-        config.load(default_config)
-        config.save()
-        print()
-        print(f"A new configuration file has been created. You can use the WebUI to easily change your settings, or manually edit it at {config.path}.")
-
-    else:
-        # Config exists - Sync structure and reconcile lists
-        user_config = dict(config)
-
-        # A. Sync structural defaults (adds new keys like 'settings' if missing)
-        synced_config = sync_config(user_config, default_config)
-
-        # B. Reconcile Modules List
-        mods_state = reconcile_lists(
-            available_module_names,
-            DEFAULT_MODULES,
-            synced_config.get("modules", {})
-        )
-        synced_config["modules"]["enabled"] = mods_state["enabled"]
-        synced_config["modules"]["disabled"] = mods_state["disabled"]
-
-        # C. Reconcile Channels List
-        chans_state = reconcile_lists(
-            available_channel_names,
-            DEFAULT_CHANNELS,
-            synced_config.get("channels", {})
-        )
-        synced_config["channels"]["enabled"] = chans_state["enabled"]
-        synced_config["channels"]["disabled"] = chans_state["disabled"]
-
-        # D. Save if changes occurred
-        if synced_config != user_config:
-            config.clear()
-            config.update(synced_config)
-            config.save()
-            core.log("core", "Configuration synchronized with file system (added/removed modules).")
-
-def reload_config():
-    """Reinitialize config with current path override (useful after set_config_path)."""
-    global config
-    initialize_config()
-
+config = core.storage.StorageDict("config", "yaml", data_dir=".", autoreload=False)
 
 default_config = {
     "core": {
@@ -108,7 +13,6 @@ default_config = {
     "api": {
         "url": "http://localhost:5001/v1",
         "key": "KEY_HERE",
-        "insecure_skip_tls_verify": False,
         "max_context": 8192,
         "max_output_tokens": 8192,
         "max_messages": 200
@@ -168,7 +72,7 @@ DEFAULT_MODULES = (
     "time"
 )
 
-DEFAULT_CHANNELS = ["webui"] # Removed CLI from default as this is not accessible when bundled within Esobold
+DEFAULT_CHANNELS = ["cli", "webui"]
 
 def sync_config(user_config, defaults):
     """
@@ -224,6 +128,68 @@ def reconcile_lists(available_names, default_names, section_config):
         "enabled": sorted(list(valid_enabled)),
         "disabled": sorted(list(valid_disabled))
     }
+
+# --- Main Setup Logic ---
+
+# get all available modules
+available_module_names = set()
+for module in modules.get_all(respect_config=False):
+    available_module_names.add(core.module.get_name(module))
+
+# get all available channels
+available_channel_names = set()
+for channel in channels.get_all(respect_config=False):
+    channel_name = core.module.get_name(channel)
+    available_channel_names.add(channel_name)
+
+# load or create the config file
+if not config:
+    # Create new config from scratch
+    # Initialize lists based on availability and defaults
+    mods_state = reconcile_lists(available_module_names, DEFAULT_MODULES, {"enabled": [], "disabled": []})
+    chans_state = reconcile_lists(available_channel_names, DEFAULT_CHANNELS, {"enabled": [], "disabled": []})
+
+    default_config["modules"]["enabled"] = mods_state["enabled"]
+    default_config["modules"]["disabled"] = mods_state["disabled"]
+    default_config["channels"]["enabled"] = chans_state["enabled"]
+    default_config["channels"]["disabled"] = chans_state["disabled"]
+
+    config.load(default_config)
+    config.save()
+    print()
+    print(f"A new configuration file has been created. You can use the WebUI to easily change your settings, or manually edit it at {config.path}.")
+
+else:
+    # load the existing config
+    user_config = dict(config)
+
+    # sync missing keys
+    synced_config = sync_config(user_config, default_config)
+
+    # sync any modules that were added upstream
+    mods_state = reconcile_lists(
+        available_module_names,
+        DEFAULT_MODULES,
+        synced_config.get("modules", {})
+    )
+    synced_config["modules"]["enabled"] = mods_state["enabled"]
+    synced_config["modules"]["disabled"] = mods_state["disabled"]
+
+    # ditto for channels
+    chans_state = reconcile_lists(
+        available_channel_names,
+        DEFAULT_CHANNELS,
+        synced_config.get("channels", {})
+    )
+    synced_config["channels"]["enabled"] = chans_state["enabled"]
+    synced_config["channels"]["disabled"] = chans_state["disabled"]
+
+    # save if changes occurred
+    if synced_config != user_config:
+        config.clear()
+        config.update(synced_config)
+        config.save()
+        core.log("core", "Your configuration was updated with new stuff!")
 
 def get(*args, **kwargs):
     """shorthand for accessing config values"""
