@@ -192,8 +192,6 @@ else:
 
     # save if changes occurred
     if synced_config != user_config:
-        if (synced_config["core"]["config"] is not None) and (user_config.path != synced_config["core"]["config"]):
-            config.path = os.path.abspath(synced_config["core"]["config"])
         config.clear()
         config.update(synced_config)
         config.save()
