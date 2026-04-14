@@ -8,6 +8,7 @@ config = core.storage.StorageDict("config", "yaml", data_dir=".", autoreload=Fal
 
 default_config = {
     "core": {
+        "config": "config/config.yml",
         "data_folder": "data"
     },
     "api": {
@@ -15,7 +16,8 @@ default_config = {
         "key": "KEY_HERE",
         "max_context": 8192,
         "max_output_tokens": 8192,
-        "max_messages": 200
+        "max_messages": 200,
+        "insecure_skip_tls_verify": False
     },
     "model": {
         "name": "MODEL_HERE",
