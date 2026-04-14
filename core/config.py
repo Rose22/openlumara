@@ -22,7 +22,7 @@ def _create_config():
         # Use default location: config/config.yml
         default_location = core.get_path("config/config")
         core.log("config", f"Using default config path: {default_location}.yml")
-        return core.storage.StorageDict("config", "yaml", data_dir="config", autoreload=True)
+        return core.storage.StorageDict("config", "yaml", data_dir=".", autoreload=False)
 
 def initialize_config():
     """Initialize config after all core imports are ready."""
@@ -102,12 +102,15 @@ def reload_config():
 
 
 default_config = {
-    "data_dir": "data",
+    "core": {
+        "data_folder": "data"
+    },
     "api": {
         "url": "http://localhost:5001/v1",
         "key": "KEY_HERE",
         "insecure_skip_tls_verify": False,
         "max_context": 8192,
+        "max_output_tokens": 8192,
         "max_messages": 200
     },
     "model": {

@@ -12,7 +12,7 @@ class Identity(core.module.Module):
         if await self.channel.context.chat.get_data("character"):
             return None
 
-        identity = self.identity[0] if len(self.identity) > 0 else None
+        identity = self.identity if len(self.identity) > 0 else None
         sysprompt = None
         if identity:
             sysprompt = f"{identity}\n\nYou can use the identity_set() tool to modify this identity if needed."
@@ -21,10 +21,11 @@ class Identity(core.module.Module):
     async def set(self, content: str):
         """
         Defines who you are as an AI. Also defines your writing style, so save style writing details to your identity.
+        Only call this if user explicitely asks for it.
 
         When defining your identity, ALWAYS start with "You are"
         Give yourself a name. Make one up if user doesn't provide it.
-        NEVER use words like "i", "i'm" or "i am". ALWAYS write in 2nd person.
+        Don't use words like "i", "i'm" or "i am". Write in 2nd person when using this tool.
 
         Example:
             You are an AI assistant named Assistant. You write in a casual, concise, clear style.
@@ -43,7 +44,7 @@ class Identity(core.module.Module):
     async def cmd_set(self, args):
         if not args:
             self.identity.load()
-            return self.identity[0] if len(self.identity) > 0 else "You have not yet set up an identity."
+            return self.identity if len(self.identity) > 0 else "You have not yet set up an identity."
 
         if args[0] == "set":
             text = " ".join(args[1:])

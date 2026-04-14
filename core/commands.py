@@ -51,7 +51,7 @@ def get_commands_help(modules_dict):
 
 class Commands:
     # delete these after they are shown to the user once
-    TEMPORARY = ("context", "sysprompt", "tools")
+    TEMPORARY = ("context", "prompt", "tools", "restart", "stop")
 
     def __init__(self, channel):
         self.channel = channel
@@ -61,14 +61,13 @@ class Commands:
 
         help_text = """
 == built in commands ==
-/reload                 reload server, applying new changes if config was changed
-/reconnect              reconnect to the API
 /modules                list modules
 /module                 enable/disable a module by name
 /tools                  list tools available to the AI
 /status                 show status info
 /restart                restarts the server
 /stop                   stops the AI in it's tracks
+/ping                   test command that echoes "Pong!"
 /help                   this help
         """.strip()
 
@@ -145,6 +144,8 @@ class Commands:
             #     return "Turn undone."
             case "help":
                 return await self._get_help()
+            case "ping":
+                return "pong!"
             case "reconnect":
                     result = await self.channel.manager.reconnect_api()
 

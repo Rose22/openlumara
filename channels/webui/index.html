@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#111111">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="OptiClaw">
+    <meta name="apple-mobile-web-app-title" content="OpenLumara">
     <meta name="description" content="AI Chat Interface">
     <link rel="manifest" href="/manifest.json">
     <link rel="apple-touch-icon" href="/icon-192.png">
@@ -15,11 +15,11 @@
     {% for filename in css_files %}
         <link rel="stylesheet" href="/static/css/{{ filename }}.css" />
     {% endfor %}
-    <title>OptiClaw</title>
+    <title>OpenLumara</title>
 
-    <script src="/static/js/ext/marked.min.js"></script>
-    <link rel="stylesheet" href="/static/css/ext/github-dark.css">
-    <script src="/static/js/ext/highlight.min.js"></script>
+    <script src="/static/js/lib/marked.min.js"></script>
+    <link rel="stylesheet" href="/static/css/code-themes/github-dark.css">
+    <script src="/static/js/lib/highlight.min.js"></script>
 </head>
 <body>
     <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
@@ -35,6 +35,8 @@
                         <!-- JS will populate this -->
                     </div>
                 </div>
+
+                <div class="category-handle" onclick="toggleCategoryStrip()" title="Toggle Category Strip"></div>
 
                 <!-- PANE 2: Chat List (Wrapper for existing content) -->
                 <div id="chat-pane" class="chat-pane">
@@ -133,7 +135,7 @@
                             </svg>
                         </button>
                         <div class="status-dot" id="status" role="status" aria-label="Connection status"></div>
-                        <h1>AI Chat</h1>
+                        <h1>AI</h1>
                     </div>
                     <div class="header-right">
                         <button class="header-btn" id="search-btn" onclick="toggleSearch()" title="Search messages (Ctrl+F)">
@@ -496,6 +498,13 @@
                     <div class="typing-indicator" id="typing" aria-label="AI is typing">
                         <span></span><span></span><span></span>
                     </div>
+                </div>
+
+                <div id="token-usage-container" class="token-usage-container">
+                    <div class="token-usage-bar-bg">
+                        <div id="token-usage-fill" class="token-usage-bar-fill"></div>
+                    </div>
+                    <span id="token-usage-text" class="token-usage-text"></span>
                 </div>
 
                 <div class="input-area">

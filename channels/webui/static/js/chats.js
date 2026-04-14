@@ -3,29 +3,25 @@
 // =============================================================================
 
 let activeCategory = 'general'; // Default category
+// OPTIMIZATION: Global map for O(1) chat data lookups (prevents JSON parsing in loops)
+let chatDataMap = new Map();
 
 const CATEGORY_REGISTRY = {
     'char': {
         icon: ICONS.user,
         class: 'category-character',
         label: (name) => name,
-        groupTitle: 'Characters' // New property
-    },
-    // Add others here if needed
+        groupTitle: 'Characters'
+    }
 };
 
 const DEFAULT_CATEGORY_HANDLER = {
     icon: ICONS.chat,
     class: 'category-default',
     label: (name) => name,
-    groupTitle: 'Chats' // Default group for non-prefixed categories
+    groupTitle: 'Chats'
 };
 
-/**
- * Handles click on the Chat Pane Header.
- * Desktop: Does nothing (or could open a dropdown if desired).
- * Mobile: Slides the Category Pane (fullscreen) into view.
- */
 function handlePaneHeaderClick() {
     if (window.innerWidth <= 768) {
         openCategoryPane();
@@ -42,9 +38,7 @@ function closeCategoryPane() {
     if (pane) pane.classList.remove('open');
 }
 
-// Helper to filter tags based on the active category
 function updateTagsForCategory(categoryKey) {
-    // 1. Filter chats to get the ones in this category
     const chatsInCategory = allChats.filter(chat => {
         if (categoryKey === 'general') {
             return !chat.category || chat.category === 'general';
@@ -52,58 +46,39 @@ function updateTagsForCategory(categoryKey) {
         return chat.category === categoryKey;
     });
 
-    // 2. Extract unique tags from these chats
     const categoryTags = new Set();
     chatsInCategory.forEach(chat => {
         (chat.tags || []).forEach(tag => categoryTags.add(tag));
     });
 
-    // 3. Convert to sorted array
     const sortedTags = Array.from(categoryTags).sort();
 
-    // 4. Check if currently active tag is valid for this category
     if (activeTagFilter && !sortedTags.includes(activeTagFilter)) {
-        // If the active tag isn't in this category, clear it
         activeTagFilter = null;
         const clearBtn = document.getElementById('clear-tag-filter');
         if (clearBtn) clearBtn.style.display = 'none';
     }
 
-    // 5. Render the tag list
     renderTagFilter(sortedTags);
 }
 
-/**
- * Selects a category.
- * Desktop: Filters list immediately.
- * Mobile: Filters list AND slides the Category Pane away (revealing Chat Pane).
- */
 function selectCategory(categoryKey) {
     activeCategory = categoryKey;
-
-    // 1. Update Header
     updateChatPaneTitle(categoryKey);
 
-    // 2. Update Active State
     const items = document.querySelectorAll('.category-item');
     items.forEach(item => {
         item.classList.toggle('active', item.dataset.key === categoryKey);
     });
 
-    // 3. Filter and Render
-    // We filter the MASTER list (allChats) and pass the subset to renderChatList
     const filtered = filterChatsByCategory(allChats, categoryKey);
     renderChatList(filtered);
-
-    // 4. Update Tags
     updateTagsForCategory(categoryKey);
 
-    // 5. Mobile close
     if (window.innerWidth <= 768) {
         closeCategoryPane();
     }
 }
-
 
 function updateChatPaneTitle(categoryKey) {
     const titleEl = document.getElementById('chat-pane-title');
@@ -113,13 +88,11 @@ function updateChatPaneTitle(categoryKey) {
         const parsed = parseCategory(categoryKey);
         displayName = parsed.handler.label(parsed.name);
     }
-
     titleEl.textContent = displayName;
 }
 
 function filterChatsByCategory(chats, categoryKey) {
     if (categoryKey === 'general') {
-        // General includes null, undefined, or "general"
         return chats.filter(c => !c.category || c.category === 'general');
     }
     return chats.filter(c => c.category === categoryKey);
@@ -128,57 +101,49 @@ function filterChatsByCategory(chats, categoryKey) {
 
 function renderCategoryList(categories) {
     const list = document.getElementById('category-list');
-    list.innerHTML = '';
 
-    // 1. Group the data
+    // FIX: Load collapsed state from localStorage instead of scanning DOM
+    const collapsedGroups = new Set(JSON.parse(localStorage.getItem('sidebar_collapsed_categories') || '[]'));
+
+    // OPTIMIZATION: Use DocumentFragment to reduce reflows
+    const fragment = document.createDocumentFragment();
     const groups = {};
 
-    // Add the "Chats" group explicitly first if it doesn't exist,
-    // or rely on the loop. Let's ensure "Chats" exists to hold "General".
     groups['Chats'] = [];
 
     categories.forEach(catKey => {
         const parsed = parseCategory(catKey);
         const group = parsed.groupTitle || 'Other';
-
-        if (!groups[group]) {
-            groups[group] = [];
-        }
-
-        // Store the original key and parsed data
+        if (!groups[group]) groups[group] = [];
         groups[group].push({ key: catKey, parsed: parsed });
     });
 
-    // 2. Define Render Order
-    // "Chats" always first, then others alphabetically
     const groupNames = Object.keys(groups).filter(g => g !== 'Chats').sort();
-    if (groups['Chats']) {
-        groupNames.unshift('Chats');
-    }
+    if (groups['Chats']) groupNames.unshift('Chats');
 
-    // 3. Render Groups
     groupNames.forEach(groupName => {
-        // Create Group Header
         const header = createCategoryGroupHeader(groupName);
-        list.appendChild(header);
+        fragment.appendChild(header);
 
-        // Create Group Content Container
         const content = document.createElement('div');
         content.className = 'category-group-content';
 
-        // Sort items inside the group alphabetically
+        // FIX: Apply collapsed state if found in localStorage
+        if (collapsedGroups.has(groupName)) {
+            content.style.display = 'none';
+            const chevron = header.querySelector('.chevron');
+            if (chevron) chevron.classList.add('collapsed');
+        }
+
         const items = groups[groupName].sort((a, b) =>
         a.parsed.name.localeCompare(b.parsed.name)
         );
 
-        // Special Case: If this is the "Chats" group, prepend "General"
         if (groupName === 'Chats') {
-            // Use ICONS.home specifically for the General category
             const generalItem = createCategoryElement('general', 'General', ICONS.home);
             content.appendChild(generalItem);
         }
 
-        // Render Items
         items.forEach(item => {
             const el = createCategoryElement(
                 item.key,
@@ -188,15 +153,17 @@ function renderCategoryList(categories) {
             content.appendChild(el);
         });
 
-        list.appendChild(content);
+        fragment.appendChild(content);
     });
+
+    // Single DOM update
+    list.innerHTML = '';
+    list.appendChild(fragment);
 }
 
 function createCategoryGroupHeader(name) {
     const header = document.createElement('div');
     header.className = 'category-group-header';
-
-    // Default state: Expanded
     header.innerHTML = `
     <svg class="chevron" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
     <polyline points="6 9 12 15 18 9"></polyline>
@@ -206,42 +173,43 @@ function createCategoryGroupHeader(name) {
 
     header.onclick = () => {
         const content = header.nextElementSibling;
+        if(!content) return;
         const isHidden = content.style.display === 'none';
         content.style.display = isHidden ? 'block' : 'none';
         header.querySelector('.chevron').classList.toggle('collapsed', !isHidden);
-    };
 
+        // FIX: Update localStorage when user toggles
+        const collapsed = new Set(JSON.parse(localStorage.getItem('sidebar_collapsed_categories') || '[]'));
+        if (isHidden) {
+            collapsed.delete(name); // Opening it, so remove from set
+        } else {
+            collapsed.add(name); // Closing it, so add to set
+        }
+        localStorage.setItem('sidebar_collapsed_categories', JSON.stringify(Array.from(collapsed)));
+    };
     return header;
 }
 
 function createCategoryElement(key, name, icon) {
     const btn = document.createElement('button');
-    // Use specific class for styling
     btn.className = 'category-item';
     if (key === activeCategory) btn.classList.add('active');
-
     btn.dataset.key = key;
-
     btn.innerHTML = `
     <span class="category-item-icon">${icon}</span>
     <span class="category-item-name">${escapeHtml(name)}</span>
     `;
-
     btn.onclick = () => selectCategory(key);
     return btn;
 }
 
 function parseCategory(categoryString) {
     if (!categoryString) return {
-        prefix: null,
-        name: 'General',
-        fullKey: 'general',
-        handler: DEFAULT_CATEGORY_HANDLER
+        prefix: null, name: 'General', fullKey: 'general', handler: DEFAULT_CATEGORY_HANDLER
     };
 
     const parts = categoryString.split(':');
 
-    // Case 1: Special "prefix:name" format
     if (parts.length === 2 && CATEGORY_REGISTRY[parts[0]]) {
         const prefix = parts[0];
         const handler = CATEGORY_REGISTRY[prefix];
@@ -250,22 +218,22 @@ function parseCategory(categoryString) {
             name: parts[1],
             fullKey: categoryString,
             handler: handler,
-            groupTitle: handler.groupTitle || 'Misc' // Fallback
+            groupTitle: handler.groupTitle || 'Misc'
         };
     }
 
-    // Case 2: Standard "name" format
     return {
         prefix: null,
         name: categoryString,
         fullKey: categoryString,
         handler: DEFAULT_CATEGORY_HANDLER,
-        groupTitle: DEFAULT_CATEGORY_HANDLER.groupTitle // "Chats"
+        groupTitle: DEFAULT_CATEGORY_HANDLER.groupTitle
     };
 }
 
 async function loadChats() {
     try {
+        // OPTIMIZATION: Parallel fetch is good, ensure backend returns summary data only
         const [chatResponse, tagsResponse] = await Promise.all([
             fetch('/chats'),
                                                                fetch('/chat/tags')
@@ -277,20 +245,18 @@ async function loadChats() {
         allTags = tagsData.tags || [];
         allChats = chatData.chats || [];
 
-        // Extract Unique Categories AND Characters
-        const categories = new Set();
+        // OPTIMIZATION: Store chats in a Map for O(1) access by ID.
+        // This prevents looping through arrays or parsing JSON strings later.
+        chatDataMap.clear();
+        allChats.forEach(chat => chatDataMap.set(chat.id, chat));
 
+        const categories = new Set();
         allChats.forEach(chat => {
-            // 1. Handle Standard Categories
-            // Ignore old 'char:' categories in the main list to avoid duplicates/confusion
             if (chat.category && chat.category !== 'general') {
                 if (!chat.category.startsWith('char:')) {
                     categories.add(chat.category);
                 }
             }
-
-            // 2. Handle Characters from custom_data
-            // If the chat has a character assigned, add it to the virtual 'char:' category list
             const characterName = chat.custom_data?.character;
             if (characterName) {
                 categories.add(`char:${characterName}`);
@@ -299,12 +265,28 @@ async function loadChats() {
 
         renderTagFilter();
         renderCategoryList(Array.from(categories));
-
-        // Initial Load based on active state
         selectCategory(activeCategory);
+        scrollToActiveChat();
 
     } catch (e) {
         console.error('Failed to load chats:', e);
+    }
+}
+
+/**
+ * Finds the currently active chat element in the sidebar and scrolls it into view.
+ */
+function scrollToActiveChat() {
+    if (!currentChatId) return;
+
+    // Use the data-chat-id attribute we set in createChatElement
+    const activeChatEl = document.querySelector(`.chat-item[data-chat-id="${currentChatId}"]`);
+
+    if (activeChatEl) {
+        activeChatEl.scrollIntoView({
+            behavior: 'smooth',
+            block: 'nearest'
+        });
     }
 }
 
@@ -315,6 +297,18 @@ async function restoreCurrentChat() {
 
         if (data.success && data.chat && data.chat.id) {
             currentChatId = data.chat.id;
+
+            // NEW: Sync the active category to match the current chat's category
+            // This ensures the sidebar is looking at the correct group/list
+            if (data.chat.category && data.chat.category !== 'general') {
+                activeCategory = data.chat.category;
+            } else {
+                activeCategory = 'general';
+            }
+
+            // NEW: Ensure the chat list is actually loaded/rendered in the sidebar
+            await loadChats();
+
             const messages = data.chat.messages || [];
             const tags = data.chat.tags || [];
 
@@ -322,17 +316,18 @@ async function restoreCurrentChat() {
 
             if (messages.length > 0) {
                 renderAllMessages(messages);
+                updateTokenUsage();
                 lastMessageIndex = messages.length;
             } else {
-                const wrappers = chat.querySelectorAll('.message-wrapper');
-                wrappers.forEach(wrapper => wrapper.remove());
-                lastMessageIndex = 0;
+                clearChatUI();
             }
+
+            // NEW: Scroll to the selected chat in the sidebar
+            scrollToActiveChat();
+
         } else {
             currentChatId = null;
-            lastMessageIndex = 0;
-            const wrappers = chat.querySelectorAll('.message-wrapper');
-            wrappers.forEach(wrapper => wrapper.remove());
+            clearChatUI();
             updateChatTitleBar(null);
         }
     } catch (e) {
@@ -342,11 +337,17 @@ async function restoreCurrentChat() {
     }
 }
 
+
+function clearChatUI() {
+    lastMessageIndex = 0;
+    const wrappers = chat.querySelectorAll('.message-wrapper');
+    wrappers.forEach(wrapper => wrapper.remove());
+}
+
 async function getCurrentChatId() {
     try {
         const response = await fetch('/chat/current');
         const data = await response.json();
-
         if (data.success && data.chat && data.chat.id) {
             currentChatId = data.chat.id;
             return data.chat.id;
@@ -358,62 +359,54 @@ async function getCurrentChatId() {
     }
 }
 
-// Helper to create header (Updated to accept icon/class)
+// Helper to create header
 function createGroupHeader(name, icon, extraClass = '') {
     const header = document.createElement('div');
     header.className = `chat-group-header ${extraClass}`;
 
-    // Use provided icon or default arrow
     const iconHtml = icon
     ? `<span class="header-icon">${icon}</span>`
     : `<svg class="chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>`;
 
-    header.innerHTML = `
-    ${iconHtml}
-    <span class="chat-group-title">${escapeHtml(name)}</span>
-    `;
+    header.innerHTML = `${iconHtml}<span class="chat-group-title">${escapeHtml(name)}</span>`;
 
     header.onclick = () => {
         const content = header.nextElementSibling;
-        // Toggle logic...
-        // If you want clicking "Luna" to open character settings, handle that here
-        // Otherwise, just toggle collapse
+        if (!content || !content.classList.contains('chat-group-content')) return;
         const isHidden = content.style.display === 'none';
         content.style.display = isHidden ? 'block' : 'none';
+        const chevron = header.querySelector('.chevron');
+        if(chevron) chevron.classList.toggle('collapsed', !isHidden);
     };
 
-    return header;
+        return header;
 }
 
-// Helper to create the container for a group's chats
 function createGroupContainer() {
     const container = document.createElement('div');
     container.className = 'chat-group-content';
     return container;
 }
 
-// Extracted helper to create a single chat item element
 function createChatElement(chat) {
     const item = document.createElement('div');
     item.className = 'chat-item' + (chat.id === currentChatId ? ' active' : '');
 
     item.dataset.chatId = chat.id;
-    item.dataset.chatData = JSON.stringify(chat);
+    // PERFORMANCE FIX: Removed JSON.stringify.
+    // Data is retrieved from chatDataMap using the ID when needed.
 
     item.onclick = (e) => {
-        // Don't trigger load if clicking on action buttons or editing
-        if (e.target.closest('.chat-item-actions') ||
-            e.target.closest('.inline-rename-container')) {
+        if (e.target.closest('.chat-item-actions') || e.target.closest('.inline-rename-container')) {
             return;
-            }
-            loadChat(chat.id);
+        }
+        loadChat(chat.id);
     };
 
     const title = document.createElement('div');
     title.className = 'chat-item-title';
     title.textContent = chat.title || 'New chat';
 
-    // Tags container
     const tagsContainer = document.createElement('div');
     tagsContainer.className = 'chat-tags';
 
@@ -453,11 +446,7 @@ function createChatElement(chat) {
     meta.appendChild(actions);
 
     if (tags.length > 0) {
-        renderFittedTags(tagsContainer, tags, {
-            maxStart: 3,
-            minTags: 1,
-            showTooltip: true
-        });
+        renderFittedTags(tagsContainer, tags, { maxStart: 3, minTags: 1, showTooltip: true });
         item.appendChild(tagsContainer);
     }
 
@@ -472,83 +461,34 @@ function renderChatList(chats) {
     const searchInput = document.getElementById('chat-search');
     const currentSearchQuery = searchInput ? searchInput.value : '';
 
-    list.innerHTML = '';
-
-    // IMPORTANT: Do NOT overwrite allChats here.
-    // allChats is the master list loaded from the backend.
-    // This function receives the filtered subset to render.
+    // OPTIMIZATION: Use DocumentFragment to build list in memory
+    const fragment = document.createDocumentFragment();
 
     if (chats.length === 0) {
         const emptyMsg = document.createElement('div');
         emptyMsg.className = 'chat-empty';
         emptyMsg.textContent = 'No chats in this category';
         emptyMsg.style.cssText = 'padding: 20px; text-align: center; color: var(--text-muted); font-size: 0.85rem;';
-        list.appendChild(emptyMsg);
-        return;
+        fragment.appendChild(emptyMsg);
+    } else {
+        chats.sort((a, b) => (b.updated || 0) - (a.updated || 0));
+        chats.forEach(chat => {
+            fragment.appendChild(createChatElement(chat));
+        });
     }
 
-    // Sort by updated time (newest first)
-    chats.sort((a, b) => (b.updated || 0) - (a.updated || 0));
+    // Single DOM update
+    list.innerHTML = '';
+    list.appendChild(fragment);
 
-    // Render a flat list (No grouping headers needed here anymore)
-    chats.forEach(chat => {
-        list.appendChild(createChatElement(chat));
-    });
-
-    // Re-apply active tag filter
-    if (activeTagFilter) {
-        filterChatsByTag();
-    }
-
-    // Re-apply text search if active
-    if (currentSearchQuery) {
-        filterChats(currentSearchQuery);
-    }
-}
-
-// Helper to create the group header element (Refined)
-function createGroupHeader(name, icon, extraClass = '') {
-    const header = document.createElement('div');
-    header.className = `chat-group-header ${extraClass}`;
-
-    const iconHtml = icon
-    ? `<span class="header-icon">${icon}</span>`
-    : `<svg class="chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>`;
-
-    header.innerHTML = `
-    ${iconHtml}
-    <span class="chat-group-title">${escapeHtml(name)}</span>
-    `;
-
-    header.onclick = () => {
-        const content = header.nextElementSibling;
-        if (!content || !content.classList.contains('chat-group-content')) return;
-
-        const isHidden = content.style.display === 'none';
-        content.style.display = isHidden ? 'block' : 'none';
-
-        // Toggle chevron rotation if using default icon
-        const chevron = header.querySelector('.chevron');
-        if(chevron) chevron.classList.toggle('collapsed', !isHidden);
-    };
-
-        return header;
-}
-
-// Helper to create the container (Crucial for spacing)
-function createGroupContainer() {
-    const container = document.createElement('div');
-    container.className = 'chat-group-content';
-    // Ensure it matches the flat list behavior
-    return container;
+    // Re-apply filters if active
+    if (activeTagFilter) filterChatsByTag();
+    if (currentSearchQuery) filterChats(currentSearchQuery);
 }
 
 
 async function newChat() {
-    if (isStreaming) {
-        await stopGeneration();
-    }
-
+    if (isStreaming) await stopGeneration();
     try {
         const response = await fetch('/chat/new', {
             method: 'POST',
@@ -561,8 +501,8 @@ async function newChat() {
         if (data.success && data.chat) {
             currentChatId = data.chat.id;
             lastMessageIndex = 0;
-
             updateChatTitleBar(data.chat.title);
+            updateTokenUsage();
 
             const wrappers = chat.querySelectorAll('.message-wrapper');
             wrappers.forEach(wrapper => wrapper.remove());
@@ -600,19 +540,54 @@ async function loadChatInternal(chatId, cachedMessages = null) {
     }
 }
 
+async function updateTokenUsage() {
+    try {
+        const response = await fetch('/api/token_usage');
+        const data = await response.json();
+
+        if (data.current !== undefined && data.max !== undefined) {
+            const container = document.getElementById('token-usage-container');
+            const fill = document.getElementById('token-usage-fill');
+            const text = document.getElementById('token-usage-text');
+
+            const percentage = (data.current / data.max) * 100;
+            const NOTIFY_THRESHOLD = 70;
+
+            // 1. Always update the numbers and the width
+            fill.style.width = `${Math.min(percentage, 100)}%`;
+            text.textContent = `${data.current.toLocaleString()} / ${data.max.toLocaleString()}`;
+
+            // 2. Handle "Notification" (Visual Prominence)
+            if (percentage >= NOTIFY_THRESHOLD) {
+                // Make it bright and "active"
+                container.classList.add('active');
+
+                // Change color based on urgency
+                if (percentage >= 90) {
+                    fill.style.backgroundColor = '#ef4444'; // Red
+                } else if (percentage >= 75) {
+                    fill.style.backgroundColor = '#f59e0b'; // Amber
+                } else {
+                    fill.style.backgroundColor = '#10b981'; // Green
+                }
+            } else {
+                // Keep it "quiet" (dimmed)
+                container.classList.remove('active');
+                fill.style.backgroundColor = '#10b981'; // Reset to green
+            }
+        }
+    } catch (e) {
+        console.error('Token usage update failed:', e);
+    }
+}
+
 async function loadChat(chatId) {
-    // 1. If clicking the chat that is already active...
     if (chatId === currentChatId) {
-        // ...just close the sidebar (mobile UX) and do nothing else.
-        // The stream continues uninterrupted.
         closeSidebar();
         return;
     }
 
-    // 2. If switching to a DIFFERENT chat while streaming...
-    if (isStreaming) {
-        await stopGeneration();
-    }
+    if (isStreaming) await stopGeneration();
 
     try {
         const response = await fetch('/chat/load?id=' + chatId);
@@ -622,24 +597,20 @@ async function loadChat(chatId) {
             currentChatId = chatId;
             const messages = data.chat.messages || [];
             renderAllMessages(messages, true);
-            lastMessageIndex = data.chat.total ||
-            (messages.length > 0 ? messages[messages.length - 1].index + 1 : 0);
+            lastMessageIndex = data.chat.total || (messages.length > 0 ? messages[messages.length - 1].index + 1 : 0);
 
-            // Update the titlebar with title and tags
-            updateChatTitleBar(
-                data.chat.title,
-                data.chat.tags || []
-            );
-
-            await loadChats();
+            updateChatTitleBar(data.chat.title, data.chat.tags || []);
+            updateTokenUsage();
             closeSidebar();
-        } else {
-            console.error('Failed to load chat:', data.error);
+
+            // Only reload list, don't restore current chat again
+            await loadChats();
         }
     } catch (e) {
         console.error('Failed to load chat:', e);
     }
 }
+
 
 // Note: Chats are auto-saved by the backend when messages are added.
 // No explicit save endpoint exists. This function is kept for potential future use
@@ -654,27 +625,18 @@ async function deleteChat(chatId) {
     if (!confirm('Delete this chat?')) return;
 
     try {
-        const response = await fetch('/chat/delete?id=' + chatId, {
-            method: 'POST'
-        });
+        const response = await fetch('/chat/delete?id=' + chatId, { method: 'POST' });
         const data = await response.json();
 
         if (data.success) {
-            // Sync with backend's chat.current
             await restoreCurrentChat();
-
-            // Force refresh the chat list
             await loadChats();
-
-            // Close sidebar on mobile
             closeSidebar();
         } else {
-            console.error('Failed to delete:', data.error);
             alert('Failed to delete chat: ' + (data.error || 'Unknown error'));
         }
     } catch (e) {
         console.error('Failed to delete chat:', e);
-        alert('Failed to delete chat');
     }
 }
 
@@ -1009,47 +971,41 @@ function toggleSearchMode() {
     filterChats(currentQuery);
 }
 
+// =============================================================================
+// Chat Search/Filter (OPTIMIZED)
+// =============================================================================
+
 function filterChats(query) {
     const searchQuery = (query || '').toLowerCase().trim();
     const items = document.querySelectorAll('.chat-item');
 
-    // Clear all snippets and visibility states first
     items.forEach(item => {
         const existingSnippet = item.querySelector('.chat-snippet');
-        if (existingSnippet) {
-            existingSnippet.remove();
-        }
+        if (existingSnippet) existingSnippet.remove();
         item.classList.remove('hidden-by-search');
     });
 
-    // Show all when search is empty
     if (!searchQuery) {
         filterTagsBySearch('');
         return;
     }
 
     items.forEach(item => {
-        const titleEl = item.querySelector('.chat-item-title');
-        const titleText = titleEl ? titleEl.textContent.toLowerCase() : '';
+        const titleText = item.querySelector('.chat-item-title')?.textContent.toLowerCase() || '';
+        const chatId = item.dataset.chatId;
 
-        // Get chat data from dataset
-        let chatData = null;
-        try {
-            chatData = JSON.parse(item.dataset.chatData || 'null');
-        } catch (e) {
-            chatData = null;
-        }
+        // PERFORMANCE: Lookup data from Map instead of JSON.parse
+        const chatData = chatDataMap.get(chatId);
 
         let matchesTitle = titleText.includes(searchQuery);
         let matchSnippet = null;
 
-        // If content search is enabled, also search in messages
         if (searchInContent && chatData && chatData.messages) {
             for (const msg of chatData.messages) {
                 const content = (msg.content || '').toLowerCase();
                 if (content.includes(searchQuery)) {
                     matchSnippet = extractSnippet(msg.content, searchQuery, 60);
-                    break; // Use first match
+                    break;
                 }
             }
         }
@@ -1059,19 +1015,16 @@ function filterChats(query) {
         if (!isVisible) {
             item.classList.add('hidden-by-search');
         } else if (matchSnippet && searchInContent) {
-            // Add snippet after the meta element
             const metaEl = item.querySelector('.chat-item-meta');
             if (metaEl && !item.querySelector('.chat-snippet')) {
                 const snippetEl = document.createElement('div');
                 snippetEl.className = 'chat-snippet';
                 snippetEl.innerHTML = matchSnippet;
-                // Insert after meta
                 metaEl.insertAdjacentElement('afterend', snippetEl);
             }
         }
     });
 
-    // Also filter tags based on search
     filterTagsBySearch(query);
 }
 

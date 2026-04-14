@@ -4,6 +4,8 @@ import json
 import yaml
 import msgpack
 
+TEMPORARY = False
+
 class StorageList(list):
     """subclassed list that handles storage of data. supports a variety of storage formats."""
     def __init__(self, file_path, type: str, manager=None, data_dir=None, autoreload=True, *args):
@@ -12,6 +14,7 @@ class StorageList(list):
         if not data_dir:
             data_dir = core.get_data_path()
         else:
+            # ensure it's relative to the opticlaw root directory
             data_dir = core.get_path(data_dir)
 
         if not os.path.exists(data_dir):
@@ -76,6 +79,8 @@ class StorageList(list):
 
     def save(self):
         """save content to file"""
+        if TEMPORARY:
+            return True
 
         match self.type:
             case "json":
@@ -90,6 +95,9 @@ class StorageList(list):
 
     def load(self, data=None):
         """load content from file or data argument"""
+        if TEMPORARY:
+            return self
+
         self.clear()
 
         if data:
@@ -124,6 +132,7 @@ class StorageDict(dict):
         if not data_dir:
             data_dir = core.get_data_path()
         else:
+            # ensure it's relative to the opticlaw root directory
             data_dir = core.get_path(data_dir)
 
         if not os.path.exists(data_dir):
@@ -216,6 +225,8 @@ class StorageDict(dict):
 
     def save(self):
         """save content to file"""
+        if TEMPORARY:
+            return True
 
         match self.type:
             case "json":
@@ -261,6 +272,9 @@ class StorageDict(dict):
 
     def load(self, data=None):
         """load content from file or data argument"""
+        if TEMPORARY:
+            return True
+
         self.clear()
 
         if data:
@@ -339,6 +353,9 @@ class StorageText:
         return str(self._data)
 
     def load(self):
+        if TEMPORARY:
+            return self
+
         try:
             with open(self.path, "r") as f:
                 self._data = f.read()
@@ -347,6 +364,9 @@ class StorageText:
         return self
 
     def save(self):
+        if TEMPORARY:
+            return self
+
         with open(self.path, "w") as f:
             f.write(self._data)
 

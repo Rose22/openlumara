@@ -80,7 +80,7 @@ class APIClient():
         self.connected = True
         self._connection_error = None
         self._connection_attempts = 0
-        core.log("API", "Successfully connected to API")
+        core.log("API", "Successfully connected to AI")
         return True
 
     def _validate_config(self):
@@ -170,7 +170,8 @@ class APIClient():
             "messages": context,
             "tools": tools,
             "stream": stream,
-            "temperature": core.config.get("model").get("temperature", 0.2)
+            "temperature": core.config.get("model").get("temperature", 0.2),
+            "max_completion_tokens": core.config.get("api").get("max_output_tokens", 8192)
         }
 
         if stream:
@@ -384,8 +385,11 @@ class APIClient():
 
         try:
             models = await self._AI.models.list()
+            models_list = [model.id for model in models.data]
+            models_list.sort()
+
         except Exception as e:
             core.log_error("error while retrieving model list", e)
             return []
 
-        return models
+        return models_list

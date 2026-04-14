@@ -1,4 +1,4 @@
-const CACHE_NAME = 'opticlaw-v2.1.1 ';
+const CACHE_NAME = 'openlumara-v2.2.8';
 const ASSETS = ['/', '/manifest.json'];
 
 self.addEventListener('install', (e) => {

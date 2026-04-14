@@ -5,6 +5,9 @@ class Chats(core.module.Module):
 
     async def on_system_prompt(self):
         categories = await self.channel.context.chat.get_categories()
+        if len(categories) <= 1:
+            return None
+
         filtered_categories = []
         for index, category in enumerate(categories):
             # get rid of special categories
@@ -50,7 +53,7 @@ class Chats(core.module.Module):
 
         result = f"Saved chats for {self.channel.name}:\n"
         for conv in chats[-20:]: # only the last 20 to avoid overwhelming the AI
-            result += f"- [{conv.get('id')}] {conv.get('title', 'Untitled')}\n"
+            result += f"- [{conv.get('id')}] {conv.get('title', 'Untitled')[:50]}\n"
 
         return result
 
@@ -154,7 +157,7 @@ class Chats(core.module.Module):
     # command version
     @core.module.command("search", temporary=True)
     async def cmd_search(self, args: list):
-        """searches within your chat history"""
+        """Searches within your chat history"""
         query = " ".join(args)
         found = await self._search(query)
         if not found:
@@ -170,8 +173,7 @@ class Chats(core.module.Module):
     async def search(self, query: str):
         """
         Searches within all previous chats the user ever had with you. very useful for recalling information from the past!
-
-        IMPORTANT: When user asks about things that happened before the current chat, search your chat history.
+        Use only if user explicitely requests it, or if you can't find a past event the user is referring to within your current context!
         """
         found = await self._search(query)
         if not found:

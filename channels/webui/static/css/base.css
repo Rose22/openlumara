@@ -20,10 +20,9 @@ html, body {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overflow: hidden;
-
 }
 
-h1, h2, h3 {
+input, button, select, h1, h2, h3 {
     font-family: var(--font-family);
 }
 

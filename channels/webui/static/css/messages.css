@@ -119,6 +119,10 @@
     overflow: auto;
 }
 
+.streaming .reasoning-content, .streaming .reasoning-block {
+    max-height: none;
+}
+
 /* When collapsed, animate the block closed */
 .reasoning-wrapper.collapsed .reasoning-block {
     max-height: 0;
@@ -153,6 +157,57 @@
 .streaming .reasoning-content {
     max-height: none;
 }
+
+/* 1. The Brightness Pulse */
+@keyframes brightnessPulse {
+    0% {
+        opacity: 1;
+        filter: brightness(1);
+    }
+    50% {
+        opacity: 1;
+        filter: brightness(1.4);
+    }
+    100% {
+        opacity: 1;
+        filter: brightness(1);
+    }
+}
+
+/* 2. The Dot Animation */
+@keyframes dotGrow {
+    0%, 100% { opacity: 0; transform: scale(0); }
+    50% { opacity: 1; transform: scale(1); }
+}
+
+/*
+ *   CHANGE: We no longer look for .streaming.
+ *   We look for .is-reasoning-active.
+ *   This ensures the animation stops the moment that class is removed.
+ */
+.reasoning-wrapper.collapsed.is-reasoning-active .reasoning-header {
+    display: flex !important;
+    align-items: center;
+    transform-origin: center;
+    animation: brightnessPulse 2s infinite ease-in-out !important;
+}
+
+.reasoning-wrapper.collapsed.is-reasoning-active .reasoning-dots span {
+    display: inline-block !important;
+    width: 4px !important;
+    height: 4px !important;
+    margin-left: 2px !important;
+    background-color: currentColor !important;
+    border-radius: 50% !important;
+    vertical-align: middle !important;
+    animation: dotGrow 1.5s infinite ease-in-out !important;
+}
+
+/* Stagger the dots */
+.reasoning-wrapper.collapsed.is-reasoning-active .reasoning-dots span:nth-child(1) { animation-delay: 0s !important; }
+.reasoning-wrapper.collapsed.is-reasoning-active .reasoning-dots span:nth-child(2) { animation-delay: 0.2s !important; }
+.reasoning-wrapper.collapsed.is-reasoning-active .reasoning-dots span:nth-child(3) { animation-delay: 0.4s !important; }
+
 
 /* Announcement messages - styled based on type */
 .message.announce {
@@ -200,7 +255,7 @@
 .message.user_command {
     background: var(--bg-message-command);
     border: 1px solid var(--border-message);
-    font-family: 'Consolas', 'Monaco', 'Menlo', monospace;
+    font-family: var(--code-font);
     font-size: 0.85rem;
     border-bottom-right-radius: var(--radius-sm);
     max-width: 85%;
@@ -216,7 +271,7 @@
 .message.command_response {
     background: var(--bg-message-command-response);
     border: 1px solid var(--border-message);
-    font-family: 'Consolas', 'Monaco', 'Menlo', monospace;
+    font-family: var(--code-font);
     font-size: 0.85rem;
     border-bottom-left-radius: var(--radius-sm);
     max-width: 85%;
@@ -301,13 +356,13 @@
     font-weight: 600;
     color: var(--accent);
     font-size: 0.9rem;
-    font-family: 'Consolas', 'Monaco', 'Menlo', monospace;
+    font-family: var(--font-family);
     flex-shrink: 0;
 }
 
 .tool-call-inline-arg {
     color: var(--text-muted);
-    font-family: 'Consolas', 'Monaco', 'Menlo', monospace;
+    font-family: var(--font-family);
     font-size: 0.85rem;
     flex: 1;
     min-width: 0;
@@ -356,7 +411,7 @@
     font-weight: 600;
     color: var(--accent);
     font-size: 0.9rem;
-    font-family: 'Consolas', 'Monaco', 'Menlo', monospace;
+    font-family: var(--font-family);
     flex: 1;
     min-width: 0;
     overflow: hidden;
@@ -419,7 +474,7 @@
     padding: 6px 10px;
     background: rgba(0, 0, 0, 0.3);
     border-radius: var(--radius-sm);
-    font-family: 'Consolas', 'Monaco', 'Menlo', monospace;
+    font-family: var(--font-family);
     font-size: 0.85rem;
 }
 
@@ -477,7 +532,7 @@
 }
 
 .tool-response-content {
-    font-family: 'Consolas', 'Monaco', 'Menlo', monospace;
+    font-family: var(--font-family);
     font-size: 0.85rem;
 }
 
@@ -662,7 +717,7 @@
 }
 
 .message code {
-    font-family: 'Consolas', 'Monaco', 'Menlo', monospace;
+    font-family: var(--code-font);
     font-size: 0.9em;
 }
 

@@ -1,9 +1,9 @@
 #!/bin/env python
 
-# OptiClaw! A modular, token-efficient AI agent framework.
+# OpenLumara! A modular, token-efficient AI agent framework.
 # Made by Rose22 (https://github.com/Rose22)
 
-# Official github: https://github.com/Rose22/opticlaw
+# Official github: https://github.com/Rose22/openlumara
 
  # This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 2.0 of the License, or (at your option) any later version.
 
@@ -16,10 +16,10 @@ import sys
 import argparse
 import asyncio
 import subprocess
+import argparse
 
 # Parse CLI arguments BEFORE importing core
-parser = argparse.ArgumentParser(description="OptiClaw - Modular AI Agent Framework")
-parser.add_argument("--data-dir", type=str, default=None, help="Path to data directory (precedence: CLI arg > config data_dir > ./data)")
+parser = argparse.ArgumentParser()
 parser.add_argument("--config", type=str, default=None, help="Path to config.yml file (default: ./config/config.yml)")
 args = parser.parse_args()
 
@@ -29,22 +29,11 @@ if args.config:
     core.set_config_path(args.config)
     core.config.reload_config()  # Re-initialize config with the new path
 
-# Data directory precedence:
-# 1) --data-dir argument
-# 2) config.yml value: data_dir
-# 3) default core.get_path("data")
-if args.data_dir:
-    core.set_data_path(args.data_dir)
-else:
-    configured_data_dir = core.config.get("data_dir")
-    if configured_data_dir:
-        core.set_data_path(configured_data_dir)
-
-async def main():
+async def main(args):
     # the manager class connects everything together
     manager = core.manager.Manager()
     # run main loop
-    return await manager.run()
+    return await manager.run(args=args)
 
 def do_restart():
     """cross-platform restart with TTY/console inheritance"""
@@ -64,10 +53,92 @@ def do_restart():
         # unix: replace process, inherits TTY automatically
         os.execv(sys.executable, args)
 
+def add_arguments_recursive(parser, config, prefix=""):
+    """
+    Recursively traverses the config dict and adds arguments to the parser.
+    """
+    for key, value in config.items():
+        # Build the argument name (e.g., --channels.settings.webui.port)
+        arg_name = f"{prefix}.{key}" if prefix else key
+        arg_flag = f"--{arg_name}"
+
+        if isinstance(value, dict):
+            # If it's a dict, we drill down deeper
+            add_arguments_recursive(parser, value, prefix=arg_name)
+        else:
+            # We reached a leaf node (a real value)
+            # We try to infer the type from the default value
+            arg_type = type(value) if value is not None else str
+
+            # Special handling for lists (like your 'enabled' keys)
+            if isinstance(value, list):
+                parser.add_argument(arg_flag, type=str, metavar="LIST", help=f"Comma-separated list for {arg_name}")
+            else:
+                parser.add_argument(arg_flag, type=arg_type, default=None, metavar="VALUE")
+
+def override_config_with_args(live_config, args_namespace):
+    """
+    Walks through the flat argparse namespace and updates the
+    nested live_config dictionary in-place, ONLY if the path exists.
+    """
+    args_dict = vars(args_namespace)
+
+    for flat_key, value in args_dict.items():
+        # 1. Skip if the user didn't provide a value
+        if value is None:
+            continue
+
+        parts = flat_key.split('.')
+
+        # 2. Attempt to traverse the config path
+        current_level = live_config
+        path_exists = True
+
+        for part in parts[:-1]:
+            if isinstance(current_level, dict) and part in current_level:
+                current_level = current_level[part]
+            else:
+                path_exists = False
+                break
+
+        # 3. Check if the final target key exists in the current level
+        if path_exists and isinstance(current_level, dict) and parts[-1] in current_level:
+            target_key = parts[-1]
+
+            # Logic for handling comma-separated lists
+            if isinstance(current_level[target_key], list) and isinstance(value, str):
+                current_level[target_key] = [item.strip() for item in value.split(',')]
+            else:
+                current_level[target_key] = value
+        else:
+            # If it's not in the config, it's likely an app flag (like --pure or --cli)
+            # We do nothing and let the rest of the program handle it via 'args'
+            continue
+
+
+# parse arguments
+arg_parser = argparse.ArgumentParser()
+add_arguments_recursive(arg_parser, core.config.default_config)
+
+# custom arguments
+arg_parser.add_argument("--pure", help="disables all non-essential modules so that system prompt is blank and you're talking to the bare model", action="store_true")
+arg_parser.add_argument("--tmp", help="temporary session, discards all data after shutdown", action="store_true")
+arg_parser.add_argument("--cli", help="CLI-only mode", action="store_true")
+arg_parser.add_argument("--quiet", help="surpress logs", action="store_true")
+
+# do the arg parsing
+args = arg_parser.parse_args(sys.argv[1:])
+
+# by this point, the config is already loaded by core.__init__.py, so we can just override the values
+override_config_with_args(core.config.config, args)
+
+if args.tmp:
+    core.storage.TEMPORARY = True
+
 while True:
     result = None
     try:
-        result = asyncio.run(main())
+        result = asyncio.run(main(args))
     except KeyboardInterrupt:
         pass
 

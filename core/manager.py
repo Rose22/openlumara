@@ -23,6 +23,7 @@ class Manager:
         self.channel = None # current active channel. gets dynamically switched around
         self.modules = {}
         self.tools = []
+        self.pure_mode = False
 
         self._restart_requested = False
 
@@ -30,13 +31,22 @@ class Manager:
         self._async_tasks.discard(task)
         core.log("task", f"background task completed: {task.get_name()}")
 
-    async def run(self):
+    async def run(self, args):
         """main loop"""
+
+        if args.quiet:
+            core.quiet = True
+        if args.pure:
+            self.pure_mode = True
 
         core.log("core", "starting openlumara..")
 
         # load channels
-        if not core.config.get("channels").get("enabled"):
+        enabled_channels = core.config.get("channels").get("enabled", [])
+        if args.cli:
+            enabled_channels = ["cli"]
+
+        if not enabled_channels:
             print("ERROR: At least one channel must be enabled in the config! Try the `cli` channel for a basic terminal UI.")
             exit(1)
 
@@ -45,7 +55,8 @@ class Manager:
         for channel in channels.get_all():
             # only load enabled channels
             channel_name_snakecase = core.modules.get_name(channel)
-            if channel_name_snakecase in core.config.get("channels").get("enabled", []):
+
+            if channel_name_snakecase in enabled_channels:
                 chan = channel(self)
                 self.channels[channel_name_snakecase] = chan
 
@@ -61,13 +72,18 @@ class Manager:
                 self.channel = self.channels[last_channel]
 
         # load modules
-        if core.config.get("modules").get("enabled"):
+        enabled_modules = core.config.get("modules").get("enabled", [])
+        if self.pure_mode:
+            enabled_modules = ["context", "chats"]
+
+        if enabled_modules:
             core.log("core", "loading modules")
             loaded_module_names = []
             for module in modules.get_all():
                 # only load enabled modules
                 module_name_snakecase = core.modules.get_name(module)
-                if module_name_snakecase in core.config.get("modules").get("enabled", []):
+
+                if module_name_snakecase in enabled_modules:
                     loaded_module = await self.add_module_class(module)
                     # run startup methods
                     if hasattr(loaded_module, "on_ready"):
@@ -90,7 +106,7 @@ class Manager:
         # run everything
         core.log("core", "startup complete")
 
-        if "webui" in core.config.get("channels").get("enabled"):
+        if "webui" in enabled_channels:
             host = core.config.get("channels").get("settings").get("webui").get("host")
             port = core.config.get("channels").get("settings").get("webui").get("port")
             print()
@@ -170,6 +186,9 @@ class Manager:
     async def get_system_prompt(self):
         # Allow generating system prompt even when disconnected
         # (modules may still need to provide context)
+        if self.pure_mode:
+            return ""
+
         nonagentic_modules = ("characters", "time")
         system_prompt = []
 
@@ -363,6 +382,9 @@ class Manager:
 
         class_display_name = core.modules.get_name(module)
         self.modules[class_display_name] = loaded_module
+
+        if self.pure_mode:
+            return loaded_module
 
         for func_name in dir(module):
             if func_name.startswith("_"):

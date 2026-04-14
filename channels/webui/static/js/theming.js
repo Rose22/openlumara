@@ -101,6 +101,10 @@ function applyTheme(family, mode) {
         // 2. Apply it to the CSS variables
         const root = document.documentElement;
         root.style.setProperty('--font-family', `'${savedFont}', sans-serif`);
+        // OVERRIDE the code font with the user's selected font
+        root.style.setProperty('--code-font', `'${savedFont}', monospace`);
+    } else if (savedFont === 'default') {
+        root.style.setProperty('--font-family', "sans-serif");
     }
 
     currentThemeFamily = family;

@@ -214,7 +214,11 @@ class Chat:
         if not self.data[self.current]["title"].strip():
             # auto-set title
             msg_content = message.get("content", "")
-            self.data[self.current]["title"] = msg_content[100:]+".." if len(msg_content) > 100 else msg_content
+            if isinstance(msg_content, str):
+                self.data[self.current]["title"] = msg_content[:100]+".." if len(msg_content) > 100 else msg_content
+            else:
+                # this happens when the user uploads a media file. don't set that as a title, lol
+                pass
 
         # if temporary, set the flag. gets handled in self.trim()
         if temporary:

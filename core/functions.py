@@ -39,7 +39,8 @@ def set_config_path(path: str):
 
 def log(category: str, msg: str):
     """simple console log"""
-    print(f"[{category.upper()}] {msg}")
+    if not core.quiet:
+        print(f"[{category.upper()}] {msg}")
 
 def log_error(msg: str, e: Exception):
     """console log but with extra spice for errors"""
@@ -63,10 +64,15 @@ def get_path(path: str = ""):
     ))
 
 def get_data_path():
-    """Get the data directory path, using override if set, otherwise default."""
-    if _data_path_override:
-        return _data_path_override
-    return get_path("data")
+    """get path to the data directory. contains all persistent data used by the framework"""
+
+    data_path = core.config.get("core", {}).get("data_folder", "data")
+    if data_path.startswith(os.path.sep):
+        # is an absolute path
+        return data_path
+    else:
+        # is a relative path
+        return get_path(data_path)
 
 def get_config_path():
     """Get the config file path, using override if set, otherwise default."""

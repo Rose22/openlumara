@@ -91,3 +91,19 @@ class Context:
             "end prompt size": f"{histend_size_tokens} tokens | {histend_size_words} words",
             "total size": f"{token_usage} tokens | {combined_size_words} words",
         }
+
+    async def get_token_usage(self):
+        max_tokens = core.config.get("api").get("max_context", 8192)
+
+        try:
+            prompt_tokens = await self.chat.count_tokens(await self.get(system_prompt=True))
+        except AttributeError as e:
+            # when modules don't have a channel assigned yet, this error triggers. we handle it "gracefully".
+            return {"current": 0, "max": max_tokens}
+        except Exception as e:
+            core.log_error("error while fetching token usage", e)
+
+        return {
+            "current": prompt_tokens,
+            "max": max_tokens
+        }

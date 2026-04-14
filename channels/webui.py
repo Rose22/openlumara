@@ -24,6 +24,9 @@ import core
 import msgpack
 import yaml
 
+from PIL import Image
+import io
+
 WEBUI_DIR = core.get_path("channels/webui")
 
 # ordered list of javascript files, to load in this exact order
@@ -48,6 +51,7 @@ JS_FILES = [
     "send",
     "upload",
     "theming",
+    "audio",
     "modal_settings",
     "storage_editor",
     "responsive",
@@ -73,6 +77,7 @@ CSS_FILES = [
     "input",
     "keyboard",
     "responsive",
+    "typewriter",
     "settings",
     "storage_editor"
 ]
@@ -113,7 +118,6 @@ def add_security_headers(response):
         "frame-ancestors 'none';"
     )
     response.headers['Content-Security-Policy'] = csp
-    response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['X-XSS-Protection'] = '1; mode=block'
 
@@ -298,15 +302,7 @@ def list_models():
 
     try:
         models = _run_async(channel_instance.manager.API.list_models())
-        # Extract model IDs from the response
-        model_list = []
-        if models and hasattr(models, 'data'):
-            for model in models.data:
-                model_list.append({
-                    'id': model.id,
-                    'owned_by': getattr(model, 'owned_by', 'unknown')
-                })
-        return jsonify({'models': model_list})
+        return jsonify({'models': models})
     except Exception as e:
         return jsonify({
             'models': [],
@@ -377,6 +373,22 @@ def get_messages_since():
         'current_chat_title': current_title,
         'current_chat_tags': current_tags
     })
+
+@app.route('/api/token_usage')
+def token_usage():
+    """Get current token usage for the active chat."""
+    global channel_instance
+
+    if not channel_instance:
+        return jsonify({'success': False, 'error': 'Channel not available'}), 500
+
+    try:
+        # Call the context class method
+        usage = _run_async(channel_instance.context.get_token_usage())
+        return jsonify(usage)
+    except Exception as e:
+        core.log("webui", f"Error getting token usage: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/stream', methods=['POST'])
 def stream_message():
@@ -582,9 +594,30 @@ def upload_file():
 
     try:
         if is_image:
-            # Store image in OpenAI vision format
-            # The base64 data is already pure data (no prefix)
-            image_url = f"data:{mimetype};base64,{content_b64}"
+            # 1. Decode the base64 string
+            image_bytes = base64.b64decode(content_b64)
+            img = Image.open(io.BytesIO(image_bytes))
+
+            # 2. Resize if the image is too large
+            # We set a max dimension (e.g., 1024px) to keep token counts low
+            max_dimension = 512
+            if max(img.size) > max_dimension:
+                img.thumbnail((max_dimension, max_dimension), Image.Resampling.LANCZOS)
+
+            # 3. Compress and convert to JPEG
+            # Converting to RGB is necessary if the original is a PNG with transparency (RGBA)
+            if img.mode in ("RGBA", "P"):
+                img = img.convert("RGB")
+
+            buffer = io.BytesIO()
+            # We save as JPEG with 80% quality to drastically reduce file size/tokens
+            img.save(buffer, format="JPEG", quality=80, optimize=True)
+
+            # 4. Re-encode the compressed image back to base64
+            compressed_b64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+
+            # Use image/jpeg as the mimetype since we converted it
+            image_url = f"data:image/jpeg;base64,{compressed_b64}"
 
             message = {
                 "role": "user",
@@ -620,7 +653,7 @@ def upload_file():
             async def insert_file():
                 await channel_instance.context.chat.add({
                     "role": "user",
-                    "content": f"[File: {filename}]\n{content}..."
+                    "content": f"[File: {filename}]\n```\n{content}\n```"
                 })
 
             asyncio.run_coroutine_threadsafe(
@@ -682,6 +715,10 @@ def load_chat():
 
     if not channel_instance:
         return jsonify({'success': False, 'error': 'Channel not available'})
+
+    # ensure we are the active channel
+    # so that things like fetching token count work
+    _run_async(channel_instance._set_as_active_channel())
 
     conv_id = request.args.get('id')
     if not conv_id:
@@ -810,6 +847,10 @@ def new_chat():
 
     if not channel_instance:
         return jsonify({'success': False, 'error': 'Channel not available'})
+
+    # ensure we are the active channel
+    # so that things like fetching token count work
+    _run_async(channel_instance._set_as_active_channel())
 
     data = request.get_json() or {}
     title = data.get('title', '')
