@@ -168,7 +168,7 @@ DEFAULT_MODULES = (
     "time"
 )
 
-DEFAULT_CHANNELS = ["cli", "webui"]
+DEFAULT_CHANNELS = ["webui"] # Removed CLI from default as this is not accessible when bundled within Esobold
 
 def sync_config(user_config, defaults):
     """
