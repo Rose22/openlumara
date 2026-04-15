@@ -15,7 +15,6 @@ class APIClient():
 
         self.connected = False
         self._AI = None # replaced later using .connect()
-        self._http_client = None
 
         self._model = None
         self._messages = []
@@ -52,23 +51,23 @@ class APIClient():
             )
             await self._AI.models.list()
         except openai.AuthenticationError as e:
-            if self._http_client:
-                await self._http_client.aclose()
-                self._http_client = None
+            if self.http_client:
+                await self.http_client.aclose()
+                self.http_client = None
             self._connection_error = "Invalid API key. Please check your configuration."
             core.log("API", f"Authentication failed: {e}")
             return False
         except openai.APIConnectionError as e:
-            if self._http_client:
-                await self._http_client.aclose()
-                self._http_client = None
+            if self.http_client:
+                await self.http_client.aclose()
+                self.http_client = None
             self._connection_error = f"Could not reach API server at {api_config.get('url')}"
             core.log("API", f"Connection failed: {e}")
             return False
         except Exception as e:
-            if self._http_client:
-                await self._http_client.aclose()
-                self._http_client = None
+            if self.http_client:
+                await self.http_client.aclose()
+                self.http_client = None
             self._connection_error = f"Connection error: {str(e)}"
             return False
 
@@ -96,9 +95,9 @@ class APIClient():
         """disconnect from the API"""
         self.connected = False
         self._AI = None
-        if self._http_client:
-            await self._http_client.aclose()
-            self._http_client = None
+        if self.http_client:
+            await self.http_client.aclose()
+            self.http_client = None
         core.log("API", "Disconnected from API")
         return True
 
