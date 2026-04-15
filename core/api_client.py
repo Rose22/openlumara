@@ -25,6 +25,9 @@ class APIClient():
         self._last_connection_attempt = None
         self._connection_attempts = 0
 
+        # used for insecure SSL connections
+        self._httpx_client = None
+
     async def connect(self):
         if self.connected:
             # dont unnecessarily connect
@@ -37,37 +40,30 @@ class APIClient():
 
         # initialize connection to the API
         try:
-            http_client = None
             if self.manager.args.insecure_tls:
                 # Allow opting out of TLS validation for self-signed certs or hostname mismatches.
                 import httpx
-                http_client = httpx.AsyncClient(verify=False)
+                self._httpx_client = httpx.AsyncClient(verify=False)
                 core.log("API", "WARNING: TLS certificate and hostname verification are disabled")
 
             self._AI = openai.AsyncOpenAI(
                 base_url=api_config.get("url"),
                 api_key=api_config.get("key"),
-                http_client=http_client
+                http_client=self._httpx_client
             )
             await self._AI.models.list()
         except openai.AuthenticationError as e:
-            if self.http_client:
-                await self.http_client.aclose()
-                self.http_client = None
+            await self.disconnect()
             self._connection_error = "Invalid API key. Please check your configuration."
             core.log("API", f"Authentication failed: {e}")
             return False
         except openai.APIConnectionError as e:
-            if self.http_client:
-                await self.http_client.aclose()
-                self.http_client = None
+            await self.disconnect()
             self._connection_error = f"Could not reach API server at {api_config.get('url')}"
             core.log("API", f"Connection failed: {e}")
             return False
         except Exception as e:
-            if self.http_client:
-                await self.http_client.aclose()
-                self.http_client = None
+            await self.disconnect()
             self._connection_error = f"Connection error: {str(e)}"
             return False
 
@@ -93,6 +89,10 @@ class APIClient():
 
     async def disconnect(self):
         """disconnect from the API"""
+        if self._httpx_client:
+            await self._httpx_client.aclose()
+            self._httpx_client = None
+
         self.connected = False
         self._AI = None
         if self.http_client:

@@ -35,11 +35,14 @@ class Files(core.module.Module):
     MAX_GLOB_DEPTH = 10
     MAX_SEARCH_RESULTS = 50
 
+    settings = {
+        "sandbox_folder": "sandbox"
+    }
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.sandbox_path = os.path.realpath(os.path.expanduser(core.config.get("modules").get("settings").get("files").get("sandbox_folder")))
+        self.sandbox_path = os.path.realpath(os.path.expanduser(self.config.get("sandbox_folder")))
         self.trash_path = os.path.realpath(os.path.join(core.get_data_path(), "trash"))
-
 
         if not os.path.exists(self.sandbox_path):
             os.makedirs(self.sandbox_path, exist_ok=True)
