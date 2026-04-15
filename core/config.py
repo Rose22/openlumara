@@ -28,7 +28,8 @@ default_config = {
         "settings": {
             "webui": {
                 "host": "localhost",
-                "port": 5000
+                "port": 5000,
+                "use_short_replies": False
             },
             "discord": {
                 "token": "TOKEN_HERE"

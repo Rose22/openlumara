@@ -24,7 +24,19 @@ Instructions for user:
 type /help for help. /stop is not available here.
 """
             case "webui":
-                chan_instr = """
+                webui_style_chat = (
+                    style_chat+"\n" if (
+                        core.config \
+                        .get("channels", {}) \
+                        .get("settings", {}) \
+                        .get("webui", {}) \
+                        .get("use_short_replies")
+                    )
+                    else ""
+                )
+
+                chan_instr = f"""
+{webui_style_chat}
 Instructions for user:
 
 Type /help for help.
