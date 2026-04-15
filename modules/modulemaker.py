@@ -25,13 +25,19 @@ class ModuleMaker(core.module.Module):
         class YourClassName(core.module.Module):
             \"\"\"You can put a description of your module here\"\"\"
 
+            # contains settings definitions. these will show up in settings panels and can be changed by the user
+            settings = {
+                "key": "default_value",
+                "save_data_path": "fancymoduledata"
+            }
+
             def __init__(self, *args, **kwargs):
                 super().__init__(*args, **kwargs)
                 # dict that gets saved to persistent storage
-                self.saved_dict = core.storage.StorageDict("fancymoduledata", type="json") # available types: json, yaml, msgpack, markdown, text
+                self.saved_dict = core.storage.StorageDict(self.config.get("save_data_path"), type="json") # available types: json, yaml, msgpack, markdown, text
 
                 # list that gets saved to persistent storage
-                self.saved_list = core.storage.StorageList("fancymoduledata", type="json") # available types: json, yaml, msgpack, text
+                self.saved_list = core.storage.StorageList(self.config.get("save_data_path"), type="json") # available types: json, yaml, msgpack, text
 
                 self.whatever_variables_you_want = "whatever value you want"
 
