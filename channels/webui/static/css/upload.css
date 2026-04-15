@@ -36,3 +36,30 @@
     margin: 8px 0;
 }
 
+.file-preview-container {
+    margin: 4px 0;
+}
+
+.file-preview {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    background: var(--bg-secondary, #1a1a2e);
+    border: 1px solid var(--border-color, #333);
+    border-radius: var(--radius-sm);
+}
+
+.file-icon {
+    font-size: 1.2em;
+    user-select: none;
+}
+
+.file-name {
+    font-size: 0.9em;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 250px;
+}
