@@ -16,7 +16,6 @@ import sys
 import argparse
 import asyncio
 import subprocess
-import argparse
 
 async def main(args):
     # load config file, allowing the path to be overridden
@@ -31,10 +30,11 @@ async def main(args):
     # run main loop
     return await manager.run()
 
-def do_restart():
+def do_restart(argv=None):
     """cross-platform restart with TTY/console inheritance"""
-    script = os.path.abspath(sys.argv[0])
-    args = [sys.executable, script] + sys.argv[1:]
+    script = os.path.abspath(__file__)
+    restart_argv = list(argv) if argv is not None else sys.argv[1:]
+    args = [sys.executable, script] + restart_argv
 
     if sys.platform == "win32":
         # windows: spawn new process, inherit same console
@@ -115,35 +115,44 @@ def override_config_with_args(live_config, args_namespace):
 
 import core
 
-arg_parser = argparse.ArgumentParser()
+def build_arg_parser():
+    arg_parser = argparse.ArgumentParser()
+    add_arguments_recursive(arg_parser, core.config.default_config)
 
-add_arguments_recursive(arg_parser, core.config.default_config)
+    # custom arguments
+    arg_parser.add_argument("--config", help="specify a specific config file to load")
+    arg_parser.add_argument("--pure", help="disables all non-essential modules so that system prompt is blank and you're talking to the bare model", action="store_true")
+    arg_parser.add_argument("--tmp", help="temporary session, discards all data after shutdown", action="store_true")
+    arg_parser.add_argument("--cli", help="CLI-only mode", action="store_true")
+    arg_parser.add_argument("--quiet", help="surpress logs", action="store_true")
+    arg_parser.add_argument("--insecure_tls", help="Disable verification for SSL/TLS certs. Use when your API uses self-signed or unvalid certificates.", action="store_true")
 
-# custom arguments
-arg_parser.add_argument("--config", help="specify a specific config file to load")
-arg_parser.add_argument("--pure", help="disables all non-essential modules so that system prompt is blank and you're talking to the bare model", action="store_true")
-arg_parser.add_argument("--tmp", help="temporary session, discards all data after shutdown", action="store_true")
-arg_parser.add_argument("--cli", help="CLI-only mode", action="store_true")
-arg_parser.add_argument("--quiet", help="surpress logs", action="store_true")
-arg_parser.add_argument("--insecure_tls", help="Disable verification for SSL/TLS certs. Use when your API uses self-signed or unvalid certificates.", action="store_true")
+    return arg_parser
 
-# do the arg parsing
-args = arg_parser.parse_args(sys.argv[1:])
 
-if args.tmp:
-    core.storage.TEMPORARY = True
+def run_from_argv(argv=None):
+    run_argv = list(argv) if argv is not None else sys.argv[1:]
+    arg_parser = build_arg_parser()
+    args = arg_parser.parse_args(run_argv)
 
-while True:
-    result = None
-    try:
-        result = asyncio.run(main(args))
-    except KeyboardInterrupt:
-        pass
+    if args.tmp:
+        core.storage.TEMPORARY = True
 
-    if result == "restart":
-        do_restart()
-    else:
-        print("Shutting down..")
-        exit()
+    while True:
+        result = None
+        try:
+            result = asyncio.run(main(args))
+        except KeyboardInterrupt:
+            pass
+
+        if result == "restart":
+            do_restart(run_argv)
+        else:
+            print("Shutting down..")
+            exit()
+
+
+if __name__ == "__main__":
+    run_from_argv(sys.argv[1:])
 
 
