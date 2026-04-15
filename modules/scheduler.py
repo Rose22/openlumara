@@ -6,7 +6,7 @@ import ulid
 class Scheduler(core.module.Module):
     async def on_ready(self) -> None:
         """Initialize storage, manager, and schedule existing jobs."""
-        self.schedule = core.storage.StorageList("schedule", type="json")
+        self.schedule = core.storage.StorageList("schedule", typeName="json")
         self.tc_manager = core.toolcalls.ToolcallManager(self.channel)
 
         # Map of job_id -> asyncio.TimerHandle

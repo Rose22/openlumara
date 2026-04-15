@@ -10,8 +10,8 @@ cached_mem = None
 class Memory(core.module.Module):
     def __init__(self, *args, **kwargs):
         super().__init__( *args, **kwargs)
-        self._mem = core.storage.StorageList("memory", type="msgpack")
-        self._mem_deleted = core.storage.StorageList("deleted_memories", type="json")
+        self._mem = core.storage.StorageList("memory", typeName="msgpack")
+        self._mem_deleted = core.storage.StorageList("deleted_memories", typeName="json")
         self.max_pinned = 10
 
     def _get_index(self, ulid: str) -> int:
