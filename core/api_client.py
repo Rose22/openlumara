@@ -34,12 +34,10 @@ class APIClient():
 
         api_config = core.config.get("api", {})
 
-        insecure_skip_tls_verify = self.manager.args.insecure_tls
-
         # initialize connection to the API
         try:
             http_client = None
-            if insecure_skip_tls_verify:
+            if self.manager.args.insecure_tls:
                 # Allow opting out of TLS validation for self-signed certs or hostname mismatches.
                 import httpx
                 http_client = httpx.AsyncClient(verify=False)
