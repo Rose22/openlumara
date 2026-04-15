@@ -30,10 +30,8 @@ class Context:
             context = [{"role": "system", "content": await self.channel.manager.get_system_prompt()}]
 
         # insert message history
-        messages_orig = await self.chat.get()
-        if messages_orig:
-            # deepcopy so we dont end up modifying the original messages array
-            messages = copy.deepcopy(messages_orig)
+        messages = await self.chat.get()
+        if messages:
             context.extend(messages)
 
         """
@@ -48,25 +46,12 @@ class Context:
         such as the current time and date.
         """
         if end_prompt:
+            # we add the end prompt message as a user message before the actual user messages
+            # because it turns out multiple consecutive user messages ARE allowed
+            # just not multiple consecutive assistant messages or system messages...
             histend = await self.channel.manager.get_end_prompt()
             if histend:
-                # we merge the end prompt with the last message, to stay compliant with API message turn rules
-
-                # or, if we're in the very first message of a chat, we put it in the system prompt instead, just at the beginning, so that it has the information right at the start
-                if len(context) == 1:
-                    context[0]["content"] += f"\n\n{histend}"
-                else:
-                    # otherwise we search for the last user message and merge the endprompt into it
-                    for i in range(len(context) - 1, -1, -1):
-                        # ^ this is for loop that loops backwards through the array!
-                        # saves a ton of time
-
-                        if context[i].get("role") == "user":
-                            # found it, use it immediately
-                            context[i]["content"] += f"\n\n[SYSTEM INFO]:\n{histend}"
-                            break
-
-                    # since we're working with a deepcopy, this won't be visible to any frontend channels!
+                context.append({"role": "user", "content": histend})
 
         return context
 

@@ -116,7 +116,6 @@ def get_command_description(command_name):
         return getattr(method, '_command_description', '')
     return None
 
-
 def is_empty_coroutine(func):
     """
     Checks if a coroutine function body is effectively empty

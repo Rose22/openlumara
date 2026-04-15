@@ -68,9 +68,9 @@ def add_arguments_recursive(parser, config, prefix=""):
 
             # Special handling for lists (like your 'enabled' keys)
             if isinstance(value, list):
-                parser.add_argument(arg_flag, type=str, metavar="LIST", help=f"Comma-separated list for {arg_name}")
+                parser.add_argument(arg_flag, type=str, metavar="<multiple,values>", help=f"Comma-separated list for {arg_name}")
             else:
-                parser.add_argument(arg_flag, type=arg_type, default=None, metavar="VALUE")
+                parser.add_argument(arg_flag, type=arg_type, default=None, metavar=f"<{key.lower()}>")
 
 def override_config_with_args(live_config, args_namespace):
     """
@@ -114,15 +114,17 @@ def override_config_with_args(live_config, args_namespace):
 
 # parse arguments
 arg_parser = argparse.ArgumentParser()
-add_arguments_recursive(arg_parser, core.config.default_config)
+args_settings = arg_parser.add_argument_group("settings")
+add_arguments_recursive(args_settings, core.config.default_config)
 
 # custom arguments
-arg_parser.add_argument("--config", help="specify a specific config file to load")
-arg_parser.add_argument("--pure", help="disables all non-essential modules so that system prompt is blank and you're talking to the bare model", action="store_true")
-arg_parser.add_argument("--tmp", help="temporary session, discards all data after shutdown", action="store_true")
-arg_parser.add_argument("--cli", help="CLI-only mode", action="store_true")
-arg_parser.add_argument("--quiet", help="surpress logs", action="store_true")
-arg_parser.add_argument("--insecure_tls", help="Disable verification for SSL/TLS certs. Use when your API uses self-signed or unvalid certificates.", action="store_true")
+args_main = arg_parser.add_argument_group("main")
+args_main.add_argument("--config", help="specify a specific config file to load", metavar="<path>")
+args_main.add_argument("--pure", help="disables all non-essential modules so that system prompt is blank and you're talking to the bare model", action="store_true")
+args_main.add_argument("--tmp", help="temporary session, discards all data after shutdown", action="store_true")
+args_main.add_argument("--cli", help="CLI-only mode", action="store_true")
+args_main.add_argument("--quiet", help="surpress logs", action="store_true")
+args_main.add_argument("--insecure_tls", help="Disable verification for SSL/TLS certs. Use when your API uses self-signed or unvalid certificates.", action="store_true")
 
 # do the arg parsing
 args = arg_parser.parse_args(sys.argv[1:])
