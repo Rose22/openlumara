@@ -73,28 +73,42 @@ class Manager:
 
         # load modules
         enabled_modules = core.config.get("modules").get("enabled", [])
+        enabled_user_modules = core.config.get("user_modules", {}).get("enabled", [])
+        loaded_module_names = []
+
         if self.pure_mode:
             enabled_modules = ["context", "chats"]
+            enabled_user_modules = []
 
         if enabled_modules:
-            core.log("core", "Loading modules")
-            loaded_module_names = []
+            core.log("core", "Loading core modules")
 
+            # load modules
             import modules
             for module in core.modules.load(modules, core.module.Module):
-                module_name = core.modules.get_name(module)
-                loaded_module = await self.add_module_class(module)
-                # run startup methods
-                if hasattr(loaded_module, "on_ready"):
-                    await loaded_module.on_ready()
-                if hasattr(loaded_module, "on_background"):
-                    if not core.module.is_empty_coroutine(loaded_module.on_background):
-                        task = asyncio.create_task(loaded_module.on_background(), name=module_name)
-                        task.add_done_callback(self._remove_async_task)
-                        self._async_tasks.add(task)
-                        core.log("core", f"Started background task {module_name}")
+                if core.modules.get_name(module) not in enabled_modules:
+                    continue
 
-                    loaded_module_names.append(module_name)
+                await self.add_module_class(module)
+                loaded_module = module(self)
+                await loaded_module._start()
+
+                self.modules[loaded_module.name] = loaded_module
+                loaded_module_names.append(loaded_module.name)
+
+            # load user modules
+            import user_modules
+            core.log("core", "Loading user modules")
+            for module in core.modules.load(user_modules, core.module.Module):
+                if core.modules.get_name(module) not in enabled_user_modules:
+                    continue
+
+                loaded_module = await self.add_module_class(module)
+                await loaded_module._start()
+
+                self.modules[loaded_module.name] = loaded_module
+                loaded_module_names.append(loaded_module.name)
+
             core.log("core", f"Modules loaded: {', '.join(loaded_module_names)}")
         else:
             core.log("core", "all modules disabled in config")
@@ -370,9 +384,6 @@ class Manager:
 
         loaded_module = module(self)
 
-        class_display_name = core.modules.get_name(module)
-        self.modules[class_display_name] = loaded_module
-
         if self.pure_mode:
             return loaded_module
 
@@ -442,7 +453,7 @@ class Manager:
             tool = {
                 "type": "function",
                 "function": {
-                    "name": f"{class_display_name}_{func_name}",
+                    "name": f"{loaded_module.name}_{func_name}",
                     "description": docstring,
                     "parameters": {
                         "type": "object",

@@ -2,6 +2,7 @@ import os
 import yaml
 import core
 import modules
+import user_modules
 import channels
 
 config = None
@@ -48,12 +49,16 @@ default_config = {
     "modules": {
         "enabled": [],
         "disabled": [],
-        "disabled_prompts": [],
         "settings": {
             "files": {
                 "sandbox_folder": "~/sandbox"
             }
         }
+    },
+    "user_modules": {
+        "enabled": [],
+        "disabled": [],
+        "settings": {}
     }
 }
 
@@ -144,6 +149,11 @@ def load(file_path = None):
     for module in core.modules.load(modules, core.module.Module, respect_config=False):
         available_module_names.append(core.modules.get_name(module))
 
+    # get all available user modules
+    available_user_module_names = []
+    for module in core.modules.load(user_modules, core.module.Module, respect_config=False):
+        available_user_module_names.append(core.modules.get_name(module))
+
     # get all available channels
     available_channel_names = []
     for channel in core.modules.load(channels, core.channel.Channel, respect_config=False):
@@ -154,10 +164,13 @@ def load(file_path = None):
         # Create new config from scratch
         # Initialize lists based on availability and defaults
         mods_state = reconcile_lists(available_module_names, DEFAULT_MODULES, {"enabled": [], "disabled": []})
+        user_mods_state = reconcile_lists(available_user_module_names, [], {"enabled": [], "disabled": []})
         chans_state = reconcile_lists(available_channel_names, DEFAULT_CHANNELS, {"enabled": [], "disabled": []})
 
         default_config["modules"]["enabled"] = mods_state["enabled"]
         default_config["modules"]["disabled"] = mods_state["disabled"]
+        default_config["user_modules"]["enabled"] = user_mods_state["enabled"]
+        default_config["user_modules"]["disabled"] = user_mods_state["disabled"]
         default_config["channels"]["enabled"] = chans_state["enabled"]
         default_config["channels"]["disabled"] = chans_state["disabled"]
 
@@ -181,6 +194,10 @@ def load(file_path = None):
         )
         synced_config["modules"]["enabled"] = mods_state["enabled"]
         synced_config["modules"]["disabled"] = mods_state["disabled"]
+
+        user_mods_state = reconcile_lists(available_user_module_names, [], synced_config.get("user_modules", {}))
+        synced_config["user_modules"]["enabled"] = user_mods_state["enabled"]
+        synced_config["user_modules"]["disabled"] = user_mods_state["disabled"]
 
         # ditto for channels
         chans_state = reconcile_lists(

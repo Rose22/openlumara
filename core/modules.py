@@ -41,7 +41,7 @@ def load(package, base_class = None, respect_config=True):
                 if respect_config:
                     enabled_classes = core.config.get(package.__name__, {}).get("enabled", [])
 
-                    if get_name(target_class) not in enabled_classes:
+                    if core.modules.get_name(target_class) not in enabled_classes:
                         continue
 
                 discovered.append(target_class)
