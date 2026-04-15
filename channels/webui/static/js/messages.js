@@ -2,28 +2,51 @@
 // Content Helpers
 // =============================================================================
 
-/**
- * Extracts plain text from message content (handles multi-modal arrays)
- */
 function extractTextContent(content) {
     if (typeof content === 'string') return content;
     if (Array.isArray(content)) {
         return content
-        .filter(part => part.type === 'text')
-        .map(part => part.text)
+        .map(part => {
+            if (part.type === 'text') return part.text;
+            if (part.type === 'file') return `File: ${part.filename}`;
+            if (part.type === 'image_url') return `[Image]`;
+            return '';
+        })
+        .filter(t => t.trim() !== '')
         .join('\n');
     }
     return '';
 }
 
-/**
- * Renders message content - handles both text strings and multi-modal arrays
- */
 function renderContentBody(content) {
     // Handle multi-modal content (images + text)
     if (Array.isArray(content)) {
         return content.map(part => {
             if (part.type === 'text') {
+                // NEW: Check if this text part is actually a file upload
+                // using the pattern "[File: filename]\ncontent"
+                const filePattern = /^\[File: (.*?)\]\n([\s\S]*)$/;
+                const fileMatch = part.text.match(filePattern);
+
+                if (fileMatch) {
+                    const filename = fileMatch[1];
+                    // Return ONLY the icon and filename preview
+                    return `
+                    <div class="file-preview-container">
+                    <div class="file-preview">
+                    <span class="file-icon">📄</span>
+                    <span class="file-name">${escapeHtml(filename)}</span>
+                    </div>
+                    </div>`;
+                }
+
+                // Also check for the image header pattern to prevent
+                // duplicate text rendering if images are multi-modal
+                const imageHeaderPattern = /^\[Image: (.*?)\]\n([\s\S]*)$/;
+                if (imageHeaderPattern.test(part.text)) {
+                    return ''; // Let the 'image_url' part of the array handle the actual image
+                }
+
                 return renderMarkdown(part.text);
             } else if (part.type === 'image_url') {
                 const url = part.image_url?.url || '';
