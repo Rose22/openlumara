@@ -36,7 +36,7 @@ class Files(core.module.Module):
     MAX_SEARCH_RESULTS = 50
 
     settings = {
-        "sandbox_folder": "sandbox"
+        "sandbox_folder": "~/sandbox"
     }
 
     def __init__(self, *args, **kwargs):

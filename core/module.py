@@ -8,11 +8,13 @@ import asyncio
 class Module:
     """Base class for modules/plugins"""
 
+    # can be defined by modules, contains default settings that can be changed by the user
+    settings = {}
+
     def __init__(self, manager, is_user_module=False, channel=None):
         self.manager = manager
         self.channel = channel # later set by the channel base class, _set_as_active_channel()
         self.name = core.modules.get_name(self) # shorthand alias
-        self.settings = {} # can be defined by modules, contains default settings that can be changed by the user
 
         # load module config
         config_target = "modules" if not is_user_module else "user_modules"
