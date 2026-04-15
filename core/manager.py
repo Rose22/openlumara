@@ -103,7 +103,7 @@ class Manager:
                 if core.modules.get_name(module) not in enabled_user_modules:
                     continue
 
-                loaded_module = await self.add_module_class(module)
+                loaded_module = await self.add_module_class(module, is_user_module=True)
                 await loaded_module._start()
 
                 self.modules[loaded_module.name] = loaded_module
@@ -373,7 +373,7 @@ class Manager:
 
         return descriptions, clean_doc
 
-    async def add_module_class(self, module):
+    async def add_module_class(self, module, is_user_module=False):
         """
         Adds tools to the manager based on a class with functions.
         To make tools, just make a class like so:
@@ -382,7 +382,7 @@ class Manager:
                 self.channel.send(your_websearch(query))
         """
 
-        loaded_module = module(self)
+        loaded_module = module(self, is_user_module)
 
         if self.pure_mode:
             return loaded_module
