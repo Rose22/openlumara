@@ -15,8 +15,9 @@ class Manager:
     """the central class that manages everything"""
 
     # --- main ---
-    def __init__(self):
+    def __init__(self, cmdline_args):
         self._async_tasks = set()
+        self.args = cmdline_args # store commandline args
         self.API = core.api_client.APIClient(self) # connect later with .connect()
         self.savedata = {}
         self.channels = {}
@@ -31,12 +32,12 @@ class Manager:
         self._async_tasks.discard(task)
         core.log("task", f"background task completed: {task.get_name()}")
 
-    async def run(self, args):
+    async def run(self):
         """main loop"""
 
-        if args.quiet:
+        if self.args.quiet:
             core.quiet = True
-        if args.pure:
+        if self.args.pure:
             self.pure_mode = True
 
         core.log("core", "Starting OpenLumara")
@@ -45,7 +46,7 @@ class Manager:
 
         # load channels
         enabled_channels = core.config.get("channels").get("enabled", [])
-        if args.cli:
+        if self.args.cli:
             enabled_channels = ["cli"]
 
         if not enabled_channels:

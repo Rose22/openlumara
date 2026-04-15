@@ -34,11 +34,21 @@ class APIClient():
 
         api_config = core.config.get("api", {})
 
+        insecure_skip_tls_verify = self.manager.args.insecure_tls
+
         # initialize connection to the API
         try:
+            http_client = None
+            if insecure_skip_tls_verify:
+                # Allow opting out of TLS validation for self-signed certs or hostname mismatches.
+                import httpx
+                http_client = httpx.AsyncClient(verify=False)
+                core.log("API", "WARNING: TLS certificate and hostname verification are disabled")
+
             self._AI = openai.AsyncOpenAI(
                 base_url=api_config.get("url"),
-                api_key=api_config.get("key")
+                api_key=api_config.get("key"),
+                http_client=http_client
             )
             await self._AI.models.list()
         except openai.AuthenticationError as e:

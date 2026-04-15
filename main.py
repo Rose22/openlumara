@@ -27,9 +27,9 @@ async def main(args):
     override_config_with_args(core.config.config, args)
 
     # the manager class connects everything together
-    manager = core.manager.Manager()
+    manager = core.manager.Manager(cmdline_args=args)
     # run main loop
-    return await manager.run(args=args)
+    return await manager.run()
 
 def do_restart():
     """cross-platform restart with TTY/console inheritance"""
@@ -122,6 +122,7 @@ arg_parser.add_argument("--pure", help="disables all non-essential modules so th
 arg_parser.add_argument("--tmp", help="temporary session, discards all data after shutdown", action="store_true")
 arg_parser.add_argument("--cli", help="CLI-only mode", action="store_true")
 arg_parser.add_argument("--quiet", help="surpress logs", action="store_true")
+arg_parser.add_argument("--insecure_tls", help="Disable verification for SSL/TLS certs. Use when your API uses self-signed or unvalid certificates.", action="store_true")
 
 # do the arg parsing
 args = arg_parser.parse_args(sys.argv[1:])
