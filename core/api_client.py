@@ -3,7 +3,6 @@ import openai
 import asyncio
 import json
 import inspect
-import httpx
 
 class APIClient():
     """
