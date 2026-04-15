@@ -129,6 +129,12 @@ def add_security_headers(response):
     return response
 
 class Webui(core.channel.Channel):
+    settings = {
+        "host": "localhost",
+        "port": 5000,
+        "use_short_replies": False
+    }
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.main_loop = None
