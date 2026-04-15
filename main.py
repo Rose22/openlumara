@@ -19,6 +19,13 @@ import subprocess
 import argparse
 
 async def main(args):
+    # load config file, allowing the path to be overridden
+    config_display_str = "config.yaml" if not args.config else args.config
+    core.log("core", f"Loading settings from config {config_display_str}")
+    core.config.load(args.config)
+
+    override_config_with_args(core.config.config, args)
+
     # the manager class connects everything together
     manager = core.manager.Manager()
     # run main loop
@@ -110,6 +117,7 @@ arg_parser = argparse.ArgumentParser()
 add_arguments_recursive(arg_parser, core.config.default_config)
 
 # custom arguments
+arg_parser.add_argument("--config", help="specify a specific config file to load")
 arg_parser.add_argument("--pure", help="disables all non-essential modules so that system prompt is blank and you're talking to the bare model", action="store_true")
 arg_parser.add_argument("--tmp", help="temporary session, discards all data after shutdown", action="store_true")
 arg_parser.add_argument("--cli", help="CLI-only mode", action="store_true")
@@ -117,9 +125,6 @@ arg_parser.add_argument("--quiet", help="surpress logs", action="store_true")
 
 # do the arg parsing
 args = arg_parser.parse_args(sys.argv[1:])
-
-# by this point, the config is already loaded by core.__init__.py, so we can just override the values
-override_config_with_args(core.config.config, args)
 
 if args.tmp:
     core.storage.TEMPORARY = True

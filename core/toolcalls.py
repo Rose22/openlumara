@@ -6,17 +6,56 @@ class ToolcallManager:
     def __init__(self, channel):
         self.channel = channel
 
+    def display_call(self, tool_data):
+        """format a toolcalling response into a nice string for display to the user"""
+
+        try:
+            if hasattr(tool_data, 'function'):
+                func_name = getattr(tool_data.function, 'name', 'unknown')
+                raw_args = getattr(tool_data.function, 'arguments', '{}')
+            elif isinstance(tool_data, dict) and 'function' in tool_data:
+                func_name = tool_data['function'].get('name', 'unknown')
+                raw_args = tool_data['function'].get('arguments', '{}')
+            else:
+                return "🔧 Calling tool..."
+
+            if isinstance(raw_args, str):
+                try:
+                    args_dict = json_repair.loads(raw_args)
+                except Exception:
+                    args_dict = {}
+            elif isinstance(raw_args, dict):
+                args_dict = raw_args
+            else:
+                args_dict = {}
+
+            arg_strs = []
+            for key, value in args_dict.items():
+                value_str = str(value)
+                if len(value_str) > 30:
+                    value_str = value_str[:30] + ".."
+                value_str = value_str.replace('"', "'")
+                arg_strs.append(f'{key}="{value_str}"')
+
+            return f"🔧 {func_name}({', '.join(arg_strs)})"
+        except Exception as e:
+            core.log("toolcall", f"Error formatting tool call: {e}")
+            return "🔧 Calling tool..."
+
     async def process(self, tool_calls, initial_content=""):
         """
-        Process tool calls from a streamed response.
-
-        Args:
-            tool_calls: The tool calls to process
-            initial_content: Content that was streamed before tool calls
-
-        Yields response tokens after executing tools.
+        process tool calls from an API response..
+        initial_content is the "normal" non-toolcall content, the text that the AI wants to say that's not toolcalls
         """
-        # Fix broken JSON and convert to dicts
+
+        # this is, once again, a very badly documented thing in openAI's chat completions docs
+        # and so i had to use a ton of AI assistance to get this to work well
+        # if you ask me, this stuff should be handled in inference servers like llamacpp,
+        # NOT by the frontends, because this is just reinventing the wheel..
+        # like why do **i** need to repair the json? that should be the server's responsibility...
+        # whatever. we deal with it as best we can here
+
+        # fix broken JSON and convert things where needed
         repaired_tool_calls = []
 
         for tool_call in tool_calls:
@@ -43,7 +82,7 @@ class ToolcallManager:
             tool_call['function']['arguments'] = json.dumps(modified_args)
             repaired_tool_calls.append(tool_call)
 
-        # Build assistant message with both content and tool_calls
+        # build openAI-compliant assistant message
         assistant_message = {
             "role": "assistant",
             "tool_calls": repaired_tool_calls
@@ -51,10 +90,10 @@ class ToolcallManager:
         if initial_content:
             assistant_message["content"] = initial_content
 
-        # Add assistant message to context
+        # add it to context
         await self.channel.context.chat.add(assistant_message)
 
-        # Execute each tool and add their responses
+        # execute each tool and add their responses
         for tool_call_dict in repaired_tool_calls:
             tool_name = tool_call_dict['function']['name']
             tool_args = json_repair.loads(tool_call_dict['function']['arguments'])
@@ -62,6 +101,8 @@ class ToolcallManager:
             module_instance = None
             module_instance_display_name = None
 
+            # find the module that has the requested tool
+            # and store the instance and name of that module
             for module_name, module_obj in self.channel.manager.modules.items():
                 class_display_name = core.modules.get_name(module_obj)
                 translated_tool_name = tool_name.replace(f"{class_display_name}_", "")
@@ -72,24 +113,23 @@ class ToolcallManager:
                     break
 
             if module_instance:
+                # remove the module name from the tool name
                 translated_tool_name = tool_name.replace(
                     f"{module_instance_display_name}_", ""
                 )
+                # and use it to get the function object for that tool
                 func_callable = getattr(module_instance, translated_tool_name)
 
-                arg_display = []
-                for key, value in tool_args.items():
-                    value = str(value)
-                    if len(value) > 50:
-                        value = f"{value[:50]}.."
-                    arg_display.append(f"{key}={value}")
-                arg_display_str = ", ".join(arg_display)
-                announce_string = f"calling tool {tool_name}({arg_display_str})"
+                # build a fancy toolcall display string
+                tool_call_str = self.display_call(tool_call_dict)
 
-                core.log("toolcall", announce_string)
+                core.log("toolcall", tool_call_str)
 
                 try:
+                    # do the function call and get it's result
                     func_response = await func_callable(**tool_args)
+
+                    # then build the openai toolcall response object
                     tool_response = {
                         "role": "tool",
                         "tool_call_id": tool_call_dict['id'],
@@ -97,12 +137,15 @@ class ToolcallManager:
                     }
                 except Exception as e:
                     core.log("toolcall", f"error: {str(e)}")
+
+                    # build an openai-compliant tool error object
                     tool_response = {
                         "role": "tool",
                         "tool_call_id": tool_call_dict['id'],
                         "content": f"error: {str(e)}"
                     }
 
+                # add the tool response to the context window
                 await self.channel.context.chat.add(tool_response)
             else:
                 core.log(
@@ -114,8 +157,14 @@ class ToolcallManager:
             await self.channel.announce("toolcalling chain cancelled", "info")
             return
 
-        # Build context and stream response
-        context = await self.channel.context.get(system_prompt=False)
+        # build the toolcalling prompt
+        try:
+            # attempt to get chat message history
+            context = await self.channel.context.chat.get()
+        except:
+            # in case we don't have a chat, just use a blank messages array
+            context = {}
+
         prompt = [
             {
                 "role": "system",
@@ -140,14 +189,13 @@ class ToolcallManager:
                     final_content.append(token.get("content"))
                     yield token
                 elif token_type == "reasoning":
-                    # only collect reasoning, in case there was no normal message content. dont yield.
+                    # only collect reasoning, in case there was no normal message content. but dont yield.
                     final_reasoning.append(token.get("content"))
                 elif token_type == "tool_calls":
                     yield token
 
-                    # Mark that we made a recursive call
                     had_recursive_call = True
-                    # Pass accumulated content to recursive call
+                    # the AI has decided to call more tools, so we make a recursive call
                     async for sub_token in self.process(
                         token.get("content"),
                         initial_content="".join(final_content)
@@ -157,9 +205,10 @@ class ToolcallManager:
                     pass
 
             if not final_content:
-                final_content = final_reasoning
+                # replace content with reasoning if there was no content
+                final_content = f"Okay, I called the tool!\nReasoning: {final_reasoning}"
 
-            # Only add final message if we didn't make a recursive call
+            # only add final message if we didn't make a recursive call
             # (the innermost call handles adding the final message)
             if final_content and not had_recursive_call:
                 await self.channel.context.chat.add({
@@ -168,8 +217,8 @@ class ToolcallManager:
                 })
 
         except Exception as e:
-            core.log("error", f"error while handling tool calls: {e}")
+            core.log("error", f"Error while handling tool calls: {e}")
             await self.channel.announce(
-                f"error while handling tool calls: {e}",
+                f"Error while handling tool calls: {e}",
                 "error"
             )

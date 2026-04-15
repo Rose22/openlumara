@@ -29,17 +29,10 @@ class APIClient():
             # dont unnecessarily connect
             return True
 
-        # validate config
-        validation_result = self._validate_config()
-        if not validation_result["valid"]:
-            self._connection_error = validation_result["error"]
-            core.log("API", f"Configuration invalid: {validation_result['error']}")
-            return False
-
-        self._model = core.config.get("model").get("name")
+        self._model = core.config.get("model", {}).get("name")
         self._connection_attempts += 1
 
-        api_config = core.config.get("api")
+        api_config = core.config.get("api", {})
 
         # initialize connection to the API
         try:
@@ -66,36 +59,7 @@ class APIClient():
         core.log("API", "Successfully connected to AI")
         return True
 
-    def _validate_config(self):
-        """Validate that API configuration is present and valid."""
-        result = {"valid": False, "error": None}
-
-        api_config = core.config.get("api")
-        if not api_config:
-            result["error"] = "API configuration not found in config file"
-            return result
-
-        url = api_config.get("url")
-        key = api_config.get("key")
-
-        if not url:
-            result["error"] = "API URL not configured. Please set 'url' in config."
-            return result
-
-        if not key:
-            result["error"] = "API key not configured. Please set 'key' in config."
-            return result
-
-        model_config = core.config.get("model")
-        if not model_config or not model_config.get("name"):
-            result["error"] = "Model name not configured. Please set model name in config."
-            return result
-
-        result["valid"] = True
-        return result
-
     def get_connection_status(self):
-        """Returns a dictionary with connection status info for UI display."""
         api_config = core.config.get("api", {})
         model_config = core.config.get("model", {})
 
@@ -110,14 +74,14 @@ class APIClient():
         }
 
     async def disconnect(self):
-        """Properly disconnect from the API."""
+        """disconnect from the API"""
         self.connected = False
         self._AI = None
         core.log("API", "Disconnected from API")
         return True
 
     async def reconnect(self):
-        """Disconnect and reconnect to the API."""
+        """disconnect and reconnect to the API"""
         await self.disconnect()
         return await self.connect()
 
@@ -129,7 +93,7 @@ class APIClient():
         return self._model
 
     def get_last_error(self):
-        """Get the last connection error message."""
+        """returns the last connection error message"""
         return self._connection_error
 
     async def _request(self, context, tools=None, stream=False):
@@ -141,7 +105,7 @@ class APIClient():
             if not connected:
                 return {"error": "not_connected", "message": self._connection_error}
 
-        if not core.config.get("model").get("use_tools"):
+        if not core.config.get("model", {}).get("use_tools"):
             # allow switching tools off globally
             tools = None
 
@@ -150,14 +114,15 @@ class APIClient():
             "messages": context,
             "tools": tools,
             "stream": stream,
-            "temperature": core.config.get("model").get("temperature", 0.2),
-            "max_completion_tokens": core.config.get("api").get("max_output_tokens", 8192)
+            "temperature": core.config.get("model", {}).get("temperature", 0.2),
+            "max_completion_tokens": core.config.get("api", {}).get("max_output_tokens", 8192)
         }
 
         if stream:
+            # request token usage from the API
             req["stream_options"] = {"include_usage": True}
 
-        if core.config.get("channels").get("debug"):
+        if core.debug:
             core.log("debug:request", str(req))
 
         try:
@@ -183,7 +148,7 @@ class APIClient():
             self.connected = False
             return {"error": "unknown", "message": str(e)}
 
-        if core.config.get("channels").get("debug"):
+        if core.debug:
             core.log("debug:response", str(response))
 
         return response
@@ -199,7 +164,7 @@ class APIClient():
 
         response = await self._request(context, tools=(tools if use_tools else None))
 
-        # Check for error response
+        # return errors if applicable
         if isinstance(response, dict) and "error" in response:
             return response
 
@@ -221,7 +186,7 @@ class APIClient():
 
         response = await self._request(context, tools=(tools if use_tools else None), stream=True)
 
-        # Check for error response
+        # return errors if applicable
         if isinstance(response, dict) and "error" in response:
             yield {"type": "error", "content": response}
             return
@@ -229,14 +194,17 @@ class APIClient():
         try:
             async for token in self._recv_stream(response):
                 if self.cancel_request:
+                    # cancel the entire stream
                     break
 
+                # let the channel calling send_stream() handle token processing
                 yield token
         except Exception as e:
             core.log_error("error while sending request to AI", e)
             yield {"type": "error", "content": {"error": "stream_failed", "message": str(e)}}
 
     async def cancel(self):
+        """cancel a request that's been sent to the AI"""
         self.cancel_request = True
         return True
 
@@ -252,12 +220,10 @@ class APIClient():
             core.log_error("error while receiving response from AI", e)
             return {"error": "invalid_response", "message": str(e)}
 
-        # Extract reasoning content if available
         reasoning_content = getattr(response_main.message, "reasoning_content", None) or \
                             getattr(response_main.message, "reasoning", None) or ""
 
-        # Log reasoning if needed
-        if reasoning_content:
+        if reasoning_content and core.debug:
             core.log("debug:reasoning", reasoning_content)
 
         # extract message content
@@ -278,7 +244,6 @@ class APIClient():
         if tool_calls:
             result["tool_calls"] = tool_calls
 
-        # Return content (reasoning is stored in context but not returned to caller)
         return result
 
     async def _recv_stream(self, response, use_tools=True):
@@ -297,6 +262,7 @@ class APIClient():
             async for chunk in response:
                 if self.cancel_request:
                     if hasattr(response, "close"):
+                        # support closing
                         await response.close()
                     return
 
@@ -323,28 +289,37 @@ class APIClient():
 
                             if index not in tool_call_buffer:
                                 tool_call_buffer[index] = tool_call
-                                # ensure arguments is a string, not None
+                                # ensure arguments is always a string
                                 if tool_call_buffer[index].function.arguments is None:
                                     tool_call_buffer[index].function.arguments = ""
                             else:
-                                # Continuation chunk — merge fields into the buffer
-                                # The id and function.name are typically only on the first chunk,
-                                # but merge them defensively in case they appear later
+                                # the documentation for this was awful, so i had to use AI to figure it out
+                                # welcome to the reason i was forced to introduce AI slop to the core framework
+                                # (dont worry, i removed it by now)
+                                # thanks openAI for ruining your documentation of chat completion requests in favor of your stupid Responses API
+
+                                # it seems these properties will only show up in one chunk,
+                                # and the rest of the stream won't have them anymore..
+                                # so the AI (GLM-5) decided we should set these if they show up
+                                # and then just assume it won't happen again
+                                # i guess if it does, it just overwrites it..
                                 if tool_call.id:
                                     tool_call_buffer[index].id = tool_call.id
                                 if tool_call.function.name:
                                     tool_call_buffer[index].function.name = tool_call.function.name
-                                # Append argument fragments
+
+                                # function arguments seem to be the part that actually gets streamed
+                                # and which we must accumulate to get the full toolcall
                                 if tool_call.function.arguments:
                                     tool_call_buffer[index].function.arguments += tool_call.function.arguments
 
-                # if response has usage data, save it so we can use it to trim context
+                # if response has usage data, save it so we can use it to show to the user and to trim context
                 if hasattr(chunk, 'usage') and chunk.usage is not None:
                     token_usage = chunk.usage.prompt_tokens
 
             if use_tools:
                 for index in sorted(tool_call_buffer.keys()):
-                    # filter out blank tool calls
+                    # filter out blank tool calls (rare model glitch)
                     tool_call = tool_call_buffer[index]
                     if not tool_call.function.name:
                         continue
@@ -352,8 +327,10 @@ class APIClient():
                     final_tool_calls.append(tool_call)
 
                 if final_tool_calls and core.config.get("model").get("use_tools", False):
+                    # yield the full toolcall object as a single token to be interpreted by the function that is iterating through _recv_stream()
                     yield {"type": "tool_calls", "content": final_tool_calls}
 
+            # yield token usage as a seperate token
             yield {"type": "token_usage", "content": token_usage}
 
         except Exception as e:
@@ -364,6 +341,7 @@ class APIClient():
             return []
 
         try:
+            # get alphabetically sorted model list
             models = await self._AI.models.list()
             models_list = [model.id for model in models.data]
             models_list.sort()

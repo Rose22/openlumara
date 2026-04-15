@@ -8,19 +8,14 @@ TEMPORARY = False
 
 class StorageList(list):
     """subclassed list that handles storage of data. supports a variety of storage formats."""
-    def __init__(self, file_path, type: str, manager=None, data_dir=None, autoreload=True, *args):
+    def __init__(self, name: str, type: str, manager=None, path=None, autoload=True, autoreload=True, *args):
         super().__init__(*args)
 
-        if not data_dir:
-            data_dir = core.get_data_path()
-        else:
-            # ensure it's relative to the opticlaw root directory
-            data_dir = core.get_path(data_dir)
+        # default to openlumara data folder if no path specified
+        if not path:
+            path = core.get_data_path()
 
-        if not os.path.exists(data_dir):
-            os.mkdir(data_dir)
-
-        self.path = core.get_path(os.path.join(data_dir, file_path))
+        self.path = core.get_path(os.path.join(path, name))
         self.name = os.path.basename(self.path)
         self.binary = False
 
@@ -52,7 +47,8 @@ class StorageList(list):
             self.manager = manager
 
         if os.path.exists(self.path):
-            self.load()
+            if autoload:
+                self.load()
         else:
             self.save()
 
@@ -126,19 +122,15 @@ class StorageList(list):
 
 class StorageDict(dict):
     """subclassed dict that handles storage of data. supports a variety of storage formats."""
-    def __init__(self, file_path, type: str, manager=None, data_dir=None, autoreload=True, *args):
+    def __init__(self, name: str, type: str, manager=None, path=None, autoload=True, autoreload=True, *args):
         super().__init__(*args)
 
-        if not data_dir:
-            data_dir = core.get_data_path()
-        else:
-            # ensure it's relative to the opticlaw root directory
-            data_dir = core.get_path(data_dir)
+        # default to openlumara data folder if no path specified
+        if not path:
+            path = core.get_data_path()
 
-        if not os.path.exists(data_dir):
-            os.mkdir(data_dir)
+        self.path = core.get_path(os.path.join(path, name))
 
-        self.path = core.get_path(os.path.join(data_dir, file_path))
         self.name = os.path.basename(self.path)
         self.binary = False
         self.autoreload = autoreload
@@ -173,7 +165,8 @@ class StorageDict(dict):
             self.manager = manager
 
         if os.path.exists(self.path):
-            self.load()
+            if autoload:
+                self.load()
         else:
             self.save()
 
@@ -243,13 +236,13 @@ class StorageDict(dict):
                 flat_items = self._flatten_nested_keys(dict(self))
 
                 for key, content in flat_items.items():
-                    file_path = os.path.join(self.path, f"{key}.md")
-                    file_dir = os.path.dirname(file_path)
+                    name = os.path.join(self.path, f"{key}.md")
+                    file_dir = os.path.dirname(name)
 
                     if not os.path.exists(file_dir):
                         os.makedirs(file_dir, exist_ok=True)
 
-                    with open(file_path, "w") as f:
+                    with open(name, "w") as f:
                         f.write(content)
 
                 # remove files that were deleted
@@ -321,24 +314,21 @@ class StorageDict(dict):
 
 class StorageText:
     """simple class that saves its content to a text file"""
-    def __init__(self, file_path, manager=None, data_dir=None, autoreload=True, *args):
+    def __init__(self, name: str, manager=None, path=None, autoload=True, autoreload=True, *args):
         super().__init__(*args)
 
-        if not data_dir:
-            data_dir = "data"
+        # default to openlumara data folder if no path specified
+        if not path:
+            path = core.get_data_path()
 
-        # ensure it's relative to the opticlaw root directory
-        data_dir = core.get_path(data_dir)
-
-        if not os.path.exists(data_dir):
-            os.mkdir(data_dir)
+        self.path = core.get_path(os.path.join(path, name))
 
         self._data = ""
         self.autoreload = autoreload
 
-        self.path = core.get_path(os.path.join(data_dir, file_path))
         if os.path.exists(self.path):
-            self.load()
+            if autoload:
+                self.load()
         else:
             self.save()
 

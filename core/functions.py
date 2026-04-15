@@ -34,12 +34,20 @@ def get_data_path():
     """get path to the data directory. contains all persistent data used by the framework"""
 
     data_path = core.config.get("core", {}).get("data_folder", "data")
+
+    final_path = None
     if data_path.startswith(os.path.sep):
         # is an absolute path
-        return data_path
+        final_path = data_path
     else:
         # is a relative path
-        return get_path(data_path)
+        final_path = get_path(data_path)
+
+    # create it if it doesn't exist
+    if not os.path.exists(final_path):
+        os.makedirs(final_path, exist_ok=True)
+
+    return final_path
 
 def remove_duplicates(lst: list):
     # removes duplicates from a list

@@ -9,7 +9,7 @@ class Channel(core.module.Module):
             # don't add this to the system prompt if a character from the character module is active
             return None
 
-        chan = core.module.get_name(self.channel)
+        chan = core.modules.get_name(self.channel)
         chan_instr = None
         style_nomarkdown = f"While in the {chan} channel, **DO NOT USE MARKDOWN**. Do not use any rich-text formatting. Do not use bold or italic text. Do not generate tables. Format every response in plaintext!"
         style_chat = f"{chan} is a chat-style channel, so write your replies as if you're texting the user on a chat platform. No long paragraphs or essays. A few sentences at most - just simple, conversational flow."
@@ -90,7 +90,7 @@ Type /stop to stop the AI at any time, even while it's generating text or callin
         if not self.channel:
             return None
 
-        chan = core.module.get_name(self.channel)
+        chan = core.modules.get_name(self.channel)
         chan_transl = {
             "cli": "Command Line Interface (CLI)",
             "webui": "WebUI",

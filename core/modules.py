@@ -2,25 +2,21 @@ import core
 import re
 import inspect
 
-def load(package, base_class):
+def load(package, base_class = None, respect_config=True):
     """
-    Dynamically discovers classes in a package.
+    loops through the specified package imported with `import whatever`, then checks inside those packages for any classes that derive from base_class, and return a tuple of those classes so we can use them as modules, channels etc
 
-    Args:
-        package: The root package module (e.g., `import channels; channels`).
-        base_class: Only collect classes inheriting from this base.
-
-    Returns:
-        A tuple of discovered classes.
+    this is what powers dynamic module/channel importing. we use it like so:
+    import my_folder_with_classes as dynamic_folder
+    self.load_modules(dynamic_folder, core.module.Module)
     """
     import importlib
     import pkgutil
 
     discovered = []
 
-    # Ensure the package has a path to iterate
     if not hasattr(package, '__path__'):
-        return tuple(discovered)
+        return ()
 
     for importer, modname, ispkg in pkgutil.iter_modules(package.__path__):
         try:
@@ -28,29 +24,38 @@ def load(package, base_class):
             module = importlib.import_module(f"{package.__name__}.{modname}")
 
             for attr_name in dir(module):
-                attr = getattr(module, attr_name)
+                target_class = getattr(module, attr_name)
 
                 # Ensure it is a class
-                if not isinstance(attr, type):
+                if not isinstance(target_class, type):
                     continue
 
-                # Filter by base class if provided (skip the base class itself)
+                # Filter by base class if provided
                 if base_class:
-                    if attr is base_class:
+                    if target_class is base_class:
                         continue
-                    if not issubclass(attr, base_class):
+                    if not issubclass(target_class, base_class):
                         continue
 
-                discovered.append(attr)
+                # skip modules that aren't enabled in the config
+                if respect_config:
+                    enabled_classes = core.config.get(package.__name__, {}).get("enabled", [])
 
-        except ImportError as e:
-            core.log("warning", f"failed to import {modname}: {e}")
+                    if get_name(target_class) not in enabled_classes:
+                        continue
+
+                discovered.append(target_class)
+
+        except Exception as e:
+            # Catching Exception prevents the program from crashing on faulty modules.
+            # We simply log the warning and continue to the next module.
+            core.log("core", f"failed to load module {modname}: {e}")
             continue
 
     return tuple(discovered)
 
 def get_name(obj):
-    """converts a name like SchedulerTool to just `scheduler`"""
+    """converts a name like LifeOrganizer to `life_organizer`"""
 
     name = None
     if inspect.isclass(obj):

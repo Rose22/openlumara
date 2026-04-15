@@ -108,41 +108,6 @@ class Telegram(core.channel.Channel):
         elif self.authorized_chat_id != chat_id:
             await update.message.reply_text("⚠️ This bot is already in use.")
 
-    def _format_tool_call(self, tool_data):
-        # (Formatting logic remains the same)
-        try:
-            if hasattr(tool_data, 'function'):
-                func_name = getattr(tool_data.function, 'name', 'unknown')
-                raw_args = getattr(tool_data.function, 'arguments', '{}')
-            elif isinstance(tool_data, dict) and 'function' in tool_data:
-                func_name = tool_data['function'].get('name', 'unknown')
-                raw_args = tool_data['function'].get('arguments', '{}')
-            else:
-                return "🔧 Calling tool..."
-
-            if isinstance(raw_args, str):
-                try:
-                    args_dict = json_repair.loads(raw_args)
-                except Exception:
-                    args_dict = {}
-            elif isinstance(raw_args, dict):
-                args_dict = raw_args
-            else:
-                args_dict = {}
-
-            arg_strs = []
-            for k, v in args_dict.items():
-                v_str = str(v)
-                if len(v_str) > 30:
-                    v_str = v_str[:30] + ".."
-                v_str = v_str.replace('"', "'")
-                arg_strs.append(f'{k}="{v_str}"')
-
-            return f"🔧 {func_name}({', '.join(arg_strs)})"
-        except Exception as e:
-            core.log("telegram", f"Error formatting tool call: {e}")
-            return "🔧 Calling tool..."
-
     async def _tg_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
         Routes incoming messages:
@@ -220,9 +185,9 @@ class Telegram(core.channel.Channel):
                     if content:
                         if isinstance(content, list):
                             for tool in content:
-                                tool_calls_display.append(self._format_tool_call(tool))
+                                tool_calls_display.append(self.tc_manager.display_call(tool))
                         else:
-                            tool_calls_display.append(self._format_tool_call(content))
+                            tool_calls_display.append(self.tc_manager.display_call(content))
                 elif t_type == "reasoning":
                     if not shown_reasoning_text:
                         visual_buffer = "thinking.."
