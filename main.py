@@ -118,7 +118,7 @@ core.config.load(pre_args.config)
 # add the config overrides to the parser
 arg_parser = argparse.ArgumentParser()
 args_settings = arg_parser.add_argument_group("settings")
-add_arguments_recursive(args_settings, core.config.default_config)
+add_arguments_recursive(args_settings, core.config.config)
 
 # custom arguments
 args_main = arg_parser.add_argument_group("main")
