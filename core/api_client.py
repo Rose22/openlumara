@@ -95,9 +95,6 @@ class APIClient():
 
         self.connected = False
         self._AI = None
-        if self.http_client:
-            await self.http_client.aclose()
-            self.http_client = None
         core.log("API", "Disconnected from API")
         return True
 
