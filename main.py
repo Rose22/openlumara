@@ -18,13 +18,6 @@ import asyncio
 import subprocess
 
 async def main(args):
-    # load config file, allowing the path to be overridden
-    config_display_str = "config.yaml" if not args.config else args.config
-    core.log("core", f"Loading settings from config {config_display_str}")
-    core.config.load(args.config)
-
-    override_config_with_args(core.config.config, args)
-
     # the manager class connects everything together
     manager = core.manager.Manager(cmdline_args=args)
     # run main loop
@@ -111,14 +104,24 @@ def override_config_with_args(live_config, args_namespace):
             # We do nothing and let the rest of the program handle it via 'args'
             continue
 
-# parse arguments
 
 import core
 
 def build_arg_parser():
+    # special parsing for the config argument, so that its values can be overridden
+    pre_parser = argparse.ArgumentParser(add_help=False)
+    pre_parser.add_argument("--config", help="specify a specific config file to load", metavar="<path>")
+    pre_args, _ = pre_parser.parse_known_args()
+
+    # load config file, allowing the path to be overridden
+    config_display_str = "config.yaml" if not pre_args.config else pre_args.config
+    core.log("core", f"Loading settings from config {config_display_str}")
+    core.config.load(pre_args.config)
+
+    # add the config overrides to the parser
     arg_parser = argparse.ArgumentParser()
     args_settings = arg_parser.add_argument_group("settings")
-    add_arguments_recursive(args_settings, core.config.default_config)
+    add_arguments_recursive(args_settings, core.config.config)
 
     # custom arguments
     args_main = arg_parser.add_argument_group("main")
@@ -136,6 +139,7 @@ def run_from_argv(argv=None):
     run_argv = list(argv) if argv is not None else sys.argv[1:]
     arg_parser = build_arg_parser()
     args = arg_parser.parse_args(run_argv)
+    override_config_with_args(core.config.config, args)
 
     if args.tmp:
         core.storage.TEMPORARY = True

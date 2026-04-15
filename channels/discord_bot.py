@@ -195,6 +195,10 @@ class Client(discord.Client):
                     return await message.channel.send(f"error while receiving response from AI: {e} | {e.__traceback__.tb_frame.f_code.co_filename}, {e.__traceback__.tb_frame.f_code.co_name}, ln:{e.__traceback__.tb_lineno}")
 
 class Discord(core.channel.Channel):
+    settings =  {
+        "token": "TOKEN_HERE"
+    }
+
     def __init__(self, manager):
         super().__init__(manager)
 

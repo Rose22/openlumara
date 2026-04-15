@@ -18,6 +18,10 @@ class Telegram(core.channel.Channel):
     """
     running = False
 
+    settings =  {
+        "token": "TOKEN_HERE"
+    }
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.token = os.getenv("TELEGRAM_BOT_TOKEN")
