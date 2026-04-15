@@ -67,6 +67,9 @@ class Commands:
 /status                 show status info
 /restart                restarts the server
 /stop                   stops the AI in it's tracks
+/connect                attempt to connect to the API
+/disconnect             disconnect from the API
+/reconnect              reconnect to the API
 /ping                   test command that echoes "Pong!"
 /help                   this help
         """.strip()
@@ -146,6 +149,15 @@ class Commands:
                 return await self._get_help()
             case "ping":
                 return "pong!"
+            case "connect":
+                if self.channel.manager.API.connected:
+                    return "Already connected."
+
+                result = await self.channel.manager.API.connect()
+                if not result:
+                    return f"error connecting to API: {self.channel.manager.API.get_last_error()}"
+
+                return "✓ Connected!"
             case "reconnect":
                     result = await self.channel.manager.reconnect_api()
 
@@ -229,11 +241,9 @@ class Commands:
 
                 return "\n\n".join(tool_map_display)
             case "restart":
-                #await core.restart(self.channel)
                 await self.channel.manager.restart()
                 return "restarting.."
             case "stop":
-                # just use restart for now until i figure out how to kill the asyncio tasks
                 await self.channel.manager.API.cancel()
                 return "stopped!"
             case _:

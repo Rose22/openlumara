@@ -2,6 +2,7 @@ import core
 import re
 import inspect
 import json
+import asyncio
 
 class Module:
     """Base class for modules/plugins"""
@@ -9,6 +10,7 @@ class Module:
     def __init__(self, manager, channel=None):
         self.manager = manager
         self.channel = channel # later set by the channel base class, _set_as_active_channel()
+        self.name = core.modules.get_name(self) # shorthand alias
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -19,6 +21,21 @@ class Module:
             if callable(method) and hasattr(method, "_is_command"):
                 cmd_name = method._command_name
                 register_command_handler(cmd_name, cls, method)
+
+    async def _start(self):
+        """run the startup sequence for a module"""
+
+        # run startup methods
+        if hasattr(self, "on_ready"):
+            await self.on_ready()
+        if hasattr(self, "on_background"):
+            if not core.module.is_empty_coroutine(self.on_background):
+                task = asyncio.create_task(self.on_background(), name=self.name)
+                task.add_done_callback(self.manager._remove_async_task)
+                self.manager._async_tasks.add(task)
+                core.log("core", f"Started background task {self.name}")
+
+        return True
 
     def result(self, data, success=True):
         """unified way of returning tool results"""
@@ -92,85 +109,6 @@ def get_command_description(command_name):
     for registered_cls, method in _command_registry[command_name]:
         return getattr(method, '_command_description', '')
     return None
-
-def load(packages, base_class, respect_config: bool = True):
-    """
-    Dynamically discovers classes in a package or list of packages.
-    Catches errors in faulty modules to prevent application crash.
-
-    Args:
-        packages: A single package module or a list of package modules.
-        base_class: Only collect classes inheriting from this base.
-        respect_config: Check config for enabled modules.
-
-    Returns:
-        A tuple of discovered classes.
-    """
-    import importlib
-    import pkgutil
-
-    # Allow passing a single package or a list of packages
-    if not isinstance(packages, (list, tuple)):
-        packages = [packages]
-
-    discovered = []
-
-    for package in packages:
-        # Ensure the package has a path to iterate
-        if not hasattr(package, '__path__'):
-            continue
-
-        for importer, modname, ispkg in pkgutil.iter_modules(package.__path__):
-            try:
-                # Import the module relative to the package
-                module = importlib.import_module(f"{package.__name__}.{modname}")
-
-                for attr_name in dir(module):
-                    attr = getattr(module, attr_name)
-
-                    # Ensure it is a class
-                    if not isinstance(attr, type):
-                        continue
-
-                    # Filter by base class if provided
-                    if base_class:
-                        if attr is base_class:
-                            continue
-                        if not issubclass(attr, base_class):
-                            continue
-
-                    # Check config
-                    if respect_config:
-                        # We use get() with defaults to be safe
-                        enabled_modules = core.config.get("modules", {}).get("enabled", [])
-                        enabled_channels = core.config.get("channels", {}).get("enabled", [])
-
-                        if get_name(attr) not in enabled_modules + enabled_channels:
-                            continue
-
-                    discovered.append(attr)
-
-            except Exception as e:
-                # Catching Exception prevents the program from crashing on faulty modules.
-                # We simply log the warning and continue to the next module.
-                core.log("core", f"failed to load module {modname}: {e}")
-                continue
-
-    return tuple(discovered)
-
-def get_name(obj):
-    """converts a name like LifeOrganizer to `life_organizer`"""
-
-    name = None
-    if inspect.isclass(obj):
-        name = obj.__name__
-    else:
-        name = obj.__class__.__name__
-
-    re_snakecase = re.compile('(?!^)([A-Z]+)')
-    name_snakecase = re.sub(re_snakecase, r'_\1', name).lower()
-
-    return name_snakecase
 
 
 def is_empty_coroutine(func):

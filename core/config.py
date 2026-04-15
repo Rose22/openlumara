@@ -2,14 +2,10 @@ import os
 import yaml
 import core
 import modules
+import user_modules
 import channels
 
-import globals
-
-pathToUse = globals.configPath if globals.configPath is not None else None
-nameToUse = os.path.splitext(os.path.basename(pathToUse))[0] if pathToUse is not None else "config"
-dataDir = os.path.dirname(pathToUse) if pathToUse is not None else "."
-config = core.storage.StorageDict(nameToUse, "yaml", data_dir=dataDir, autoreload=False)
+config = None
 
 default_config = {
     "core": {
@@ -34,7 +30,8 @@ default_config = {
         "settings": {
             "webui": {
                 "host": "localhost",
-                "port": 5000
+                "port": 5000,
+                "use_short_replies": False
             },
             "discord": {
                 "token": "TOKEN_HERE"
@@ -53,25 +50,28 @@ default_config = {
     "modules": {
         "enabled": [],
         "disabled": [],
-        "disabled_prompts": [],
         "settings": {
             "files": {
                 "sandbox_folder": "~/sandbox"
             }
         }
+    },
+    "user_modules": {
+        "enabled": [],
+        "disabled": [],
+        "settings": {}
     }
 }
 
 # Define defaults for auto-enabling
 DEFAULT_MODULES = (
-    "agent_framework_awareness",
+    "openlumara_prompt",
     "identity",
     "models",
     "channel",
     "chats",
     "context",
     "memory",
-    "notes",
     "system",
     "scheduler",
     "tokens",
@@ -82,8 +82,8 @@ DEFAULT_CHANNELS = ["webui"] # "cli" is disabled for Esobold
 
 def sync_config(user_config, defaults):
     """
-    Recursively sync user config with defaults.
-    Ensures new keys are added, but preserves user values.
+    Recursively sync config with defaults
+    Inserts new keys that were added to default_config, but preserves existing values.
     """
     if not isinstance(defaults, dict):
         return defaults
@@ -106,96 +106,115 @@ def sync_config(user_config, defaults):
 
 def reconcile_lists(available_names, default_names, section_config):
     """
-    Updates the enabled/disabled lists based on what is actually on disk.
-    - Removes items that no longer exist.
-    - Adds new items (enabling them if in default_names, else disabling).
+    Updates the enabled/disabled lists based on what is actually on disk
     """
     # Get current state from the loaded config
     enabled = set(section_config.get("enabled", []))
     disabled = set(section_config.get("disabled", []))
+    available_names = set(available_names)
 
-    # 1. Remove "ghosts": Items in config that don't exist on disk anymore
+    # remove items in config that don't exist on disk anymore
     valid_enabled = enabled.intersection(available_names)
     valid_disabled = disabled.intersection(available_names)
 
-    # 2. Find new items: Available on disk but not in config
+    # find items available on disk but not in config
     known_items = valid_enabled.union(valid_disabled)
     new_items = available_names - known_items
 
-    # 3. Add new items to the correct list
+    # add new items to the correct list
     for item in new_items:
         if item in default_names:
             valid_enabled.add(item)
         else:
             valid_disabled.add(item)
 
-    # Return updated lists (sorted for clean config files)
+    # return updated lists
     return {
         "enabled": sorted(list(valid_enabled)),
         "disabled": sorted(list(valid_disabled))
     }
 
-# --- Main Setup Logic ---
+def load(file_path = None):
+    if file_path:
+        filename = os.path.splitext(os.path.basename(file_path))[0]
+        dirname = os.path.dirname(file_path)
+    else:
+        filename = "config"
+        dirname = core.get_path()
 
-# get all available modules
-available_module_names = set()
-for module in modules.get_all(respect_config=False):
-    available_module_names.add(core.module.get_name(module))
+    global config
+    config = core.storage.StorageDict(filename, "yaml", path=dirname, autoreload=False)
 
-# get all available channels
-available_channel_names = set()
-for channel in channels.get_all(respect_config=False):
-    channel_name = core.module.get_name(channel)
-    available_channel_names.add(channel_name)
+    # get all available modules
+    available_module_names = []
+    for module in core.modules.load(modules, core.module.Module, respect_config=False):
+        available_module_names.append(core.modules.get_name(module))
 
-# load or create the config file
-if not config:
-    # Create new config from scratch
-    # Initialize lists based on availability and defaults
-    mods_state = reconcile_lists(available_module_names, DEFAULT_MODULES, {"enabled": [], "disabled": []})
-    chans_state = reconcile_lists(available_channel_names, DEFAULT_CHANNELS, {"enabled": [], "disabled": []})
+    # get all available user modules
+    available_user_module_names = []
+    for module in core.modules.load(user_modules, core.module.Module, respect_config=False):
+        available_user_module_names.append(core.modules.get_name(module))
 
-    default_config["modules"]["enabled"] = mods_state["enabled"]
-    default_config["modules"]["disabled"] = mods_state["disabled"]
-    default_config["channels"]["enabled"] = chans_state["enabled"]
-    default_config["channels"]["disabled"] = chans_state["disabled"]
+    # get all available channels
+    available_channel_names = []
+    for channel in core.modules.load(channels, core.channel.Channel, respect_config=False):
+        available_channel_names.append(core.modules.get_name(channel))
 
-    config.load(default_config)
-    config.save()
-    print()
-    print(f"A new configuration file has been created. You can use the WebUI to easily change your settings, or manually edit it at {config.path}.")
+    # load or create the config file
+    if not config:
+        # Create new config from scratch
+        # Initialize lists based on availability and defaults
+        mods_state = reconcile_lists(available_module_names, DEFAULT_MODULES, {"enabled": [], "disabled": []})
+        user_mods_state = reconcile_lists(available_user_module_names, [], {"enabled": [], "disabled": []})
+        chans_state = reconcile_lists(available_channel_names, DEFAULT_CHANNELS, {"enabled": [], "disabled": []})
 
-else:
-    # load the existing config
-    user_config = dict(config)
+        default_config["modules"]["enabled"] = mods_state["enabled"]
+        default_config["modules"]["disabled"] = mods_state["disabled"]
+        default_config["user_modules"]["enabled"] = user_mods_state["enabled"]
+        default_config["user_modules"]["disabled"] = user_mods_state["disabled"]
+        default_config["channels"]["enabled"] = chans_state["enabled"]
+        default_config["channels"]["disabled"] = chans_state["disabled"]
 
-    # sync missing keys
-    synced_config = sync_config(user_config, default_config)
-
-    # sync any modules that were added upstream
-    mods_state = reconcile_lists(
-        available_module_names,
-        DEFAULT_MODULES,
-        synced_config.get("modules", {})
-    )
-    synced_config["modules"]["enabled"] = mods_state["enabled"]
-    synced_config["modules"]["disabled"] = mods_state["disabled"]
-
-    # ditto for channels
-    chans_state = reconcile_lists(
-        available_channel_names,
-        DEFAULT_CHANNELS,
-        synced_config.get("channels", {})
-    )
-    synced_config["channels"]["enabled"] = chans_state["enabled"]
-    synced_config["channels"]["disabled"] = chans_state["disabled"]
-
-    # save if changes occurred
-    if synced_config != user_config:
-        config.clear()
-        config.update(synced_config)
+        config.load(default_config)
         config.save()
-        core.log("core", "Your configuration was updated with new stuff!")
+        print()
+        print(f"A new configuration file has been created. You can use the WebUI to easily change your settings, or manually edit it at {config.path}.")
+
+    else:
+        # load the existing config
+        user_config = dict(config)
+
+        # sync missing keys
+        synced_config = sync_config(user_config, default_config)
+
+        # sync any modules that were added upstream
+        mods_state = reconcile_lists(
+            available_module_names,
+            DEFAULT_MODULES,
+            synced_config.get("modules", {})
+        )
+        synced_config["modules"]["enabled"] = mods_state["enabled"]
+        synced_config["modules"]["disabled"] = mods_state["disabled"]
+
+        user_mods_state = reconcile_lists(available_user_module_names, [], synced_config.get("user_modules", {}))
+        synced_config["user_modules"]["enabled"] = user_mods_state["enabled"]
+        synced_config["user_modules"]["disabled"] = user_mods_state["disabled"]
+
+        # ditto for channels
+        chans_state = reconcile_lists(
+            available_channel_names,
+            DEFAULT_CHANNELS,
+            synced_config.get("channels", {})
+        )
+        synced_config["channels"]["enabled"] = chans_state["enabled"]
+        synced_config["channels"]["disabled"] = chans_state["disabled"]
+
+        # save if changes occurred
+        if synced_config != user_config:
+            config.clear()
+            config.update(synced_config)
+            config.save()
+            core.log("core", "Your configuration was updated with new stuff!")
 
 def get(*args, **kwargs):
     """shorthand for accessing config values"""

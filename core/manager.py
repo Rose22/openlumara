@@ -15,10 +15,11 @@ class Manager:
     """the central class that manages everything"""
 
     # --- main ---
-    def __init__(self):
+    def __init__(self, cmdline_args):
         self._async_tasks = set()
+        self.args = cmdline_args # store commandline args
         self.API = core.api_client.APIClient(self) # connect later with .connect()
-        self.savedata = core.storage.StorageDict("save", "msgpack")
+        self.savedata = {}
         self.channels = {}
         self.channel = None # current active channel. gets dynamically switched around
         self.modules = {}
@@ -31,39 +32,38 @@ class Manager:
         self._async_tasks.discard(task)
         core.log("task", f"background task completed: {task.get_name()}")
 
-    async def run(self, args):
+    async def run(self):
         """main loop"""
 
-        if args.quiet:
+        if self.args.quiet:
             core.quiet = True
-        if args.pure:
+        if self.args.pure:
             self.pure_mode = True
 
-        core.log("core", "starting openlumara..")
+        core.log("core", "Starting OpenLumara")
+
+        self.savedata = core.storage.StorageDict("save", "msgpack")
 
         # load channels
         enabled_channels = core.config.get("channels").get("enabled", [])
-        if args.cli:
+        if self.args.cli:
             enabled_channels = ["cli"]
 
         if not enabled_channels:
             print("ERROR: At least one channel must be enabled in the config! Try the `cli` channel for a basic terminal UI.")
             exit(1)
 
-        core.log("core", "loading channels")
+        core.log("core", "Loading channels")
         import channels
-        for channel in channels.get_all():
-            # only load enabled channels
-            channel_name_snakecase = core.modules.get_name(channel)
+        for channel in core.modules.load(channels, core.channel.Channel):
+            channel_name = core.modules.get_name(channel)
+            # add an instance of the channel's class to self.channels
+            self.channels[channel_name] = channel(self)
 
-            if channel_name_snakecase in enabled_channels:
-                chan = channel(self)
-                self.channels[channel_name_snakecase] = chan
-
-        # start channels
+        # start channels (execute their .run() method)
         for channel_name, channel in self.channels.items():
             self._async_tasks.add(asyncio.create_task(channel.run()))
-            core.log("core", f"started channel {channel_name}")
+            core.log("core", f"Started channel {channel_name}")
 
         if not self.channel:
             # attempt to restore last used channel from save data
@@ -73,30 +73,43 @@ class Manager:
 
         # load modules
         enabled_modules = core.config.get("modules").get("enabled", [])
+        enabled_user_modules = core.config.get("user_modules", {}).get("enabled", [])
+        loaded_module_names = []
+
         if self.pure_mode:
             enabled_modules = ["context", "chats"]
+            enabled_user_modules = []
 
         if enabled_modules:
-            core.log("core", "loading modules")
-            loaded_module_names = []
-            for module in modules.get_all():
-                # only load enabled modules
-                module_name_snakecase = core.modules.get_name(module)
+            core.log("core", "Loading core modules")
 
-                if module_name_snakecase in enabled_modules:
-                    loaded_module = await self.add_module_class(module)
-                    # run startup methods
-                    if hasattr(loaded_module, "on_ready"):
-                        await loaded_module.on_ready()
-                    if hasattr(loaded_module, "on_background"):
-                        if not core.module.is_empty_coroutine(loaded_module.on_background):
-                            task = asyncio.create_task(loaded_module.on_background(), name=module_name_snakecase)
-                            task.add_done_callback(self._remove_async_task)
-                            self._async_tasks.add(task)
-                            core.log("core", f"started background task {module_name_snakecase}")
+            # load modules
+            import modules
+            for module in core.modules.load(modules, core.module.Module):
+                if core.modules.get_name(module) not in enabled_modules:
+                    continue
 
-                    loaded_module_names.append(module_name_snakecase)
-            core.log("core", f"modules loaded: {', '.join(loaded_module_names)}")
+                await self.add_module_class(module)
+                loaded_module = module(self)
+                await loaded_module._start()
+
+                self.modules[loaded_module.name] = loaded_module
+                loaded_module_names.append(loaded_module.name)
+
+            # load user modules
+            import user_modules
+            core.log("core", "Loading user modules")
+            for module in core.modules.load(user_modules, core.module.Module):
+                if core.modules.get_name(module) not in enabled_user_modules:
+                    continue
+
+                loaded_module = await self.add_module_class(module)
+                await loaded_module._start()
+
+                self.modules[loaded_module.name] = loaded_module
+                loaded_module_names.append(loaded_module.name)
+
+            core.log("core", f"Modules loaded: {', '.join(loaded_module_names)}")
         else:
             core.log("core", "all modules disabled in config")
 
@@ -104,7 +117,7 @@ class Manager:
         await self._initialize_api_connection()
 
         # run everything
-        core.log("core", "startup complete")
+        core.log("core", "Startup complete")
 
         if "webui" in enabled_channels:
             host = core.config.get("channels").get("settings").get("webui").get("host")
@@ -154,15 +167,6 @@ class Manager:
     async def reconnect_api(self):
         """Manually trigger API reconnection. Returns status dict."""
         core.log("API", "Attempting to reconnect...")
-
-        # First validate config
-        validation = self.API._validate_config()
-        if not validation["valid"]:
-            return {
-                "success": False,
-                "error": validation["error"],
-                "action": "Please update your config file and try again."
-            }
 
         connected = await self.API.reconnect()
         if connected:
@@ -380,9 +384,6 @@ class Manager:
 
         loaded_module = module(self)
 
-        class_display_name = core.modules.get_name(module)
-        self.modules[class_display_name] = loaded_module
-
         if self.pure_mode:
             return loaded_module
 
@@ -452,7 +453,7 @@ class Manager:
             tool = {
                 "type": "function",
                 "function": {
-                    "name": f"{class_display_name}_{func_name}",
+                    "name": f"{loaded_module.name}_{func_name}",
                     "description": docstring,
                     "parameters": {
                         "type": "object",
