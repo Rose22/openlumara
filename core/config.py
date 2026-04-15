@@ -16,8 +16,7 @@ default_config = {
         "key": "KEY_HERE",
         "max_context": 8192,
         "max_output_tokens": 8192,
-        "max_messages": 200,
-        "insecure_skip_tls_verify": False
+        "max_messages": 200
     },
     "model": {
         "name": "MODEL_HERE",

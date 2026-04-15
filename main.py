@@ -111,19 +111,11 @@ def override_config_with_args(live_config, args_namespace):
             # We do nothing and let the rest of the program handle it via 'args'
             continue
 
-
-# Config loading argument (optional, since we have a default path in core.config)
-import globals
-arg_parser = argparse.ArgumentParser()
-arg_parser.add_argument("--config", type=str, default=None, help="Path to config.yml file (default: ./config/config.yml)")
-argsConfig, unknown = arg_parser.parse_known_args()
-coreConfig = getattr(argsConfig, "config")
-if coreConfig:
-    globals.configPath = coreConfig
-
 # parse arguments
 
 import core
+
+arg_parser = argparse.ArgumentParser()
 
 add_arguments_recursive(arg_parser, core.config.default_config)
 
