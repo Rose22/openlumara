@@ -213,7 +213,7 @@ class Chat:
 
         if not self.data[self.current]["title"].strip():
             # auto-set title
-            msg_content = message.get("content", "")
+            msg_content = self.channel._extract_content(message)
             if isinstance(msg_content, str):
                 self.data[self.current]["title"] = msg_content[:100]+".." if len(msg_content) > 100 else msg_content
             else:

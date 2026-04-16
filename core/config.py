@@ -1,11 +1,13 @@
 import os
 import yaml
+import copy
 import core
 import modules
 import user_modules
 import channels
 
 config = None
+_registry_cache = None
 
 default_config = {
     "core": {
@@ -57,113 +59,123 @@ DEFAULT_MODULES = (
 
 DEFAULT_CHANNELS = ["cli", "webui"]
 
-def sync_config(user_config, defaults):
-    """
-    Recursively sync config with defaults
-    Inserts new keys that were added to default_config, but preserves existing values.
-    """
-    if not isinstance(defaults, dict):
-        return defaults
-    if not isinstance(user_config, dict):
-        return defaults
+def _get_registry_data():
+    global _registry_cache
+    if _registry_cache is not None:
+        return _registry_cache
+
+    # load instances
+    mod_inst = list(core.modules.load(modules, core.module.Module, respect_config=False))
+    user_mod_inst = list(core.modules.load(user_modules, core.module.Module, respect_config=False))
+    chan_inst = list(core.modules.load(channels, core.channel.Channel, respect_config=False))
+
+    # define the sections to be managed
+    _registry_cache = [
+        {
+            "section_key": "channels",
+            "instances": chan_inst,
+            "names": [core.modules.get_name(m) for m in chan_inst],
+            "default_names": DEFAULT_CHANNELS
+        },
+        {
+            "section_key": "modules",
+            "instances": mod_inst,
+            "names": [core.modules.get_name(m) for m in mod_inst],
+            "default_names": DEFAULT_MODULES
+        },
+        {
+            "section_key": "user_modules",
+            "instances": user_mod_inst,
+            "names": [core.modules.get_name(m) for m in user_mod_inst],
+            "default_names": []
+        }
+    ]
+    return _registry_cache
+
+def _inject_settings_into_dict(target_dict, instances, section_key):
+    """Helper to build the schema by injecting class settings defaults."""
+    section = target_dict.setdefault(section_key, {})
+    settings = section.setdefault("settings", {})
+    for inst in instances:
+        name = core.modules.get_name(inst)
+        defaults = getattr(inst, 'settings', {})
+        if isinstance(defaults, dict) and defaults:
+            settings[name] = defaults.copy()
+
+def get_schema():
+    """returns the blueprint for a complete config file, including module and channel settings defined in their classes"""
+    schema = copy.deepcopy(default_config)
+    for item in _get_registry_data():
+        _inject_settings_into_dict(schema, item['instances'], item['section_key'])
+    return schema
+
+def sync_config(user_config, schema):
+    """Recursively syncs structural keys from the schema."""
+    if not isinstance(schema, dict) or not isinstance(user_config, dict):
+        return schema
 
     result = dict(user_config)
-
-    for key, default_value in defaults.items():
+    for key, schema_val in schema.items():
         if key in result:
-            user_value = result[key]
-
-            # If the default is an empty container, skip syncing this key
-            # to avoid wiping out the user's dynamic settings/lists.
-            if isinstance(default_value, (dict, list)) and len(default_value) == 0:
+            user_val = result[key]
+            if isinstance(schema_val, (dict, list)) and len(schema_val) == 0:
                 continue
-
-            if isinstance(default_value, dict) and isinstance(user_value, dict):
-                result[key] = sync_config(user_value, default_value)
+            if isinstance(schema_val, dict) and isinstance(user_val, dict):
+                result[key] = sync_config(user_val, schema_val)
         else:
-            # Key is missing from user_config, add the default
-            result[key] = default_value
-
+            result[key] = schema_val
     return result
 
 def reconcile_lists(available_names, default_names, section_config):
     """
     Updates the enabled/disabled lists based on what is actually on disk
     """
-    # Get current state from the loaded config
-    enabled = set(section_config.get("enabled", []))
-    disabled = set(section_config.get("disabled", []))
-    available_names = set(available_names)
+    available = set(available_names)
+    defaults = set(default_names)
 
-    # remove items in config that don't exist on disk anymore
-    valid_enabled = enabled.intersection(available_names)
-    valid_disabled = disabled.intersection(available_names)
+    # 1. Get existing valid items
+    enabled = set(section_config.get("enabled", [])) & available
+    disabled = set(section_config.get("disabled", [])) & available
 
-    # find items available on disk but not in config
-    known_items = valid_enabled.union(valid_disabled)
-    new_items = available_names - known_items
+    # 2. Find items that are available but not yet in the config
+    known = enabled | disabled
+    new_items = available - known
 
-    # add new items to the correct list
-    for item in new_items:
-        if item in default_names:
-            valid_enabled.add(item)
-        else:
-            valid_disabled.add(item)
+    # 3. Distribute new items: those in 'defaults' are enabled, everything else is disabled
+    new_enabled = new_items & defaults
+    new_disabled = new_items - defaults
 
-    # return updated lists
     return {
-        "enabled": sorted(list(valid_enabled)),
-        "disabled": sorted(list(valid_disabled))
+        "enabled": sorted(list(enabled | new_enabled)),
+        "disabled": sorted(list(disabled | new_disabled))
     }
 
-def sync_module_settings(config_dict, module_instances, section_key):
-    """Ensures module/channel settings perfectly match the current class definitions."""
+def sync_module_settings(config_dict, instances, section_key):
+    """Performs deep pruning and merging of module settings."""
+    section = config_dict.setdefault(section_key, {})
+    settings = section.setdefault("settings", {})
 
-    # 1. Ensure the section (e.g. 'channels') exists
-    if section_key not in config_dict:
-        config_dict[section_key] = {}
-    section = config_dict[section_key]
+    # 1. Top-level Prune
+    available_names = [core.modules.get_name(m) for m in instances]
+    for k in [k for k in settings if k not in available_names]:
+        del settings[k]
 
-    # 2. Ensure the 'settings' dict exists and get a DIRECT REFERENCE to it
-    if "settings" not in section:
-        section["settings"] = {}
-    section_settings = section["settings"]
+    # 2. Deep Prune & Merge
+    for inst in instances:
+        name = core.modules.get_name(inst)
+        defaults = getattr(inst, 'settings', {})
+        if not isinstance(defaults, dict): continue
 
-    # 3. Top-level Pruning: Remove settings for modules that are no longer present on disk
-    available_names = [core.modules.get_name(m) for m in module_instances]
-    stale_module_names = [k for k in section_settings if k not in available_names]
-    for k in stale_module_names:
-        del section_settings[k]
-
-    # 4. Deep Pruning & Merging: Sync internal keys for each active module
-    for mod in module_instances:
-        name = core.modules.get_name(mod)
-        defaults = getattr(mod, 'settings', {})
-        if not isinstance(defaults, dict):
-            continue
-
-        if name in section_settings:
-            current_mod_settings = section_settings[name]
-
-            if isinstance(current_mod_settings, dict):
-                # DEEP PRUNE: Remove keys in config that are no longer in the class 'settings'
-                stale_keys = [k for k in current_mod_settings if k not in defaults]
-                for k in stale_keys:
-                    del current_mod_settings[k]
-
-                # MERGE: Add keys from class 'settings' that are missing in config
-                for k, v in defaults.items():
-                    if k not in current_mod_settings:
-                        current_mod_settings[k] = v
-            else:
-                # If for some reason the config value isn't a dict, reset it to defaults
-                section_settings[name] = defaults.copy()
+        if name in settings and isinstance(settings[name], dict):
+            curr = settings[name]
+            for k in [k for k in curr if k not in defaults]: del curr[k]
+            for k, v in defaults.items():
+                if k not in curr: curr[k] = v
         else:
-            # Module exists in code but not in config, add it entirely
-            section_settings[name] = defaults.copy()
+            settings[name] = defaults.copy()
 
 
-def load(file_path = None):
+def load(file_path=None):
     if file_path:
         filename = os.path.splitext(os.path.basename(file_path))[0]
         dirname = os.path.dirname(file_path)
@@ -174,82 +186,46 @@ def load(file_path = None):
     global config
     config = core.storage.StorageDict(filename, "yaml", path=dirname, autoreload=False)
 
-    # get all "available" (enable-able) modules, user modules and channels
-    available_module_instances = list(core.modules.load(modules, core.module.Module, respect_config=False))
-    available_user_module_instances = list(core.modules.load(user_modules, core.module.Module, respect_config=False))
-    available_channel_instances = list(core.modules.load(channels, core.channel.Channel, respect_config=False))
+    schema = get_schema()
+    registry = _get_registry_data()
 
-    # store their names for later syncing
-    available_module_names = [core.modules.get_name(m) for m in available_module_instances]
-    available_user_module_names = [core.modules.get_name(m) for m in available_user_module_instances]
-    available_channel_names = [core.modules.get_name(c) for c in available_channel_instances]
-
-    # load or create the config file
     if not config:
-        # Create new config from scratch
-        # Initialize lists based on availability and defaults
-        mods_state = reconcile_lists(available_module_names, DEFAULT_MODULES, {"enabled": [], "disabled": []})
-        user_mods_state = reconcile_lists(available_user_module_names, [], {"enabled": [], "disabled": []})
-        chans_state = reconcile_lists(available_channel_names, DEFAULT_CHANNELS, {"enabled": [], "disabled": []})
-
-        default_config["modules"]["enabled"] = mods_state["enabled"]
-        default_config["modules"]["disabled"] = mods_state["disabled"]
-        default_config["user_modules"]["enabled"] = user_mods_state["enabled"]
-        default_config["user_modules"]["disabled"] = user_mods_state["disabled"]
-        default_config["channels"]["enabled"] = chans_state["enabled"]
-        default_config["channels"]["disabled"] = chans_state["disabled"]
-
-        # Auto-populate the settings dictionary with defaults from the instances
-        sync_module_settings(default_config, available_channel_instances, "channels")
-        sync_module_settings(default_config, available_module_instances, "modules")
-        sync_module_settings(default_config, available_user_module_instances, "user_modules")
-
-        config.load(default_config)
-        config.save()
-        print()
-        print(f"A new configuration file has been created. You can use the WebUI to easily change your settings, or manually edit it at {config.path}.")
-
+        target = copy.deepcopy(schema)
     else:
-        # load the existing config
+        target = sync_config(dict(config), schema)
+
+    # sync config with schema
+    for item in registry:
+        # sync module/channel settings
+        sync_module_settings(target, item['instances'], item['section_key'])
+
+        # reconcile lists (Enabled/Disabled)
+        state = reconcile_lists(item['names'], item['default_names'], target.get(item['section_key'], {}))
+        target[item['section_key']]['enabled'] = state['enabled']
+        target[item['section_key']]['disabled'] = state['disabled']
+
+    if not config:
+        config.load(target)
+        config.save()
+        print(f"A new configuration file has been created at {config.path}.")
+    else:
         user_config = dict(config)
-
-        # sync missing keys
-        synced_config = sync_config(user_config, default_config)
-
-        # add module default settings
-        sync_module_settings(synced_config, available_channel_instances, "channels")
-        sync_module_settings(synced_config, available_module_instances, "modules")
-        sync_module_settings(synced_config, available_user_module_instances, "user_modules")
-
-        # sync any modules that were added upstream
-        mods_state = reconcile_lists(
-            available_module_names,
-            DEFAULT_MODULES,
-            synced_config.get("modules", {})
-        )
-        synced_config["modules"]["enabled"] = mods_state["enabled"]
-        synced_config["modules"]["disabled"] = mods_state["disabled"]
-
-        user_mods_state = reconcile_lists(available_user_module_names, [], synced_config.get("user_modules", {}))
-        synced_config["user_modules"]["enabled"] = user_mods_state["enabled"]
-        synced_config["user_modules"]["disabled"] = user_mods_state["disabled"]
-
-        # ditto for channels
-        chans_state = reconcile_lists(
-            available_channel_names,
-            DEFAULT_CHANNELS,
-            synced_config.get("channels", {})
-        )
-        synced_config["channels"]["enabled"] = chans_state["enabled"]
-        synced_config["channels"]["disabled"] = chans_state["disabled"]
-
-        # save if changes occurred
-        if synced_config != user_config:
+        if target != user_config:
             config.clear()
-            config.update(synced_config)
+            config.update(target)
             config.save()
             core.log("core", "Your configuration was updated with new stuff!")
 
 def get(*args, **kwargs):
     """shorthand for accessing config values"""
+    global config
+
+    # fall back to default config if no config is loaded
+    if config is None:
+        try:
+            val = default_config
+            for arg in args: val = val[arg]
+            return val
+        except (KeyError, TypeError): return None
+
     return config.get(*args, **kwargs)

@@ -63,3 +63,44 @@
     text-overflow: ellipsis;
     max-width: 250px;
 }
+
+.upload-queue-container {
+    padding: 8px 12px;
+    background: rgba(30, 30, 30, 0.8);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    max-height: 120px;
+    overflow-y: auto;
+    transition: all 0.2s ease;
+}
+
+.upload-queue-container.hidden {
+    display: none;
+}
+
+.upload-queue-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.upload-queue-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+    color: #ccc;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.queue-file-icon {
+    font-size: 1rem;
+}
+
+.queue-file-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+

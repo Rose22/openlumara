@@ -43,6 +43,21 @@ class Channel:
 
         return "\n".join(message_parts)
 
+    def _extract_content(self, message_dict):
+        """helper method that makes sure we always get the text content as a string from the messages array, even if it's multimodal"""
+        content = message_dict.get("content")
+
+        if isinstance(content, str):
+            return content
+        elif isinstance(content, list):
+            # it's multimodal
+            for item in content:
+                if isinstance(item, dict) and item.get("type") == "text":
+                    return item.get("text")
+
+        # fallback
+        return ""
+
     async def send(self, message: dict):
         """sends a message to the AI from within the current channel"""
 

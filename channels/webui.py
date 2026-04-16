@@ -35,6 +35,7 @@ JS_FILES = [
     "icons",
     "variables",
     "markdown",
+    "content_helpers",
     "messages",
     "msg_actions",
     "sidebar",
@@ -589,86 +590,61 @@ def cancel_stream():
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
-    """Handle file upload and insert into backend."""
+    """Handle multiple file uploads and insert as a single multi-modal message."""
     global channel_instance
 
     data = request.get_json()
-    filename = data.get('filename', '')
-    content_b64 = data.get('content', '')
-    mimetype = data.get('mimetype', '')
-    is_image = data.get('is_image', False)
+    files_data = data.get('files', [])
+    if not files_data:
+        return jsonify({'success': False, 'error': 'No files provided'}), 400
 
     try:
-        if is_image:
-            # 1. Decode the base64 string
-            image_bytes = base64.b64decode(content_b64)
-            img = Image.open(io.BytesIO(image_bytes))
+        message_content = []
+        for f in files_data:
+            filename = f.get('filename', '')
+            content_b64 = f.get('content', '')
+            is_image = f.get('is_image', False)
 
-            # 2. Resize if the image is too large
-            # We set a max dimension (e.g., 1024px) to keep token counts low
-            max_dimension = 512
-            if max(img.size) > max_dimension:
-                img.thumbnail((max_dimension, max_dimension), Image.Resampling.LANCZOS)
+            if is_image:
+                # Image processing (resizing/compression)
+                image_bytes = base64.b64decode(content_b64)
+                img = Image.open(io.BytesIO(image_bytes))
+                max_dimension = 512
+                if max(img.size) > max_dimension:
+                    img.thumbnail((max_dimension, max_dimension), Image.Resampling.LANCZOS)
+                if img.mode in ("RGBA", "P"):
+                    img = img.convert("RGB")
+                buffer = io.BytesIO()
+                img.save(buffer, format="JPEG", quality=80, optimize=True)
+                compressed_b64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+                image_url = f"data:image/jpeg;base64,{compressed_b64}"
 
-            # 3. Compress and convert to JPEG
-            # Converting to RGB is necessary if the original is a PNG with transparency (RGBA)
-            if img.mode in ("RGBA", "P"):
-                img = img.convert("RGB")
-
-            buffer = io.BytesIO()
-            # We save as JPEG with 80% quality to drastically reduce file size/tokens
-            img.save(buffer, format="JPEG", quality=80, optimize=True)
-
-            # 4. Re-encode the compressed image back to base64
-            compressed_b64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
-
-            # Use image/jpeg as the mimetype since we converted it
-            image_url = f"data:image/jpeg;base64,{compressed_b64}"
-
-            message = {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": f"[Image: {filename}]"
-                    },
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": image_url
-                        }
-                    }
-                ]
-            }
-
-            async def insert_image():
-                await channel_instance.context.chat.add(message)
-
-            asyncio.run_coroutine_threadsafe(
-                insert_image(),
-                channel_instance.main_loop
-            ).result()
-
-            total = len(_run_async(channel_instance.context.chat.get()))
-            return jsonify({'success': True, 'total': total, 'type': 'image'})
-
-        else:
-            # Handle text files as before
-            content = base64.b64decode(content_b64).decode('utf-8', errors='replace')
-
-            async def insert_file():
-                await channel_instance.context.chat.add({
-                    "role": "user",
-                    "content": f"[File: {filename}]\n```\n{content}\n```"
+                # Add a text part for searchability/extraction
+                message_content.append({
+                    "type": "text",
+                    "text": f"[Image: {filename}]"
+                })
+                # Add the image part
+                message_content.append({
+                    "type": "image_url",
+                    "image_url": {"url": image_url}
+                })
+            else:
+                # Text file processing
+                content = base64.b64decode(content_b64).decode('utf-8', errors='replace')
+                # Add a text part for searchability/extraction
+                message_content.append({
+                    "type": "text",
+                    "text": f"[File: {filename}]\n{content}"
                 })
 
-            asyncio.run_coroutine_threadsafe(
-                insert_file(),
-                channel_instance.main_loop
-            ).result()
+        async def insert_message():
+            await channel_instance.context.chat.add({"role": "user", "content": message_content})
 
-            total = len(_run_async(channel_instance.context.chat.get()))
-            return jsonify({'success': True, 'total': total, 'type': 'file'})
+        asyncio.run_coroutine_threadsafe(insert_message(), channel_instance.main_loop).result()
+
+        total = len(_run_async(channel_instance.context.chat.get()))
+        return jsonify({'success': True, 'total': total, 'type': 'multi'})
 
     except Exception as e:
         core.log("webui", f"Upload error: {e}")
@@ -692,11 +668,26 @@ def list_chats():
     for conv in all_chats:
         messages_preview = []
         for msg in conv.get('messages', [])[:5]:
-            content = msg.get('content', '')
-            if content:
+            raw_content = msg.get('content', '')
+
+            # NEW: Handle multimodal content extraction for preview
+            text_content = ""
+            if isinstance(raw_content, str):
+                text_content = raw_content
+            elif isinstance(raw_content, list):
+                # Extract only text parts for the sidebar preview
+                parts = []
+                for part in raw_content:
+                    if isinstance(part, dict) and part.get('type') == 'text':
+                        parts.append(part.get('text', ''))
+                    elif isinstance(part, dict) and part.get('type') == 'image_url':
+                        parts.append("[Image]")
+                text_content = " ".join(parts)
+
+            if text_content:
                 messages_preview.append({
                     'role': msg.get('role'),
-                    'content': content[:500]
+                    'content': text_content[:500] # Safe slicing on string
                 })
 
         chats.append({

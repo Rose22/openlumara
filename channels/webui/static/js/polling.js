@@ -92,6 +92,8 @@ async function syncMessages() {
             renderAllMessages(messages);
             // Update lastMessageIndex to the last message's index
             lastMessageIndex = messages[messages.length - 1].index;
+
+            updateTokenUsage();
         } else {
             const wrappers = chat.querySelectorAll('.message-wrapper');
             wrappers.forEach(wrapper => wrapper.remove());

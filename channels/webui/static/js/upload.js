@@ -54,18 +54,57 @@ document.body.addEventListener('drop', (e) => {
 });
 
 // =============================================================================
-// File Upload
+// File Upload (Modified for Queuing)
 // =============================================================================
 const SUPPORTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 const MAX_IMAGE_SIZE = 20 * 1024 * 1024; // 20MB
+
+// Global queue to hold files and their UI wrappers until 'send' is clicked
+window.upload_queue = {
+    files: [],      // Stores the content objects for the API payload
+    wrappers: []    // Stores the DOM elements to remove them later
+};
+
+/**
+ * Updates the visual queue near the input bar
+ */
+window.updateUploadQueueUI = function() {
+    const container = document.getElementById('upload-queue-container');
+    if (!container) return;
+
+    if (window.upload_queue.files.length === 0) {
+        container.classList.add('hidden');
+        container.innerHTML = '';
+        return;
+    }
+
+    container.classList.remove('hidden');
+    container.innerHTML = ''; // Clear current view
+
+    const queueList = document.createElement('div');
+    queueList.className = 'upload-queue-list';
+
+    window.upload_queue.files.forEach((fileObj) => {
+        const item = document.createElement('div');
+        item.className = 'upload-queue-item';
+        item.innerHTML = `
+        <span class="queue-file-icon">📄</span>
+        <span class="queue-file-name">${escapeHtml(fileObj.name)}</span>
+        `;
+        queueList.appendChild(item);
+    });
+
+    container.appendChild(queueList);
+};
+
 
 async function handleFileUpload(event) {
     const filesList = event.target.files || event.dataTransfer.files;
     if (!filesList || filesList.length === 0) return;
     const rawFiles = Array.from(filesList);
 
-    // 1. Create previews for all files in the batch
     const previewWrappers = [];
+
     for (const file of rawFiles) {
         const isImage = SUPPORTED_IMAGE_TYPES.includes(file.type);
         const previewWrapper = document.createElement('div');
@@ -75,99 +114,72 @@ async function handleFileUpload(event) {
         const previewMsg = document.createElement('div');
         previewMsg.className = 'message user';
 
+        let contentPart = {};
+
         if (isImage) {
+            // Image processing
             const imgContainer = document.createElement('div');
             imgContainer.className = 'uploaded-image-container';
             const img = document.createElement('img');
-            img.src = await new Promise((res, rej) => {
+            const imageDataUrl = await new Promise((res, rej) => {
                 const r = new FileReader();
                 r.onload = () => res(r.result);
                 r.onerror = rej;
                 r.readAsDataURL(file);
             });
+
+            img.src = imageDataUrl;
             img.className = 'uploaded-image-preview';
-            const caption = document.createElement('div');
-            caption.className = 'uploaded-image-caption';
-            caption.textContent = file.name;
-            imgContainer.appendChild(img);
-            imgContainer.appendChild(caption);
-            previewMsg.appendChild(imgContainer);
+
+            // Resize/Compress logic for the preview
+            const imgObj = new Image();
+            imgObj.src = imageDataUrl;
+            await new Promise(r => imgObj.onload = r);
+
+            const maxDimension = 512;
+            let width = imgObj.width;
+            let height = imgObj.height;
+
+            if (width > maxDimension || height > maxDimension) {
+                if (width > height) {
+                    height = (maxDimension / width) * height;
+                    width = maxDimension;
+                } else {
+                    width = (maxDimension / height) * width;
+                    height = maxDimension;
+                }
+            }
+            img.style.width = `${width}px`;
+            img.style.height = `${height}px`;
+
+            // Prepare the part for the final payload
+            contentPart = {
+                type: "image_url",
+                image_url: { url: imageDataUrl }
+            };
         } else {
-            // Create preview in chat immediately
-            const previewWrapper = document.createElement('div');
-            previewWrapper.className = 'message-wrapper user animate-in';
-            previewWrapper.dataset.index = 'pending';
-
-            const previewMsg = document.createElement('div');
-            previewMsg.className = 'message user';
-
-            // NEW: Consistent preview style for the pending state
-            const fileContainer = document.createElement('div');
-            fileContainer.className = 'file-preview-container';
-            fileContainer.innerHTML = `
-            <div class="file-preview">
-            <span class="file-icon">📄</span>
-            <span class="file-name">${escapeHtml(file.name)}</span>
-            </div>
-            `;
-            previewMsg.appendChild(fileContainer);
-        }
-
-        const userTs = document.createElement('span');
-        userTs.className = 'timestamp timestamp-right';
-        userTs.textContent = formatTime();
-        previewMsg.appendChild(userTs);
-
-        const actions = createActionButtons('user', 'pending', file.name, true);
-        previewWrapper.appendChild(previewMsg);
-        previewWrapper.appendChild(actions);
-
-        chat.insertBefore(previewWrapper, typing);
-        previewWrappers.push(previewWrapper);
-    }
-
-    scrollToBottom();
-
-    // 2. Prepare data and send all files to backend
-    try {
-        const filePromises = rawFiles.map(async (file) => {
-            const isImage = SUPPORTED_IMAGE_TYPES.includes(file.type);
-            const reader = new FileReader();
-            const base64 = await new Promise((resolve, reject) => {
+            // Text file processing
+            const content = await new Promise((resolve) => {
+                const reader = new FileReader();
                 reader.onload = () => resolve(reader.result);
-                reader.onerror = reject;
-                reader.readAsDataURL(file);
+                reader.readAsText(file);
             });
 
-            return {
-                filename: file.name,
-                content: base64.split(',')[1],
-                                          mimetype: file.type,
-                                          is_image: isImage
+            contentPart = {
+                type: "text",
+                text: `[File: ${file.name}]\n${content}`
             };
-        });
-
-        const filesData = await Promise.all(filePromises);
-
-        const response = await fetch('/upload', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ files: filesData })
-        });
-
-        if (response.ok) {
-            previewWrappers.forEach(w => w.remove());
-            await syncMessages();
-        } else {
-            const error = await response.json();
-            showNotification(error.error || 'Failed to upload files', 'error');
-            previewWrappers.forEach(w => w.remove());
         }
-    } catch (err) {
-        console.error('Upload failed:', err);
-        showNotification('Failed to upload files', 'error');
-        previewWrappers.forEach(w => w.remove());
+
+        window.upload_queue.files.push({
+            content: contentPart,
+            name: file.name
+        });
+        window.upload_queue.wrappers.push(previewWrapper);
     }
 
+    window.updateUploadQueueUI();
+    scrollToBottom();
     inputField.focus();
 }
+

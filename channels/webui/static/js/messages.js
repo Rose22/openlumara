@@ -1,72 +1,4 @@
 // =============================================================================
-// Content Helpers
-// =============================================================================
-
-function extractTextContent(content) {
-    if (typeof content === 'string') return content;
-    if (Array.isArray(content)) {
-        return content
-        .map(part => {
-            if (part.type === 'text') return part.text;
-            if (part.type === 'file') return `File: ${part.filename}`;
-            if (part.type === 'image_url') return `[Image]`;
-            return '';
-        })
-        .filter(t => t.trim() !== '')
-        .join('\n');
-    }
-    return '';
-}
-
-function renderContentBody(content) {
-    // Handle multi-modal content (images + text)
-    if (Array.isArray(content)) {
-        return content.map(part => {
-            if (part.type === 'text') {
-                // NEW: Check if this text part is actually a file upload
-                // using the pattern "[File: filename]\ncontent"
-                const filePattern = /^\[File: (.*?)\]\n([\s\S]*)$/;
-                const fileMatch = part.text.match(filePattern);
-
-                if (fileMatch) {
-                    const filename = fileMatch[1];
-                    // Return ONLY the icon and filename preview
-                    return `
-                    <div class="file-preview-container">
-                    <div class="file-preview">
-                    <span class="file-icon">📄</span>
-                    <span class="file-name">${escapeHtml(filename)}</span>
-                    </div>
-                    </div>`;
-                }
-
-                // Also check for the image header pattern to prevent
-                // duplicate text rendering if images are multi-modal
-                const imageHeaderPattern = /^\[Image: (.*?)\]\n([\s\S]*)$/;
-                if (imageHeaderPattern.test(part.text)) {
-                    return ''; // Let the 'image_url' part of the array handle the actual image
-                }
-
-                return renderMarkdown(part.text);
-            } else if (part.type === 'image_url') {
-                const url = part.image_url?.url || '';
-                if (url.startsWith('data:image') || url.startsWith('http')) {
-                    return `
-                    <div class="uploaded-image-container">
-                    <img src="${escapeHtml(url)}" class="uploaded-image-preview" alt="Uploaded image">
-                    </div>`;
-                }
-                return '';
-            }
-            return '';
-        }).join('');
-    }
-
-    // Standard string content
-    return renderMarkdown(content || '');
-}
-
-// =============================================================================
 // Parse message content to determine display type
 // =============================================================================
 
@@ -273,7 +205,6 @@ function createMessageElement(msg, index, animate = false) {
 
     // Add reasoning block BEFORE the main content (only for assistant messages)
     if (role === 'assistant' && reasoningContent) {
-        // Pass 'Thoughts' here so history always uses the correct term
         messageHtml += renderReasoningBlock(reasoningContent, true, 'Thoughts');
     }
 
@@ -283,7 +214,6 @@ function createMessageElement(msg, index, animate = false) {
     } else if (role === 'tool' && !toolCallId) {
         messageHtml += renderStandaloneToolResponse(rawText);
     } else if (toolCalls && toolCalls.length > 0) {
-        // Render tool decision text with proper styling
         if (displayContent && displayContent.trim()) {
             messageHtml += `<div class="tool-decision-text">${renderMarkdown(displayContent)}</div>`;
         }
@@ -304,33 +234,25 @@ function createMessageElement(msg, index, animate = false) {
         highlightCode(msgDiv);
     }
 
+    // ... (Rest of createMessageElement remains the same, ensuring rawText is used for copy actions)
+
     const isToolMessage = toolCalls && toolCalls.length > 0;
 
-    // Only add timestamp for non-tool messages
     if (!isToolMessage) {
         const ts = document.createElement('span');
         ts.className = 'timestamp';
-
-        if (wrapperClass === 'user' || wrapperClass === 'user_command') {
-            ts.classList.add('timestamp-right');
-        } else if (wrapperClass === 'ai' || wrapperClass === 'command_response') {
-            ts.classList.add('timestamp-left');
-        } else {
-            ts.classList.add('timestamp-center');
-        }
-
+        if (wrapperClass === 'user' || wrapperClass === 'user_command') ts.classList.add('timestamp-right');
+        else if (wrapperClass === 'ai' || wrapperClass === 'command_response') ts.classList.add('timestamp-left');
+        else ts.classList.add('timestamp-center');
         ts.textContent = timestamp;
         ts.innerHTML += ` <span class="index-badge">#${index}</span>`;
-
         msgDiv.appendChild(ts);
     }
 
     wrapper.appendChild(msgDiv);
 
-    // Only add action buttons for regular user/assistant messages, not tool messages
     if ((role === 'user' || role === 'assistant') && !isToolMessage && !parsed.isAnnouncement && !parsed.isCommandOutput) {
-        // Pass the extracted text (rawText) to action buttons for copying/editing
-        const actions = createActionButtons(role, index, rawText);
+        const actions = createActionButtons(role, index, rawText); // Copy text content
         wrapper.appendChild(actions);
     }
 

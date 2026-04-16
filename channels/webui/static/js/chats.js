@@ -22,6 +22,24 @@ const DEFAULT_CATEGORY_HANDLER = {
     groupTitle: 'Chats'
 };
 
+// IntersectionObserver for lazy-loading chat items
+const chatListObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+        if (entry.isIntersecting) {
+            const el = entry.target;
+            const chatId = el.dataset.chatId;
+            const chat = chatDataMap.get(chatId);
+
+            if (chat && el.classList.contains('chat-item-shell')) {
+                populateChatItem(el, chat);
+                chatListObserver.unobserve(el);
+            }
+        }
+    });
+}, {
+    rootMargin: '100px' // Start loading slightly before they enter the viewport
+});
+
 function handlePaneHeaderClick() {
     if (window.innerWidth <= 768) {
         openCategoryPane();
@@ -275,19 +293,43 @@ async function loadChats() {
 
 /**
  * Finds the currently active chat element in the sidebar and scrolls it into view.
+ * Populates all shells above the target to ensure the scroll container has
+ * the correct height, then centers the target element in the viewport.
  */
 function scrollToActiveChat() {
     if (!currentChatId) return;
 
-    // Use the data-chat-id attribute we set in createChatElement
-    const activeChatEl = document.querySelector(`.chat-item[data-chat-id="${currentChatId}"]`);
+    const list = document.getElementById('chat-list');
+    if (!list) return;
 
-    if (activeChatEl) {
+    const items = Array.from(list.children);
+    const targetIndex = items.findIndex(el => el.dataset.chatId === currentChatId);
+
+    if (targetIndex === -1) return;
+
+    // 1. Populate all shells from the top down to the target index.
+    // This ensures the container's total height is accurate.
+    for (let i = 0; i <= targetIndex; i++) {
+        const el = items[i];
+        if (el.classList.contains('chat-item-shell')) {
+            const chatId = el.dataset.chatId;
+            const chat = chatDataMap.get(chatId);
+            if (chat) {
+                populateChatItem(el, chat);
+            }
+        }
+    }
+
+    // 2. Identify the target element
+    const activeChatEl = items[targetIndex];
+
+    // 3. Scroll to the center of the visible area
+    requestAnimationFrame(() => {
         activeChatEl.scrollIntoView({
             behavior: 'smooth',
-            block: 'nearest'
+            block: 'center' // <--- This centers the element
         });
-    }
+    });
 }
 
 async function restoreCurrentChat() {
@@ -456,12 +498,93 @@ function createChatElement(chat) {
     return item;
 }
 
+/**
+ * Creates a lightweight placeholder for a chat item.
+ * This prevents the initial DOM overhead of creating hundreds of complex elements.
+ */
+function createChatItemShell(chat) {
+    const item = document.createElement('div');
+    item.className = 'chat-item chat-item-shell' + (chat.id === currentChatId ? ' active' : '');
+    item.dataset.chatId = chat.id;
+
+    // Crucial: Set a min-height so the scrollbar behaves correctly
+    // before the item is fully rendered.
+    item.style.minHeight = '55px';
+
+    item.onclick = (e) => {
+        if (e.target.closest('.chat-item-actions') || e.target.closest('.inline-rename-container')) {
+            return;
+        }
+        loadChat(chat.id);
+    };
+
+    return item;
+}
+
+/**
+ * Fills a chat item shell with its actual content.
+ * This is called only when the item is about to enter the view.
+ */
+function populateChatItem(item, chat) {
+    // Remove the shell class
+    item.classList.remove('chat-item-shell');
+
+    const title = document.createElement('div');
+    title.className = 'chat-item-title';
+    title.textContent = chat.title || 'New chat';
+
+    const tagsContainer = document.createElement('div');
+    tagsContainer.className = 'chat-tags';
+
+    const tags = chat.tags || [];
+    const meta = document.createElement('div');
+    meta.className = 'chat-item-meta';
+
+    const date = document.createElement('span');
+    date.textContent = formatDate(chat.updated || chat.created);
+
+    const actions = document.createElement('div');
+    actions.className = 'chat-item-actions';
+
+    const editBtn = document.createElement('button');
+    editBtn.className = 'chat-action-btn edit';
+    editBtn.innerHTML = ICONS.edit;
+    editBtn.setAttribute('aria-label', 'Rename');
+    editBtn.setAttribute('title', 'Rename');
+    editBtn.onclick = (e) => {
+        e.stopPropagation();
+        renameChat(chat.id, chat.title || 'New chat');
+    };
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'chat-action-btn delete';
+    deleteBtn.innerHTML = ICONS.trash;
+    deleteBtn.setAttribute('aria-label', 'Delete');
+    deleteBtn.setAttribute('title', 'Delete');
+    deleteBtn.onclick = (e) => {
+        e.stopPropagation();
+        deleteChat(chat.id);
+    };
+
+    actions.appendChild(editBtn);
+    actions.appendChild(deleteBtn);
+    meta.appendChild(date);
+    meta.appendChild(actions);
+
+    if (tags.length > 0) {
+        renderFittedTags(tagsContainer, tags, { maxStart: 3, minTags: 1, showTooltip: true });
+        item.appendChild(tagsContainer);
+    }
+
+    item.appendChild(title);
+    item.appendChild(meta);
+}
+
 function renderChatList(chats) {
     const list = document.getElementById('chat-list');
     const searchInput = document.getElementById('chat-search');
     const currentSearchQuery = searchInput ? searchInput.value : '';
 
-    // OPTIMIZATION: Use DocumentFragment to build list in memory
     const fragment = document.createDocumentFragment();
 
     if (chats.length === 0) {
@@ -473,19 +596,23 @@ function renderChatList(chats) {
     } else {
         chats.sort((a, b) => (b.updated || 0) - (a.updated || 0));
         chats.forEach(chat => {
-            fragment.appendChild(createChatElement(chat));
+            // Create the shell instead of the full element
+            const shell = createChatItemShell(chat);
+            fragment.appendChild(shell);
         });
     }
 
-    // Single DOM update
     list.innerHTML = '';
     list.appendChild(fragment);
+
+    // Initialize observer on the new shells
+    const shells = list.querySelectorAll('.chat-item-shell');
+    shells.forEach(shell => chatListObserver.observe(shell));
 
     // Re-apply filters if active
     if (activeTagFilter) filterChatsByTag();
     if (currentSearchQuery) filterChats(currentSearchQuery);
 }
-
 
 async function newChat() {
     if (isStreaming) await stopGeneration();
@@ -603,14 +730,44 @@ async function loadChat(chatId) {
             updateTokenUsage();
             closeSidebar();
 
-            // Only reload list, don't restore current chat again
-            await loadChats();
+            // SMART UPDATE:
+            // Only perform a full re-render if the category actually changes.
+            // This prevents the "jump" during normal chat selection on desktop.
+            const chatCategory = data.chat.category || 'general';
+
+            if (chatCategory !== activeCategory) {
+                // Category changed (e.g., clicking a character chat while in 'General')
+                // We must reload to show the correct list and update the category strip
+                await loadChats();
+            } else {
+                // Same category (e.g., clicking a different chat in the current list)
+                // Just swap the active class on the existing element
+                updateSidebarActiveChat(chatId);
+            }
         }
     } catch (e) {
         console.error('Failed to load chat:', e);
     }
 }
 
+/**
+ * Updates the visual 'active' state in the sidebar without re-rendering the whole list.
+ * This prevents layout jumps and scroll stutters.
+ */
+function updateSidebarActiveChat(chatId) {
+    // 1. Remove active class from the current active item
+    const currentActive = document.querySelector('.chat-item.active');
+    if (currentActive) {
+        currentActive.classList.remove('active');
+    }
+
+    // 2. Find the new chat item and add the active class
+    // This works whether the item is a fully rendered item or still a 'shell'
+    const newActive = document.querySelector(`.chat-item[data-chat-id="${chatId}"]`);
+    if (newActive) {
+        newActive.classList.add('active');
+    }
+}
 
 // Note: Chats are auto-saved by the backend when messages are added.
 // No explicit save endpoint exists. This function is kept for potential future use
@@ -1002,9 +1159,11 @@ function filterChats(query) {
 
         if (searchInContent && chatData && chatData.messages) {
             for (const msg of chatData.messages) {
-                const content = (msg.content || '').toLowerCase();
+                // FIX: Use extractTextContent to handle multimodal arrays
+                const content = extractTextContent(msg.content).toLowerCase();
                 if (content.includes(searchQuery)) {
-                    matchSnippet = extractSnippet(msg.content, searchQuery, 60);
+                    // Pass the extracted string to extractSnippet
+                    matchSnippet = extractSnippet(content, searchQuery, 60);
                     break;
                 }
             }

@@ -99,9 +99,8 @@ class Commands:
             return True
         return False
 
-    async def _extract_cmd(self, message: dict):
-        message_content_orig = message.get("content")
-        message_content = message.get("content").strip().lower()
+    async def _extract_cmd(self, message_text):
+        message_content = message_text.strip().lower()
         cmd_prefix = core.config.get("cmd_prefix", "/")
         cmd_prefix_index = message_content.find(cmd_prefix)+len(cmd_prefix)
 
@@ -112,10 +111,11 @@ class Commands:
 
     async def process_input(self, message: dict):
         """wrapper around the real _process_input, handles insertion of context"""
-        cmd_prefix, cmd, args = await self._extract_cmd(message)
+        content = self.channel._extract_content(message)
+        cmd_prefix, cmd, args = await self._extract_cmd(content)
 
         # treat message as normal if it's not a command
-        if cmd is None or not message.get("content").startswith(cmd_prefix):
+        if cmd is None or not content.startswith(cmd_prefix):
             return False
 
         use_temporary = self._check_if_temporary(cmd[0])
@@ -137,7 +137,7 @@ class Commands:
     async def _process_input(self, message: dict):
         """processes user input and detects special commands that control opticlaw"""
 
-        cmd_prefix, cmd, args = await self._extract_cmd(message)
+        cmd_prefix, cmd, args = await self._extract_cmd(self.channel._extract_content(message))
 
         match cmd[0]:
             # case "undo":
