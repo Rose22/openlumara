@@ -34,10 +34,10 @@ class ModuleMaker(core.module.Module):
             def __init__(self, *args, **kwargs):
                 super().__init__(*args, **kwargs)
                 # dict that gets saved to persistent storage
-                self.saved_dict = core.storage.StorageDict(self.config.get("save_data_path"), typeName="json") # available types: json, yaml, msgpack, markdown, text
+                self.saved_dict = core.storage.StorageDict(self.config.get("save_data_path"), type="json") # available types: json, yaml, msgpack, markdown, text
 
                 # list that gets saved to persistent storage
-                self.saved_list = core.storage.StorageList(self.config.get("save_data_path"), typeName="json") # available types: json, yaml, msgpack, text
+                self.saved_list = core.storage.StorageList(self.config.get("save_data_path"), type="json") # available types: json, yaml, msgpack, text
 
                 self.whatever_variables_you_want = "whatever value you want"
 
