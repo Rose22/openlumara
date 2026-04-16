@@ -26,7 +26,7 @@ default_config = {
         "use_tools": True
     },
     "channels": {
-        "enabled": ["cli", "webui"],
+        "enabled": [],
         "disabled": [],
         "settings": {}
     },
@@ -219,6 +219,7 @@ def load(file_path=None):
 def get(*args, **kwargs):
     """shorthand for accessing config values"""
     global config
+    global default_config
 
     # fall back to default config if no config is loaded
     if config is None:
