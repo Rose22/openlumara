@@ -1949,9 +1949,6 @@ function createThemeSection() {
     <span>Large</span>
     </div>
     </div>
-    <div class="font-preview" id="font-preview-text" style="font-size: ${savedFontSize}px;">
-    The quick brown fox jumps over the lazy dog.
-    </div>
     `;
 
     const fontSizeSlider = fontSizeRow.querySelector('#font-size-slider-settings');
@@ -1974,6 +1971,50 @@ function createThemeSection() {
     });
 
     typographyControls.appendChild(fontSizeRow);
+
+    // Chat Content Width Slider
+    const chatWidthRow = document.createElement('div');
+    chatWidthRow.className = 'font-size-row';
+    const chatWidthMin = 20;
+    const chatWidthMax = 100;
+    const chatWidthVal = parseInt(localStorage.getItem('chatContentWidth') || '100');
+    const chatWidthPercentage = ((chatWidthVal - chatWidthMin) / (chatWidthMax - chatWidthMin)) * 100;
+
+    chatWidthRow.innerHTML = `
+    <div class="slider-header">
+    <span class="slider-label">Chat Width</span>
+    <span class="slider-value" id="chat-width-display">${chatWidthVal}%</span>
+    </div>
+    <div class="slider-track-wrapper">
+    <div class="slider-track">
+    <input type="range" class="slider-input" id="chat-width-slider-settings"
+    min="${chatWidthMin}" max="${chatWidthMax}" value="${chatWidthVal}">
+    <div class="slider-fill" id="chat-width-fill" style="width: ${chatWidthPercentage}%"></div>
+    <div class="slider-handle" id="chat-width-handle" style="left: ${chatWidthPercentage}%"></div>
+    </div>
+    <div class="slider-labels">
+    <span>Narrow</span>
+    <span>Full</span>
+    </div>
+    </div>
+    `;
+
+    const chatWidthSlider = chatWidthRow.querySelector('#chat-width-slider-settings');
+    const chatWidthDisplay = chatWidthRow.querySelector('#chat-width-display');
+    const chatWidthFill = chatWidthRow.querySelector('#chat-width-fill');
+    const chatWidthHandle = chatWidthRow.querySelector('#chat-width-handle');
+
+    chatWidthSlider.addEventListener('input', function() {
+        const val = parseInt(this.value);
+        const percentage = ((val - chatWidthMin) / (chatWidthMax - chatWidthMin)) * 100;
+        chatWidthDisplay.textContent = `${val}%`;
+        chatWidthFill.style.width = `${percentage}%`;
+        chatWidthHandle.style.left = `${percentage}%`;
+        document.documentElement.style.setProperty('--chat-content-width', `${val}%`);
+        localStorage.setItem('chatContentWidth', val);
+    });
+
+    typographyControls.appendChild(chatWidthRow);
 
     // Reasoning Blocks Toggle (moved to Typography section)
     const reasoningExpandedByDefault = localStorage.getItem('reasoningExpandedByDefault') === 'true';
@@ -2531,6 +2572,12 @@ toggleModal = function(modalName) {
         originalToggleModal(modalName);
     }
 };
+
+// Apply chat content width on script load
+(function initChatWidth() {
+    const width = localStorage.getItem('chatContentWidth') || '100';
+    document.documentElement.style.setProperty('--chat-content-width', width + '%');
+})();
 
 // Apply token bar visibility on script load
 (function initTokenBarVisibility() {

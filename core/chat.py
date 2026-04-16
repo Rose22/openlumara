@@ -213,7 +213,7 @@ class Chat:
 
         if not self.data[self.current]["title"].strip():
             # auto-set title
-            msg_content = message.get("content", "")
+            msg_content = self.channel._extract_content(message)
             if isinstance(msg_content, str):
                 self.data[self.current]["title"] = msg_content[:100]+".." if len(msg_content) > 100 else msg_content
             else:
@@ -336,8 +336,15 @@ class Chat:
             # <im_start>{role/name}\n{content}<im_end>\n
             num_tokens += 4
             for key, value in message.items():
-                if value:
-                    num_tokens += len(encoding.encode(str(value)))
+                if value and isinstance(value, str):
+                    # if it's just a normal text message, count tokens using its contents
+                    num_tokens += len(encoding.encode(value))
+                elif value and isinstance(value, list):
+                    # if its multimodal, skip all non-text content because we filter that out when using context.get()
+                    for part in value:
+                        part_text = part.get("text", None)
+                        if isinstance(part, dict) and part_text:
+                            num_tokens += len(encoding.encode(part_text))
 
         # Add 2-3 tokens for the assistant priming at the end
         num_tokens += 2

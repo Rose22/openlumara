@@ -9,12 +9,13 @@
     height: 100%;
     min-width: 0;
     min-height: 0;
+    background: var(--bg-primary);
 }
 
 .app-container {
     display: flex;
     flex-direction: column;
-    width: 100%;
+    width: var(--chat-content-width, 100%); /* Changed from 100% to use the variable */
     height: 100%;
     /* max-width: 900px; */
     margin: 0 auto;

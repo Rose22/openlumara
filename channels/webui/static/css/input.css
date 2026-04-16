@@ -165,3 +165,52 @@ body.token-bar-hidden .input-area {
     border-top: 1px solid var(--border-color);
 }
 
+/* Streaming Status Indicator Styles */
+.streaming-status-indicator {
+    font-size: 0.8rem;
+    color: var(--text-secondary, #888);
+    font-style: italic;
+    margin: 4px 0 8px 12px;
+    padding: 2px 8px;
+    animation: streamingFadeIn 0.3s ease-out;
+    display: inline-block;
+}
+
+/* Optimistic UI Styles */
+
+/* The temporary user message */
+.user-placeholder {
+    opacity: 0.7;
+    filter: grayscale(0.5);
+}
+
+.placeholder-status {
+    font-size: 0.75rem;
+    color: var(--text-secondary, #888);
+    margin-top: 4px;
+    font-style: italic;
+}
+
+/* Refined Typing Status Styles (Above the dots) */
+
+.typing-status-text {
+    display: block;
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--text-secondary, #888);
+    margin-bottom: 4px; /* Space below the text, before the dots */
+    margin-top: 0;      /* No space above the text */
+    font-style: italic;
+    width: 100%;
+    animation: statusFadeIn 0.2s ease-out;
+}
+
+.typing-status-text.hidden {
+    display: none;
+}
+
+@keyframes statusFadeIn {
+    from { opacity: 0; transform: translateY(2px); } /* Slight slide down into place */
+    to { opacity: 1; transform: translateY(0); }
+}
+

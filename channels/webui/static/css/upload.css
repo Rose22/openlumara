@@ -44,10 +44,6 @@
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 6px 10px;
-    background: var(--bg-secondary, #1a1a2e);
-    border: 1px solid var(--border-color, #333);
-    border-radius: var(--radius-sm);
 }
 
 .file-icon {
@@ -63,3 +59,55 @@
     text-overflow: ellipsis;
     max-width: 250px;
 }
+
+.upload-queue-container {
+    padding: 8px 12px;
+    background: rgba(30, 30, 30, 0.8);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    max-height: 120px;
+    overflow-y: auto;
+    transition: all 0.2s ease;
+}
+
+.upload-queue-container.hidden {
+    display: none;
+}
+
+.upload-queue-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.upload-queue-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.delete-queue-item {
+    margin-left: auto; /* Pushes button to the right */
+    background: none;
+    border: none;
+    color: #888;
+    cursor: pointer;
+    font-size: 1.2rem;
+    line-height: 1;
+    padding: 0 4px;
+    transition: color 0.2s;
+}
+
+.delete-queue-item:hover {
+    color: #ff4d4d; /* Red on hover */
+}
+
+.queue-file-icon {
+    font-size: 1rem;
+}
+
+.queue-file-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
