@@ -24,7 +24,6 @@ import core
 import msgpack
 import yaml
 
-from PIL import Image
 import io
 
 WEBUI_DIR = core.get_path("channels/webui")

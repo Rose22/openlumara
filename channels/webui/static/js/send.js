@@ -1,6 +1,8 @@
 // =============================================================================
-// Main Send Function (Refactored)
+// Main Send Function
 // =============================================================================
+let placeholderUserWrapper = null;
+let typingStatusEl = null;
 
 async function send(providedContent = null) {
     // 1. Pre-checks and State Reset
@@ -17,21 +19,28 @@ async function send(providedContent = null) {
     displayedContent = '';
     isTypewriterRunning = false;
 
-    // 2. Handle Commands (Bypass for specific strings)
+    // 2. Handle Commands
     if (!isRegenerate) {
-        clearInput(); // Clear input immediately for responsiveness
+        clearInput();
         if (message.trim().startsWith('/') || message.trim().startsWith("STOP")) {
             return sendCommand(message);
         }
     }
 
-    // 3. API Status Check
-    // We check connection before proceeding to avoid hanging UI on a dead server
+    // 3. STAGE: SENDING (Optimistic UI)
+    // Only create a placeholder if this is a brand new message (not a regeneration)
+    if (!isRegenerate) {
+        placeholderUserWrapper = createPlaceholderUserMessage(message);
+        chat.insertBefore(placeholderUserWrapper, typing);
+    }
+
+    // 4. API Status Check
     try {
         const statusResponse = await fetch('/api/status', { signal: AbortSignal.timeout(5000) });
         if (statusResponse.ok) {
             const statusData = await statusResponse.json();
             if (!statusData.connected) {
+                removePlaceholder();
                 if (!isRegenerate) {
                     showApiConfigError(statusData.error || 'API is not connected.', statusData.error_type, statusData.action);
                 }
@@ -40,10 +49,9 @@ async function send(providedContent = null) {
         }
     } catch (err) {
         console.error('Could not check API status:', err);
-        // Decide if we should proceed anyway or return. Proceeding allows offline-ish modes if server supports it.
     }
 
-    // 4. Prepare Payload
+    // 5. Prepare Payload
     const hasFiles = window.upload_queue && window.upload_queue.files.length > 0;
     const isMultimodalInput = typeof rawContent !== 'string';
     let payloadBody;
@@ -52,27 +60,20 @@ async function send(providedContent = null) {
         payloadBody = { role: "user", content: rawContent };
     } else {
         let contentPayload = [];
-
-        // Handle multimodal content
         if (typeof rawContent === 'string') {
             contentPayload.push({ type: 'text', text: rawContent });
         } else {
             contentPayload = [...rawContent];
         }
-
-        // Append files
         if (hasFiles) {
             const queuedContents = window.upload_queue.files.map(f => f.content);
             contentPayload.push(...queuedContents);
         }
-
-        // Flatten the payload in case any file contents were arrays (multimodal)
         contentPayload = contentPayload.flat();
-
         payloadBody = { role: "user", content: contentPayload };
     }
 
-    // 5. UI Preparation
+    // 6. UI Preparation
     setInputState(true, true, true);
     isStreaming = true;
     isDataStreaming = true;
@@ -100,10 +101,10 @@ async function send(providedContent = null) {
         });
 
         if (!response.ok) {
+            removePlaceholder();
             return await handleServerError(response, aiWrapper);
         }
 
-        // Sync backend state (adds the user message to the chat list)
         await syncMessages();
 
         // Handle file upload cleanup
@@ -116,12 +117,11 @@ async function send(providedContent = null) {
 
         chat.insertBefore(aiWrapper, typing);
 
-        // 6. Stream Reading Loop
+        // 8. Stream Reading Loop
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
 
-        // Cache settings
         const typewriterEnabled = localStorage.getItem("typewriterEnabled") !== 'false';
         const typewriterSpeed = parseInt(localStorage.getItem("typewriterSpeed") ?? "30", 10);
         const useTypewriter = typewriterEnabled && typewriterSpeed > 0;
@@ -136,7 +136,7 @@ async function send(providedContent = null) {
 
             buffer += decoder.decode(value, { stream: true });
             const lines = buffer.split('\n');
-            buffer = lines.pop() || ''; // Keep the last partial line
+            buffer = lines.pop() || '';
 
             for (const line of lines) {
                 if (!line.startsWith('data: ')) continue;
@@ -153,57 +153,55 @@ async function send(providedContent = null) {
                         return;
                     }
 
-                    // Handle Content Tokens
-                    if (data.type === 'content' || data.token) {
-                        const token = data.content || data.token || '';
-                        if (token) {
-                            if (!streamStarted) startStreamingUI(aiWrapper, typing);
+                    // 9. STAGE: STREAMING (No special text, clear indicators)
+                    if (data.type === 'content' || data.token || data.type === 'reasoning') {
+                        if (!streamStarted) {
+                            // Transition from "Processing" to real streaming
+                            removePlaceholder();
+                            startStreamingUI(aiWrapper, typing);
+                            streamStarted = true;
+                        }
 
-                            // Stop reasoning animation
-                            const reasoningWrapper = aiWrapper.querySelector('.reasoning-wrapper');
-                            if (reasoningWrapper) reasoningWrapper.classList.remove('is-reasoning-active');
+                        // Handle Content Tokens
+                        if (data.type === 'content' || data.token) {
+                            const token = data.content || data.token || '';
+                            if (token) {
+                                const reasoningWrapper = aiWrapper.querySelector('.reasoning-wrapper');
+                                if (reasoningWrapper) reasoningWrapper.classList.remove('is-reasoning-active');
 
-                            aiContent += token;
+                                aiContent += token;
 
-                            if (useTypewriter) {
-                                for (const char of token) typewriterQueue.push(char);
-                                if (!isTypewriterRunning) startTypewriterProcess(aiMsgDiv, aiReasoning);
-                            } else {
-                                displayedContent += token;
-                                updateStreamingContent(aiMsgDiv, displayedContent, aiReasoning);
-                                scrollToBottomDelayed();
+                                if (useTypewriter) {
+                                    for (const char of token) typewriterQueue.push(char);
+                                    if (!isTypewriterRunning) startTypewriterProcess(aiMsgDiv, aiReasoning);
+                                } else {
+                                    displayedContent += token;
+                                    updateStreamingContent(aiMsgDiv, displayedContent, aiReasoning);
+                                    scrollToBottomDelayed();
+                                }
                             }
                         }
-                    }
 
-                    // Handle Reasoning Tokens
-                    if (data.type === 'reasoning') {
-                        if (!streamStarted) startStreamingUI(aiWrapper, typing);
-
-                        if (!streamFrozen) {
-                            aiReasoning += data.content || '';
-                            updateStreamingContent(aiMsgDiv, aiContent, aiReasoning);
-                            const reasoningWrapper = aiWrapper.querySelector('.reasoning-wrapper');
-                            if (reasoningWrapper) reasoningWrapper.classList.add('is-reasoning-active');
-                            scrollToBottomDelayed();
+                        // Handle Reasoning Tokens
+                        if (data.type === 'reasoning') {
+                            if (!streamFrozen) {
+                                aiReasoning += data.content || '';
+                                updateStreamingContent(aiMsgDiv, aiContent, aiReasoning);
+                                const reasoningWrapper = aiWrapper.querySelector('.reasoning-wrapper');
+                                if (reasoningWrapper) reasoningWrapper.classList.add('is-reasoning-active');
+                                scrollToBottomDelayed();
+                            }
                         }
                     }
 
                     // Handle New Turn
                     if (data.type === 'new_turn') {
                         currentTurnIndex++;
-                        aiContent = '';
-                        aiReasoning = '';
-                        displayedContent = '';
-
+                        aiContent = ''; aiReasoning = ''; displayedContent = '';
                         if (!aiWrapper.querySelector('.turn-container')) {
                             aiMsgDiv.innerHTML = '<div class="turn-container current"></div>';
                         }
-
-                        const prevTurns = streamingTurns.map(t =>
-                        `<div class="assistant-turn">${renderMarkdown(t.content)}</div>`
-                        ).join('');
-
+                        const prevTurns = streamingTurns.map(t => `<div class="assistant-turn">${renderMarkdown(t.content)}</div\>`).join('');
                         aiMsgDiv.innerHTML = prevTurns + '<div class="turn-container current"></div>';
                     }
 
@@ -213,24 +211,22 @@ async function send(providedContent = null) {
 
                     if (data.error) {
                         streamHadError = true;
-                        typewriterQueue = []; // Stop typewriter
+                        typewriterQueue = [];
                         handleInlineError(data, aiMsgDiv, aiWrapper, streamStarted);
                     }
 
-                } catch (e) { /* Ignore parse errors for individual lines */ }
+                } catch (e) { /* Ignore parse errors */ }
             }
         }
     } catch (err) {
+        removePlaceholder();
         if (err.name !== 'AbortError') {
             streamHadError = true;
             typewriterQueue = [];
             handleCatchError(err, aiMsgDiv, aiWrapper, streamStarted);
         }
     } finally {
-        // 7. Cleanup and Finalization
-
-        // Signal that network data has stopped.
-        // The typewriter loop will see this and drain the queue, then exit.
+        // 10. Cleanup and Finalization
         isDataStreaming = false;
 
         if (window.upload_queue && window.upload_queue.files.length > 0) {
@@ -240,13 +236,10 @@ async function send(providedContent = null) {
             window.updateUploadQueueUI();
         }
 
-        // Wait for typewriter to finish flushing its queue.
-        // The loop inside startTypewriterProcess checks isDataStreaming and queue length.
         if (isTypewriterRunning) {
             await waitForTypewriter();
         }
 
-        // Collapse reasoning block with animation
         const reasoningWrapper = aiWrapper.querySelector('.reasoning-wrapper');
         if (reasoningWrapper && !reasoningWrapper.classList.contains('collapsed')) {
             reasoningWrapper.classList.add('collapsed');
@@ -264,7 +257,6 @@ async function send(providedContent = null) {
             if (actions) actions.querySelectorAll('button').forEach(btn => btn.disabled = false);
         }
 
-        // Update Chat Info
         try {
             const chatResponse = await fetch('/chat/current');
             const chatData = await chatResponse.json();
@@ -279,8 +271,37 @@ async function send(providedContent = null) {
 }
 
 // =============================================================================
-// Helper Functions
+// NEW OPTIMISTIC UI HELPERS
 // =============================================================================
+
+function createPlaceholderUserMessage(text) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'message-wrapper user user-placeholder';
+
+    const msgDiv = document.createElement('div');
+    msgDiv.className = 'message user';
+
+    const contentContainer = document.createElement('div');
+    contentContainer.className = 'message-content-container';
+    contentContainer.textContent = text;
+
+    const status = document.createElement('div');
+    status.className = 'placeholder-status';
+    status.textContent = 'Sending...';
+
+    msgDiv.appendChild(contentContainer);
+    msgDiv.appendChild(status);
+    wrapper.appendChild(msgDiv);
+
+    return wrapper;
+}
+
+function removePlaceholder() {
+    if (placeholderUserWrapper) {
+        placeholderUserWrapper.remove();
+        placeholderUserWrapper = null;
+    }
+}
 
 function startStreamingUI(aiWrapper, typingIndicator) {
     typingIndicator.classList.remove('show');
@@ -644,67 +665,15 @@ function findLastTextNode(node) {
     return null;
 }
 
-/**
- * Helper to find the last text node in a DOM tree (depth-first search).
- */
-function findLastTextNode(node) {
-    if (node.nodeType === Node.TEXT_NODE) {
-        // Check if it's just whitespace
-        if (node.textContent.trim().length === 0) return null;
-        return node;
-    }
-
-    // Iterate children backwards
-    for (let i = node.childNodes.length - 1; i >= 0; i--) {
-        const child = node.childNodes[i];
-        const result = findLastTextNode(child);
-        if (result) return result;
-    }
-
-    return null;
-}
-
 function finishStream() {
+    removePlaceholder();
     setInputState(false, false, false);
     isStreaming = false;
     streamFrozen = false;
     currentController = null;
     currentStreamId = null;
-
-    // Reset typewriter states
     typewriterQueue = [];
     displayedContent = '';
     isTypewriterRunning = false;
-
     inputField.focus();
-}
-
-async function stopGeneration(sent_from_command = false) {
-    if (currentController) {
-        currentController.abort();
-        currentController = null;
-    }
-
-    if (currentStreamId) {
-        if (!sent_from_command) {
-            fetch('/send', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({role: "user", content: "/stop" })
-            });
-        }
-        try {
-            await fetch('/cancel', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: currentStreamId })
-            });
-        } catch (e) {
-            // Ignore
-        }
-        currentStreamId = null;
-    }
-
-    await syncMessages();
-    finishStream();
 }
