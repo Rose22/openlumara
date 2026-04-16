@@ -27,45 +27,53 @@ function extractTextContent(content) {
  * Handles multimodal arrays (images + text) and standard strings.
  */
 function renderContentBody(content) {
-    // Handle multi-modal content (images + text)
-    if (Array.isArray(content)) {
-        return content.map(part => {
-            if (part.type === 'text') {
-                // Check if this text part is actually a file upload
-                // using the pattern "[File: filename]\ncontent"
-                const filePattern = /^\[File: (.*?)\]\n([\s\S]*)$/;
-                const fileMatch = part.text.match(filePattern);
-
-                if (fileMatch) {
-                    const filename = fileMatch[1];
-                    // Return ONLY the icon and filename preview
-                    return `
-                    <div class="file-preview-container">
-                    <div class="file-preview">
-                    <span class="file-icon">📄</span>
-                    <span class="file-name">${escapeHtml(filename)}</span>
-                    </div>
-                    </div>`;
-                }
-
-                return renderMarkdown(part.text);
-            } else if (part.type === 'image_url') {
-                const url = part.image_url?.url || '';
-                if (url.startsWith('data:image') || url.startsWith('http')) {
-                    return `
-                    <div class="uploaded-image-container">
-                    <img src="${escapeHtml(url)}" class="uploaded-image-preview" alt="Uploaded image">
-                    </div>`;
-                }
-                return '';
-            }
-            return '';
-        }).join('');
-    }
+    if (!content) return '';
 
     // Standard string content
-    return renderMarkdown(content || '');
+    if (typeof content === 'string') {
+        return renderMarkdown(content);
+    }
+
+    // Normalize content to an array to handle both single part objects and arrays of parts
+    const parts = Array.isArray(content) ? content : [content];
+
+    return parts.map(part => {
+        if (part.type === 'text') {
+            // Check if this text part is actually a file or image upload
+            // using patterns "[File: filename]\ncontent" or "[Image: filename]"
+            const filePattern = /^\[(File|Image): (.*?)\](\n([\s\S]*))?$/;
+            const match = part.text.match(filePattern);
+
+            if (match) {
+                const type = match[1]; // 'File' or 'Image'
+                const filename = match[2];
+                const icon = type === 'File' ? '📄' : '🖼️';
+
+                // Return ONLY the icon and filename preview
+                return `
+                <div class="file-preview-container">
+                <div class="file-preview">
+                <span class="file-icon">${icon}</span>
+                <span class="file-name">${escapeHtml(filename)}</span>
+                </div>
+                </div>`;
+            }
+
+            return renderMarkdown(part.text);
+        } else if (part.type === 'image_url') {
+            const url = part.image_url?.url || '';
+            if (url.startsWith('data:image') || url.startsWith('http')) {
+                return `
+                <div class="uploaded-image-container">
+                <img src="${escapeHtml(url)}" class="uploaded-image-preview" alt="Uploaded image">
+                </div>`;
+            }
+            return '';
+        }
+        return '';
+    }).join('');
 }
+
 
 // Note: extractSnippet now expects 'content' to be a string because
 // filterChats calls extractTextContent before passing it.
