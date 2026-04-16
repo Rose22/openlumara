@@ -34,7 +34,16 @@ Features:
 
 # How to install
 
-Clone the git repository, run `run.sh` if you're on linux, `run.bat` if you're on windows!
+Run this command in a terminal or your command prompt:
+```
+git clone https://github.com/Rose22/openlumara
+```
+
+This will give you support for auto-updating via git.
+
+If you'd rather download the zip, you can, but be aware that it won't auto-update.
+
+Once you have openlumara, run `run.sh` if you're on linux, `run.bat` if you're on windows!
 
 Once it's started up, open your browser and go to the url it displays. Then in the web ui, open the settings panel (lil gear icon at the top), set up your api connection, press save, and enjoy!
 
