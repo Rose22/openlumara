@@ -8,7 +8,7 @@ TEMPORARY = False
 
 class StorageList(list):
     """subclassed list that handles storage of data. supports a variety of storage formats."""
-    def __init__(self, name: str, typeName: str, manager=None, path=None, autoload=True, autoreload=True, *args):
+    def __init__(self, name: str, type: str, manager=None, path=None, autoload=True, autoreload=True, *args):
         super().__init__(*args)
 
         # default to openlumara data folder if no path specified
@@ -20,8 +20,8 @@ class StorageList(list):
         self.binary = False
 
         # lets not overwrite a builtin
-        file_type = typeName
-        if not typeName:
+        file_type = type
+        if not type:
             # default to json
             file_type = "json"
 
@@ -122,7 +122,7 @@ class StorageList(list):
 
 class StorageDict(dict):
     """subclassed dict that handles storage of data. supports a variety of storage formats."""
-    def __init__(self, name: str, typeName: str, manager=None, path=None, autoload=True, autoreload=True, *args):
+    def __init__(self, name: str, type: str, manager=None, path=None, autoload=True, autoreload=True, *args):
         super().__init__(*args)
 
         # default to openlumara data folder if no path specified
@@ -136,8 +136,8 @@ class StorageDict(dict):
         self.autoreload = autoreload
 
         # lets not overwrite a builtin
-        file_type = typeName
-        if not typeName:
+        file_type = type
+        if not type:
             # default to json
             file_type = "json"
 

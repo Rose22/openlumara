@@ -5,7 +5,7 @@ class Identity(core.module.Module):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.identity = core.storage.StorageList("identity", typeName="text")
+        self.identity = core.storage.StorageList("identity", type="text")
 
     async def on_system_prompt(self):
         # dont use identity if the characters module is enabled and a character is currently active

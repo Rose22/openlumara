@@ -5,7 +5,7 @@ class Characters(core.module.Module):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.characters = core.storage.StorageDict("characters", typeName="json")
+        self.characters = core.storage.StorageDict("characters", type="json")
         self.user_profile = core.storage.StorageDict("character_user", "json")
         self._header = "Profiles"
 
