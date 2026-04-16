@@ -30,7 +30,19 @@ class Context:
             context = [{"role": "system", "content": await self.channel.manager.get_system_prompt()}]
 
         # insert message history
-        messages = await self.chat.get()
+        messages = copy.deepcopy(await self.chat.get()) # deepcopy so that we don't modify the original
+
+        # strip multimodal data from all messages except the last one to save tokens
+        for i in range(len(messages) - 1):
+            msg = messages[i]
+            content = msg.get("content")
+            if isinstance(content, list):
+                # Keep only the parts of the message that are text
+                msg["content"] = [
+                    part for part in content
+                    if isinstance(part, dict) and part.get("type") == "text"
+                ]
+
         if messages:
             context.extend(messages)
 

@@ -44,10 +44,6 @@
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 6px 10px;
-    background: var(--bg-secondary, #1a1a2e);
-    border: 1px solid var(--border-color, #333);
-    border-radius: var(--radius-sm);
 }
 
 .file-icon {
@@ -87,11 +83,22 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 0.85rem;
-    color: #ccc;
-    background: rgba(255, 255, 255, 0.05);
-    padding: 4px 8px;
-    border-radius: 4px;
+}
+
+.delete-queue-item {
+    margin-left: auto; /* Pushes button to the right */
+    background: none;
+    border: none;
+    color: #888;
+    cursor: pointer;
+    font-size: 1.2rem;
+    line-height: 1;
+    padding: 0 4px;
+    transition: color 0.2s;
+}
+
+.delete-queue-item:hover {
+    color: #ff4d4d; /* Red on hover */
 }
 
 .queue-file-icon {

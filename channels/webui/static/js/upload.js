@@ -84,19 +84,40 @@ window.updateUploadQueueUI = function() {
     const queueList = document.createElement('div');
     queueList.className = 'upload-queue-list';
 
-    window.upload_queue.files.forEach((fileObj) => {
+    window.upload_queue.files.forEach((fileObj, index) => {
         const item = document.createElement('div');
         item.className = 'upload-queue-item';
         item.innerHTML = `
         <span class="queue-file-icon">📄</span>
         <span class="queue-file-name">${escapeHtml(fileObj.name)}</span>
+        <button class="delete-queue-item" aria-label="Remove file">&times;</button>
         `;
+
+        // Add event listener for the delete button
+        const deleteBtn = item.querySelector('.delete-queue-item');
+        deleteBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            // 1. Remove the pending message wrapper from the chat DOM if it exists
+            const wrapper = window.upload_queue.wrappers[index];
+            if (wrapper && wrapper.parentNode) {
+                wrapper.remove();
+            }
+
+            // 2. Remove from the data arrays
+            window.upload_queue.files.splice(index, 1);
+            window.upload_queue.wrappers.splice(index, 1);
+
+            // 3. Re-render the queue UI
+            window.updateUploadQueueUI();
+        });
+
         queueList.appendChild(item);
     });
 
     container.appendChild(queueList);
 };
-
 
 async function handleFileUpload(event) {
     const filesList = event.target.files || event.dataTransfer.files;
@@ -152,11 +173,17 @@ async function handleFileUpload(event) {
             img.style.width = `${width}px`;
             img.style.height = `${height}px`;
 
-            // Prepare the part for the final payload
-            contentPart = {
-                type: "image_url",
-                image_url: { url: imageDataUrl }
-            };
+            // Prepare the parts for the final payload
+            contentPart = [
+                {
+                    type: "text",
+                    text: `[Image: ${file.name}]`
+                },
+                {
+                    type: "image_url",
+                    image_url: { url: imageDataUrl }
+                }
+            ];
         } else {
             // Text file processing
             const content = await new Promise((resolve) => {

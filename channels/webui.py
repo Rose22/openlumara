@@ -76,6 +76,7 @@ CSS_FILES = [
     "containers",
     "messages",
     "input",
+    "upload",
     "keyboard",
     "responsive",
     "typewriter",
@@ -606,18 +607,7 @@ def upload_file():
             is_image = f.get('is_image', False)
 
             if is_image:
-                # Image processing (resizing/compression)
-                image_bytes = base64.b64decode(content_b64)
-                img = Image.open(io.BytesIO(image_bytes))
-                max_dimension = 512
-                if max(img.size) > max_dimension:
-                    img.thumbnail((max_dimension, max_dimension), Image.Resampling.LANCZOS)
-                if img.mode in ("RGBA", "P"):
-                    img = img.convert("RGB")
-                buffer = io.BytesIO()
-                img.save(buffer, format="JPEG", quality=80, optimize=True)
-                compressed_b64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
-                image_url = f"data:image/jpeg;base64,{compressed_b64}"
+                image_url = f"data:image/jpeg;base64,{content_b64}"
 
                 # Add a text part for searchability/extraction
                 message_content.append({

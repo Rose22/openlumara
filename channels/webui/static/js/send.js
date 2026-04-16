@@ -66,6 +66,9 @@ async function send(providedContent = null) {
             contentPayload.push(...queuedContents);
         }
 
+        // Flatten the payload in case any file contents were arrays (multimodal)
+        contentPayload = contentPayload.flat();
+
         payloadBody = { role: "user", content: contentPayload };
     }
 
