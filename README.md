@@ -41,7 +41,7 @@ git clone https://github.com/Rose22/openlumara
 
 This will give you support for auto-updating via git.
 
-If you'd rather download the zip, you can, but be aware that it won't auto-update.
+If you'd rather download the zip, you can, but be aware that it won't auto-update!
 
 Once you have openlumara, run `run.sh` if you're on linux, `run.bat` if you're on windows!
 
