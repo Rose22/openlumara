@@ -1,6 +1,8 @@
 import core
 
 class Channel(core.module.Module):
+    """Inserts channel-specific instructions and prompts into your chats"""
+
     async def on_system_prompt(self):
         if not self.channel:
             return None

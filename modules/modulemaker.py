@@ -2,7 +2,7 @@ import core
 import os
 
 class ModuleMaker(core.module.Module):
-    """a class that lets you create custom modules"""
+    """Lets your AI create OpenLumara modules for you"""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

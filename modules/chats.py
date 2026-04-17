@@ -1,7 +1,7 @@
 import core
 
 class Chats(core.module.Module):
-    """manage your chat history"""
+    """Lets you or the AI manage your chats"""
 
     async def on_system_prompt(self):
         categories = await self.channel.context.chat.get_categories()

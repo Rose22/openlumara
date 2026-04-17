@@ -983,6 +983,25 @@ def save_settings():
 
     return jsonify({"success": True})
 
+@app.route("/settings/get_module_info")
+def get_module_info():
+    module_info = {}
+    import modules
+    import user_modules
+
+    loaded_module_classes = core.modules.load(modules, core.module.Module, respect_config=False) + core.modules.load(user_modules, core.module.Module, respect_config=False)
+    for module_class in loaded_module_classes:
+        module_name = core.modules.get_name(module_class)
+        docstring = str(module_class.__doc__).strip()
+
+        if docstring not in [None, "None"] and module_name not in module_info.keys():
+            # only get the first class's docstring, dont overwrite it with docstrings from other classes in the file
+            module_info[module_name] = {
+                "description": docstring
+            }
+
+    return jsonify({"success": True, "module_info": module_info})
+
 # =============================================================================
 # Storage Editor Routes
 # =============================================================================

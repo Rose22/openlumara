@@ -5,6 +5,8 @@ import platform
 import datetime
 
 class System(core.module.Module):
+    """Inserts information about your system into the system prompt"""
+
     async def on_system_prompt(self):
         details = {
             "OS": sys.platform,

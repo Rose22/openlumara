@@ -8,6 +8,8 @@ import ulid
 cached_mem = None
 
 class Memory(core.module.Module):
+    """Gives your AI a persistent memory system"""
+
     def __init__(self, *args, **kwargs):
         super().__init__( *args, **kwargs)
         self._mem = core.storage.StorageList("memory", type="msgpack")

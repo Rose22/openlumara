@@ -31,6 +31,8 @@ def sizeof_format(num, suffix="B"):
     return f"{num:.1f}Yi{suffix}"
 
 class Files(core.module.Module):
+    """Read/write/manage files inside a special sandbox folder"""
+
     MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
     MAX_GLOB_DEPTH = 10
     MAX_SEARCH_RESULTS = 50

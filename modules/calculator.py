@@ -118,6 +118,8 @@ class SafeCalculator:
         raise ValueError(f"Forbidden syntax element: {type(node).__name__}")
 
 class Calculator(core.module.Module):
+    """Lets your AI do simple calculations without relying on it's own intelligence"""
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._calc = SafeCalculator()

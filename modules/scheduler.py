@@ -4,6 +4,8 @@ import core
 import ulid
 
 class Scheduler(core.module.Module):
+    """Lets your AI send you scheduled reminders and do things at specified times"""
+
     async def on_ready(self) -> None:
         """Initialize storage, manager, and schedule existing jobs."""
         self.schedule = core.storage.StorageList("schedule", type="json")

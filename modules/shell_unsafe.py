@@ -5,7 +5,7 @@ import subprocess
 import tempfile
 
 class ShellUnsafe(core.module.Module):
-    """enables the AI to run shell commands. extremely dangerous! enable at your own risk"""
+    """Lets your AI run shell commands. EXTREMELY DANGEROUS! Enable at your own risk"""
 
     async def exec(self, cmd: str):
         """executes commands in an unsandboxed shell. careful!"""

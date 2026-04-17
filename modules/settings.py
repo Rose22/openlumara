@@ -1,6 +1,6 @@
 import core
 
 class Settings(core.module.Module):
-    """lets you or the AI manage openlumara's settings/config"""
+    """Lets you or the AI manage openlumara's settings/config"""
 
     pass

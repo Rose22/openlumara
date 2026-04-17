@@ -6,8 +6,6 @@
     display: flex;
     flex-direction: column;
     width: 95vw;
-    max-width: 900px;
-    max-height: 700px;
     height: 85vh;
     padding: 0;
 }
@@ -237,6 +235,7 @@
     resize: vertical;
     font-family: inherit;
 }
+
 /* ==========================================================================
  *  Toggle Switches - Fixed
  *  ========================================================================== */
@@ -316,16 +315,43 @@
     color: var(--text-secondary);
 }
 
-/* Toggle List Item - ensure the switch works inside */
+/* ==========================================================================
+ *  Improved Toggle List Styles
+ *  ========================================================================== */
+
+
+.toggle-list {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.toggle-list-status {
+    padding: 10px 12px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.toggle-count {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.toggle-list-grid {
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+}
+
+/* Base style for ALL toggle items */
 .toggle-list-item {
-    display: flex;
-    padding: 8px 10px;
+    padding: 10px;
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
-    border-radius: 6px;
+    border-radius: 8px;
     transition: all 0.15s ease;
-    align-items: center;
-    justify-content: space-between;
+    box-sizing: border-box;
 }
 
 .toggle-list-item.enabled {
@@ -333,19 +359,83 @@
     border-color: var(--accent);
 }
 
-.toggle-list-item.enabled .toggle-list-name {
+/* --- STANDARD STYLE (Default) --- */
+/* Used for normal setting lists (Row layout) */
+.toggle-list-item:not(.module-card) {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.toggle-list-item:not(.module-card) .toggle-list-name {
+    font-weight: 500;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+/* --- MODULE CARD STYLE (Special) --- */
+/* Used for Modules/Channels (Column layout with scroll) */
+.toggle-list-item.module-card {
+    display: flex;
+    flex-direction: column;
+    height: 115px; /* Fixed height to enable description scrolling */
+}
+
+.toggle-list-item.module-card .toggle-list-top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    width: 100%;
+    margin-bottom: 6px;
+}
+
+.toggle-list-item.module-card .toggle-list-name {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.2;
+    word-break: break-word;
+}
+
+.toggle-list-item.module-card .toggle-list-name.enabled {
     color: var(--text-primary);
 }
 
-/* Smaller toggle for toggle list items */
+/* Scrollable Description Area */
+.toggle-list-desc-container {
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.toggle-list-item-description {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+    white-space: pre-wrap;
+}
+
+/* Custom Scrollbar for descriptions */
+.toggle-list-desc-container::-webkit-scrollbar {
+    width: 4px;
+}
+.toggle-list-desc-container::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 2px;
+}
+
+/* Common Switch Sizing */
 .toggle-list-item .toggle-switch {
     width: 36px;
     height: 20px;
+    flex-shrink: 0;
 }
 
 .toggle-list-item .toggle-slider::before {
     height: 14px;
     width: 14px;
+    left: 3px;
+    bottom: 3px;
 }
 
 .toggle-list-item .toggle-switch input:checked + .toggle-slider::before {
@@ -743,17 +833,6 @@
     max-height: 300px;
     overflow-y: auto;
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-}
-
-.toggle-list-item {
-    display: flex;
-    padding: 8px 10px;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    transition: all 0.15s ease;
-    align-items: center;
-    justify-content: space-between;
 }
 
 .toggle-list-item.enabled {

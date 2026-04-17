@@ -7,6 +7,7 @@ let settingsOriginal = {};
 let settingsHasChanges = false;
 let cachedModels = null;
 let modelsLoadError = null;
+let moduleInfoCache = {};
 
 // Category icons
 const SETTINGS_ICONS = {
@@ -65,7 +66,7 @@ async function fetchModels() {
 }
 
 // Organize settings into categories, grouping by second-level key (e.g. modules.X)
-function organizeSettingsIntoCategories(originalData) {
+function organizeSettingsIntoCategories(originalData, moduleInfo = {}) {
     const categories = {};
 
     // Always add appearance first
@@ -108,19 +109,28 @@ function organizeSettingsIntoCategories(originalData) {
         };
 
         // Special handling for modules and channels
-        if (topKey === 'modules' || topKey === 'channels') {
+        if (topKey === 'modules' || topKey === 'user_modules') {
             // Get list of enabled items to filter settings
             const enabledItems = new Set(topValue.enabled || []);
             const allItems = getAllToggleItems(topValue);
+
+            const itemDescriptions = {};
+            for (const itemName in moduleInfo) {
+                if (moduleInfo[itemName].description) {
+                    itemDescriptions[itemName] = moduleInfo[itemName].description;
+                }
+            }
 
             // Add the toggle list directly (ungrouped) at the top
             addToGroup('_direct_', null, {
                 key: topKey,
                 value: {
                     enabled: topValue.enabled || [],
-                    disabled: topValue.disabled || []
+                    disabled: topValue.disabled || [],
+                    descriptions: itemDescriptions // <--- Injecting descriptions here,
                 },
-                type: 'toggle_list'
+                type: 'toggle_list',
+                isModuleList: true
             }, true);
 
             // Only show settings for enabled items
@@ -384,13 +394,23 @@ async function loadSettings() {
         settingsData = await response.json();
         settingsOriginal = JSON.parse(JSON.stringify(settingsData));
 
+        try {
+            const infoResponse = await fetch('/settings/get_module_info');
+            if (infoResponse.ok) {
+                const infoData = await infoResponse.json();
+                moduleInfoCache = infoData.module_info || {};
+            }
+        } catch (infoErr) {
+            console.error('Failed to fetch module info:', infoErr);
+        }
+
         // Pre-fetch models if we have a model field
         const hasModelField = checkForModelField(settingsData);
         if (hasModelField) {
             await fetchModels();
         }
 
-        const categories = organizeSettingsIntoCategories(settingsData);
+        const categories = organizeSettingsIntoCategories(settingsData, moduleInfoCache);
 
         renderSettingsForm(categories);
         renderSettingsNav(categories);
@@ -580,7 +600,7 @@ function createSettingItem(item) {
             inputEl = createModelInput(item.key, item.value);
             break;
         case 'toggle_list':
-            inputEl = createToggleListInput(item.key, item.value);
+            inputEl = createToggleListInput(item.key, item.value, !!item.isModuleList);
             break;
         case 'boolean':
             inputEl = createToggleInput(item.key, item.value);
@@ -781,13 +801,14 @@ function createModelInput(key, value) {
 }
 
 // Create toggle list (for enabled/disabled arrays)
-function createToggleListInput(key, value) {
+function createToggleListInput(key, value, isModuleList = false) {
     const wrapper = document.createElement('div');
     wrapper.className = 'toggle-list';
     wrapper.dataset.key = key;
 
     const allItems = getAllToggleItems(value);
     const enabledSet = new Set(value.enabled || []);
+    const descriptions = value.descriptions || {};
 
     // Sort: enabled items first, then alphabetically within each group
     const sortedItems = allItems.sort((a, b) => {
@@ -798,13 +819,11 @@ function createToggleListInput(key, value) {
         return a.localeCompare(b);
     });
 
-    // Status bar
     const status = document.createElement('div');
     status.className = 'toggle-list-status';
     status.innerHTML = `<span class="toggle-count">${enabledSet.size} of ${sortedItems.length} enabled</span>`;
     wrapper.appendChild(status);
 
-    // Grid of toggles
     const grid = document.createElement('div');
     grid.className = 'toggle-list-grid';
 
@@ -812,49 +831,88 @@ function createToggleListInput(key, value) {
         const isEnabled = enabledSet.has(item);
 
         const itemWrapper = document.createElement('div');
-        itemWrapper.className = 'toggle-list-item' + (isEnabled ? ' enabled' : '');
+        // Add 'module-card' class only if isModuleList is true
+        itemWrapper.className = 'toggle-list-item' +
+        (isEnabled ? ' enabled' : '') +
+        (isModuleList ? ' module-card' : '');
 
-        const name = document.createElement('span');
-        name.className = 'toggle-list-name';
-        name.textContent = formatLabel(item);
+        if (isModuleList) {
+            // --- MODULE CARD STRUCTURE ---
+            const topRow = document.createElement('div');
+            topRow.className = 'toggle-list-top-row';
 
-        const toggle = document.createElement('label');
-        toggle.className = 'toggle-switch';
+            const name = document.createElement('div');
+            name.className = 'toggle-list-name';
+            name.textContent = formatLabel(item);
 
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.checked = isEnabled;
+            const toggle = document.createElement('label');
+            toggle.className = 'toggle-switch';
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = isEnabled;
+            const slider = document.createElement('span');
+            slider.className = 'toggle-slider';
+            toggle.appendChild(checkbox);
+            toggle.appendChild(slider);
 
-        const slider = document.createElement('span');
-        slider.className = 'toggle-slider';
+            topRow.appendChild(name);
+            topRow.appendChild(toggle);
+            itemWrapper.appendChild(topRow);
 
-        toggle.appendChild(checkbox);
-        toggle.appendChild(slider);
+            if (descriptions[item] !== "None") {
+                const descContainer = document.createElement('div');
+                descContainer.className = 'toggle-list-desc-container';
 
-        checkbox.onchange = () => {
-            const newState = checkbox.checked;
-            itemWrapper.classList.toggle('enabled', newState);
+                const desc = document.createElement('div');
+                desc.className = 'toggle-list-item-description';
+                desc.textContent = descriptions[item];
 
-            if (newState) {
-                enabledSet.add(item);
-            } else {
-                enabledSet.delete(item);
+                descContainer.appendChild(desc);
+                itemWrapper.appendChild(descContainer);
             }
 
-            status.querySelector('.toggle-count').textContent =
-            `${enabledSet.size} of ${sortedItems.length} enabled`;
+            checkbox.onchange = () => {
+                const newState = checkbox.checked;
+                itemWrapper.classList.toggle('enabled', newState);
+                newState ? enabledSet.add(item) : enabledSet.delete(item);
+                status.querySelector('.toggle-count').textContent = `${enabledSet.size} of ${sortedItems.length} enabled`;
+                updateToggleListData(key, Array.from(enabledSet), sortedItems);
+            };
+        } else {
+            // --- STANDARD LIST STRUCTURE ---
+            const name = document.createElement('div');
+            name.className = 'toggle-list-name';
+            name.textContent = formatLabel(item);
 
-            updateToggleListData(key, Array.from(enabledSet), sortedItems);
-        };
+            const toggle = document.createElement('label');
+            toggle.className = 'toggle-switch';
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = isEnabled;
+            const slider = document.createElement('span');
+            slider.className = 'toggle-slider';
+            toggle.appendChild(checkbox);
+            toggle.appendChild(slider);
 
-        itemWrapper.appendChild(name);
-        itemWrapper.appendChild(toggle);
+            itemWrapper.appendChild(name);
+            itemWrapper.appendChild(toggle);
+
+            checkbox.onchange = () => {
+                const newState = checkbox.checked;
+                itemWrapper.classList.toggle('enabled', newState);
+                newState ? enabledSet.add(item) : enabledSet.delete(item);
+                status.querySelector('.toggle-count').textContent = `${enabledSet.size} of ${sortedItems.length} enabled`;
+                updateToggleListData(key, Array.from(enabledSet), sortedItems);
+            };
+        }
+
         grid.appendChild(itemWrapper);
     });
 
     wrapper.appendChild(grid);
     return wrapper;
 }
+
 
 // Update toggle list data in settings
 function updateToggleListData(key, enabledItems, allItems) {

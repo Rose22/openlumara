@@ -16,20 +16,7 @@ import requests
 
 class Http(core.module.Module):
     """
-    Lets the AI send/receive HTTP requests with security hardening.
-    SECURITY FEATURES:
-    - SSRF Protection (blocks private/internal IPs)
-    - URL Validation (validates scheme, format, length)
-    - Request Rate Limiting (prevents DoS)
-    - Data Size Limits (prevents resource exhaustion)
-    - Protocol Enforcement (HTTP/HTTPS only)
-    - Redirect Protection (limits redirect depth)
-    - Timeout Enforcement (prevents hanging)
-    - Header Validation (sanitizes headers, blocks dangerous ones)
-    - Dangerous Port Blocking (prevents service abuse)
-    - Metadata Endpoint Blocking (cloud metadata protection)
-    - Request Logging (for audit trail)
-    - Error Handling (specific exceptions, no stack trace leaks)
+    Lets the AI send/receive HTTP requests
     """
 
     # Security constants
