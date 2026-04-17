@@ -21,17 +21,13 @@ function showAnnouncementNotification(content, type) {
     if (notificationPermission !== 'granted') return;
     if (!('Notification' in window)) return;
 
-    if (type !== "schedule") {
-        // only notify for scheduler events
-        return;
-    }
-
     // Determine notification options based on type
     const typeSettings = {
         schedule: { icon: '📢', tag: 'announce-info' },
         warning: { icon: '⚠️', tag: 'announce-warning' },
         error: { icon: '❌', tag: 'announce-error' },
-        success: { icon: '✅', tag: 'announce-success' }
+        success: { icon: '✅', tag: 'announce-success' },
+        info: { icon: 'ℹ️', tag: 'announce-info' }
     };
 
     const settings = typeSettings[type] || typeSettings.info;

@@ -300,14 +300,16 @@ class Chat:
         if (
             # if we have anything at all in the messages array
             messages and
-            # and the last message was not a user or tool response message
-            messages[-1].get("role") not in ("user", "tool") and
-            # and the last message was also not an assistant message with toolcalls
+            # and the last message was an assistant message
+            messages[-1].get("role") == "assistant" and
+            # and that last assistant message didn't have toolcalls
             not messages[-1].get("tool_calls") and
-            # and the message we're about to post isn't by the user role
-            message.get("role") != "user"
+            # and the message we're about to post is an assistant message
+            message.get("role") == "assistant"
         ):
-            # ensure message turn order is correct
+            # according to openAI spec, consecutive assistant messages
+            # are not allowed. so we enforce it here
+
             # assistants are allowed to output after a tool role message
             # but not after their own message..
             await self.add({"role": "user", "content": "[SYSTEM_TICK]"})

@@ -102,9 +102,9 @@ async function deleteMessage(index) {
     }
 }
 
-async function regenerateMessage(aiIndex) {
+async function regenerateMessage(targetIndex) {
     // Validate index
-    if (typeof aiIndex !== 'number' || aiIndex < 0) {
+    if (typeof targetIndex !== 'number' || targetIndex < 0) {
         console.error('Invalid index for regeneration');
         return;
     }
@@ -120,35 +120,48 @@ async function regenerateMessage(aiIndex) {
         const data = await response.json();
         const messages = data.messages;
 
-        if (aiIndex >= messages.length) {
+        if (targetIndex >= messages.length) {
             console.error('Invalid index for regeneration');
             return;
         }
 
-        // Verify this is an assistant message
-        if (messages[aiIndex].role !== 'assistant') {
-            console.error('Can only regenerate assistant messages');
+        const targetMsg = messages[targetIndex];
+        let contentToResend = '';
+        let deleteIndex = -1;
+
+        // Determine logic based on role
+        if (targetMsg.role === 'assistant') {
+            // CASE 1: Assistant Message
+            // Find the user message that triggered this response to roll back to it
+            let userMsgIndex = targetIndex - 1;
+            while (userMsgIndex >= 0 && messages[userMsgIndex].role !== 'user') {
+                userMsgIndex--;
+            }
+
+            if (userMsgIndex < 0) {
+                console.error('No user message found before this AI message');
+                return;
+            }
+
+            contentToResend = messages[userMsgIndex].content;
+            deleteIndex = userMsgIndex; // Deletes from user message onwards
+        }
+        else if (targetMsg.role === 'user') {
+            // CASE 2: User Message
+            // Delete the specific user message and prepare to re-send its content
+            contentToResend = targetMsg.content;
+            deleteIndex = targetIndex;
+        }
+        else {
+            console.error('Can only regenerate assistant or user messages');
             return;
         }
 
-        // Find the user message before this AI message
-        let userMsgIndex = aiIndex - 1;
-        while (userMsgIndex >= 0 && messages[userMsgIndex].role !== 'user') {
-            userMsgIndex--;
-        }
-
-        if (userMsgIndex < 0) {
-            console.error('No user message found before this AI message');
-            return;
-        }
-
-        const userMsg = messages[userMsgIndex];
-
-        // Delete from the user message onwards
+        // Execute deletion
         const deleteResponse = await fetch('/delete', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ index: userMsgIndex })
+            body: JSON.stringify({ index: deleteIndex })
         });
 
         if (!deleteResponse.ok) {
@@ -159,11 +172,12 @@ async function regenerateMessage(aiIndex) {
         // Sync to update UI
         await syncMessages();
 
-        // Re-send the user message to generate new response
-        await send(userMsg.content);
+        // Re-send the content
+        await send(contentToResend);
 
     } catch (err) {
         console.error('Failed to regenerate message:', err);
     }
 }
+
 

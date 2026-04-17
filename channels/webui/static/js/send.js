@@ -8,6 +8,23 @@ async function send(providedContent = null) {
     // 1. Pre-checks and State Reset
     if (isStreaming) return;
 
+    // if the last message is a user message, and the user presses the Send button while no input is in the input box, regenerate
+    if (providedContent === null && inputField.value.trim() === '') {
+        const allMessages = chat.querySelectorAll('.message-wrapper');
+        const lastMsg = allMessages[allMessages.length - 1];
+
+        // Only proceed if the last message in the chat is actually a user message
+        if (lastMsg && lastMsg.classList.contains('user')) {
+            const index = parseInt(lastMsg.dataset.index);
+            if (!isNaN(index)) {
+                regenerateMessage(index);
+                return;
+            }
+        }
+        // If the last message is an assistant message (or no messages exist), just exit
+        return;
+    }
+
     const isRegenerate = providedContent !== null;
     const rawContent = providedContent !== null ? providedContent : inputField.value.trim();
     const message = typeof rawContent === 'string' ? rawContent : extractTextContent(rawContent);
@@ -28,10 +45,16 @@ async function send(providedContent = null) {
     }
 
     // 3. STAGE: SENDING (Optimistic UI)
-    // Only create a placeholder if this is a brand new message (not a regeneration)
     if (!isRegenerate) {
+        // Standard new message: Show the "Sending..." placeholder
         placeholderUserWrapper = createPlaceholderUserMessage(message);
         chat.insertBefore(placeholderUserWrapper, typing);
+    } else {
+        // REGENERATION: Create a standard user message immediately
+        // so it doesn't "vanish" while the AI is thinking.
+        const allMessages = chat.querySelectorAll('.message-wrapper')
+        const userMsgWrapper = createMessageElement({"role": "user", "content": message}, allMessages.length);
+        chat.insertBefore(userMsgWrapper, typing);
     }
 
     // 4. API Status Check
@@ -97,7 +120,7 @@ async function send(providedContent = null) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payloadBody),
-                                     signal: currentController.signal
+            signal: currentController.signal
         });
 
         if (!response.ok) {
@@ -223,7 +246,7 @@ async function send(providedContent = null) {
         if (err.name !== 'AbortError') {
             streamHadError = true;
             typewriterQueue = [];
-            handleCatchError(err, aiMsgDiv, aiWrapper, streamStarted);
+            handleCatchError(err, aiMsgDiv, aiWrapper, False);
         }
     } finally {
         // 10. Cleanup and Finalization
@@ -310,16 +333,45 @@ function startStreamingUI(aiWrapper, typingIndicator) {
 }
 
 async function handleServerError(response, aiWrapper) {
-    if (response.status === 503) {
-        let errorData;
-        try { errorData = await response.json(); }
-        catch (e) { errorData = { error: 'API is not available.' }; }
+    let errorMsg = 'An unexpected error occurred.';
+    let errorType = 'unknown';
+    let action = '';
 
-        showApiConfigError(errorData.error || 'API is not available.', errorData.error_type, errorData.action);
+    // 1. Attempt to extract detailed error information from the response body
+    try {
+        const errorData = await response.json();
+        // The backend sends 'error' as the message in some routes,
+        // or 'error_type'/'action' in others.
+        errorMsg = errorData.error || errorData.message || errorMsg;
+        errorType = errorData.error_type || errorData.error || errorType;
+        action = errorData.action || '';
+    } catch (e) {
+        // If response is not JSON, fall back to status-based messages
+        if (response.status === 503) {
+            errorMsg = 'API is not available.';
+        } else if (response.status === 500) {
+            errorMsg = 'Internal Server Error.';
+        } else if (response.status === 401 || response.status === 403) {
+            errorMsg = 'Authentication failed.';
+            errorType = 'auth_failed';
+        }
     }
-    aiWrapper.remove();
+
+    // 2. Display the error using the global UI config error handler
+    // This ensures the user actually sees what went wrong.
+    showApiConfigError(errorMsg, errorType, action);
+
+    // 3. Cleanup UI state
+    removePlaceholder();
+
+    // Only attempt to remove aiWrapper if it has actually been added to the DOM
+    if (aiWrapper && aiWrapper.parentNode) {
+        aiWrapper.remove();
+    }
+
     finishStream();
 }
+
 
 function handleInlineError(data, aiMsgDiv, aiWrapper, streamStarted) {
     if (!streamStarted) aiWrapper.classList.remove('hidden');
