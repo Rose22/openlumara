@@ -237,7 +237,7 @@ class Manager:
         else:
             return ""
 
-    async def get_end_prompt(self):
+    async def get_end_prompt(self, prevent_recursion=False):
         # don't return endprompt if characters module is active
         active_character = None
         if self.channel:
@@ -248,6 +248,10 @@ class Manager:
         # automatically insert system prompts returned by modules (such as memory)
         histend_prompt = []
         for module_name, module in self.modules.items():
+            if prevent_recursion and module_name == "tokens":
+                # if we try to count the system prompt's tokens from the function that counts tokens.. we get recursion
+                continue
+
             module_sysprompt = await module.on_end_prompt()
 
             if module_sysprompt and (module_name not in core.config.get("modules").get("disabled_end_prompts", [])):

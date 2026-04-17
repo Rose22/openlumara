@@ -8,7 +8,7 @@ class Context:
         # UI-agnostic chat history system - save/load context windows from save file!
         self.chat = core.chat.Chat(self.channel)
 
-    async def get(self, system_prompt=True, end_prompt=True):
+    async def get(self, system_prompt=True, end_prompt=True, prevent_recursion=False):
         """
         builds the full context window using system prompt + message history + end prompt
         to the API, we send this full context.
@@ -61,7 +61,7 @@ class Context:
             # we add the end prompt message as a user message before the actual user messages
             # because it turns out multiple consecutive user messages ARE allowed
             # just not multiple consecutive assistant messages or system messages...
-            histend = await self.channel.manager.get_end_prompt()
+            histend = await self.channel.manager.get_end_prompt(prevent_recursion=prevent_recursion)
             if histend:
                 context.append({"role": "user", "content": histend})
 
@@ -92,8 +92,11 @@ class Context:
     async def get_token_usage(self):
         max_tokens = core.config.get("api").get("max_context", 8192)
 
+        # we use prevent_recursive to tell the system prompt retrieval
+        # call in self.get() to not include token usage data
+
         try:
-            prompt_tokens = await self.chat.count_tokens(await self.get(system_prompt=True))
+            prompt_tokens = await self.chat.count_tokens(await self.get(system_prompt=True, prevent_recursion=True))
         except AttributeError as e:
             # when modules don't have a channel assigned yet, this error triggers. we handle it "gracefully".
             return {"current": 0, "max": max_tokens}
