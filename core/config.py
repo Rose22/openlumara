@@ -18,7 +18,8 @@ default_config = {
         "key": "KEY_HERE",
         "max_context": 8192,
         "max_output_tokens": 8192,
-        "max_messages": 200
+        "max_messages": 200,
+        "custom_fields": {}
     },
     "model": {
         "name": "MODEL_HERE",
