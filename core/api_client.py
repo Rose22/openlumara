@@ -135,6 +135,12 @@ class APIClient():
             "max_completion_tokens": core.config.get("api", {}).get("max_output_tokens", 8192)
         }
 
+        # allow inserting custom request fields
+        custom_fields = core.config.get("api", {}).get("custom_fields", {})
+        if isinstance(custom_fields, dict):
+            for key, value in custom_fields.items():
+                req[key] = value
+
         if stream:
             # request token usage from the API
             req["stream_options"] = {"include_usage": True}
