@@ -39,6 +39,16 @@ if ('serviceWorker' in navigator) {
 // Don't set initial connection status - let it be determined by checkConnection()
 
 async function init() {
+    requestNotificationPermission();
+
+    // The first time the user clicks anywhere,
+    // we attempt to request notification permission.
+    document.addEventListener('click', () => {
+        if (typeof notificationPermission !== 'undefined' && notificationPermission === 'default') {
+            requestNotificationPermission();
+        }
+    }, { once: true });
+
     try {
         await checkConnection();
 
@@ -61,7 +71,6 @@ async function init() {
     loadTheme();
     loadChats();
     initTagFilterState();
-    requestNotificationPermission();
 
     window.addEventListener('resize', handleTitleBarResize);
 

@@ -35,7 +35,7 @@
 }
 
 .message {
-    max-width: 85%;
+    max-width: var(--message-max-width, 60%);
     padding: 12px 16px;
     border-radius: var(--radius-lg);
     border: var(--message-decoration);
@@ -217,7 +217,7 @@
     font-style: italic;
     text-align: center;
     font-size: 0.9rem;
-    max-width: 90%;
+    max-width: var(--message-max-width, 60%); /* Changed from 90% */
     white-space: pre-wrap;
 }
 
@@ -258,7 +258,7 @@
     font-family: var(--code-font);
     font-size: 0.85rem;
     border-bottom-right-radius: var(--radius-sm);
-    max-width: 85%;
+    max-width: var(--message-max-width, 60%);
     white-space: pre-wrap;
     color: var(--text-secondary);
 }
@@ -274,7 +274,7 @@
     font-family: var(--code-font);
     font-size: 0.85rem;
     border-bottom-left-radius: var(--radius-sm);
-    max-width: 85%;
+    max-width: var(--message-max-width, 60%);
     white-space: pre-wrap;
     word-wrap: break-word;
     color: var(--text-secondary);
@@ -305,7 +305,7 @@
     border: none;
     padding: 0;
     margin: 0;
-    width: 90%;
+    width: var(--message-max-width, 60%);
 }
 
 .message-wrapper.tool_call {
@@ -614,7 +614,7 @@
     border: none;
     padding: 0;
     margin: 0;
-    max-width: 90%;
+    max-width: var(--message-max-width, 60%); /* Changed from 90% */
 }
 
 .message-wrapper.tool {

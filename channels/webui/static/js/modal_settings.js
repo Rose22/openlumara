@@ -2016,6 +2016,50 @@ function createThemeSection() {
 
     typographyControls.appendChild(chatWidthRow);
 
+    // --- NEW: Message Bubble Width Slider ---
+    const messageWidthRow = document.createElement('div');
+    messageWidthRow.className = 'font-size-row'; // Reusing class for consistent styling
+    const msgWidthMin = 30;
+    const msgWidthMax = 100;
+    const msgWidthVal = parseInt(localStorage.getItem('messageMaxWidth') || '60');
+    const msgWidthPercentage = ((msgWidthVal - msgWidthMin) / (msgWidthMax - msgWidthMin)) * 100;
+
+    messageWidthRow.innerHTML = `
+    <div class="slider-header">
+    <span class="slider-label">Message Width</span>
+    <span class="slider-value" id="message-width-display">${msgWidthVal}%</span>
+    </div>
+    <div class="slider-track-wrapper">
+    <div class="slider-track">
+    <input type="range" class="slider-input" id="message-width-slider-settings"
+    min="${msgWidthMin}" max="${msgWidthMax}" value="${msgWidthVal}">
+    <div class="slider-fill" id="message-width-fill" style="width: ${msgWidthPercentage}%"></div>
+    <div class="slider-handle" id="message-width-handle" style="left: ${msgWidthPercentage}%"></div>
+    </div>
+    <div class="slider-labels">
+    <span>Narrow</span>
+    <span>Wide</span>
+    </div
+    </div>
+    `;
+
+    const messageWidthSlider = messageWidthRow.querySelector('#message-width-slider-settings');
+    const messageWidthDisplay = messageWidthRow.querySelector('#message-width-display');
+    const messageWidthFill = messageWidthRow.querySelector('#message-width-fill');
+    const messageWidthHandle = messageWidthRow.querySelector('#message-width-handle');
+
+    messageWidthSlider.addEventListener('input', function() {
+        const val = parseInt(this.value);
+        const percentage = ((val - msgWidthMin) / (msgWidthMax - msgWidthMin)) * 100;
+        messageWidthDisplay.textContent = `${val}%`;
+        messageWidthFill.style.width = `${percentage}%`;
+        messageWidthHandle.style.left = `${percentage}%`;
+        document.documentElement.style.setProperty('--message-max-width', `${val}%`);
+        localStorage.setItem('messageMaxWidth', val);
+    });
+
+    typographyControls.appendChild(messageWidthRow);
+
     // Reasoning Blocks Toggle (moved to Typography section)
     const reasoningExpandedByDefault = localStorage.getItem('reasoningExpandedByDefault') === 'true';
 

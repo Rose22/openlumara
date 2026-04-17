@@ -6,12 +6,19 @@ function parseMessageContent(content) {
     // Normalize content to string for parsing logic
     const textContent = extractTextContent(content);
 
-    const systemMatch = textContent.match(/^\[System (\w+)\]:\s*/i);
+    // REMOVED the '^' anchor to make it more robust against leading whitespace
+    const systemMatch = textContent.match(/\[System (\w+)\]:\s*/i);
+
     if (systemMatch) {
         const type = systemMatch[1].toLowerCase();
+
+        // We find the start index of the match to correctly slice the content
+        // instead of assuming it starts at index 0
+        const contentStart = systemMatch.index + systemMatch[0].length;
+
         return {
             type: `announce_${type}`,
-            displayContent: textContent.substring(systemMatch[0].length),
+            displayContent: textContent.substring(contentStart).trim(),
             isAnnouncement: true
         };
     }
@@ -233,8 +240,6 @@ function createMessageElement(msg, index, animate = false) {
     if (!parsed.isAnnouncement && !parsed.isCommandOutput && !wrapperClass.includes('command')) {
         highlightCode(msgDiv);
     }
-
-    // ... (Rest of createMessageElement remains the same, ensuring rawText is used for copy actions)
 
     const isToolMessage = toolCalls && toolCalls.length > 0;
 
