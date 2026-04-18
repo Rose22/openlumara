@@ -47,6 +47,15 @@ class Lists(core.module.Module):
 
         return output
 
+    def _verify_target(self, category, list_name):
+        if category not in self.data.keys():
+            return False
+
+        if list_name not in self.data[category].keys():
+            return False
+
+        return True
+
     async def create(self, category: str, name: str, items: list = None, pinned: bool = False):
         if category not in self.data.keys():
             self.data[category] = {}
@@ -72,36 +81,30 @@ class Lists(core.module.Module):
 #
 #         return self.result("list deleted!")
 
-    async def delete(self, list_name: str):
-        for category_name, category in self.data.items():
-            if list_name in category.keys():
-                target_category = category_name
+    async def delete(self, category: str, list_name: str):
+        """Deletes a list. ONLY use this if user explicitely asks for it!"""
 
-        if not target_category:
+        if not self._verify_target(category, list_name):
             return self.result("that list doesn't exist")
 
-        del(self.data[target_category][list_name])
+        del(self.data[category][list_name])
         self.data.save()
 
         return self.result("list deleted!")
 
-    async def pin(self, list_name: str):
-        """Deletes a list. ONLY use this if user explicitely asks for it!"""
+    async def pin(self, category: str, list_name: str):
+        if not self._verify_target(category, list_name):
+            return self.result("that list doesn't exist")
 
-        target_list = self._find_list(list_name)
-        if target_list == None:
-            return self.result("that list doesn't exist", False)
-
-        target_list["pinned"] = True
+        self.data[category][list_name]["pinned"] = True
         self.data.save()
 
         return self.result("list pinned!")
-    async def unpin(self, list_name: str):
-        target_list = self._find_list(list_name)
-        if target_list == None:
-            return self.result("that list doesn't exist", False)
+    async def unpin(self, category: str, list_name: str):
+        if not self._verify_target(category, list_name):
+            return self.result("that list doesn't exist")
 
-        target_list["pinned"] = False
+        self.data[category][list_name]["pinned"] = False
         self.data.save()
 
         return self.result("list unpinned!")
@@ -124,15 +127,6 @@ class Lists(core.module.Module):
     #                 output += f"{index+1}. {list_item}\n"
     #
     #     return self.result(output)
-
-    def _verify_target(self, category, list_name):
-        if category not in self.data.keys():
-            return False
-
-        if list_name not in self.data[category].keys():
-            return False
-
-        return True
 
     async def get(self, category: str, list_name: str):
         """retrieves the contents of a list"""
