@@ -35,7 +35,6 @@
 }
 
 .message {
-    max-width: var(--message-max-width, 60%);
     padding: 12px 16px;
     border-radius: var(--radius-lg);
     border: var(--message-decoration);
@@ -60,6 +59,7 @@
     background: var(--bg-message-user);
     border: 1px solid var(--border-user);
     border-bottom-right-radius: var(--radius-sm);
+    max-width: var(--message-max-width, 60%);
 }
 
 /* AI messages */
@@ -67,6 +67,7 @@
     background: var(--bg-message-ai);
     border: 1px solid var(--border-message);
     border-bottom-left-radius: var(--radius-sm);
+    max-width: var(--message-max-width, 60%);
 }
 
 /* Reasoning block styles */
@@ -305,7 +306,7 @@
     border: none;
     padding: 0;
     margin: 0;
-    width: var(--message-max-width, 60%);
+    width: 90%;
 }
 
 .message-wrapper.tool_call {

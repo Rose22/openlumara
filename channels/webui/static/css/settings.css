@@ -8,6 +8,7 @@
     width: 95vw;
     height: 85vh;
     padding: 0;
+    max-width: 1200px;
 }
 
 .settings-modal .modal-header {
@@ -442,6 +443,42 @@
     transform: translateX(16px);
 }
 
+/* The main container stays as a vertical stack (normal layout) */
+.settings-items {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+/* New container specifically for groups to be in columns */
+.settings-groups-grid {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(1, 1fr); /* 1 column minimum (mobile) */
+}
+
+/* Responsive columns for the groups grid (up to 6 on desktop) */
+@media (min-width: 600px) {
+    .settings-groups-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (min-width: 900px) {
+    .settings-groups-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+/*
+@media (min-width: 1200px) {
+    .settings-groups-grid { grid-template-columns: repeat(4, 1fr); }
+}
+*/
+
+/* Special class for items that should span the full width of their container */
+.full-width-item {
+    grid-column: 1 / -1;
+    width: 100%;
+}
+
+
 /* Select Dropdown */
 .setting-select {
     max-width: 300px;
@@ -762,7 +799,6 @@
 
 /* Settings Groups */
 .settings-group {
-    margin-top: 16px;
     border: 1px solid var(--border-color);
     border-radius: 8px;
     overflow: hidden;
@@ -772,13 +808,7 @@
     display: flex;
     padding: 12px 16px;
     background: var(--bg-secondary);
-    cursor: pointer;
-    transition: background 0.15s;
     align-items: center;
-}
-
-.settings-group-header:hover {
-    background: var(--bg-tertiary);
 }
 
 .settings-group-title {
@@ -1507,11 +1537,14 @@
 
 .typography-settings-section,
 .audio-settings-section {
-    margin-top: 20px;
     padding: 20px;
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: 12px;
+}
+
+.audio-settings-section {
+    margin-top: 20px;
 }
 
 .settings-section-header {

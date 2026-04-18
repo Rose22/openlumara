@@ -478,7 +478,6 @@ function switchSettingsCategory(category) {
     });
 }
 
-// Render settings form
 function renderSettingsForm(categories) {
     const form = document.getElementById('settings-form');
     form.innerHTML = '';
@@ -514,18 +513,27 @@ function renderSettingsForm(categories) {
 
         // Render groups - put direct items first
         if (data.groups) {
-            // First render direct (ungrouped) items
+            // First render direct (ungrouped) items into the main vertical stack
             const directGroup = data.groups.get('_direct_');
             if (directGroup && directGroup.isDirect) {
                 directGroup.items.forEach(item => {
                     const itemEl = createSettingItem(item);
+
+                    // Apply full-width class to module/user module toggle lists
+                    if (item.isModuleList) {
+                        itemEl.classList.add('full-width-item');
+                    }
+
                     itemsContainer.appendChild(itemEl);
                 });
             }
 
-            // Then render grouped items
+            // Create the grid container for grouped items
+            const groupsGrid = document.createElement('div');
+            groupsGrid.className = 'settings-groups-grid';
+
+            // Then render grouped items into the grid
             data.groups.forEach((groupData, groupKey) => {
-                // Skip direct items - already rendered
                 if (groupKey === '_direct_') return;
 
                 const groupContainer = document.createElement('div');
@@ -535,10 +543,8 @@ function renderSettingsForm(categories) {
                 // Create header (clickable to collapse)
                 const header = document.createElement('div');
                 header.className = 'settings-group-header';
-                header.onclick = () => toggleSettingsGroup(header);
                 header.innerHTML = `
                 <span class="settings-group-title">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
                 ${groupData.title}
                 </span>
                 `;
@@ -546,7 +552,6 @@ function renderSettingsForm(categories) {
                 // Create content container
                 const content = document.createElement('div');
                 content.className = 'settings-group-content';
-                content.style.display = 'none';
 
                 // Render items within the group
                 groupData.items.forEach(item => {
@@ -556,8 +561,10 @@ function renderSettingsForm(categories) {
 
                 groupContainer.appendChild(header);
                 groupContainer.appendChild(content);
-                itemsContainer.appendChild(groupContainer);
+                groupsGrid.appendChild(groupContainer); // Append to the grid
             });
+
+            itemsContainer.appendChild(groupsGrid); // Append grid to the main container
         }
 
         section.appendChild(itemsContainer);

@@ -82,7 +82,7 @@ class StorageList(list):
             case "json":
                 self._write(json.dumps(self, indent=2))
             case "yaml":
-                self._write(yaml.dump(self, default_flow_style=False, sort_keys=False))
+                self._write(yaml.safe_dump(self, default_flow_style=False, sort_keys=False, allow_unicode=True))
             case "msgpack":
                 self._write(msgpack.packb(self))
             case "text":
@@ -108,7 +108,7 @@ class StorageList(list):
             case "json":
                 self.extend(json.loads(data))
             case "yaml":
-                self.extend(yaml.load(data))
+                self.extend(yaml.safe_load(data))
             case "msgpack":
                 self.extend(msgpack.unpackb(data))
             case "text":
@@ -225,7 +225,7 @@ class StorageDict(dict):
             case "json":
                 self._write(json.dumps(dict(self), indent=2))
             case "yaml":
-                self._write(yaml.dump(dict(self), default_flow_style=False, sort_keys=False))
+                self._write(yaml.safe_dump(dict(self), default_flow_style=False, sort_keys=False, allow_unicode=True))
             case "markdown":
                 # recursive file structure
                 # keys like "ideas/opticlaw/topic" become nested directories

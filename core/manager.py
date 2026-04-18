@@ -255,7 +255,11 @@ class Manager:
             module_sysprompt = await module.on_end_prompt()
 
             if module_sysprompt and (module_name not in core.config.get("modules").get("disabled_end_prompts", [])):
-                prompt_chunk = f"# {' '.join(module_name.split('_')).capitalize()}\n{str(module_sysprompt).strip()}"
+                sysprompt_header = ' '.join(module_name.split('_')).capitalize()
+                if hasattr(module, "_header") and module._header:
+                    # but allow overriding the header
+                    sysprompt_header = module._header
+                prompt_chunk = f"# {sysprompt_header}\n{str(module_sysprompt).strip()}"
                 histend_prompt.append(prompt_chunk)
 
         if histend_prompt:
