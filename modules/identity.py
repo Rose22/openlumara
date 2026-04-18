@@ -1,7 +1,7 @@
 import core
 
 class Identity(core.module.Module):
-    """Lets your AI edit it's own personality prompt"""
+    """Gives your AI a personality by inserting it as a prompt. The AI can edit its own personality!"""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
