@@ -172,7 +172,7 @@ class Lists(core.module.Module):
             return self.result("that list doesn't exist", False)
 
         target_index = index-1 # the system prompt shows list items as 1-indexed
-        if target_index > len(target_list):
+        if target_index < 0 or target_index >= len(target_list["items"]):
             return self.result("invalid list index", False)
 
         target_list["items"][target_index] = item_content
@@ -189,7 +189,7 @@ class Lists(core.module.Module):
             return self.result("that list doesn't exist", False)
 
         target_index = index-1 # the system prompt shows list items as 1-indexed
-        if target_index > len(target_list):
+        if target_index < 0 or target_index >= len(target_list["items"]):
             return self.result("invalid list index", False)
 
         target_list["items"].pop(target_index)
