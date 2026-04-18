@@ -9,7 +9,7 @@ class SandboxedShell(core.module.Module):
     """
 
     settings = {
-        "internet_access": True,
+        "internet_access": False,
         "persistent_data": True,
         "sandbox_path": "~/sandbox",
         "cpu_limit": "0.5",
