@@ -91,13 +91,13 @@ class StorageList(list):
 
     def load(self, data=None):
         """load content from file or data argument"""
-        if TEMPORARY:
-            return self
-
         self.clear()
 
         if data:
             self.extend(data)
+            return self
+
+        if TEMPORARY:
             return self
 
         data = self._read()
@@ -265,13 +265,13 @@ class StorageDict(dict):
 
     def load(self, data=None):
         """load content from file or data argument"""
-        if TEMPORARY:
-            return True
-
         self.clear()
 
         if data:
             self.update(data)
+            return True
+
+        if TEMPORARY:
             return True
 
         if self.type not in ["markdown"]:

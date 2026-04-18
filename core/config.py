@@ -193,8 +193,11 @@ def load(file_path=None):
     schema = get_schema()
     registry = _get_registry_data()
 
+    created_new_config = False
     if not config:
         target = copy.deepcopy(schema)
+        if not core.storage.TEMPORARY:
+            created_new_config = True
     else:
         target = sync_config(dict(config), schema)
 
@@ -208,17 +211,12 @@ def load(file_path=None):
         target[item['section_key']]['enabled'] = state['enabled']
         target[item['section_key']]['disabled'] = state['disabled']
 
-    if not config:
-        config.load(target)
-        config.save()
+    # load in the new edited config
+    config.load(target)
+    config.save()
+
+    if created_new_config:
         print(f"A new configuration file has been created at {config.path}.")
-    else:
-        user_config = dict(config)
-        if target != user_config:
-            config.clear()
-            config.update(target)
-            config.save()
-            core.log("core", "Your configuration was updated with new stuff!")
 
 def get(*args, **kwargs):
     """shorthand for accessing config values"""
