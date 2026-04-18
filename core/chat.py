@@ -31,7 +31,9 @@ class Chat:
         # chat autoresume
         if os.path.exists(self.current_save_path) and core.config.get("core", {}).get("auto_resume_chats"):
             try:
-                target_index = int(open(self.current_save_path, "r").read())
+                with open(self.current_save_path, "r") as f:
+                    target_index = int(f.read())
+
                 if target_index < len(self.data):
                     self.current = target_index
             except Exception as e:
