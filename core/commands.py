@@ -49,6 +49,99 @@ def get_commands_help(modules_dict):
 
     return "\n\n".join(output)
 
+def _convert_type(value: str):
+    """
+    Converts string inputs from the CLI/Chat into appropriate Python types.
+    """
+    if value.lower() == "true":
+        return True
+    if value.lower() == "false":
+        return False
+
+    # Try integer conversion
+    try:
+        # We use a check to see if it's a valid integer representation
+        if value.lstrip('-').isdigit():
+            return int(value)
+    except ValueError:
+        pass
+
+    # Try float conversion
+    try:
+        return float(value)
+    except ValueError:
+        pass
+
+    # Default to string
+    return value
+
+def _set_config_value(path: list, value: str):
+    """
+    Sets a configuration value at a nested path.
+
+    Args:
+        path: A list of keys representing the nested path (e.g., ["api", "url"]).
+        value: The value to set (as a string, will be type-converted).
+    """
+    if not path:
+        return "error: Path cannot be empty"
+
+    typed_value = _convert_type(value)
+
+    try:
+        # Access the StorageDict instance from the config module
+        target = core.config.config
+        if target is None:
+            return "error: Configuration is not loaded. Please restart or wait for system initialization."
+
+        # Traverse the dictionary following the path
+        current = target
+        for i, key in enumerate(path[:-1]):
+            # If the key doesn't exist or the current level isn't a dictionary,
+            # create a new dictionary to allow for deep nesting.
+            if key not in current or not isinstance(current[key], dict):
+                current[key] = {}
+            current = current[key]
+
+        # Set the final value
+        current[path[-1]] = typed_value
+
+        # Persist changes to the YAML file
+        core.config.config.save()
+
+        return f"Config updated: {' -> '.join(path)} = {typed_value}"
+    except Exception as e:
+        return f"Failed to update config: {e}"
+
+def _get_config_value(path: list):
+    """
+    Gets a configuration value from a nested path.
+
+    Args:
+        path: A list of keys representing the nested path (e.g., ["api", "url"]).
+    """
+    try:
+        # Use the shorthand get from the config module which handles the StorageDict
+        root_item = core.config.get(path[0])
+        if root_item == None:
+            return f"{path[0]} is not a valid settings category"
+
+        sub_item = root_item
+        last_path_key = path[0]
+        for path_key in path[1:]:
+            sub_item = sub_item.get(path_key)
+            if sub_item == None:
+                return f"{path_key} is not a valid setting"
+            last_path_key = path_key
+
+        if isinstance(sub_item, dict):
+            sub_keys = ", ".join(sub_item.keys())
+            sub_item = f"Available settings in {last_path_key}: {sub_keys}"
+
+        return sub_item
+    except Exception as e:
+        return f"Error retrieving config: {e}"
+
 class Commands:
     # delete these after they are shown to the user once
     TEMPORARY = ("context", "prompt", "tools", "restart", "stop")
@@ -61,17 +154,20 @@ class Commands:
 
         help_text = """
 == built in commands ==
-/modules                list modules
-/module                 enable/disable a module by name
-/tools                  list tools available to the AI
-/status                 show status info
-/restart                restarts the server
-/stop                   stops the AI in it's tracks
-/connect                attempt to connect to the API
-/disconnect             disconnect from the API
-/reconnect              reconnect to the API
-/ping                   test command that echoes "Pong!"
-/help                   this help
+/modules                    list modules
+/module                     enable/disable a module by name
+/tools                      list tools available to the AI
+/status                     show status info
+/config                     Manage settings. Usage: /config set <path> <value> OR /config get <path>
+/config set <path> <value>  Example: /config set api url http://localhost:5001/v1
+/config get <path>          Example: /config get api url
+/restart                    restarts the server
+/stop                       stops the AI in it's tracks
+/connect                    attempt to connect to the API
+/disconnect                 disconnect from the API
+/reconnect                  reconnect to the API
+/ping                       test command that echoes "Pong!"
+/help                       this help
         """.strip()
 
         output.append(help_text)
@@ -124,7 +220,7 @@ class Commands:
         args_display = ""
         if args:
             args_display += " "
-            args_display += "".join(args)
+            args_display += " ".join(args)
         await self.channel.context.chat.add({"role": "user", "content": f"{cmd_prefix}{cmd[0]}{args_display}"}, temporary=use_temporary)
 
         result = await self._process_input(message)
@@ -240,6 +336,31 @@ class Commands:
                     tool_map_display.append(f"== {module_name} ==\n{tools_display}")
 
                 return "\n\n".join(tool_map_display)
+            case "config":
+                if not args:
+                    return "Usage: /config <set|get> <path> [value]"
+
+                subcommand = args[0].lower()
+
+                if subcommand == "set":
+                    # Expected: ['set', 'key1', 'key2', 'value']
+                    if len(args) < 3:
+                        return "Usage: /config set <key1> <key2> ... <value>"
+
+                    path = args[1:-1]
+                    value = args[-1]
+                    return str(_set_config_value(path, value))
+
+                elif subcommand == "get":
+                    # Expected: ['get', 'key1', 'key2']
+                    if len(args) < 2:
+                        return "Usage: /config get <key1> <key2> ..."
+
+                    path = args[1:]
+                    return str(_get_config_value(path))
+
+                else:
+                    return f"Unknown subcommand '{subcommand}'. Use 'set' or 'get'."
             case "restart":
                 await self.channel.manager.restart()
                 return "restarting.."

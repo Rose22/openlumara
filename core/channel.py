@@ -67,7 +67,11 @@ class Channel:
         # process any /commands
         cmd_response = None
         if message.get("role", "user") == "user":
-            cmd_response = await self.commands.process_input(message)
+            try:
+                cmd_response = await self.commands.process_input(message)
+            except Exception as e:
+                core.log_error("error while executing command", e)
+
             if cmd_response:
                 return {"role": "assistant", "content": cmd_response}
             else:
@@ -139,7 +143,10 @@ class Channel:
 
         cmd_response = None
         if message.get("role", "user") == "user":
-            cmd_response = await self.commands.process_input(message)
+            try:
+                cmd_response = await self.commands.process_input(message)
+            except Exception as e:
+                core.log_error("error while executing command", e)
 
         if cmd_response:
             # insert and return the command response without sending it to the AI
