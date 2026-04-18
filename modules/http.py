@@ -16,7 +16,7 @@ import requests
 
 class Http(core.module.Module):
     """
-    Lets the AI send/receive HTTP requests
+    Lets the AI send/receive raw HTTP requests
     """
 
     # Security constants

@@ -30,7 +30,7 @@ def sizeof_format(num, suffix="B"):
         num /= 1024.0
     return f"{num:.1f}Yi{suffix}"
 
-class FilesSandbox(core.module.Module):
+class SandboxedFiles(core.module.Module):
     """Read/write/manage files inside a special sandbox folder"""
 
     MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
