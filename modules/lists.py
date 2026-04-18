@@ -88,6 +88,10 @@ class Lists(core.module.Module):
             return self.result("that list doesn't exist")
 
         del(self.data[category][list_name])
+        # check if the category still contains any lists. if not, delete the category itself
+        if not self.data[category]:
+            del(self.data[category])
+
         self.data.save()
 
         return self.result("list deleted!")
