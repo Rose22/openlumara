@@ -8,5 +8,6 @@ aiofiles
 python-ulid
 requests
 flask
+beautifulsoup4
 discord.py
 python-telegram-bot
