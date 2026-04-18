@@ -256,7 +256,7 @@ function createMessageElement(msg, index, animate = false) {
 
     wrapper.appendChild(msgDiv);
 
-    if ((role === 'user' || role === 'assistant') && !isToolMessage && !parsed.isAnnouncement && !parsed.isCommandOutput) {
+    if ((role === 'user' || role === 'assistant') && !isToolMessage) {
         const actions = createActionButtons(role, index, rawText); // Copy text content
         wrapper.appendChild(actions);
     }

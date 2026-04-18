@@ -56,6 +56,17 @@ class Lists(core.module.Module):
 
         return True
 
+    def _create_if_non_existent(self, category, list_name):
+        if not self._verify_target(category, list_name):
+            if category not in self.data.keys():
+                self.data[category] = {}
+
+            self.data[category][list_name] = {"items": [], "pinned": False}
+            self.data.save()
+            return True
+
+        return False
+
     async def create(self, category: str, name: str, items: list = None, pinned: bool = False):
         if category not in self.data.keys():
             self.data[category] = {}
@@ -148,8 +159,7 @@ class Lists(core.module.Module):
         """
         Adds an item to a list. List items are 1-indexed.
         """
-        if not self._verify_target(category, list_name):
-            return self.result("that list doesn't exist")
+        self._create_if_non_existent(category, list_name)
 
         target_list = self.data[category][list_name]
         target_list["items"].append(item_content)

@@ -6,6 +6,13 @@ class Notes(core.module.Module):
         super().__init__(*args, **kwargs)
         self.data = core.storage.StorageDict("notes", "markdown")
 
+    async def on_system_prompt(self):
+        if not self.data.keys():
+            return None
+
+        categories = ", ".join(self.data.keys())
+        return f"current categories containing notes: {categories}"
+
     async def create(self, name: str, category: str, content: str):
         """create a new note and store it within the notebook"""
         if category not in self.data.keys():
@@ -48,6 +55,13 @@ class Notes(core.module.Module):
                 yield from self._recursive_items(value, current_key)
             else:
                 yield current_key, value
+
+    async def list(self, category: str):
+        """gets all notes in a specific category"""
+        if category not in self.data.keys():
+            return self.result("category doesn't exist", False)
+
+        return self.result(list(self.data.get(category, {}).keys()))
 
     async def search(self, query: str):
         """searches within the stored notes"""

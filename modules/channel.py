@@ -49,16 +49,24 @@ Features only available while channel is WebUI:
 - User can press the hamburger button (on the top left) or swipe from the left to open the sidebar
 
 ## On desktop
+Layout, from left to right: Category Sidebar | Chat List | Chat Window
+Top bar is on top of the chat window. Chat title bar is below the top bar. Input box is at the bottom.
+
 - User can press Ctrl+B to toggle the sidebar.
 - User can press ctrl+/ to see keyboard shortcuts
 - User can press Ctrl+Space to open a global search (searches within all past chats)
+- User can press the folder icon on the top bar to access the Storage Editor, which lets them manually view and edit all persistent information the AI stores
+- User can click on edges of the UI to show/hide panels
 
 ## On both mobile & desktop
+Layout: Chat Window without sidebars or lists. Sidebars/lists can be accessed by swiping.
+
 - User can press the gear icon at the top of the screen to open the settings.
 - User can press the icon with a down arrow to export chats
 - User can type text in the sidebar to search in conversations, use the icon next to the search box in the sidebar to toggle searching within conversation content instead of title.
 - User can click or tap the `filter by tag` header in the sidebar to select tags to filter by.
 - User can stop text generation by pressing the stop button, or typing /stop.
+- User can upload files using the upload button
                 """.strip()
             case "telegram":
                 chan_instr = f"""

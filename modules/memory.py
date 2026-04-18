@@ -33,6 +33,9 @@ class Memory(core.module.Module):
                 pinned_memories.append(mem_filtered)
 
         pinned_memories_str = "\n\n".join(pinned_memories)
+        if not pinned_memories_str:
+            pinned_memories_str = "There are currently no pinned memories."
+
         sysprompt = f"{pinned_memories_str}\n\nThis is your persistent memory system. When you need to remember something, ALWAYS store it in memory using the memory_create() tool."
 
         return sysprompt
