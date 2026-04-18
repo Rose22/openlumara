@@ -171,8 +171,8 @@ class Memory(core.module.Module):
         results = []
 
         for mem in self._mem:
-            content = mem.get("content", "").lower()
-            tags = [t.lower() for t in mem.get("tags", [])]
+            content = str(mem.get("content", "")).lower()
+            tags = [str(t).lower() for t in mem.get("tags", [])]
 
             match_found = False
             # Check if query is in any of the tags
