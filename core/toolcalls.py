@@ -205,8 +205,11 @@ class ToolcallManager:
                     pass
 
             if not final_content:
-                # replace content with reasoning if there was no content
-                final_content = f"Okay, I called the tool!\nReasoning: {final_reasoning}"
+                if final_reasoning:
+                    # replace content with reasoning if there was no content
+                    final_content = f"The AI made a tool call, but returned no message.\nReasoning: {''.join(final_reasoning)}"
+                else:
+                    final_content = "Made a tool call"
 
             # only add final message if we didn't make a recursive call
             # (the innermost call handles adding the final message)
