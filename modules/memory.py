@@ -70,7 +70,6 @@ class Memory(core.module.Module):
         CAUTION:
             - ONLY use if you can see the memory's ID
             - NEVER hallucinate or make up an ID
-            - If you cannot see the memory, search for it first using memory_search()
         
         Reject if:
             - You cannot see the memory you are about to edit
@@ -131,32 +130,32 @@ class Memory(core.module.Module):
         self._mem[index]["pinned"] = False
         return self.result(self._mem.save())
 
-    async def search(self, query: str, search_in_content: bool = False):
-        """
-        Searches your memories for a query.
-        Defaults to searching within tags. Enable search_content to also search within the content of memories.
-        """
-        results = []
-        query_lower = query.lower()
-
-        for index, mem in enumerate(self._mem):
-            # Check tags: split tags into words and check if any word is in the query
-            match_found = False
-            tags = mem.get("tags", [])
-
-            for tag in tags:
-                # Split tag into words and check if any word exists in the query
-                if any(word in query_lower for word in str(tag).lower().split()):
-                    match_found = True
-                    break
-
-            # Check content only if no tag match found
-            if not match_found and search_in_content:
-                content = str(mem.get("content", ""))
-                if content and query_lower in content.lower():
-                    match_found = True
-
-            if match_found:
-                results.append(mem)
-
-        return results
+    # async def search(self, query: str, search_in_content: bool = False):
+    #     """
+    #     Searches your memories for a query.
+    #     Defaults to searching within tags. Enable search_content to also search within the content of memories.
+    #     """
+    #     results = []
+    #     query_lower = query.lower()
+    #
+    #     for index, mem in enumerate(self._mem):
+    #         # Check tags: split tags into words and check if any word is in the query
+    #         match_found = False
+    #         tags = mem.get("tags", [])
+    #
+    #         for tag in tags:
+    #             # Split tag into words and check if any word exists in the query
+    #             if any(word in query_lower for word in str(tag).lower().split()):
+    #                 match_found = True
+    #                 break
+    #
+    #         # Check content only if no tag match found
+    #         if not match_found and search_in_content:
+    #             content = str(mem.get("content", ""))
+    #             if content and query_lower in content.lower():
+    #                 match_found = True
+    #
+    #         if match_found:
+    #             results.append(mem)
+    #
+    #     return results

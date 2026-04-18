@@ -53,6 +53,8 @@ DEFAULT_MODULES = (
     "chats",
     "context",
     "memory",
+    "notes",
+    "lists",
     "system",
     "scheduler",
     "tokens",
