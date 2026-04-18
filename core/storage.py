@@ -274,9 +274,10 @@ class StorageDict(dict):
             self.update(data)
             return True
 
-        data = self._read()
-        if self.type not in ["markdown"] and not data:
-            return None
+        if self.type not in ["markdown"]:
+            data = self._read()
+            if not data:
+                return None
 
         match self.type:
             case "json":
