@@ -830,8 +830,6 @@
     display: grid;
     gap: 8px;
     padding: 12px;
-    max-height: 300px;
-    overflow-y: auto;
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
 }
 
