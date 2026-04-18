@@ -1,4 +1,5 @@
 import core
+import random
 
 class Lists(core.module.Module):
     """
@@ -124,53 +125,48 @@ class Lists(core.module.Module):
     #
     #     return self.result(output)
 
-    async def get(self, list_name: str):
+    def _verify_target(self, category, list_name):
+        if category not in self.data.keys():
+            return False
+
+        if list_name not in self.data[category].keys():
+            return False
+
+        return True
+
+    async def get(self, category: str, list_name: str):
         """retrieves the contents of a list"""
 
-        target_list = self._find_list(list_name)
-        if target_list == None:
-            return self.result("that list doesn't exist", False)
+        if not self._verify_target(category, list_name):
+            return self.result("that list doesn't exist")
 
         output = ""
-        for index, list_item in enumerate(target_list.get("items")):
+        for index, list_item in enumerate(self.data[category][list_name].get("items")):
                     output += f"{index+1}. {list_item}\n"
 
         return self.result(output)
 
-    def _find_list(self, list_name: str):
-        # find the list by it's name
-        target_category = None
-
-        for category_name, category in self.data.items():
-            if list_name in category.keys():
-                target_category = category_name
-
-        if not target_category:
-            return None
-
-        return self.data[target_category][list_name]
-
-    async def add_item(self, list_name: str, item_content: str):
+    async def add_item(self, category: str, list_name: str, item_content: str):
         """
         Adds an item to a list. List items are 1-indexed.
         """
-        target_list = self._find_list(list_name)
-        if target_list == None:
-            return self.result("that list doesn't exist", False)
+        if not self._verify_target(category, list_name):
+            return self.result("that list doesn't exist")
 
+        target_list = self.data[category][list_name]
         target_list["items"].append(item_content)
         self.data.save()
 
         return self.result("list item added!")
 
-    async def edit_item(self, list_name: str, index: int, item_content: str):
+    async def edit_item(self, category: str, list_name: str, index: int, item_content: str):
         """
         Edits an item in a list. List items are 1-indexed.
         """
-        target_list = self._find_list(list_name)
-        if target_list == None:
-            return self.result("that list doesn't exist", False)
+        if not self._verify_target(category, list_name):
+            return self.result("that list doesn't exist")
 
+        target_list = self.data[category][list_name]
         target_index = index-1 # the system prompt shows list items as 1-indexed
         if target_index < 0 or target_index >= len(target_list["items"]):
             return self.result("invalid list index", False)
@@ -180,14 +176,14 @@ class Lists(core.module.Module):
 
         return self.result("list item edited!")
 
-    async def delete_item(self, list_name: str, index: int):
+    async def delete_item(self, category: str, list_name: str, index: int):
         """
         Deletes an item in a list. List items are 1-indexed.
         """
-        target_list = self._find_list(list_name)
-        if target_list == None:
-            return self.result("that list doesn't exist", False)
+        if not self._verify_target(category, list_name):
+            return self.result("that list doesn't exist")
 
+        target_list = self.data[category][list_name]
         target_index = index-1 # the system prompt shows list items as 1-indexed
         if target_index < 0 or target_index >= len(target_list["items"]):
             return self.result("invalid list index", False)
@@ -196,3 +192,9 @@ class Lists(core.module.Module):
         self.data.save()
 
         return self.result("list item deleted!")
+
+    async def get_random_item(self, category: str, list_name: str):
+        if not self._verify_target(category, list_name):
+            return self.result("that list doesn't exist")
+
+        return self.result(random.choice(self.data[category][list_name]["items"]))
