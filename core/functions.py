@@ -24,30 +24,35 @@ async def restart(channel = None):
 
 def get_path(path: str = ""):
     """get path relative to the project root directory. returns root path if no path is specified."""
-    return os.path.abspath(os.path.join(
-        os.path.dirname(__file__),
-        os.pardir,
-        path
-    ))
+    if not path:
+        return os.path.join(
+            os.path.dirname(__file__),
+            os.pardir
+        )
+
+    if path.startswith(os.path.sep):
+        # is an absolute path
+        return path
+    else:
+        # is a relative path
+        return os.path.abspath(os.path.join(
+            os.path.dirname(__file__),
+            os.pardir,
+            path
+        ))
 
 def get_data_path():
     """get path to the data directory. contains all persistent data used by the framework"""
 
-    data_path = core.config.get("core", {}).get("data_folder", "data")
-
-    final_path = None
-    if data_path.startswith(os.path.sep):
-        # is an absolute path
-        final_path = data_path
-    else:
-        # is a relative path
-        final_path = get_path(data_path)
+    data_path = core.get_path(
+        core.config.get("core", {}).get("data_folder", "data")
+    )
 
     # create it if it doesn't exist
-    if not os.path.exists(final_path):
-        os.makedirs(final_path, exist_ok=True)
+    if not os.path.exists(data_path):
+        os.makedirs(data_path, exist_ok=True)
 
-    return final_path
+    return data_path
 
 def remove_duplicates(lst: list):
     # removes duplicates from a list

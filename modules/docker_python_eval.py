@@ -2,7 +2,7 @@ import core
 import subprocess
 import shutil
 
-class SafeEval(core.module.Module):
+class DockerPythonEval(core.module.Module):
     """Runs python code in a docker container"""
     async def run(self, code: str):
         program = "podman" if shutil.which("podman") else "docker"

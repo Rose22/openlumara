@@ -4,7 +4,7 @@ import sys
 import subprocess
 import tempfile
 
-class ShellUnsafe(core.module.Module):
+class UnsafeShell(core.module.Module):
     """Lets your AI run shell commands. EXTREMELY DANGEROUS! Enable at your own risk"""
 
     async def exec(self, cmd: str):
