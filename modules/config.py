@@ -8,35 +8,9 @@ class Config(core.module.Module):
 
     async def on_system_prompt(self):
         try:
-            return json.dumps(core.config.config, indent=2)
+            return json.dumps(core.config.config)
         except:
             return None
-
-    def _convert_type(self, value: str):
-        """
-        Converts string inputs from the CLI/Chat into appropriate Python types.
-        """
-        if value.lower() == "true":
-            return True
-        if value.lower() == "false":
-            return False
-
-        # Try integer conversion
-        try:
-            # We use a check to see if it's a valid integer representation
-            if value.lstrip('-').isdigit():
-                return int(value)
-        except ValueError:
-            pass
-
-        # Try float conversion
-        try:
-            return float(value)
-        except ValueError:
-            pass
-
-        # Default to string
-        return value
 
     async def set(self, path: list, value: str):
         """
@@ -49,7 +23,7 @@ class Config(core.module.Module):
         if not path:
             return self.result("Path cannot be empty", False)
 
-        typed_value = self._convert_type(value)
+        typed_value = core.commands._convert_type(value)
 
         try:
             # Access the StorageDict instance from the config module
