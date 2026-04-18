@@ -136,7 +136,7 @@ class ToolcallManager:
                         "content": json.dumps(str(func_response))
                     }
                 except Exception as e:
-                    core.log("toolcall", f"error: {str(e)}")
+                    core.log_error("error", e)
 
                     # build an openai-compliant tool error object
                     tool_response = {
