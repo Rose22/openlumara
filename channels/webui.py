@@ -181,7 +181,7 @@ class Webui(core.channel.Channel):
         except:
             pass  # Server shutdown
 
-    def shutdown(self):
+    def on_shutdown(self):
         """Shutdown the Flask server."""
         self._shutdown_requested = True
         if self.server:
