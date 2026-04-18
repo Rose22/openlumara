@@ -1,6 +1,7 @@
 import core
 import ulid
 import datetime
+import os
 
 class Chat:
     DEFAULT_DATA = {
@@ -15,6 +16,7 @@ class Chat:
         self.data = core.storage.StorageList(f"{channel.name}_chats", "json")
         self.channel = channel
         self.current = None
+        self.current_save_path = os.path.join(core.get_data_path(), f"{self.channel.name}_current_chat")
 
         for index, chat in enumerate(self.data):
             # find any blank chats and delete them
@@ -25,6 +27,21 @@ class Chat:
             for key, default_value in self.DEFAULT_DATA.items():
                 if key not in chat.keys():
                     self.data[index][key] = default_value
+
+        # chat autoresume
+        if os.path.exists(self.current_save_path) and core.config.get("core", {}).get("auto_resume_chats"):
+            try:
+                target_index = int(open(self.current_save_path, "r").read())
+                if target_index < len(self.data):
+                    self.current = target_index
+            except Exception as e:
+                core.log_error("couldn't autoresume chat", e)
+
+    def _set_current(self, index: int):
+        self.current = index
+        # store current index into a simple file
+        with open(self.current_save_path, "w") as f:
+            f.write(str(index))
 
     def _find_index(self, id: str):
         """find index of the chat with that ID"""
@@ -49,7 +66,7 @@ class Chat:
             "updated": now
         })
         index = len(self.data) - 1
-        self.current = index
+        self._set_current(index)
 
         self.data.save()
         return True
@@ -75,7 +92,7 @@ class Chat:
         # Adjust current index if needed
         if self.current == index:
             # Deleted the current chat - reset or move to previous
-            self.current = min(index, len(self.data) - 1) if self.data else None
+            self._set_current(min(index, len(self.data) - 1) if self.data else None)
         elif self.current > index:
             # Current was after deleted item, shift down
             self.current -= 1
@@ -93,7 +110,7 @@ class Chat:
         if index is None:
             return False
 
-        self.current = index
+        self._set_current(index)
 
         return True
 

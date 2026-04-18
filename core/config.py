@@ -11,7 +11,8 @@ _registry_cache = None
 
 default_config = {
     "core": {
-        "data_folder": "data"
+        "data_folder": "data",
+        "auto_resume_chats": True
     },
     "api": {
         "url": "http://localhost:5001/v1",
