@@ -15,7 +15,7 @@ class Identity(core.module.Module):
         identity = "\n".join(self.identity) if len(self.identity) > 0 else None
         sysprompt = None
         if identity:
-            sysprompt = f"{identity}\n\nYou can use the identity_set() tool to modify this identity if needed."
+            sysprompt = f"{identity}\nYou can use the identity_set() tool to modify this identity if needed."
         return sysprompt
 
     async def set(self, content: str):

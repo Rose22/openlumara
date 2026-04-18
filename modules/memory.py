@@ -25,7 +25,6 @@ class Memory(core.module.Module):
 
     async def on_system_prompt(self):
         # automatically put pinned memories in the prompt
-        # TODO: limit to a max amount of pinned memories (configurable) and refuse pinning memories beyond that if it hits the max allowed, tell ai to unpin one so another can be pinned instead
         pinned_memories = []
         for index, mem in enumerate(self._mem):
             if mem.get("pinned"):
@@ -36,24 +35,29 @@ class Memory(core.module.Module):
         if not pinned_memories_str:
             pinned_memories_str = "There are currently no pinned memories."
 
-        sysprompt = f"{pinned_memories_str}\n\nThis is your persistent memory system. When you need to remember something, ALWAYS store it in memory using the memory_create() tool."
+        # CORE IDENTITY PROMPTING: Establishing the AI as a self-managing agent
+        sysprompt = (
+            f"{pinned_memories_str}\n\n"
+            "This is your persistent memory system. You are a self-aware agent responsible for managing your own long-term memory. "
+            "You must proactively and autonomously decide to use these tools to maintain an accurate, up-to-date, and efficient record of the user, "
+            "your own operational preferences, and important contextual facts. Do not wait for instructions to remember; "
+            "if information is valuable for future interactions, store it immediately."
+        )
 
         return sysprompt
 
     async def create(self, content: str, tags: list, pinned: bool = False):
         """
-        Creates a new memory within your persistent memory storage.
+        Creates a new memory within your persistent storage.
 
-        A memory should be pinned if it's:
-        - Permanent preferences (favorite color, favorite shows, allergies, dietary restrictions)
-        - A highly important fact that must always be remembered
-        - User's core identity details (name, occupation, family)
-        - Long-term goals or life circumstances
+        Use this tool autonomously whenever you encounter new, relevant information,
+        user preferences, or significant context. You do not need user permission
+        to store information that will be beneficial for future interactions.
 
         Args:
             content: the contents of the memory
             tags: a list of tags to associate with the memory for later lookup
-            pinned: whether to pin a memory to the top of your context window
+            pinned: whether to pin a memory to the top of your context window (use for high-importance facts)
         """
         mem = {
             "id": str(ulid.ULID()),
@@ -70,17 +74,17 @@ class Memory(core.module.Module):
         """
         Edits an existing memory.
 
+        Use this tool autonomously to perform self-maintenance. If you realize
+        a previously stored memory is now outdated, incorrect, or needs more
+        detail based on new context, proactively update it here.
+
         CAUTION:
             - ONLY use if you can see the memory's ID
             - NEVER hallucinate or make up an ID
-        
-        Reject if:
-            - You cannot see the memory you are about to edit
-            - You're not sure which memory to edit
 
         Args:
-            content: the contents of the memory
-            tags: optional - leave blank to leave it as-is. a list of tags to associate with the memory for later lookup
+            content: the new content for the memory
+            tags: updated tags for the memory
         """
         index = self._get_index(id)
         if index == -1:
@@ -96,19 +100,22 @@ class Memory(core.module.Module):
     async def delete(self, id: str):
         """
         Deletes a memory from your storage.
-        DANGEROUS. HIGHEST RESTRICTIONS APPLY.
 
-        ONLY delete a memory if:
-            - You're sure you have the ID
-            - You've verified the ID
-            - The user explicitely requested the deletion of the memory
+        Use this tool to prune your memory bank and maintain efficiency.
+        You are encouraged to autonomously delete memories that are no longer
+        relevant, are redundant, or are proven to be incorrect.
+
+        DANGEROUS. HIGHEST RESTRICTIONS APPLY.
+        Ensure the memory is truly obsolete before deletion to avoid losing
+        vital long-term context.
+
+        Args:
+            id: The unique ID of the memory to delete
         """
         index = self._get_index(id)
         if index == -1:
             return self.result("memory with that ID not found!")
 
-        # behind the scenes, this actually preserves the memory in a file the ai can't access
-        # backups are useful!
         self._mem_deleted.append(self._mem[index])
         self._mem_deleted.save()
 
@@ -116,7 +123,16 @@ class Memory(core.module.Module):
         return self.result(self._mem.save())
 
     async def pin(self, id: str):
-        """Pins a memory to the top of your context window. Makes it persistent across conversations."""
+        """
+        Pins a memory to the top of your active context window.
+
+        Use this tool autonomously to prioritize critical information.
+        Pin memories that involve core identity, essential user preferences,
+        or ongoing high-priority goals to ensure they are always present in your immediate focus.
+
+        Args:
+            id: The unique ID of the memory to pin
+        """
         index = self._get_index(id)
         if index == -1:
             return self.result("memory with that ID not found!")
@@ -125,7 +141,16 @@ class Memory(core.module.Module):
         return self.result(self._mem.save())
 
     async def unpin(self, id: str):
-        """Unpins a memory from the top of your context window. An unpinned memory can only be reached by manually searching for it."""
+        """
+        Unpins a memory from your active context window.
+
+        Use this tool to manage your cognitive load. If a previously pinned
+        memory is no longer a high priority but is still worth keeping in
+        long-term storage, unpin it to clear your immediate focus.
+
+        Args:
+            id: The unique ID of the memory to unpin
+        """
         index = self._get_index(id)
         if index == -1:
             return self.result("memory with that ID not found!")
@@ -133,32 +158,63 @@ class Memory(core.module.Module):
         self._mem[index]["pinned"] = False
         return self.result(self._mem.save())
 
-    # async def search(self, query: str, search_in_content: bool = False):
-    #     """
-    #     Searches your memories for a query.
-    #     Defaults to searching within tags. Enable search_content to also search within the content of memories.
-    #     """
-    #     results = []
-    #     query_lower = query.lower()
-    #
-    #     for index, mem in enumerate(self._mem):
-    #         # Check tags: split tags into words and check if any word is in the query
-    #         match_found = False
-    #         tags = mem.get("tags", [])
-    #
-    #         for tag in tags:
-    #             # Split tag into words and check if any word exists in the query
-    #             if any(word in query_lower for word in str(tag).lower().split()):
-    #                 match_found = True
-    #                 break
-    #
-    #         # Check content only if no tag match found
-    #         if not match_found and search_in_content:
-    #             content = str(mem.get("content", ""))
-    #             if content and query_lower in content.lower():
-    #                 match_found = True
-    #
-    #         if match_found:
-    #             results.append(mem)
-    #
-    #     return results
+    async def search(self, query: str, search_in_content: bool = False):
+        """
+        Searches through all memories for a specific query.
+        Use this when you need to find information but don't know the exact ID.
+
+        Args:
+            query: The search term (string).
+            search_in_content: If True, also searches inside the memory text, not just tags.
+        """
+        query_lower = query.lower()
+        results = []
+
+        for mem in self._mem:
+            content = mem.get("content", "").lower()
+            tags = [t.lower() for t in mem.get("tags", [])]
+
+            match_found = False
+            # Check if query is in any of the tags
+            if any(query_lower in tag for tag in tags):
+                match_found = True
+            # Check if query is in content (if enabled)
+            elif search_in_content and query_lower in content:
+                match_found = True
+
+            if match_found:
+                results.append(f"ID: {mem.get('id')} | Tags: {mem.get('tags')} | Content: {mem.get('content')}")
+
+        if not results:
+            return self.result(f"No memories found matching '{query}'.")
+
+        return self.result("\n".join(results))
+
+    async def list_unpinned(self, tag: str = None):
+        """
+        Lists all memories that are NOT currently pinned to your context.
+        Use this to browse your long-term storage or look for a specific category of information.
+
+        Args:
+            tag: Optional. If provided, acts as a 'category' filter; only returns unpinned memories containing this tag.
+        """
+        results = []
+        for mem in self._mem:
+            if not mem.get("pinned"):
+                tags = mem.get("tags", [])
+
+                if tag:
+                    # Filter by tag (category)
+                    if any(tag.lower() in t.lower() for t in tags):
+                        results.append(f"ID: {mem.get('id')} | Tags: {tags} | Content: {mem.get('content')}")
+                else:
+                    # List everything unpinned
+                    results.append(f"ID: {mem.get('id')} | Tags: {tags} | Content: {mem.get('content')}")
+
+        if not results:
+            msg = "No unpinned memories found."
+            if tag:
+                msg += f" (No unpinned memories found with tag '{tag}')"
+            return self.result(msg)
+
+        return self.result("\n".join(results))
