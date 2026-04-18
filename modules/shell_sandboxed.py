@@ -114,7 +114,9 @@ class SandboxedShell(core.module.Module):
         except Exception as e:
             return self.result(f"Module Error: {str(e)}", False)
 
-    @core.module.command("shell", temporary=False)
+    @core.module.command("shell", temporary=False, help={
+        "<cmd>": "runs a command in the sandboxed shell"
+    })
     async def cmd_shell(self, args):
         if not args:
             return "Usage: shell [command]"
@@ -133,7 +135,7 @@ class SandboxedShell(core.module.Module):
             if stdout:
                 output += stdout
             if stderr:
-                output += ("\n" + stderr if output else "")
+                output += "\n" + stderr
 
             return output if output else "BLANK"
         except Exception as e:
@@ -141,6 +143,8 @@ class SandboxedShell(core.module.Module):
 
     @core.module.command("shell_setup", temporary=False)
     async def cmd_setup(self, args):
+        """shows details about your sandbox setup"""
+
         conf = (
             f"Runtime: {self.runtime}\n"
             f"Container Name: {self.container_name}\n"
