@@ -16,8 +16,7 @@ class SandboxedShell(core.module.Module):
         "memory_limit": "256m",
         "max_processes": 50,
         "execution_timeout": 30,
-        "image": "python:3.11",
-        "container_name": "openlumara_shell"
+        "image": "python:3.11-slim"
     }
 
     def __init__(self, *args, **kwargs):
@@ -68,13 +67,13 @@ class SandboxedShell(core.module.Module):
             if self.config.get("persistent_data", True):
                 start_cmd.extend(['-v', f"{self.host_workspace}:/data:Z"])
             else:
-                start_cmd.extend(['--tmpfs', '/data'])
+                start_cmd.extend(['--rm', '--tmpfs', '/data'])
 
             # set working dir to /data
             start_cmd.extend(['-w', '/data'])
 
             start_cmd.extend([
-                self.config.get("image", "python:3.11"),
+                self.config.get("image", "python:3.11-slim"),
                 'tail', '-f', '/dev/null'  # Keep it alive
             ])
 

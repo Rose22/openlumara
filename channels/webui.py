@@ -1345,7 +1345,8 @@ def add_storage_key():
 # =============================================================================
 @app.route("/server/restart", methods=["POST"])
 def restart_server():
-    _run_async(core.restart())
+    global channel_instance
+    _run_async(channel_instance.manager.restart())
     return jsonify({"success": True})
 
 # =============================================================================
