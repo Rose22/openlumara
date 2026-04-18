@@ -164,7 +164,6 @@ class Webui(core.channel.Channel):
             while not self._shutdown_requested:
                 await asyncio.sleep(1)
         except asyncio.CancelledError:
-            core.log("webui", "shutting down")
             raise
 
     def _run_flask(self):

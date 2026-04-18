@@ -144,7 +144,7 @@ def _get_config_value(path: list):
 
 class Commands:
     # delete these after they are shown to the user once
-    TEMPORARY = ("context", "prompt", "tools", "restart", "stop")
+    TEMPORARY = ("context", "prompt", "tools", "stop")
 
     def __init__(self, channel):
         self.channel = channel
@@ -195,9 +195,9 @@ class Commands:
         return False
 
     async def _extract_cmd(self, message_text):
-        message_content = message_text.strip().lower()
+        message_content = message_text.strip()
         cmd_prefix = core.config.get("cmd_prefix", "/")
-        cmd_prefix_index = message_content.find(cmd_prefix)+len(cmd_prefix)
+        cmd_prefix_index = message_content.lower().find(cmd_prefix.lower())+len(cmd_prefix)
 
         cmd = message_content[cmd_prefix_index:].split()
         args = cmd[1:]

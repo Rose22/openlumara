@@ -901,7 +901,7 @@ class Matrix(core.channel.Channel):
 
     # ── shutdown / cleanup ────────────────────────────────────────────────
 
-    async def shutdown(self):
+    async def on_shutdown(self):
         core.log("matrix", "Shutting down…")
         self.running = False
         self._shutting_down = True

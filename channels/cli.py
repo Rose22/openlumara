@@ -103,8 +103,6 @@ class Cli(core.channel.Channel):
         self._print_formatted(f"[cli] {message}\n", style_class)
         core.log("cli", message)
 
-    def shutdown(self):
-        self._print_formatted("Shutting down CLI...\n", "status")
-        core.log("cli", "shutting down")
+    def on_shutdown(self):
         self.running = False
         return True

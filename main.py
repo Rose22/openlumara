@@ -142,7 +142,6 @@ while True:
     if result == "restart":
         do_restart()
     else:
-        print("Shutting down..")
         exit()
 
 

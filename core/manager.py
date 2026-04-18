@@ -125,27 +125,47 @@ class Manager:
             print()
             print(f"Please open the WebUI at http://{host}:{port}")
 
-        await asyncio.gather(*self._async_tasks, return_exceptions=True)
+        try:
+            await asyncio.gather(*self._async_tasks, return_exceptions=True)
+        except KeyboardInterrupt:
+            pass
+        finally:
+            if self._restart_requested:
+                return "restart"
 
-        if self._restart_requested:
-            return "restart"
+            # gracefully shut down
+            await self.shutdown()
+
         return None
 
     async def restart(self):
-        if self.channel:
-            await self.channel.announce("restarting server..")
-        core.log("core", "restarting server..")
-
+        core.log("core", "Restarting server..")
         self._restart_requested = True
+        await self.shutdown()
+
+    async def shutdown(self):
+        core.log("core", "Shutting down..")
+
+        # shutdown modules
+        for module_name, module in self.modules.items():
+            if hasattr(module, "on_shutdown"):
+                try:
+                    if asyncio.iscoroutinefunction(module.on_shutdown):
+                        await module.on_shutdown()
+                    else:
+                        module.on_shutdown()
+                except Exception as e:
+                    core.log("warning", f"Error shutting down {module_name}: {e}")
 
         # shutdown channels
         for channel_name, channel in self.channels.items():
-            if hasattr(channel, "shutdown"):
+            if hasattr(channel, "on_shutdown"):
+                core.log("core", f"Shutting down channel {channel_name}")
                 try:
-                    if asyncio.iscoroutinefunction(channel.shutdown):
-                        await channel.shutdown()
+                    if asyncio.iscoroutinefunction(channel.on_shutdown):
+                        await channel.on_shutdown()
                     else:
-                        channel.shutdown()
+                        channel.on_shutdown()
                 except Exception as e:
                     core.log("warning", f"Error shutting down {channel_name}: {e}")
 
@@ -153,9 +173,11 @@ class Manager:
         for task in list(self._async_tasks):
             task.cancel()
 
+        core.log("core", "Shutdown complete")
+
     async def _initialize_api_connection(self):
         """Initialize API connection with user-friendly error handling."""
-        core.log("API", "connecting to AI..")
+        core.log("API", "Connecting to AI..")
 
         connected = await self.API.connect()
         if not connected:
