@@ -33,6 +33,8 @@ async def main(args):
 
 def do_restart():
     """cross-platform restart with TTY/console inheritance"""
+    print("----------------")
+
     script = os.path.abspath(sys.argv[0])
     args = [sys.executable, script] + sys.argv[1:]
 
