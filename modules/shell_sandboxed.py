@@ -61,7 +61,7 @@ class SandboxedShell(core.module.Module):
                 '--cpus', self.config.get("cpu_limit", "0.5"),
                 '--memory', self.config.get("memory_limit", "256m"),
                 '--pids-limit', str(self.config.get("max_processes", 50)),
-                '--network', 'bridge' if self.config.get("internet_access", True) else 'none'
+                '--network', 'bridge' if self.config.get("internet_access", False) else 'none'
             ]
 
             if self.config.get("persistent_data", True):
