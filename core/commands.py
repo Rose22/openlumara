@@ -158,7 +158,6 @@ class Commands:
 /module                     enable/disable a module by name
 /tools                      list tools available to the AI
 /status                     show status info
-/config                     Manage settings. Usage: /config set <path> <value> OR /config get <path>
 /config set <path> <value>  Example: /config set api url http://localhost:5001/v1
 /config get <path>          Example: /config get api url
 /restart                    restarts the server

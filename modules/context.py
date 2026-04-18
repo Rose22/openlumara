@@ -94,14 +94,10 @@ class Context(core.module.Module):
         for module_name, module in self.channel.manager.modules.items():
             has_sysprompt = True if await module.on_system_prompt() else False
 
-            if has_sysprompt and (module_name not in core.config.get("modules").get("disabled_prompts")):
+            if has_sysprompt:
                 enabled.append(module_name)
-            elif module_name not in core.config.get("modules").get("disabled_prompts"):
-                no_prompt.append(module_name)
             else:
                 disabled.append(module_name)
 
         enabled_str = "\n".join(enabled)
-        no_prompt_str = "\n".join(no_prompt)
-        disabled_str = "\n".join(disabled)
-        return f"== modules with active prompts ==\n{enabled_str}\n\n== modules that don't include prompts ==\n{no_prompt_str}\n\n== modules with disabled prompts ==\n{disabled_str}"
+        return f"== modules with active prompts ==\n{enabled_str}"
