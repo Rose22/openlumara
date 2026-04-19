@@ -138,18 +138,22 @@ class Cli(core.channel.Channel):
         message_state = None
         # Create a fresh renderer for this message session
         tool_renderer = ToolCallRenderer()
+        shown_reasoning = False
 
         async for token in self.send_stream({"role": "user", "content": msg}):
             token_type = token.get("type")
             content = token.get("content", "")
 
-            if token_type == "reasoning" and not message_state:
+            if token_type in ["content", "tool_calls"] and shown_reasoning:
+                # we can have multiple reasoning blocks
+                shown_reasoning = False
+
+            if token_type == "reasoning" and not shown_reasoning:
                 self._print_formatted("Reasoning:", "reasoning-label")
-                message_state = "reasoning"
+                shown_reasoning = True
 
             if token_type == "content" and message_state == "reasoning":
                 self._print_formatted("\nConclusion:", "conclusion-label")
-                message_state = "final output"
 
             if token_type in ["content", "reasoning"]:
                 print(content, end="", flush=True)
