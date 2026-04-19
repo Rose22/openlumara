@@ -15,6 +15,7 @@ class Coder(modules.files_sandboxed.SandboxedFiles):
 
     settings = {
         "coding_style": "Write clean, well-commented code. Do not include your reasoning inside final code.",
+        "allow_file_modifications": False,
         "allow_code_execution": False,
         "sandbox_folder": "~/coder",
         "enable_progress_messages": False,
@@ -255,6 +256,9 @@ class YourClassName(core.module.Module):
         """
         Creates an entire project structure in one go!
         """
+        if not self.config.get("allow_file_modifications"):
+            return self.result("User has disabled file modification. Provide the code directly to user.", False)
+
         async def _build_structure(current_path: str, structure: dict):
             for name, content in structure.items():
                 if name == "root":
@@ -305,6 +309,9 @@ class YourClassName(core.module.Module):
         """
         Edits a file within a project using targeted replacements.
         """
+        if not self.config.get("allow_file_modifications"):
+            return self.result("User has disabled file modification. Provide the code directly to user.", False)
+
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
             return self.result("file does not exist!", False)
@@ -373,6 +380,9 @@ class YourClassName(core.module.Module):
         """
         Writes to a file within a project.
         """
+        if not self.config.get("allow_file_modifications"):
+            return self.result("User has disabled file modification. Provide the code directly to user.", False)
+
         file_path_str = self._get_file_path(project_name, file_path)
 
         try:
