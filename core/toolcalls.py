@@ -191,6 +191,8 @@ class ToolcallManager:
                 elif token_type == "reasoning":
                     # only collect reasoning, in case there was no normal message content. but dont yield.
                     final_reasoning.append(token.get("content"))
+                elif token_type == "tool_call_delta":
+                    yield token
                 elif token_type == "tool_calls":
                     yield token
 

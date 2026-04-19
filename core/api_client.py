@@ -316,6 +316,11 @@ class APIClient():
                                 # ensure arguments is always a string
                                 if tool_call_buffer[index].function.arguments is None:
                                     tool_call_buffer[index].function.arguments = ""
+
+                                yield {
+                                    "type": "tool_call_delta",
+                                    "tool_calls": [tool_call_buffer[index]]
+                                }
                             else:
                                 # the documentation for this was awful, so i had to use AI to figure it out
                                 # welcome to the reason i was forced to introduce AI slop to the core framework
@@ -336,6 +341,12 @@ class APIClient():
                                 # and which we must accumulate to get the full toolcall
                                 if tool_call.function.arguments:
                                     tool_call_buffer[index].function.arguments += tool_call.function.arguments
+
+                                    # the magic sauce that allows streaming toolcall arguments
+                                    yield {
+                                        "type": "tool_call_delta",
+                                        "tool_calls": [tool_call_buffer[index]]
+                                    }
 
                 # if response has usage data, save it so we can use it to show to the user and to trim context
                 if hasattr(chunk, 'usage') and chunk.usage is not None:

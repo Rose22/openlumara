@@ -193,9 +193,11 @@ class Channel:
             elif token_type == "reasoning":
                 final_reasoning.append(token.get("content"))
                 yield token
+            elif token_type == "tool_call_delta":
+                # yay toolcall arg streaming!
+                yield token
             elif token_type == "tool_calls":
                 yield token
-
                 tool_calls_occurred = True
 
                 # we add the accumulated content tokens so far to the initial_content argument
