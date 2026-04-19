@@ -6,6 +6,7 @@ import stat
 import shutil
 import itertools
 import collections
+import asyncio
 import modules.files_sandboxed
 
 class Coder(modules.files_sandboxed.SandboxedFiles):
@@ -145,24 +146,24 @@ class Coder(modules.files_sandboxed.SandboxedFiles):
         except OSError as e:
             await self.manager.channel.announce(f"Error creating project structure: {e}")
 
-    async def read_file(self, project_name: str, file_path: list):
-        """
-        Reads a file within a project.
-
-        Use this instead of search() if you don't know what you're looking for.
-
-        Args:
-            project_name: project name
-            file_path: path to the file, as a list that will be joined by the OS's path separator using python os.path.join()
-        """
-        file_path_str = self._get_file_path(project_name, file_path)
-        if not os.path.exists(file_path_str):
-            return self.result("file does not exist!", False)
-
-        with open(file_path_str, "r") as f:
-            result = f.read()
-
-        return self.result(result)
+    # async def read_file(self, project_name: str, file_path: list):
+    #     """
+    #     Reads a file within a project.
+    #
+    #     Use this instead of search() if you don't know what you're looking for.
+    #
+    #     Args:
+    #         project_name: project name
+    #         file_path: path to the file, as a list that will be joined by the OS's path separator using python os.path.join()
+    #     """
+    #     file_path_str = self._get_file_path(project_name, file_path)
+    #     if not os.path.exists(file_path_str):
+    #         return self.result("file does not exist!", False)
+    #
+    #     with open(file_path_str, "r") as f:
+    #         result = f.read()
+    #
+    #     return self.result(result)
 
     async def edit_file(self, project_name: str, file_path: list, edits: list = None):
         """
@@ -319,13 +320,14 @@ class Coder(modules.files_sandboxed.SandboxedFiles):
 
         return self.result(None)
 
-    async def execute(self, project_name: str, file_path: list):
+    async def execute(self, project_name: str, file_path: list, timeout: int = 30):
         """
         executes a file within a project. will automatically chmod for you if not done already
 
         Args:
             project_name: project name
             file_path: path to the file, as a list that will be joined by the OS's path separator using python os.path.join()
+            timeout: maximum time in seconds to wait for execution
         """
         if not self.config.get("allow_code_execution"):
             return self.result("Code execution is disabled for security", False)
@@ -336,7 +338,28 @@ class Coder(modules.files_sandboxed.SandboxedFiles):
 
         os.chmod(file_path_str, os.stat(file_path_str).st_mode | stat.S_IEXEC)
         try:
-            proc = subprocess.run(file_path_str, shell=False, capture_output=True, text=True)
+            proc = await asyncio.create_subprocess_exec(
+                file_path_str,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+
+            try:
+                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+                stdout_str = stdout.decode().strip()
+                stderr_str = stderr.decode().strip()
+
+                if proc.returncode != 0:
+                    error_msg = stderr_str if stderr_str else f"Process exited with code {proc.returncode}"
+                    return self.result(f"Error (exit code {proc.returncode}):\\n{error_msg}", False)
+                
+                return self.result(stdout_str)
+            except asyncio.TimeoutError:
+                try:
+                    proc.kill()
+                    await proc.wait()
+                except:
+                    pass
+                return self.result(f"Execution timed out after {timeout} seconds", False)
         except Exception as e:
             return self.result(f"error: {e}", False)
-        return self.result(proc.stdout)
