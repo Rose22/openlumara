@@ -132,7 +132,8 @@ class APIClient():
             "tools": tools,
             "stream": stream,
             "temperature": core.config.get("model", {}).get("temperature", 0.2),
-            "max_completion_tokens": core.config.get("api", {}).get("max_output_tokens", 8192)
+            "max_completion_tokens": core.config.get("api", {}).get("max_output_tokens", 8192),
+            "reasoning_effort": core.config.get("model", {}).get("reasoning_effort", "medium")
         }
 
         # allow inserting custom request fields
