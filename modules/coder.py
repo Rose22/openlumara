@@ -15,9 +15,9 @@ class Coder(modules.files_sandboxed.SandboxedFiles):
 
     settings = {
         "coding_style": "Write clean, well-commented code. Do not include your reasoning inside final code.",
-        "allow_file_modifications": False,
-        "allow_code_execution": False,
         "sandbox_folder": "~/coder",
+        "read-only_mode": True,
+        "allow_code_execution": False,
         "enable_progress_messages": False,
         "openlumara_module_creation_mode": False,
     }
@@ -256,7 +256,7 @@ class YourClassName(core.module.Module):
         """
         Creates an entire project structure in one go!
         """
-        if not self.config.get("allow_file_modifications"):
+        if self.config.get("read-only_mode"):
             return self.result("User has disabled file modification. Provide the code directly to user.", False)
 
         async def _build_structure(current_path: str, structure: dict):
@@ -309,7 +309,7 @@ class YourClassName(core.module.Module):
         """
         Edits a file within a project using targeted replacements.
         """
-        if not self.config.get("allow_file_modifications"):
+        if self.config.get("read-only_mode"):
             return self.result("User has disabled file modification. Provide the code directly to user.", False)
 
         file_path_str = self._get_file_path(project_name, file_path)
@@ -380,7 +380,7 @@ class YourClassName(core.module.Module):
         """
         Writes to a file within a project.
         """
-        if not self.config.get("allow_file_modifications"):
+        if self.config.get("read-only_mode"):
             return self.result("User has disabled file modification. Provide the code directly to user.", False)
 
         file_path_str = self._get_file_path(project_name, file_path)
