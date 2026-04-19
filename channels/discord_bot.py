@@ -157,7 +157,8 @@ class Client(discord.Client):
 
     async def on_ready(self):
         core.log("discord", "logged in.")
-        await self.ai_channel.announce("i'm back up!", type="status")
+        if self.ai_channel.config.get("announce_startup"):
+            await self.ai_channel.announce("i'm back up!", type="status")
 
     async def on_message(self, message):
         if message.author == self.user:
@@ -196,7 +197,9 @@ class Client(discord.Client):
 
 class Discord(core.channel.Channel):
     settings =  {
-        "token": "TOKEN_HERE"
+        "token": "TOKEN_HERE",
+        "announce_startup": False,
+        "announce_shutdown": False
     }
 
     def __init__(self, manager):
@@ -228,3 +231,7 @@ class Discord(core.channel.Channel):
             await self._client.start(token)
         except Exception as e:
             core.log("error", f"error connecting to discord: {e}")
+
+    async def on_shutdown(self):
+        if self.config.get("announce_shutdown"):
+            await self.announce("i'm shutting down!")
