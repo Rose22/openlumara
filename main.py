@@ -19,7 +19,7 @@ import subprocess
 import argparse
 
 async def main(args):
-    if args.quiet or args.coder:
+    if args.quiet:
         core.quiet = True
 
     # load config file, allowing the path to be overridden

@@ -61,7 +61,6 @@ class Manager:
             enabled_user_modules = []
             enabled_user_modules = []
         elif self.coding_mode:
-            core.quiet = True
             enabled_modules = ["coder"]
             enabled_user_modules = []
             enabled_channels = ["cli"]
