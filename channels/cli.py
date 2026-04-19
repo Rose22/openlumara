@@ -76,11 +76,9 @@ class Cli(core.channel.Channel):
 
     async def _process_message(self, msg):
         message_state = None
+        tool_calls_display = []
         async for token in self.send_stream({"role": "user", "content": msg}):
             token_type = token.get("type")
-            if token_type not in ["reasoning", "content"]:
-                continue
-
             content = token.get("content", "")
 
             if token_type == "reasoning" and not message_state:
@@ -91,7 +89,10 @@ class Cli(core.channel.Channel):
                 self._print_formatted("\nConclusion:", "conclusion-label")
                 message_state = "final output"
 
-            print(content, end="", flush=True)
+            if token_type in ["content", "reasoning"]:
+                print(content, end="", flush=True)
+            elif token_type == "tool_calls":
+                print("\n", end="", flush=True)
 
         print()
         print()
