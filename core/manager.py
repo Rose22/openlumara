@@ -57,6 +57,9 @@ class Manager:
         import channels
         for channel in core.modules.load(channels, core.channel.Channel):
             channel_name = core.modules.get_name(channel)
+            if channel_name not in enabled_channels:
+                continue
+
             # add an instance of the channel's class to self.channels
             self.channels[channel_name] = channel(self)
 

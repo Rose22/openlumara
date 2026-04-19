@@ -2688,6 +2688,12 @@ toggleModal = function(modalName) {
     document.documentElement.style.setProperty('--chat-content-width', width + '%');
 })();
 
+// Apply message max width on script load
+(function initMessageMaxWidth() {
+    const val = localStorage.getItem('messageMaxWidth') || '60';
+    document.documentElement.style.setProperty('--message-max-width', val + '%');
+})();
+
 // Apply token bar visibility on script load
 (function initTokenBarVisibility() {
     const isVisible = localStorage.getItem('tokenBarVisible') !== 'false';
