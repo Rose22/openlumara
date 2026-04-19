@@ -991,7 +991,7 @@ def get_module_info():
     import modules
     import user_modules
 
-    loaded_module_classes = core.modules.load(modules, core.module.Module, respect_config=False) + core.modules.load(user_modules, core.module.Module, respect_config=False)
+    loaded_module_classes = core.modules.load(modules, core.module.Module) + core.modules.load(user_modules, core.module.Module)
     for module_class in loaded_module_classes:
         module_name = core.modules.get_name(module_class)
         docstring = str(module_class.__doc__).strip()
