@@ -2020,7 +2020,6 @@ function createThemeSection() {
     const fontSizeDisplay = fontSizeRow.querySelector('#font-size-display');
     const fontSizeFill = fontSizeRow.querySelector('#font-size-fill');
     const fontSizeHandle = fontSizeRow.querySelector('#font-size-handle');
-    const fontPreview = fontSizeRow.querySelector('#font-preview-text');
 
     fontSizeSlider.addEventListener('input', function() {
         const size = parseInt(this.value);
@@ -2029,7 +2028,6 @@ function createThemeSection() {
         fontSizeDisplay.textContent = `${size}px`;
         fontSizeFill.style.width = `${percentage}%`;
         fontSizeHandle.style.left = `${percentage}%`;
-        fontPreview.style.fontSize = `${size}px`;
 
         document.documentElement.style.setProperty('--font-size-base', `${size}px`);
         localStorage.setItem('fontSize', size);
