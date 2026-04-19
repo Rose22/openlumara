@@ -109,6 +109,21 @@ channel_instance = None
 # Set of stream IDs that have been cancelled
 stream_cancellations = set()
 
+def serialize_for_json(obj):
+    """Recursively converts non-serializable objects into plain dicts/lists."""
+    if isinstance(obj, dict):
+        return {k: serialize_for_json(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [serialize_for_json(x) for x in obj]
+    elif hasattr(obj, 'to_dict'):  # Many AI libraries use this
+        return serialize_for_json(obj.to_dict())
+    elif hasattr(obj, '__dict__'):  # Handles custom class instances
+        return serialize_for_json(obj.__dict__)
+    elif isinstance(obj, (str, int, float, bool, type(None))):
+        return obj
+    else:
+        return str(obj)  # Fallback to string representation
+
 # Security headers
 @app.after_request
 def add_security_headers(response):
@@ -474,9 +489,11 @@ def stream_message():
                     break
 
             elif isinstance(item, dict):
-                yield f"data: {json.dumps(item)}\n\n"
+                # FIX: Use the recursive serializer here!
+                yield f"data: {json.dumps(serialize_for_json(item))}\n\n"
 
             else:
+                # This handles raw string tokens
                 yield f"data: {json.dumps({'type': 'content', 'text': str(item)})}\n\n"
 
         future.result()

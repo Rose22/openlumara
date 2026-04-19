@@ -177,7 +177,7 @@ async function send(providedContent = null) {
                     }
 
                     // 9. STAGE: STREAMING (No special text, clear indicators)
-                    if (data.type === 'content' || data.token || data.type === 'reasoning') {
+                    if (data.type === 'content' || data.token || data.type === 'reasoning' || data.type === 'tool_call_delta' || data.type === 'tool_calls') {
                         if (!streamStarted) {
                             // Transition from "Processing" to real streaming
                             removePlaceholder();
@@ -215,6 +215,16 @@ async function send(providedContent = null) {
                                 scrollToBottomDelayed();
                             }
                         }
+
+                        // NEW: Handle Streaming Tool Call Deltas (with safety check)
+                        if (data.type === 'tool_call_delta' && Array.isArray(data.tool_calls) && data.tool_calls.length > 0) {
+                            handleStreamingToolCall(aiWrapper, data.tool_calls[0]);
+                        }
+
+                        // NEW: Handle Final Tool Call Signal
+                        if (data.type === 'tool_calls') {
+                            finalizeStreamingToolCall(aiWrapper);
+                        }
                     }
 
                     // Handle New Turn
@@ -228,14 +238,14 @@ async function send(providedContent = null) {
                         aiMsgDiv.innerHTML = prevTurns + '<div class="turn-container current"></div>';
                     }
 
-                    if (data.done) {
-                        streamingTurns.push({ content: aiContent, reasoning: aiReasoning });
-                    }
-
+                    // Handle Errors
                     if (data.error) {
                         streamHadError = true;
-                        typewriterQueue = [];
                         handleInlineError(data, aiMsgDiv, aiWrapper, streamStarted);
+                    }
+
+                    if (data.done) {
+                        streamingTurns.push({ content: aiContent, reasoning: aiReasoning });
                     }
 
                 } catch (e) { /* Ignore parse errors */ }
@@ -244,6 +254,7 @@ async function send(providedContent = null) {
     } catch (err) {
         removePlaceholder();
         if (err.name !== 'AbortError') {
+            console.log(err);
             streamHadError = true;
             typewriterQueue = [];
             handleCatchError(err, aiMsgDiv, aiWrapper, False);

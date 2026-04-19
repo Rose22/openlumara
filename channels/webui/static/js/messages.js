@@ -643,3 +643,90 @@ function renderScheduleMessage(content) {
 function handleScheduleAction(type, id) {
     console.log('Schedule action:', type, id);
 }
+
+/**
+ * Incremental Tool Call Renderer
+ * This creates a separate DOM element so it isn't wiped by the text streamer.
+ */
+function handleStreamingToolCall(aiWrapper, toolCall) {
+    // 1. Find or create the streaming card
+    let toolCard = aiWrapper.querySelector('.streaming-tool-call');
+
+    if (!toolCard) {
+        toolCard = document.createElement('div');
+        toolCard.className = 'tool-call-card streaming-tool-call';
+        toolCard.innerHTML = `
+        <div class="tool-call-header">
+        <svg class="tool-call-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+        </svg>
+        <span class="tool-call-name">Calling tool...</span>
+        <span class="tool-call-status calling">calling...</span>
+        </div>
+        <div class="tool-call-body">
+        <div class="tool-call-section">
+        <div class="tool-call-section-title">Arguments</div>
+        <div class="tool-call-args"></div>
+        </div>
+        </div>
+        `;
+        // IMPORTANT: Insert BEFORE the content container so text streaming doesn't overwrite it
+        const contentContainer = aiWrapper.querySelector('.message-content-container');
+        if (contentContainer) {
+            aiWrapper.insertBefore(toolCard, contentContainer);
+        } else {
+            aiWrapper.appendChild(toolCard);
+        }
+    }
+
+    // 2. Update Name
+    const func = toolCall.function;
+    if (func && func.name) {
+        toolCard.querySelector('.tool-call-name').textContent = func.name;
+    }
+
+    // 3. Parse Arguments via Regex (to handle partial/broken JSON strings)
+    const argsStr = func.arguments || '{}';
+    const argsContainer = toolCard.querySelector('.tool-call-args');
+
+    // Regex to match "key": "value" or "key": value (handles unclosed quotes)
+    const pattern = /"([^"]+)"\s*:\s*(?:"((?:[^"\\]|\\.)*)"?|([^,}\s"{}\]]+)?)/g;
+    let match;
+
+    while ((match = pattern.exec(argsStr)) !== null) {
+        const key = match[1];
+        let val = match[2] !== undefined ? match[2] : (match[3] || "");
+        val = val.replace(/\\n/g, '\n'); // handle escaped newlines
+
+        let argRow = argsContainer.querySelector(`[data-arg-key="${escapeHtml(key)}"]`);
+        if (!argRow) {
+            argRow = document.createElement('div');
+            argRow.className = 'tool-call-arg-row';
+            argRow.setAttribute('data-arg-key', key);
+            argRow.innerHTML = `<span class="tool-call-arg-name">${escapeHtml(key)}</span><span class="tool-call-arg-value"></span>`;
+            argsContainer.appendChild(argRow);
+        }
+
+        const valSpan = argRow.querySelector('.tool-call-arg-value');
+        if (valSpan.textContent !== val) {
+            valSpan.textContent = val;
+        }
+    }
+}
+
+/**
+* Finalizes the tool call UI when the full tool_calls list is emitted.
+*/
+function finalizeStreamingToolCall(aiWrapper) {
+    const toolCard = aiWrapper.querySelector('.streaming-tool-call');
+    if (toolCard) {
+        toolCard.classList.remove('streaming-tool-call');
+        toolCard.classList.add('completed');
+        const status = toolCard.querySelector('.tool-call-status');
+        if (status) {
+            status.textContent = 'done';
+            status.classList.remove('calling');
+            status.classList.add('completed');
+        }
+    }
+}
