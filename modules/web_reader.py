@@ -134,19 +134,3 @@ class WebReader(modules.http.Http):
         results = await asyncio.gather(*tasks)
 
         return self.result(results)
-
-    # override and get rid of parent class's methods
-    async def get():
-        pass
-    async def post():
-        pass
-    async def head():
-        pass
-    async def options():
-        pass
-    async def put():
-        pass
-    async def patch():
-        pass
-    async def delete():
-        pass

@@ -425,7 +425,7 @@ class Manager:
         if self.pure_mode:
             return loaded_module
 
-        for func_name in dir(module):
+        for func_name in vars(module):
             if func_name.startswith("_"):
                 # skip private methods and other private properties
                 continue
