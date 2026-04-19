@@ -10,6 +10,17 @@ import asyncio
 import modules.files_sandboxed
 from typing import List, Dict, Any, Optional, Union
 
+try:
+    import tree_sitter
+    from tree_sitter import Language, Parser
+    import tree_sitter_python as tspython
+    HAS_TREE_SITTER = True
+    # Pre-load the python language for efficiency
+    PYTHON_LANGUAGE = tspython.language()
+except ImportError:
+    HAS_TREE_SITTER = False
+    PYTHON_LANGUAGE = None
+
 class Coder(modules.files_sandboxed.SandboxedFiles):
     """Allows your AI to write, edit and test code for you."""
 
