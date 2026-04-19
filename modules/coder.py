@@ -286,18 +286,20 @@ class YourClassName(core.module.Module):
         except OSError as e:
             await self.manager.channel.announce(f"Error creating project structure: {e}")
 
-    # async def read_file(self, project_name: str, file_path: list):
-    #     """
-    #     Reads a file within a project.
-    #     """
-    #     file_path_str = self._get_file_path(project_name, file_path)
-    #     if not os.path.exists(file_path_str):
-    #         return self.result("file does not exist!", False)
-    #
-    #     with open(file_path_str, "r") as f:
-    #         result = f.read()
-    #
-    #     return self.result(result)
+    async def read_file(self, project_name: str, file_path: list):
+        """
+        Reads a file within a project.
+        Prefer using get_outline() over read_file().
+        This tool will flood your context with lots of tokens, so only use it as a last resort!
+        """
+        file_path_str = self._get_file_path(project_name, file_path)
+        if not os.path.exists(file_path_str):
+            return self.result("file does not exist!", False)
+
+        with open(file_path_str, "r") as f:
+            result = f.read()
+
+        return self.result(result)
 
     async def edit_file(self, project_name: str, file_path: list, edits: list = None):
         """
@@ -486,6 +488,8 @@ class YourClassName(core.module.Module):
         """
         Returns a list of symbols (classes, functions, etc.) with their names, types, and line numbers.
         The language can be specified, or it will be guessed from the extension.
+
+        ALWAYS use this to read code! Only ever use read_file if get_outline didn't provide enough information.
         """
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
