@@ -2,6 +2,9 @@ import core
 import re
 import inspect
 
+# modules that should have their prompts inserted even when tools are off
+nonagentic = ("characters", "time")
+
 def load(package, base_class = None, respect_config=True):
     """
     loops through the specified package imported with `import whatever`, then checks inside those packages for any classes that derive from base_class, and return a tuple of those classes so we can use them as modules, channels etc

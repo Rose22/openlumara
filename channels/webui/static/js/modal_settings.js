@@ -382,50 +382,66 @@ async function loadSettings() {
     error.style.display = 'none';
     form.style.display = 'none';
 
+    let fetchError = null;
+
     try {
+        // 1. Attempt to fetch fresh data
         const response = await fetch('/settings/load', {
-            signal: AbortSignal.timeout(10000)
+            signal: AbortSignal.timeout(5000) // Reduced timeout for better responsiveness
         });
 
         if (!response.ok) {
             throw new Error(`Server returned ${response.status}`);
         }
 
-        settingsData = await response.json();
+        const newData = await response.json();
+
+        // 2. If successful, update the master cache and the original reference
+        settingsData = newData;
         settingsOriginal = JSON.parse(JSON.stringify(settingsData));
 
+        // 3. Attempt to fetch module info (gracefully)
         try {
-            const infoResponse = await fetch('/settings/get_module_info');
+            const infoResponse = await fetch('/settings/get_module_info', { signal: AbortSignal.timeout(3000) });
             if (infoResponse.ok) {
                 const infoData = await infoResponse.json();
                 moduleInfoCache = infoData.module_info || {};
             }
         } catch (infoErr) {
-            console.error('Failed to fetch module info:', infoErr);
+            console.warn('Failed to fetch module info (using cache):', infoErr);
         }
 
-        // Pre-fetch models if we have a model field
-        const hasModelField = checkForModelField(settingsData);
-        if (hasModelField) {
-            await fetchModels();
+        // 4. Pre-fetch models (gracefully)
+        if (checkForModelField(settingsData)) {
+            fetchModels().catch(e => console.warn("Model fetch failed:", e));
         }
-
-        const categories = organizeSettingsIntoCategories(settingsData, moduleInfoCache);
-
-        renderSettingsForm(categories);
-        renderSettingsNav(categories);
-
-        loading.style.display = 'none';
-        form.style.display = 'block';
-        settingsHasChanges = false;
-        updateUnsavedIndicator();
 
     } catch (err) {
-        console.error('Failed to load settings:', err);
-        loading.style.display = 'none';
-        error.style.display = 'flex';
-        errorMsg.textContent = err.message || 'Failed to load settings';
+        console.error('Failed to load settings from server:', err);
+        fetchError = err.message;
+
+        // 5. CHECK CACHE: If we have data in settingsData, don't show error, just use what we have
+        if (Object.keys(settingsData).length === 0) {
+            // No cache exists and server failed -> Hard error
+            loading.style.display = 'none';
+            error.style.display = 'flex';
+            errorMsg.textContent = fetchError || 'Failed to load settings and no cached data available.';
+            return;
+        } else {
+            // We have cache! We will proceed to render, but we've logged the error.
+            console.warn('Proceeding with cached settings due to connection error.');
+        }
     }
+
+    // 6. Render whatever we have (either the fresh data or the cached data)
+    const categories = organizeSettingsIntoCategories(settingsData, moduleInfoCache);
+    renderSettingsForm(categories);
+    renderSettingsNav(categories);
+
+    loading.style.display = 'none';
+    form.style.display = 'block';
+    settingsHasChanges = false;
+    updateUnsavedIndicator();
 }
 
 // Check if settings contain a model field
@@ -1311,10 +1327,10 @@ function resetSettingsForm() {
 
 // Save settings to backend
 async function saveSettings() {
-    // Check if we're on the Appearance tab - theme changes are applied immediately
     const activeCategory = document.querySelector('.settings-nav-item.active')?.dataset.category;
+
+    // Appearance changes are local/immediate and don't trigger server saves here
     if (activeCategory === 'appearance') {
-        // Just close the modal - theme changes are applied immediately
         toggleModal('settings');
         return;
     }
@@ -1324,8 +1340,6 @@ async function saveSettings() {
     const saveBtn = document.getElementById('settings-save-btn');
     const btnText = saveBtn.querySelector('.btn-text');
     const btnLoading = saveBtn.querySelector('.btn-loading');
-
-    // Check if there are non-theme changes (require restart)
     const hasNonThemeChanges = detectNonThemeChanges();
 
     saveBtn.disabled = true;
@@ -1337,7 +1351,7 @@ async function saveSettings() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(settingsData),
-                                     signal: AbortSignal.timeout(30000)
+                                     signal: AbortSignal.timeout(15000)
         });
 
         if (!response.ok) {
@@ -1345,10 +1359,10 @@ async function saveSettings() {
             throw new Error(error.message || `Server returned ${response.status}`);
         }
 
+        // Success: Update the original reference so "unsaved" indicator clears
         settingsOriginal = JSON.parse(JSON.stringify(settingsData));
         settingsHasChanges = false;
 
-        // Show appropriate success message
         if (hasNonThemeChanges) {
             showSettingsSuccessWithRestart();
             await restartServer();
@@ -1358,7 +1372,15 @@ async function saveSettings() {
 
     } catch (err) {
         console.error('Failed to save settings:', err);
-        showSettingsError(err.message || 'Failed to save settings');
+
+        // 7. IMPROVED ERROR HANDLING: Distinguish between server rejection and connection loss
+        // If the error is a TypeError (usually happens when fetch fails due to network), it's an offline issue
+        let userMessage = err.message;
+        if (err instanceof TypeError || err.message.includes('Failed to fetch')) {
+            userMessage = "Connection lost. Changes cannot be saved to the server, but you can still customize appearance locally.";
+        }
+
+        showSettingsError(userMessage);
     } finally {
         saveBtn.disabled = false;
         btnText.style.display = 'inline';

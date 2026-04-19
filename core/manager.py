@@ -218,7 +218,6 @@ class Manager:
         if self.pure_mode:
             return ""
 
-        nonagentic_modules = ("characters", "time")
         system_prompt = []
 
         active_character = None
@@ -230,7 +229,7 @@ class Manager:
         sysprompt_middle = []
         sysprompt_bottom = []
         for module_name, module in self.modules.items():
-            if not core.config.get("model").get("use_tools", False) and module_name not in nonagentic_modules:
+            if not core.config.get("model").get("use_tools", False) and module_name not in core.modules.nonagentic:
                 # skip most prompts if tools are turned off
                 continue
 
@@ -277,6 +276,10 @@ class Manager:
         for module_name, module in self.modules.items():
             if prevent_recursion and module_name == "tokens":
                 # if we try to count the system prompt's tokens from the function that counts tokens.. we get recursion
+                continue
+
+            if not core.config.get("model").get("use_tools", False) and module_name not in core.modules.nonagentic:
+                # skip most prompts if tools are turned off
                 continue
 
             module_sysprompt = await module.on_end_prompt()
