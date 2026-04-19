@@ -78,6 +78,9 @@ class Cli(core.channel.Channel):
         message_state = None
         async for token in self.send_stream({"role": "user", "content": msg}):
             token_type = token.get("type")
+            if token_type not in ["reasoning", "content"]:
+                continue
+
             content = token.get("content", "")
 
             if token_type == "reasoning" and not message_state:

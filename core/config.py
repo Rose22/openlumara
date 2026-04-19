@@ -70,9 +70,9 @@ def _get_registry_data():
         return _registry_cache
 
     # load instances
-    mod_inst = list(core.modules.load(modules, core.module.Module, respect_config=False))
-    user_mod_inst = list(core.modules.load(user_modules, core.module.Module, respect_config=False))
-    chan_inst = list(core.modules.load(channels, core.channel.Channel, respect_config=False))
+    mod_inst = list(core.modules.load(modules, core.module.Module))
+    user_mod_inst = list(core.modules.load(user_modules, core.module.Module))
+    chan_inst = list(core.modules.load(channels, core.channel.Channel))
 
     # define the sections to be managed
     _registry_cache = [

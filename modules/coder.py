@@ -1,13 +1,14 @@
 import core
 import os
 import sys
+import re
 import subprocess
 import stat
 import shutil
 import itertools
-import collections
 import asyncio
 import modules.files_sandboxed
+
 
 class Coder(modules.files_sandboxed.SandboxedFiles):
     """Allows your AI to write, edit and test code for you."""
@@ -21,6 +22,24 @@ class Coder(modules.files_sandboxed.SandboxedFiles):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.path = self.sandbox_path
+        self._header = "Coder projects in sandbox"
+
+    async def on_system_prompt(self):
+        file_list = os.listdir(self.sandbox_path)
+        project_list = []
+        for filename in file_list:
+            if not os.path.isdir(os.path.join(self.sandbox_path, filename)):
+                continue
+
+            project_list.append(filename)
+
+        if not project_list:
+            return "No projects yet."
+
+        try:
+            return "\n".join(project_list)
+        except Exception as e:
+            return f"error: {e}", False
 
     def _get_project_path(self, name: str):
         """returns the project path as a string within the sandbox"""
@@ -31,12 +50,6 @@ class Coder(modules.files_sandboxed.SandboxedFiles):
         # Join project name and the list of path components into a single relative path
         rel_path = os.path.join(project_name, *file_path)
         return self._get_sandbox_path(rel_path)
-
-    async def list_projects(self):
-        try:
-            return self.result(os.listdir(self.sandbox_path))
-        except Exception as e:
-            return self.result(f"error: {e}", False)
 
     async def list_project(self, project_name: str, depth_limit: int = 3):
         """
@@ -273,52 +286,78 @@ class Coder(modules.files_sandboxed.SandboxedFiles):
         except Exception as e:
             return self.result(f"error: {e}", False)
 
-    async def search(self, project_name: str, file_path: list, query: str, context_lines: int = 5):
+    async def search(self, project_name: str, file_path: list, query: str, context_lines: int = 5, max_matches: int = 10, use_regex: bool = False):
         """
-        Search for a query within the file and return a snippet with line numbers and context.
+        Search for a query within the file and return snippets with line numbers and context.
         Always use this before making any edits!
 
         Args:
             project_name: project name
             file_path: path to the file, as a list
-            query: the search string
-            context_lines: number of lines to show before and after the match
+            query: the search string or regex pattern
+            context_lines: number of lines to show before and after each match
+            max_matches: maximum number of matches to return
+            use_regex: whether to treat the query as a regular expression
         """
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
             return self.result("file does not exist!", False)
 
-        query_lower = query.strip().lower()
         try:
             with open(file_path_str, 'r') as f:
-                history = collections.deque(maxlen=context_lines)
-                for line_num, line in enumerate(f, 1):
+                lines = f.readlines()
+
+            matches = []
+            num_lines = len(lines)
+
+            if use_regex:
+                try:
+                    pattern = re.compile(query, re.IGNORECASE)
+                except re.error as e:
+                    return self.result(f"Invalid regex pattern: {e}", False)
+            else:
+                query_lower = query.lower()
+
+            for i, line in enumerate(lines):
+                line_num = i + 1
+                match_found = False
+                
+                if use_regex:
+                    if pattern.search(line):
+                        match_found = True
+                else:
                     if query_lower in line.lower():
-                        # Match found!
-                        snippet = []
+                        match_found = True
+                
+                if match_found:
+                    snippet = [f"--- Match at line {line_num} ---"]
+                    
+                    # Determine window for context
+                    start_idx = max(0, i - context_lines)
+                    end_idx = min(num_lines, i + context_lines + 1)
+                    
+                    for j in range(start_idx, end_idx):
+                        curr_line_num = j + 1
+                        curr_line_content = lines[j].rstrip('\n\r')
+                        
+                        if curr_line_num == line_num:
+                            snippet.append(f"{curr_line_num:4}: {curr_line_content}  <-- MATCH")
+                        else:
+                            snippet.append(f"{curr_line_num:4}: {curr_line_content}")
+                    
+                    matches.append("\n".join(snippet))
+                    
+                    if len(matches) >= max_matches:
+                        break
+            
+            if not matches:
+                return self.result(None)
+            
+            result_str = "\n\n".join(matches)
+            return self.result(result_str)
 
-                        # 1. Context before (from our sliding window)
-                        for h_num, h_line in history:
-                            snippet.append(f"{h_num:4}: {h_line.rstrip('\n\r')}")
-
-                        # 2. The matching line
-                        snippet.append(f"{line_num:4}: {line.rstrip('\n\r')}  <-- MATCH")
-
-                        # 3. Context after (reading ahead from the file pointer)
-                        for i in range(1, context_lines + 1):
-                            next_line = f.readline()
-                            if not next_line:
-                                break
-                            snippet.append(f"{line_num + i:4}: {next_line.rstrip('\n\r')}")
-
-                        result_str = "\n".join(snippet)
-                        return self.result(f"Found match at line {line_num}:\n\n{result_str}")
-
-                    history.append((line_num, line))
         except Exception as e:
             return self.result(f"error: {e}", False)
-
-        return self.result(None)
 
     async def execute(self, project_name: str, file_path: list, timeout: int = 30):
         """

@@ -5,7 +5,7 @@ import inspect
 # modules that should have their prompts inserted even when tools are off
 nonagentic = ("characters", "time")
 
-def load(package, base_class = None, respect_config=True):
+def load(package, base_class = None, filter: list = None):
     """
     loops through the specified package imported with `import whatever`, then checks inside those packages for any classes that derive from base_class, and return a tuple of those classes so we can use them as modules, channels etc
 
@@ -40,12 +40,9 @@ def load(package, base_class = None, respect_config=True):
                     if not issubclass(target_class, base_class):
                         continue
 
-                # skip modules that aren't enabled in the config
-                if respect_config:
-                    enabled_classes = core.config.get(package.__name__, {}).get("enabled", [])
-
-                    if core.modules.get_name(target_class) not in enabled_classes:
-                        continue
+                # skip modules not in filter if filter is enabled
+                if filter and core.modules.get_name(target_class) not in filter:
+                    continue
 
                 discovered.append(target_class)
 

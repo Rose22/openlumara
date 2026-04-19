@@ -154,9 +154,25 @@ class Commands:
 
         help_text = """
 == built in commands ==
+chats:
+/new                        starts a new chat
+/clear                      clear current chat history
+/chats                      list previous chats
+/chat <ID>                  load a chat by its ID
+/chat rename <name>         rename current chat
+/chat category <category>   put chat in that category
+
+modules:
 /modules                    list modules
 /module                     enable/disable a module by name
 /tools                      list tools available to the AI
+
+core:
+/prompt                     show system prompt
+/prompt <module name>       show system prompt for that module
+/history                    show full chat history
+/context full               show full context being sent to AI
+/context raw                show full context as raw JSON
 /status                     show status info
 /config set <path> <value>  Example: /config set api url http://localhost:5001/v1
 /config get <path>          Example: /config get api url
@@ -244,6 +260,79 @@ class Commands:
                 return await self._get_help()
             case "ping":
                 return "pong!"
+            case "new":
+                """starts a new session"""
+                result = await self.channel.context.chat.new()
+                if result:
+                    return "New session started."
+                else:
+                    return "Failed to start new session"
+            case "clear":
+                """clear chat history"""
+
+                result = await self.channel.context.chat.clear()
+                if result:
+                    return "Chat history wiped."
+                else:
+                    return "Failed to wipe chat history"
+            case "chats":
+                # if i overwrite the list builtin, it leads to really bad stuff
+
+                """list chats"""
+
+                chats = await self.channel.context.chat.get_all()
+                if not chats:
+                    return self.result("No saved chats found.", False)
+
+                result = f"Saved chats for {self.channel.name}:\n"
+                for conv in chats[-20:]: # only the last 20 to avoid overwhelming the AI
+                    result += f"- [{conv.get('id')}] {conv.get('title', 'Untitled')[:50]}\n"
+
+                return result
+
+    # @core.module.command("chat", temporary=True, help={
+    #     "": "show information about current chat",
+    #     "<ID>": "load chat using its ID",
+    #     "rename <new_name>": "rename chat to <new_name>",
+    #     "category <category>": "put chat in category <category>"
+    # })
+    # async def load(self, args: list):
+            case "chat":
+                """load chat using its ID"""
+                if not args:
+                    chat_title = await self.channel.context.chat.get_title()
+                    chat_category = await self.channel.context.chat.get_category()
+                    chat_tags = await self.channel.context.chat.get_tags()
+                    chat_tags_str = "None"
+                    if chat_tags:
+                        chat_tags_str = ", ".join(chat_tags)
+                    chat_data = await self.channel.context.chat.get_data() or {}
+                    if chat_data:
+                        chat_data_str = "\n"
+                        chat_data_str += "\n".join([f"  {key}: {value}" for key, value in chat_data.items()])
+                    else:
+                        chat_data_str = "None"
+
+                    return f"== chat info ==\ntitle: {chat_title}\ncategory: {chat_category}\ntags: {chat_tags_str}\ndata: {chat_data_str}"
+                match args[0].lower().strip():
+                    case "rename":
+                        newname = " ".join(args[1:])
+                        result = await self.channel.context.chat.set_title(newname)
+                        if not result:
+                            return "rename failed"
+                        return f"chat renamed to {newname}"
+                    case "category":
+                        newcat = " ".join(args[1:])
+                        result = await self.channel.context.chat.set_category(newcat)
+                        if not result:
+                            return "setting category failed"
+                        return f"chat categorised into {newcat}"
+                    case _:
+                        result = await self.channel.context.chat.load(args[0])
+                        if not result:
+                            return "failed to load chat"
+                        return "chat loaded"
+
             case "connect":
                 if self.channel.manager.API.connected:
                     return "Already connected."
@@ -360,6 +449,95 @@ class Commands:
 
                 else:
                     return f"Unknown subcommand '{subcommand}'. Use 'set' or 'get'."
+
+            case "context":
+                """shows current context window"""
+
+                if not core.config.get("api").get("context_window", True):
+                    return "CONTEXT DISABLED"
+
+                show_system_prompt = True if len(args) and args[0] == "full" else False
+
+                context = await self.channel.context.get(system_prompt=show_system_prompt)
+                if not context:
+                    return "BLANK"
+
+                if len(args) and args[0] == "raw":
+                    import json
+                    return json.dumps(context, indent=2)
+
+                context_display = []
+
+                for message in context:
+                    content = message.get("content")
+                    if not content:
+                        if message.get("tool_calls"):
+                            content = str(message.get("tool_calls"))
+
+                    context_display.append(f"== {message.get('role')} ==\n{content}")
+
+                context_display.append("---")
+
+                disabled_prompts = core.config.get("modules").get("disabled_prompts")
+                if disabled_prompts:
+                    disabled_prompts_str = "\n".join([mod_name for mod_name in disabled_prompts])
+                    context_display.append(f"== disabled prompts ==\n{disabled_prompts_str}")
+
+                ctx_string = ""
+                context_size = await self.channel.context.get_size()
+                for key, value in context_size.items():
+                    ctx_string += f"{key}: {value}\n"
+                context_display.append(f"== context size ==\n{ctx_string}")
+
+                return "\n\n".join(context_display)
+
+            case "prompt":
+                """shows only the system prompt"""
+
+                if not core.config.get("api").get("context_window", True):
+                    return "CONTEXT DISABLED"
+
+                if not len(args):
+                    _sysprompt = await self.channel.manager.get_system_prompt()
+                    if not _sysprompt:
+                        _sysprompt = "BLANK"
+                    sysprompt = f"=== system prompt ===\n{_sysprompt}"
+                    disabled_prompts = core.config.get("modules").get("disabled_prompts")
+                    if disabled_prompts:
+                        sysprompt += "\n\n=== disabled prompts ===\n"
+                        sysprompt += "\n".join([mod_name for mod_name in disabled_prompts])
+                    endprompt = await self.channel.manager.get_end_prompt()
+                    if endprompt:
+                        sysprompt += f"\n\n=== end prompts ===\n{endprompt}"
+
+                    return sysprompt if sysprompt else "BLANK"
+                else:
+                    module_name = args[0].strip().replace(" ", "_")
+                    module_obj = self.manager.modules.get(module_name, None)
+                    if module_obj:
+                        if hasattr(module_obj, "on_system_prompt"):
+                            return await module_obj.on_system_prompt() or "BLANK"
+                        else:
+                            return "module does not have a system prompt defined"
+
+                    return "module not found"
+
+            case "prompts":
+                """show which prompts are active"""
+
+                enabled = []
+                no_prompt = []
+                disabled = []
+                for module_name, module in self.channel.manager.modules.items():
+                    has_sysprompt = True if await module.on_system_prompt() else False
+
+                    if has_sysprompt:
+                        enabled.append(module_name)
+                    else:
+                        disabled.append(module_name)
+
+                enabled_str = "\n".join(enabled)
+                return f"== modules with active prompts ==\n{enabled_str}"
             case "restart":
                 await self.channel.manager.restart()
                 return "restarting.."

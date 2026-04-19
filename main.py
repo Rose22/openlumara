@@ -19,9 +19,13 @@ import subprocess
 import argparse
 
 async def main(args):
+    if args.quiet or args.coder:
+        core.quiet = True
+
     # load config file, allowing the path to be overridden
     config_display_str = "config.yaml" if not args.config else args.config
-    core.log("core", f"Loading settings from config {config_display_str}")
+    if not core.quiet:
+        core.log("core", f"Loading settings from config {config_display_str}")
     core.config.load(args.config)
 
     override_config_with_args(core.config.config, args)
@@ -125,6 +129,7 @@ args_main.add_argument("--config", help="specify a specific config file to load"
 args_main.add_argument("--pure", help="disables all non-essential modules so that system prompt is blank and you're talking to the bare model", action="store_true")
 args_main.add_argument("--tmp", help="temporary session, discards all data after shutdown", action="store_true")
 args_main.add_argument("--cli", help="CLI-only mode", action="store_true")
+args_main.add_argument("--coder", help="enable only the coder module (coding agent mode)", action="store_true")
 args_main.add_argument("--quiet", help="surpress logs", action="store_true")
 args_main.add_argument("--insecure_tls", help="Disable verification for SSL/TLS certs. Use when your API uses self-signed or unvalid certificates.", action="store_true")
 

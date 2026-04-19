@@ -25,6 +25,7 @@ class Manager:
         self.modules = {}
         self.tools = []
         self.pure_mode = False
+        self.coding_mode = False
 
         self._restart_requested = False
 
@@ -35,18 +36,34 @@ class Manager:
     async def run(self):
         """main loop"""
 
-        if self.args.quiet:
-            core.quiet = True
         if self.args.pure:
             self.pure_mode = True
+        elif self.args.coder:
+            self.coding_mode = True
 
-        core.log("core", "Starting OpenLumara")
+        if not core.quiet:
+            core.log("core", "Starting OpenLumara")
 
         self.savedata = core.storage.StorageDict("save", "msgpack")
 
-        # load channels
+        # retrieve enabled channels from config
         enabled_channels = core.config.get("channels").get("enabled", [])
         if self.args.cli:
+            enabled_channels = ["cli"]
+
+        # retrieve enabled modules from config
+        enabled_modules = core.config.get("modules").get("enabled", [])
+        enabled_user_modules = core.config.get("user_modules", {}).get("enabled", [])
+        loaded_module_names = []
+
+        if self.pure_mode:
+            enabled_modules = []
+            enabled_user_modules = []
+            enabled_user_modules = []
+        elif self.coding_mode:
+            core.quiet = True
+            enabled_modules = ["coder"]
+            enabled_user_modules = []
             enabled_channels = ["cli"]
 
         if not enabled_channels:
@@ -55,7 +72,7 @@ class Manager:
 
         core.log("core", "Loading channels")
         import channels
-        for channel in core.modules.load(channels, core.channel.Channel):
+        for channel in core.modules.load(channels, core.channel.Channel, filter=enabled_channels):
             channel_name = core.modules.get_name(channel)
             if channel_name not in enabled_channels:
                 continue
@@ -74,21 +91,12 @@ class Manager:
             if last_channel and last_channel in self.channels.keys():
                 self.channel = self.channels[last_channel]
 
-        # load modules
-        enabled_modules = core.config.get("modules").get("enabled", [])
-        enabled_user_modules = core.config.get("user_modules", {}).get("enabled", [])
-        loaded_module_names = []
-
-        if self.pure_mode:
-            enabled_modules = ["context", "chats"]
-            enabled_user_modules = []
-
         if enabled_modules:
             core.log("core", "Loading core modules")
 
             # load modules
             import modules
-            for module in core.modules.load(modules, core.module.Module):
+            for module in core.modules.load(modules, core.module.Module, filter=enabled_modules):
                 if core.modules.get_name(module) not in enabled_modules:
                     continue
 
@@ -102,7 +110,7 @@ class Manager:
             # load user modules
             import user_modules
             core.log("core", "Loading user modules")
-            for module in core.modules.load(user_modules, core.module.Module):
+            for module in core.modules.load(user_modules, core.module.Module, filter=enabled_user_modules):
                 if core.modules.get_name(module) not in enabled_user_modules:
                     continue
 
