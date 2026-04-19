@@ -231,9 +231,11 @@ class Manager:
                 # skip most prompts if tools are turned off
                 continue
 
-            if active_character and module_name != "characters":
+            if active_character and module_name != "characters" and "characters" in self.modules.keys():
                 # if a character is currently active, display ONLY the character system prompt
-                continue
+                char_disable_agent_prompts = self.modules["characters"].config.get("disable_agent_prompts_when_character_active")
+                if char_disable_agent_prompts:
+                    continue
 
             module_sysprompt = await module.on_system_prompt()
 
@@ -448,7 +450,6 @@ class Manager:
 
             # only get class methods with a self parameter
             if not func_params.get("self"):
-                core.log("error", f"class method {func_name} skipped because it didn't have required `self` argument.")
                 continue
 
             # remove "self" arg from func

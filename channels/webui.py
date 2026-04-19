@@ -95,6 +95,9 @@ log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 log.disabled = True
 
+# disable json key sorting
+app.json.sort_keys = False
+
 # Load HTML template
 HTML_TEMPLATE = None
 with open(os.path.join(WEBUI_DIR, "index.html"), "r") as f:

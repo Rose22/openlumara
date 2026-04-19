@@ -45,6 +45,13 @@ class Http(core.module.Module):
         5432,  # PostgreSQL
     }
 
+    settings = {
+        "block_uncommon_ports": True,
+        "https_only": True,
+        "domain_whitelist": [],
+        "domain_blacklist": []
+    }
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.default_headers = {
@@ -68,6 +75,8 @@ class Http(core.module.Module):
         - IPv6 loopback/internal
         - AWS/GCP/Azure metadata endpoints
         - Non-HTTP schemes
+        - Blacklisted domains (including subdomains)
+        - Domains not in the whitelist (if whitelist is active)
         """
         try:
             parsed = urlparse(url)
@@ -77,13 +86,44 @@ class Http(core.module.Module):
                 self._log(f"Blocked non-HTTP scheme: {parsed.scheme}")
                 return False
 
+            if self.config.get("https_only") and parsed.scheme.lower() != "https":
+                self._log(f"HTTPS-only is on, tried to access non-HTTPS URL: {parsed.scheme}")
+                return False
+
             hostname = parsed.hostname
             if not hostname:
                 self._log("URL has no hostname")
                 return False
 
+            hostname = hostname.lower()
+
+            # --- Domain Whitelist/Blacklist Logic ---
+            whitelist = self.config.get("domain_whitelist", [])
+            blacklist = self.config.get("domain_blacklist", [])
+
+            # 1. Blacklist Check (Matches exact domain or any subdomain)
+            for blocked_domain in blacklist:
+                blocked_domain = blocked_domain.lower()
+                if hostname == blocked_domain or hostname.endswith('.' + blocked_domain):
+                    self._log(f"Blocked by domain blacklist: {hostname}")
+                    return False
+
+            # 2. Whitelist Check (If whitelist is not empty, hostname must match)
+            if whitelist:
+                is_allowed = False
+                for allowed_domain in whitelist:
+                    allowed_domain = allowed_domain.lower()
+                    if hostname == allowed_domain or hostname.endswith('.' + allowed_domain):
+                        is_allowed = True
+                        break
+
+                if not is_allowed:
+                    self._log(f"Blocked by domain whitelist: {hostname}")
+                    return False
+            # -----------------------------------------
+
             # Block localhost variants
-            if hostname.lower() in ['localhost', '127.0.0.1', '::1', '0.0.0.0']:
+            if hostname in ['localhost', '127.0.0.1', '::1', '0.0.0.0']:
                 self._log("Blocked localhost access")
                 return False
 
@@ -472,7 +512,7 @@ class Http(core.module.Module):
             headers: HTTP headers
 
         Returns:
-            Result dict with status, headers, and cookies
+            Result dict with status, headers, cookies, and status
         """
         return await self._make_request(
             requests.head,
@@ -492,7 +532,7 @@ class Http(core.module.Module):
             headers: HTTP headers
 
         Returns:
-            Result dict with status, headers, and cookies
+            Result dict with status, headers, cookies, and status
         """
         return await self._make_request(
             requests.options,
@@ -552,7 +592,7 @@ class Http(core.module.Module):
             headers: HTTP headers
 
         Returns:
-            Result dict with status, headers, and cookies
+            Result dict with status, headers, cookies, and content
         """
         return await self._make_request(
             requests.delete,

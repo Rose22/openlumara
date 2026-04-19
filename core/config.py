@@ -159,7 +159,7 @@ def sync_module_settings(config_dict, instances, section_key):
     section = config_dict.setdefault(section_key, {})
     settings = section.setdefault("settings", {})
 
-    # 1. Top-level Prune
+    # 1. Top-level Prune: Remove settings for modules that no longer exist
     available_names = [core.modules.get_name(m) for m in instances]
     for k in [k for k in settings if k not in available_names]:
         del settings[k]
@@ -168,15 +168,26 @@ def sync_module_settings(config_dict, instances, section_key):
     for inst in instances:
         name = core.modules.get_name(inst)
         defaults = getattr(inst, 'settings', {})
-        if not isinstance(defaults, dict): continue
+        if not isinstance(defaults, dict):
+            continue
 
         if name in settings and isinstance(settings[name], dict):
             curr = settings[name]
-            for k in [k for k in curr if k not in defaults]: del curr[k]
+            # Remove keys that are no longer in the module's defaults
+            for k in [k for k in curr if k not in defaults]:
+                del curr[k]
+            # Add missing keys from defaults
             for k, v in defaults.items():
-                if k not in curr: curr[k] = v
-        else:
+                if k not in curr:
+                    curr[k] = v
+
+            # If the settings became empty after pruning, remove the entry entirely
+            if not curr:
+                del settings[name]
+
+        elif defaults:  # Only insert if the module actually has settings to add
             settings[name] = defaults.copy()
+
 
 
 def load(file_path=None):

@@ -1,15 +1,40 @@
 import core
 import json
+import copy
 
 class Config(core.module.Module):
     """Lets the AI manage the OpenLumara configuration/settings for you"""
 
     _header = "OpenLumara config"
 
+    def _redact_sensitive_info(self, data):
+        """Recursively redacts sensitive information from a dictionary or list."""
+        sensitive_keywords = ["token", "key", "secret", "password", "auth", "credential"]
+
+        if isinstance(data, dict):
+            new_dict = {}
+            for k, v in data.items():
+                # Check if the key contains any of the sensitive keywords
+                if any(kw in k.lower() for kw in sensitive_keywords):
+                    new_dict[k] = "****"
+                elif isinstance(v, (dict, list)):
+                    new_dict[k] = self._redact_sensitive_info(v)
+                else:
+                    new_dict[k] = v
+            return new_dict
+        elif isinstance(data, list):
+            return [self._redact_sensitive_info(item) for item in data]
+        else:
+            return data
+
     async def on_system_prompt(self):
         try:
-            return json.dumps(core.config.config)
-        except:
+            # Deep copy to avoid mutating the actual live configuration
+            config_data = copy.deepcopy(core.config.config)
+            redacted_config = self._redact_sensitive_info(config_data)
+            return json.dumps(redacted_config)
+        except Exception as e:
+            core.log_error("error while inserting config into system prompt", e)
             return None
 
     async def set(self, path: list, value: str):

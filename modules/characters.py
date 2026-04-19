@@ -3,6 +3,10 @@ import core
 class Characters(core.module.Module):
     """Lets your AI embody different characters! inspired by characterAI, janitorAI, sillytavern, etc."""
 
+    settings = {
+        "disable_agent_prompts_when_character_active": True,
+    }
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.characters = core.storage.StorageDict("characters", type="json")

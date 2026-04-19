@@ -444,27 +444,23 @@
 }
 
 /* The main container stays as a vertical stack (normal layout) */
-.settings-items {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-}
-
-/* New container specifically for groups to be in columns */
 .settings-groups-grid {
-    display: grid;
-    gap: 16px;
-    grid-template-columns: repeat(1, 1fr); /* 1 column minimum (mobile) */
+    display: block; /* Remove grid */
+    column-gap: 16px; /* Space between columns */
 }
 
-/* Responsive columns for the groups grid (up to 6 on desktop) */
+/* Responsive column counts */
 @media (min-width: 600px) {
-    .settings-groups-grid { grid-template-columns: repeat(2, 1fr); }
+    .settings-groups-grid {
+        column-count: 2;
+    }
 }
 
-@media (min-width: 900px) {
-    .settings-groups-grid { grid-template-columns: repeat(3, 1fr); }
-}
+/*@media (min-width: 900px) {
+    .settings-groups-grid {
+        column-count: 3;
+    }
+}*/
 
 /*
 @media (min-width: 1200px) {
@@ -802,7 +798,14 @@
     border: 1px solid var(--border-color);
     border-radius: 8px;
     overflow: hidden;
+
+    /* Add these three lines */
+    break-inside: avoid;    /* Prevents the group from splitting across columns */
+    display: inline-block;   /* Required for break-inside to work reliably in columns */
+    width: 100%;             /* Ensures it fills the column width */
+    margin-bottom: 16px;     /* Adds vertical spacing between groups in the same column */
 }
+
 
 .settings-group-header {
     display: flex;

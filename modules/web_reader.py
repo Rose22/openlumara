@@ -1,31 +1,23 @@
 import core
 import asyncio
+import requests
 import aiohttp
 import urllib.parse
 import re
+import modules.http
 
-class WebReader(core.module.Module):
+# we base off the existing HTTP module in order to support all its security features
+class WebReader(modules.http.Http):
     """
     Lets your AI read the content of pages on the web
     """
-
-    settings = {
-        "max_concurrent_tasks": 4
-    }
 
     # ---------------------------------------------------------
     # Internal Helper Methods
     # ---------------------------------------------------------
 
-    async def _http_request(self, url: str) -> bytes:
-        """Internal helper to fetch remote content."""
-        async with aiohttp.ClientSession(
-            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.3"}
-        ) as session:
-            async with session.get(url, timeout=15) as response:
-                if response.status != 200:
-                    raise Exception(f"Request failed with status {response.status}")
-                return await response.read()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
     def _remove_duplicates(self, lst: list) -> list:
         """Removes duplicates from a list while preserving order."""
@@ -96,36 +88,37 @@ class WebReader(core.module.Module):
     # AI Tools
     # ---------------------------------------------------------
 
-    async def read(self, path: str, purpose: str, memory: str, multi: bool = False):
+    async def read(self, path: str):
         """
         Processes a URL and scrapes its content.
         """
         try:
             url_parser = urllib.parse.urlparse(path)
             if url_parser.scheme not in ["http", "https"]:
-                return self.result(None, error="Invalid URL. Please provide a valid http or https link.", success=False)
+                return self.result("Invalid URL. Please provide a valid http or https link.", False)
 
             domain = url_parser.netloc
 
-            file_content = await self._http_request(path)
+            result = await self._make_request(
+                requests.get,
+                path,
+                include_content=True
+            )
+
+            data = result.get("content")
+            if not isinstance(data, dict):
+                return self.result(data, False)
+
+            file_content = data.get("content", "")
+
             output_data = await self._process_webpage(file_content)
 
-            result_data = {
-                "data": output_data,
-            }
-
-            if not multi:
-                result_data["ai_instructions"] = {
-                    "important_details": memory,
-                    "purpose_of_request": purpose,
-                }
-                return self.result(result_data, success=True)
-            return result_data
+            return self.result(output_data, success=True)
 
         except Exception as e:
-            return self.result({"error": str(e)}, error=str(e), success=False)
+            return self.result(f"error {e}", False)
 
-    async def read_multiple(self, paths: list, purpose: str, memory: str):
+    async def read_multiple(self, paths: list):
         """Processes multiple URLs in parallel."""
         semaphore = asyncio.Semaphore(self.config.get("max_concurrent_tasks", 4))
 
@@ -133,17 +126,27 @@ class WebReader(core.module.Module):
             async with semaphore:
                 path_str = p["path"] if isinstance(p, dict) else p
                 try:
-                    return await self.read(path_str, purpose, memory, multi=True)
+                    return await self.read(path_str)
                 except Exception as e:
                     return {"path": path_str, "error": str(e)}
 
         tasks = [handle_one(p) for p in paths]
         results = await asyncio.gather(*tasks)
 
-        return {
-            "results": results,
-            "ai_instructions": {
-                "important_details": memory,
-                "purpose_of_request": f"{purpose}. Include links to all sources.",
-            },
-        }
+        return self.result(results)
+
+    # override and get rid of parent class's methods
+    async def get():
+        pass
+    async def post():
+        pass
+    async def head():
+        pass
+    async def options():
+        pass
+    async def put():
+        pass
+    async def patch():
+        pass
+    async def delete():
+        pass

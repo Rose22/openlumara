@@ -49,7 +49,7 @@ def load(package, base_class = None, respect_config=True):
         except Exception as e:
             # Catching Exception prevents the program from crashing on faulty modules.
             # We simply log the warning and continue to the next module.
-            core.log("core", f"failed to load module {modname}: {e}")
+            core.log_error(f"failed to load module {modname}", e)
             continue
 
     return tuple(discovered)
