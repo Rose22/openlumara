@@ -12,6 +12,7 @@ import prompt_toolkit.application
 import sys
 import re
 import json
+import json_repair
 
 class ToolCallRenderer:
     def __init__(self):
@@ -27,37 +28,8 @@ class ToolCallRenderer:
             self.current_tool = name
             self.printed_values = {}
 
-        def repair_json(s):
-            stack = []
-            in_string = False
-            escape = False
-            for char in s:
-                if char == '"' and not escape:
-                    in_string = not in_string
-                if char == '\\' and not escape:
-                    escape = True
-                else:
-                    escape = False
-                if not in_string:
-                    if char == '{':
-                        stack.append('}')
-                    elif char == '[':
-                        stack.append(']')
-                    elif char == '}':
-                        if stack and stack[-1] == '}':
-                            stack.pop()
-                    elif char == ']':
-                        if stack and stack[-1] == ']':
-                            stack.pop()
-            repaired = s
-            if in_string:
-                repaired += '"'
-            repaired += "".join(reversed(stack))
-            return repaired
-
         try:
-            repaired_str = repair_json(args_str)
-            data = json.loads(repaired_str)
+            data = json_repair.loads(args_str)
             if not isinstance(data, dict):
                 return
 
