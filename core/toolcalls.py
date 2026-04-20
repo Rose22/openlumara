@@ -42,22 +42,8 @@ class ToolcallManager:
             core.log("toolcall", f"Error formatting tool call: {e}")
             return "🔧 Calling tool..."
 
-    async def process(self, tool_calls, initial_content=""):
-        """
-        process tool calls from an API response..
-        initial_content is the "normal" non-toolcall content, the text that the AI wants to say that's not toolcalls
-        """
-
-        # this is, once again, a very badly documented thing in openAI's chat completions docs
-        # and so i had to use a ton of AI assistance to get this to work well
-        # if you ask me, this stuff should be handled in inference servers like llamacpp,
-        # NOT by the frontends, because this is just reinventing the wheel..
-        # like why do **i** need to repair the json? that should be the server's responsibility...
-        # whatever. we deal with it as best we can here
-
-        # fix broken JSON and convert things where needed
+    def _repair_tool_calls(self, tool_calls):
         repaired_tool_calls = []
-
         for tool_call in tool_calls:
             if not isinstance(tool_call, dict):
                 tool_call = tool_call.model_dump(warnings=False)
@@ -81,6 +67,23 @@ class ToolcallManager:
 
             tool_call['function']['arguments'] = json.dumps(modified_args)
             repaired_tool_calls.append(tool_call)
+        return repaired_tool_calls
+
+    async def process(self, tool_calls, initial_content=""):
+        """
+        process tool calls from an API response..
+        initial_content is the "normal" non-toolcall content, the text that the AI wants to say that's not toolcalls
+        """
+
+        # this is, once again, a very badly documented thing in openAI's chat completions docs
+        # and so i had to use a ton of AI assistance to get this to work well
+        # if you ask me, this stuff should be handled in inference servers like llamacpp,
+        # NOT by the frontends, because this is just reinventing the wheel..
+        # like why do **i** need to repair the json? that should be the server's responsibility...
+        # whatever. we deal with it as best we can here
+
+        # fix broken JSON and convert things where needed
+        repaired_tool_calls = self._repair_tool_calls(tool_calls)
 
         # build openAI-compliant assistant message
         assistant_message = {
@@ -165,23 +168,23 @@ class ToolcallManager:
             await self.channel.announce("toolcalling chain cancelled", "info")
             return
 
-        # build the toolcalling prompt
-        try:
-            # attempt to get chat message history
-            context = await self.channel.context.chat.get()
-        except:
-            # in case we don't have a chat, just use a blank messages array
-            context = {}
+        # # build the toolcalling prompt
+        # try:
+        #     # attempt to get chat message history
+        #     context = await self.channel.context.chat.get()
+        # except:
+        #     # in case we don't have a chat, just use a blank messages array
+        #     context = {}
 
-        prompt = [
-            {
-                "role": "system",
-                "content": (
-                    "If the tool response provides sufficient answers, "
-                    "explain the results to the user. If not, call another tool."
-                )
-            }
-        ] + context
+        # prompt = [
+        #     {
+        #         "role": "system",
+        #         "content": (
+        #             "If the tool response provides sufficient answers, "
+        #             "explain the results to the user. If not, call another tool."
+        #         )
+        #     }
+        # ] + context
 
         final_content = []
         final_reasoning = []
@@ -189,7 +192,7 @@ class ToolcallManager:
 
         try:
             async for token in self.channel.manager.API.send_stream(
-                prompt,
+                await self.channel.context.get(end_prompt=False),
                 tools=self.channel.manager.tools
             ):
                 token_type = token.get("type")
@@ -201,18 +204,25 @@ class ToolcallManager:
                     # actually, do yield. we wanna see it!
                     yield token
                     final_reasoning.append(token.get("content"))
-                elif token_type == "tool_call_delta":
-                    yield token
-                elif token_type == "tool_response":
-                    yield token
-                elif token_type == "tool_calls":
+                elif token_type in ["tool_call_delta", "tool_response", "tool_calls"]:
                     yield token
 
+                if token_type == "tool_calls":
                     had_recursive_call = True
+                    tool_calls = token.get("content")
+                    repaired_tool_calls = []
+                    if tool_calls:
+                        repaired_tool_calls = self._repair_tool_calls(tool_calls)
+                        repaired_token = token.copy()
+                        repaired_token["content"] = repaired_tool_calls
+                        yield repaired_token
+                    else:
+                        yield token
+
                     # the AI has decided to call more tools, so we make a recursive call
                     async for sub_token in self.process(
-                        token.get("content"),
-                        initial_content="".join(final_content)
+                        repaired_tool_calls if tool_calls else [],
+                        initial_content=None
                     ):
                         yield sub_token
                 elif token_type == "usage":

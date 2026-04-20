@@ -12,6 +12,7 @@ import prompt_toolkit.application
 import sys
 import re
 import json
+import json_repair
 
 class ToolCallRenderer:
     def __init__(self):
@@ -27,42 +28,34 @@ class ToolCallRenderer:
             self.current_tool = name
             self.printed_values = {}
 
-        # Extract key-value pairs
-        # Match "key": "value" or "key": value
-        # This regex captures the key, and the value (which might be partial if it's a string)
-        pattern = r'"([^"]+)"\s*:\s*(?:"((?:[^"\\]|\\.)*)"?|([^,}\s"]+)?)'
-        matches = list(re.finditer(pattern, args_str))
+        try:
+            data = json_repair.loads(args_str)
+            if not isinstance(data, dict):
+                return
 
-        for match in matches:
-            key = match.group(1)
-            val = match.group(2) if match.group(2) is not None else match.group(3)
-            if val is None:
-                val = ""
+            for key, value in data.items():
+                val_str = str(value)
+                previously_printed = self.printed_values.get(key, "")
 
-            previously_printed = self.printed_values.get(key, "")
+                if val_str.startswith(previously_printed):
+                    to_print = val_str[len(previously_printed):]
+                else:
+                    to_print = val_str
 
-            if val.startswith(previously_printed):
-                to_print = val[len(previously_printed):]
-            else:
-                # Fallback if the value somehow changed (shouldn't happen in well-formed streams)
-                to_print = val
+                if key not in self.printed_values:
+                    prompt_toolkit.shortcuts.print_formatted_text(
+                        prompt_toolkit.formatted_text.HTML(f"\n<ansicyan>{key}:</ansicyan>\n"),
+                        end="",
+                        flush=True
+                    )
 
-            if key not in self.printed_values:
-                # If the parser detects a new key, print its label
-                prompt_toolkit.shortcuts.print_formatted_text(
-                    prompt_toolkit.formatted_text.HTML(f"\n<ansicyan>{key}:</ansicyan>\n"),
-                    end="",
-                    flush=True
-                )
+                if to_print:
+                    to_print = to_print.replace("\\n", "\n")
+                    print(to_print, end="", flush=True)
 
-            if to_print:
-                # convert newlines to real newlines
-                to_print = to_print.replace("\\n", "\n")
-
-                # Print the streamed value inline
-                print(to_print, end="", flush=True)
-
-            self.printed_values[key] = val
+                self.printed_values[key] = val_str
+        except Exception:
+            pass
 
     def reset(self):
         """Finalize the tool call block with a newline."""
@@ -85,6 +78,7 @@ class Cli(core.channel.Channel):
             "prompt": "ansicyan bold",
             "reasoning-label": "ansiyellow bold",
             "conclusion-label": "ansimagenta bold",
+            "toolcall-response-label": "ansiblue bold",
             "error": "ansired bold",
             "status": "ansiblue",
         })
@@ -167,7 +161,7 @@ class Cli(core.channel.Channel):
                     pass
 
                 if not isinstance(content_decoded, dict):
-                    self._print_formatted("\nToolcall response:", "reasoning-label")
+                    self._print_formatted("\nToolcall response:", "toolcall-response-label")
                     print(content)
                     print()
                     continue
