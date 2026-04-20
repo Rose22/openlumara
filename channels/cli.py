@@ -10,6 +10,67 @@ import prompt_toolkit.key_binding
 import prompt_toolkit.shortcuts
 import prompt_toolkit.application
 import sys
+import re
+import json
+
+class ToolCallRenderer:
+    def __init__(self):
+        self.current_tool = None
+        self.printed_values = {}
+
+    def render(self, name: str, args_str: str):
+        # If this is a new tool, print the header.
+        if self.current_tool != name:
+            prompt_toolkit.shortcuts.print_formatted_text(
+                prompt_toolkit.formatted_text.HTML(f"\n<b>Calling tool: {name}()</b>")
+            )
+            self.current_tool = name
+            self.printed_values = {}
+
+        # Extract key-value pairs
+        # Match "key": "value" or "key": value
+        # This regex captures the key, and the value (which might be partial if it's a string)
+        pattern = r'"([^"]+)"\s*:\s*(?:"((?:[^"\\]|\\.)*)"?|([^,}\s"]+)?)'
+        matches = list(re.finditer(pattern, args_str))
+
+        for match in matches:
+            key = match.group(1)
+            val = match.group(2) if match.group(2) is not None else match.group(3)
+            if val is None:
+                val = ""
+
+            previously_printed = self.printed_values.get(key, "")
+
+            if val.startswith(previously_printed):
+                to_print = val[len(previously_printed):]
+            else:
+                # Fallback if the value somehow changed (shouldn't happen in well-formed streams)
+                to_print = val
+
+            if key not in self.printed_values:
+                # If the parser detects a new key, print its label
+                prompt_toolkit.shortcuts.print_formatted_text(
+                    prompt_toolkit.formatted_text.HTML(f"\n<ansicyan>{key}:</ansicyan>\n"),
+                    end="",
+                    flush=True
+                )
+
+            if to_print:
+                # convert newlines to real newlines
+                to_print = to_print.replace("\\n", "\n")
+
+                # Print the streamed value inline
+                print(to_print, end="", flush=True)
+
+            self.printed_values[key] = val
+
+    def reset(self):
+        """Finalize the tool call block with a newline."""
+        if self.current_tool is not None:
+            # Just print a newline to finish the inline streaming
+            print()
+            self.current_tool = None
+            self.printed_values = {}
 
 class Cli(core.channel.Channel):
     running = True
@@ -76,19 +137,60 @@ class Cli(core.channel.Channel):
 
     async def _process_message(self, msg):
         message_state = None
+        # Create a fresh renderer for this message session
+        tool_renderer = ToolCallRenderer()
+        shown_reasoning = False
+
         async for token in self.send_stream({"role": "user", "content": msg}):
             token_type = token.get("type")
             content = token.get("content", "")
 
-            if token_type == "reasoning" and not message_state:
+            if token_type in ["content", "tool_calls", "tool_response"] and shown_reasoning:
+                # we can have multiple reasoning blocks
+                shown_reasoning = False
+
+            if token_type == "reasoning" and not shown_reasoning:
                 self._print_formatted("Reasoning:", "reasoning-label")
-                message_state = "reasoning"
+                shown_reasoning = True
 
             if token_type == "content" and message_state == "reasoning":
                 self._print_formatted("\nConclusion:", "conclusion-label")
-                message_state = "final output"
 
-            print(content, end="", flush=True)
+            if token_type in ["content", "reasoning"]:
+                print(content, end="", flush=True)
+
+            if token_type == "tool_response":
+                content_decoded = None
+                try:
+                    content_decoded = json.loads(content)
+                except:
+                    pass
+
+                if not isinstance(content_decoded, dict):
+                    self._print_formatted("\nToolcall response:", "reasoning-label")
+                    print(content)
+                    print()
+                    continue
+
+                content_str = None
+                if content_decoded:
+                    content_str = str(content_decoded.get("content"))
+
+                if content_str:
+                    print(f"{content_str}\n", flush=True)
+
+            elif token_type == "tool_call_delta":
+                # Extract the accumulated tool call from the delta
+                tc_list = token.get("tool_calls", [])
+                if tc_list:
+                    tc = tc_list[0]
+                    # Render the partial/full tool call fancy style
+                    tool_renderer.render(tc.function.name, tc.function.arguments)
+
+            elif token_type == "tool_calls":
+                # The final full tool call list is emitted at the end of the stream
+                tool_renderer.reset()
+                print("\n", end="", flush=True)
 
         print()
         print()
@@ -103,8 +205,6 @@ class Cli(core.channel.Channel):
         self._print_formatted(f"[cli] {message}\n", style_class)
         core.log("cli", message)
 
-    def shutdown(self):
-        self._print_formatted("Shutting down CLI...\n", "status")
-        core.log("cli", "shutting down")
+    def on_shutdown(self):
         self.running = False
         return True

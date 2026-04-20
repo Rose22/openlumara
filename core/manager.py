@@ -25,6 +25,7 @@ class Manager:
         self.modules = {}
         self.tools = []
         self.pure_mode = False
+        self.coding_mode = False
 
         self._restart_requested = False
 
@@ -35,18 +36,33 @@ class Manager:
     async def run(self):
         """main loop"""
 
-        if self.args.quiet:
-            core.quiet = True
         if self.args.pure:
             self.pure_mode = True
+        elif self.args.coder:
+            self.coding_mode = True
 
-        core.log("core", "Starting OpenLumara")
+        if not core.quiet:
+            core.log("core", "Starting OpenLumara")
 
         self.savedata = core.storage.StorageDict("save", "msgpack")
 
-        # load channels
+        # retrieve enabled channels from config
         enabled_channels = core.config.get("channels").get("enabled", [])
         if self.args.cli:
+            enabled_channels = ["cli"]
+
+        # retrieve enabled modules from config
+        enabled_modules = core.config.get("modules").get("enabled", [])
+        enabled_user_modules = core.config.get("user_modules", {}).get("enabled", [])
+        loaded_module_names = []
+
+        if self.pure_mode:
+            enabled_modules = []
+            enabled_user_modules = []
+            enabled_user_modules = []
+        elif self.coding_mode:
+            enabled_modules = ["coder"]
+            enabled_user_modules = []
             enabled_channels = ["cli"]
 
         if not enabled_channels:
@@ -55,8 +71,11 @@ class Manager:
 
         core.log("core", "Loading channels")
         import channels
-        for channel in core.modules.load(channels, core.channel.Channel):
+        for channel in core.modules.load(channels, core.channel.Channel, filter=enabled_channels):
             channel_name = core.modules.get_name(channel)
+            if channel_name not in enabled_channels:
+                continue
+
             # add an instance of the channel's class to self.channels
             self.channels[channel_name] = channel(self)
 
@@ -71,21 +90,12 @@ class Manager:
             if last_channel and last_channel in self.channels.keys():
                 self.channel = self.channels[last_channel]
 
-        # load modules
-        enabled_modules = core.config.get("modules").get("enabled", [])
-        enabled_user_modules = core.config.get("user_modules", {}).get("enabled", [])
-        loaded_module_names = []
-
-        if self.pure_mode:
-            enabled_modules = ["context", "chats"]
-            enabled_user_modules = []
-
         if enabled_modules:
             core.log("core", "Loading core modules")
 
             # load modules
             import modules
-            for module in core.modules.load(modules, core.module.Module):
+            for module in core.modules.load(modules, core.module.Module, filter=enabled_modules):
                 if core.modules.get_name(module) not in enabled_modules:
                     continue
 
@@ -99,7 +109,7 @@ class Manager:
             # load user modules
             import user_modules
             core.log("core", "Loading user modules")
-            for module in core.modules.load(user_modules, core.module.Module):
+            for module in core.modules.load(user_modules, core.module.Module, filter=enabled_user_modules):
                 if core.modules.get_name(module) not in enabled_user_modules:
                     continue
 
@@ -125,27 +135,47 @@ class Manager:
             print()
             print(f"Please open the WebUI at http://{host}:{port}")
 
-        await asyncio.gather(*self._async_tasks, return_exceptions=True)
+        try:
+            await asyncio.gather(*self._async_tasks, return_exceptions=True)
+        except KeyboardInterrupt:
+            pass
+        finally:
+            if self._restart_requested:
+                return "restart"
 
-        if self._restart_requested:
-            return "restart"
+            # gracefully shut down
+            await self.shutdown()
+
         return None
 
     async def restart(self):
-        if self.channel:
-            await self.channel.announce("restarting server..")
-        core.log("core", "restarting server..")
-
+        core.log("core", "Restarting server..")
         self._restart_requested = True
+        await self.shutdown()
+
+    async def shutdown(self):
+        core.log("core", "Shutting down..")
+
+        # shutdown modules
+        for module_name, module in self.modules.items():
+            if hasattr(module, "on_shutdown"):
+                try:
+                    if asyncio.iscoroutinefunction(module.on_shutdown):
+                        await module.on_shutdown()
+                    else:
+                        module.on_shutdown()
+                except Exception as e:
+                    core.log("warning", f"Error shutting down {module_name}: {e}")
 
         # shutdown channels
         for channel_name, channel in self.channels.items():
-            if hasattr(channel, "shutdown"):
+            if hasattr(channel, "on_shutdown"):
+                core.log("core", f"Shutting down channel {channel_name}")
                 try:
-                    if asyncio.iscoroutinefunction(channel.shutdown):
-                        await channel.shutdown()
+                    if asyncio.iscoroutinefunction(channel.on_shutdown):
+                        await channel.on_shutdown()
                     else:
-                        channel.shutdown()
+                        channel.on_shutdown()
                 except Exception as e:
                     core.log("warning", f"Error shutting down {channel_name}: {e}")
 
@@ -153,9 +183,11 @@ class Manager:
         for task in list(self._async_tasks):
             task.cancel()
 
+        core.log("core", "Shutdown complete")
+
     async def _initialize_api_connection(self):
         """Initialize API connection with user-friendly error handling."""
-        core.log("API", "connecting to AI..")
+        core.log("API", "Connecting to AI..")
 
         connected = await self.API.connect()
         if not connected:
@@ -193,7 +225,6 @@ class Manager:
         if self.pure_mode:
             return ""
 
-        nonagentic_modules = ("characters", "time")
         system_prompt = []
 
         active_character = None
@@ -205,13 +236,15 @@ class Manager:
         sysprompt_middle = []
         sysprompt_bottom = []
         for module_name, module in self.modules.items():
-            if not core.config.get("model").get("use_tools", False) and module_name not in nonagentic_modules:
+            if not core.config.get("model").get("use_tools", False) and module_name not in core.modules.nonagentic:
                 # skip most prompts if tools are turned off
                 continue
 
-            if active_character and module_name != "characters":
+            if active_character and module_name != "characters" and "characters" in self.modules.keys():
                 # if a character is currently active, display ONLY the character system prompt
-                continue
+                char_disable_agent_prompts = self.modules["characters"].config.get("disable_agent_prompts_when_character_active")
+                if char_disable_agent_prompts:
+                    continue
 
             module_sysprompt = await module.on_system_prompt()
 
@@ -237,7 +270,7 @@ class Manager:
         else:
             return ""
 
-    async def get_end_prompt(self):
+    async def get_end_prompt(self, prevent_recursion=False):
         # don't return endprompt if characters module is active
         active_character = None
         if self.channel:
@@ -248,10 +281,22 @@ class Manager:
         # automatically insert system prompts returned by modules (such as memory)
         histend_prompt = []
         for module_name, module in self.modules.items():
+            if prevent_recursion and module_name == "tokens":
+                # if we try to count the system prompt's tokens from the function that counts tokens.. we get recursion
+                continue
+
+            if not core.config.get("model").get("use_tools", False) and module_name not in core.modules.nonagentic:
+                # skip most prompts if tools are turned off
+                continue
+
             module_sysprompt = await module.on_end_prompt()
 
             if module_sysprompt and (module_name not in core.config.get("modules").get("disabled_end_prompts", [])):
-                prompt_chunk = f"# {' '.join(module_name.split('_')).capitalize()}\n{str(module_sysprompt).strip()}"
+                sysprompt_header = ' '.join(module_name.split('_')).capitalize()
+                if hasattr(module, "_header") and module._header:
+                    # but allow overriding the header
+                    sysprompt_header = module._header
+                prompt_chunk = f"# {sysprompt_header}\n{str(module_sysprompt).strip()}"
                 histend_prompt.append(prompt_chunk)
 
         if histend_prompt:
@@ -387,7 +432,7 @@ class Manager:
         if self.pure_mode:
             return loaded_module
 
-        for func_name in dir(module):
+        for func_name in vars(module):
             if func_name.startswith("_"):
                 # skip private methods and other private properties
                 continue
@@ -418,7 +463,6 @@ class Manager:
 
             # only get class methods with a self parameter
             if not func_params.get("self"):
-                core.log("error", f"class method {func_name} skipped because it didn't have required `self` argument.")
                 continue
 
             # remove "self" arg from func

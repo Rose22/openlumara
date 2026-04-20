@@ -49,9 +49,102 @@ def get_commands_help(modules_dict):
 
     return "\n\n".join(output)
 
+def _convert_type(value: str):
+    """
+    Converts string inputs from the CLI/Chat into appropriate Python types.
+    """
+    if value.lower() == "true":
+        return True
+    if value.lower() == "false":
+        return False
+
+    # Try integer conversion
+    try:
+        # We use a check to see if it's a valid integer representation
+        if value.lstrip('-').isdigit():
+            return int(value)
+    except ValueError:
+        pass
+
+    # Try float conversion
+    try:
+        return float(value)
+    except ValueError:
+        pass
+
+    # Default to string
+    return value
+
+def _set_config_value(path: list, value: str):
+    """
+    Sets a configuration value at a nested path.
+
+    Args:
+        path: A list of keys representing the nested path (e.g., ["api", "url"]).
+        value: The value to set (as a string, will be type-converted).
+    """
+    if not path:
+        return "error: Path cannot be empty"
+
+    typed_value = _convert_type(value)
+
+    try:
+        # Access the StorageDict instance from the config module
+        target = core.config.config
+        if target is None:
+            return "error: Configuration is not loaded. Please restart or wait for system initialization."
+
+        # Traverse the dictionary following the path
+        current = target
+        for i, key in enumerate(path[:-1]):
+            # If the key doesn't exist or the current level isn't a dictionary,
+            # create a new dictionary to allow for deep nesting.
+            if key not in current or not isinstance(current[key], dict):
+                current[key] = {}
+            current = current[key]
+
+        # Set the final value
+        current[path[-1]] = typed_value
+
+        # Persist changes to the YAML file
+        core.config.config.save()
+
+        return f"Config updated: {' -> '.join(path)} = {typed_value}"
+    except Exception as e:
+        return f"Failed to update config: {e}"
+
+def _get_config_value(path: list):
+    """
+    Gets a configuration value from a nested path.
+
+    Args:
+        path: A list of keys representing the nested path (e.g., ["api", "url"]).
+    """
+    try:
+        # Use the shorthand get from the config module which handles the StorageDict
+        root_item = core.config.get(path[0])
+        if root_item == None:
+            return f"{path[0]} is not a valid settings category"
+
+        sub_item = root_item
+        last_path_key = path[0]
+        for path_key in path[1:]:
+            sub_item = sub_item.get(path_key)
+            if sub_item == None:
+                return f"{path_key} is not a valid setting"
+            last_path_key = path_key
+
+        if isinstance(sub_item, dict):
+            sub_keys = ", ".join(sub_item.keys())
+            sub_item = f"Available settings in {last_path_key}: {sub_keys}"
+
+        return sub_item
+    except Exception as e:
+        return f"Error retrieving config: {e}"
+
 class Commands:
     # delete these after they are shown to the user once
-    TEMPORARY = ("context", "prompt", "tools", "restart", "stop")
+    TEMPORARY = ("context", "prompt", "tools", "stop")
 
     def __init__(self, channel):
         self.channel = channel
@@ -61,17 +154,35 @@ class Commands:
 
         help_text = """
 == built in commands ==
-/modules                list modules
-/module                 enable/disable a module by name
-/tools                  list tools available to the AI
-/status                 show status info
-/restart                restarts the server
-/stop                   stops the AI in it's tracks
-/connect                attempt to connect to the API
-/disconnect             disconnect from the API
-/reconnect              reconnect to the API
-/ping                   test command that echoes "Pong!"
-/help                   this help
+chats:
+/new                        starts a new chat
+/clear                      clear current chat history
+/chats                      list previous chats
+/chat <ID>                  load a chat by its ID
+/chat rename <name>         rename current chat
+/chat category <category>   put chat in that category
+
+modules:
+/modules                    list modules
+/module                     enable/disable a module by name
+/tools                      list tools available to the AI
+
+core:
+/prompt                     show system prompt
+/prompt <module name>       show system prompt for that module
+/history                    show full chat history
+/context full               show full context being sent to AI
+/context raw                show full context as raw JSON
+/status                     show status info
+/config set <path> <value>  Example: /config set api url http://localhost:5001/v1
+/config get <path>          Example: /config get api url
+/restart                    restarts the server
+/stop                       stops the AI in it's tracks
+/connect                    attempt to connect to the API
+/disconnect                 disconnect from the API
+/reconnect                  reconnect to the API
+/ping                       test command that echoes "Pong!"
+/help                       this help
         """.strip()
 
         output.append(help_text)
@@ -100,9 +211,9 @@ class Commands:
         return False
 
     async def _extract_cmd(self, message_text):
-        message_content = message_text.strip().lower()
+        message_content = message_text.strip()
         cmd_prefix = core.config.get("cmd_prefix", "/")
-        cmd_prefix_index = message_content.find(cmd_prefix)+len(cmd_prefix)
+        cmd_prefix_index = message_content.lower().find(cmd_prefix.lower())+len(cmd_prefix)
 
         cmd = message_content[cmd_prefix_index:].split()
         args = cmd[1:]
@@ -124,7 +235,7 @@ class Commands:
         args_display = ""
         if args:
             args_display += " "
-            args_display += "".join(args)
+            args_display += " ".join(args)
         await self.channel.context.chat.add({"role": "user", "content": f"{cmd_prefix}{cmd[0]}{args_display}"}, temporary=use_temporary)
 
         result = await self._process_input(message)
@@ -149,6 +260,79 @@ class Commands:
                 return await self._get_help()
             case "ping":
                 return "pong!"
+            case "new":
+                """starts a new session"""
+                result = await self.channel.context.chat.new()
+                if result:
+                    return "New session started."
+                else:
+                    return "Failed to start new session"
+            case "clear":
+                """clear chat history"""
+
+                result = await self.channel.context.chat.clear()
+                if result:
+                    return "Chat history wiped."
+                else:
+                    return "Failed to wipe chat history"
+            case "chats":
+                # if i overwrite the list builtin, it leads to really bad stuff
+
+                """list chats"""
+
+                chats = await self.channel.context.chat.get_all()
+                if not chats:
+                    return self.result("No saved chats found.", False)
+
+                result = f"Saved chats for {self.channel.name}:\n"
+                for conv in chats[-20:]: # only the last 20 to avoid overwhelming the AI
+                    result += f"- [{conv.get('id')}] {conv.get('title', 'Untitled')[:50]}\n"
+
+                return result
+
+    # @core.module.command("chat", temporary=True, help={
+    #     "": "show information about current chat",
+    #     "<ID>": "load chat using its ID",
+    #     "rename <new_name>": "rename chat to <new_name>",
+    #     "category <category>": "put chat in category <category>"
+    # })
+    # async def load(self, args: list):
+            case "chat":
+                """load chat using its ID"""
+                if not args:
+                    chat_title = await self.channel.context.chat.get_title()
+                    chat_category = await self.channel.context.chat.get_category()
+                    chat_tags = await self.channel.context.chat.get_tags()
+                    chat_tags_str = "None"
+                    if chat_tags:
+                        chat_tags_str = ", ".join(chat_tags)
+                    chat_data = await self.channel.context.chat.get_data() or {}
+                    if chat_data:
+                        chat_data_str = "\n"
+                        chat_data_str += "\n".join([f"  {key}: {value}" for key, value in chat_data.items()])
+                    else:
+                        chat_data_str = "None"
+
+                    return f"== chat info ==\ntitle: {chat_title}\ncategory: {chat_category}\ntags: {chat_tags_str}\ndata: {chat_data_str}"
+                match args[0].lower().strip():
+                    case "rename":
+                        newname = " ".join(args[1:])
+                        result = await self.channel.context.chat.set_title(newname)
+                        if not result:
+                            return "rename failed"
+                        return f"chat renamed to {newname}"
+                    case "category":
+                        newcat = " ".join(args[1:])
+                        result = await self.channel.context.chat.set_category(newcat)
+                        if not result:
+                            return "setting category failed"
+                        return f"chat categorised into {newcat}"
+                    case _:
+                        result = await self.channel.context.chat.load(args[0])
+                        if not result:
+                            return "failed to load chat"
+                        return "chat loaded"
+
             case "connect":
                 if self.channel.manager.API.connected:
                     return "Already connected."
@@ -240,6 +424,120 @@ class Commands:
                     tool_map_display.append(f"== {module_name} ==\n{tools_display}")
 
                 return "\n\n".join(tool_map_display)
+            case "config":
+                if not args:
+                    return "Usage: /config <set|get> <path> [value]"
+
+                subcommand = args[0].lower()
+
+                if subcommand == "set":
+                    # Expected: ['set', 'key1', 'key2', 'value']
+                    if len(args) < 3:
+                        return "Usage: /config set <key1> <key2> ... <value>"
+
+                    path = args[1:-1]
+                    value = args[-1]
+                    return str(_set_config_value(path, value))
+
+                elif subcommand == "get":
+                    # Expected: ['get', 'key1', 'key2']
+                    if len(args) < 2:
+                        return "Usage: /config get <key1> <key2> ..."
+
+                    path = args[1:]
+                    return str(_get_config_value(path))
+
+                else:
+                    return f"Unknown subcommand '{subcommand}'. Use 'set' or 'get'."
+
+            case "context":
+                """shows current context window"""
+
+                if not core.config.get("api").get("context_window", True):
+                    return "CONTEXT DISABLED"
+
+                show_system_prompt = True if len(args) and args[0] == "full" else False
+
+                context = await self.channel.context.get(system_prompt=show_system_prompt)
+                if not context:
+                    return "BLANK"
+
+                if len(args) and args[0] == "raw":
+                    import json
+                    return json.dumps(context, indent=2)
+
+                context_display = []
+
+                for message in context:
+                    content = message.get("content")
+                    if not content:
+                        if message.get("tool_calls"):
+                            content = str(message.get("tool_calls"))
+
+                    context_display.append(f"== {message.get('role')} ==\n{content}")
+
+                context_display.append("---")
+
+                disabled_prompts = core.config.get("modules").get("disabled_prompts")
+                if disabled_prompts:
+                    disabled_prompts_str = "\n".join([mod_name for mod_name in disabled_prompts])
+                    context_display.append(f"== disabled prompts ==\n{disabled_prompts_str}")
+
+                ctx_string = ""
+                context_size = await self.channel.context.get_size()
+                for key, value in context_size.items():
+                    ctx_string += f"{key}: {value}\n"
+                context_display.append(f"== context size ==\n{ctx_string}")
+
+                return "\n\n".join(context_display)
+
+            case "prompt":
+                """shows only the system prompt"""
+
+                if not core.config.get("api").get("context_window", True):
+                    return "CONTEXT DISABLED"
+
+                if not len(args):
+                    _sysprompt = await self.channel.manager.get_system_prompt()
+                    if not _sysprompt:
+                        _sysprompt = "BLANK"
+                    sysprompt = f"=== system prompt ===\n{_sysprompt}"
+                    disabled_prompts = core.config.get("modules").get("disabled_prompts")
+                    if disabled_prompts:
+                        sysprompt += "\n\n=== disabled prompts ===\n"
+                        sysprompt += "\n".join([mod_name for mod_name in disabled_prompts])
+                    endprompt = await self.channel.manager.get_end_prompt()
+                    if endprompt:
+                        sysprompt += f"\n\n=== end prompts ===\n{endprompt}"
+
+                    return sysprompt if sysprompt else "BLANK"
+                else:
+                    module_name = args[0].strip().replace(" ", "_")
+                    module_obj = self.manager.modules.get(module_name, None)
+                    if module_obj:
+                        if hasattr(module_obj, "on_system_prompt"):
+                            return await module_obj.on_system_prompt() or "BLANK"
+                        else:
+                            return "module does not have a system prompt defined"
+
+                    return "module not found"
+
+            case "prompts":
+                """show which prompts are active"""
+
+                enabled = []
+                no_prompt = []
+                disabled = []
+                for module_name, module in self.channel.manager.modules.items():
+                    has_sysprompt = True if await module.on_system_prompt() else False
+
+                    if has_sysprompt:
+                        enabled.append(module_name)
+                    else:
+                        disabled.append(module_name)
+
+                enabled_str = "\n".join(enabled)
+                return f"== modules with active prompts ==\n{enabled_str}"
             case "restart":
                 await self.channel.manager.restart()
                 return "restarting.."

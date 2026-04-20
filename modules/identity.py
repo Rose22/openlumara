@@ -1,7 +1,7 @@
 import core
 
 class Identity(core.module.Module):
-    """manage your AI's personality"""
+    """Gives your AI a personality by inserting it as a prompt. The AI can edit its own personality!"""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -15,7 +15,7 @@ class Identity(core.module.Module):
         identity = "\n".join(self.identity) if len(self.identity) > 0 else None
         sysprompt = None
         if identity:
-            sysprompt = f"{identity}\n\nYou can use the identity_set() tool to modify this identity if needed."
+            sysprompt = f"{identity}\nYou can use the identity_set() tool to modify this identity if needed."
         return sysprompt
 
     async def set(self, content: str):

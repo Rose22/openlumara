@@ -1,6 +1,8 @@
 import core
 
 class OpenlumaraPrompt(core.module.Module):
+    """Makes the AI aware of OpenLumara itself"""
+
     _header = "agent_platform"
 
     async def on_system_prompt(self):

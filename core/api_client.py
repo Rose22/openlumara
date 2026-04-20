@@ -132,7 +132,8 @@ class APIClient():
             "tools": tools,
             "stream": stream,
             "temperature": core.config.get("model", {}).get("temperature", 0.2),
-            "max_completion_tokens": core.config.get("api", {}).get("max_output_tokens", 8192)
+            "max_completion_tokens": core.config.get("api", {}).get("max_output_tokens", 8192),
+            "reasoning_effort": core.config.get("model", {}).get("reasoning_effort", "medium")
         }
 
         # allow inserting custom request fields
@@ -315,6 +316,11 @@ class APIClient():
                                 # ensure arguments is always a string
                                 if tool_call_buffer[index].function.arguments is None:
                                     tool_call_buffer[index].function.arguments = ""
+
+                                yield {
+                                    "type": "tool_call_delta",
+                                    "tool_calls": [tool_call_buffer[index]]
+                                }
                             else:
                                 # the documentation for this was awful, so i had to use AI to figure it out
                                 # welcome to the reason i was forced to introduce AI slop to the core framework
@@ -335,6 +341,12 @@ class APIClient():
                                 # and which we must accumulate to get the full toolcall
                                 if tool_call.function.arguments:
                                     tool_call_buffer[index].function.arguments += tool_call.function.arguments
+
+                                    # the magic sauce that allows streaming toolcall arguments
+                                    yield {
+                                        "type": "tool_call_delta",
+                                        "tool_calls": [tool_call_buffer[index]]
+                                    }
 
                 # if response has usage data, save it so we can use it to show to the user and to trim context
                 if hasattr(chunk, 'usage') and chunk.usage is not None:

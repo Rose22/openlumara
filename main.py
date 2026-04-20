@@ -18,9 +18,13 @@ import asyncio
 import subprocess
 
 async def main(args):
+    if args.quiet:
+        core.quiet = True
+
     # load config file, allowing the path to be overridden
     config_display_str = "config.yaml" if not args.config else args.config
-    core.log("core", f"Loading settings from config {config_display_str}")
+    if not core.quiet:
+        core.log("core", f"Loading settings from config {config_display_str}")
     core.config.load(args.config)
 
     override_config_with_args(core.config.config, args)
@@ -32,6 +36,8 @@ async def main(args):
 
 def do_restart(argv=None):
     """cross-platform restart with TTY/console inheritance"""
+    print("----------------")
+
     script = os.path.abspath(__file__)
     restart_argv = list(argv) if argv is not None else sys.argv[1:]
     args = [sys.executable, script] + restart_argv
@@ -126,6 +132,7 @@ def build_arg_parser():
     args_main.add_argument("--pure", help="disables all non-essential modules so that system prompt is blank and you're talking to the bare model", action="store_true")
     args_main.add_argument("--tmp", help="temporary session, discards all data after shutdown", action="store_true")
     args_main.add_argument("--cli", help="CLI-only mode", action="store_true")
+    args_main.add_argument("--coder", help="enable only the coder module (coding agent mode)", action="store_true")
     args_main.add_argument("--quiet", help="surpress logs", action="store_true")
     args_main.add_argument("--insecure_tls", help="Disable verification for SSL/TLS certs. Use when your API uses self-signed or unvalid certificates.", action="store_true")
 
@@ -151,7 +158,6 @@ def run_from_argv(argv=None):
         if result == "restart":
             do_restart(run_argv)
         else:
-            print("Shutting down..")
             exit()
 
 

@@ -123,20 +123,25 @@ class ToolcallManager:
                 # build a fancy toolcall display string
                 tool_call_str = self.display_call(tool_call_dict)
 
-                core.log("toolcall", tool_call_str)
+                # core.log("toolcall", tool_call_str)
 
                 try:
                     # do the function call and get it's result
                     func_response = await func_callable(**tool_args)
 
                     # then build the openai toolcall response object
+                    func_response_str = json.dumps(str(func_response))
                     tool_response = {
                         "role": "tool",
                         "tool_call_id": tool_call_dict['id'],
-                        "content": json.dumps(str(func_response))
+                        "content": func_response_str
                     }
+
+                    # yield it so it can be displayed immediately
+                    yield {"type": "tool_response", "content": func_response_str}
+
                 except Exception as e:
-                    core.log("toolcall", f"error: {str(e)}")
+                    core.log_error("error", e)
 
                     # build an openai-compliant tool error object
                     tool_response = {
@@ -144,6 +149,9 @@ class ToolcallManager:
                         "tool_call_id": tool_call_dict['id'],
                         "content": f"error: {str(e)}"
                     }
+
+                    # yield it so it can be displayed immediately
+                    yield {"type": "tool_response", "content": f"error: {str(e)}"}
 
                 # add the tool response to the context window
                 await self.channel.context.chat.add(tool_response)
@@ -190,7 +198,13 @@ class ToolcallManager:
                     yield token
                 elif token_type == "reasoning":
                     # only collect reasoning, in case there was no normal message content. but dont yield.
+                    # actually, do yield. we wanna see it!
+                    yield token
                     final_reasoning.append(token.get("content"))
+                elif token_type == "tool_call_delta":
+                    yield token
+                elif token_type == "tool_response":
+                    yield token
                 elif token_type == "tool_calls":
                     yield token
 
@@ -205,8 +219,11 @@ class ToolcallManager:
                     pass
 
             if not final_content:
-                # replace content with reasoning if there was no content
-                final_content = f"Okay, I called the tool!\nReasoning: {final_reasoning}"
+                if final_reasoning:
+                    # replace content with reasoning if there was no content
+                    final_content = f"The AI made a tool call, but returned no message.\nReasoning: {''.join(final_reasoning)}"
+                else:
+                    final_content = "Made a tool call"
 
             # only add final message if we didn't make a recursive call
             # (the innermost call handles adding the final message)

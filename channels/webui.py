@@ -95,6 +95,9 @@ log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 log.disabled = True
 
+# disable json key sorting
+app.json.sort_keys = False
+
 # Load HTML template
 HTML_TEMPLATE = None
 with open(os.path.join(WEBUI_DIR, "index.html"), "r") as f:
@@ -105,6 +108,21 @@ channel_instance = None
 
 # Set of stream IDs that have been cancelled
 stream_cancellations = set()
+
+def serialize_for_json(obj):
+    """Recursively converts non-serializable objects into plain dicts/lists."""
+    if isinstance(obj, dict):
+        return {k: serialize_for_json(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [serialize_for_json(x) for x in obj]
+    elif hasattr(obj, 'to_dict'):  # Many AI libraries use this
+        return serialize_for_json(obj.to_dict())
+    elif hasattr(obj, '__dict__'):  # Handles custom class instances
+        return serialize_for_json(obj.__dict__)
+    elif isinstance(obj, (str, int, float, bool, type(None))):
+        return obj
+    else:
+        return str(obj)  # Fallback to string representation
 
 # Security headers
 @app.after_request
@@ -164,7 +182,6 @@ class Webui(core.channel.Channel):
             while not self._shutdown_requested:
                 await asyncio.sleep(1)
         except asyncio.CancelledError:
-            core.log("webui", "shutting down")
             raise
 
     def _run_flask(self):
@@ -182,7 +199,7 @@ class Webui(core.channel.Channel):
         except:
             pass  # Server shutdown
 
-    def shutdown(self):
+    def on_shutdown(self):
         """Shutdown the Flask server."""
         self._shutdown_requested = True
         if self.server:
@@ -472,9 +489,11 @@ def stream_message():
                     break
 
             elif isinstance(item, dict):
-                yield f"data: {json.dumps(item)}\n\n"
+                # FIX: Use the recursive serializer here!
+                yield f"data: {json.dumps(serialize_for_json(item))}\n\n"
 
             else:
+                # This handles raw string tokens
                 yield f"data: {json.dumps({'type': 'content', 'text': str(item)})}\n\n"
 
         future.result()
@@ -983,6 +1002,25 @@ def save_settings():
 
     return jsonify({"success": True})
 
+@app.route("/settings/get_module_info")
+def get_module_info():
+    module_info = {}
+    import modules
+    import user_modules
+
+    loaded_module_classes = core.modules.load(modules, core.module.Module) + core.modules.load(user_modules, core.module.Module)
+    for module_class in loaded_module_classes:
+        module_name = core.modules.get_name(module_class)
+        docstring = str(module_class.__doc__).strip()
+
+        if docstring not in [None, "None"] and module_name not in module_info.keys():
+            # only get the first class's docstring, dont overwrite it with docstrings from other classes in the file
+            module_info[module_name] = {
+                "description": docstring
+            }
+
+    return jsonify({"success": True, "module_info": module_info})
+
 # =============================================================================
 # Storage Editor Routes
 # =============================================================================
@@ -1327,7 +1365,9 @@ def add_storage_key():
 # =============================================================================
 @app.route("/server/restart", methods=["POST"])
 def restart_server():
-    _run_async(core.restart())
+    global channel_instance
+    core.log("webui", "Restart triggered")
+    _run_async(channel_instance.manager.restart())
     return jsonify({"success": True})
 
 # =============================================================================

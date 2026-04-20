@@ -8,5 +8,8 @@ aiofiles
 python-ulid
 requests
 flask
+beautifulsoup4
 discord.py
 python-telegram-bot
+tree-sitter
+tree-sitter-python

@@ -1,7 +1,11 @@
 import core
 
 class Characters(core.module.Module):
-    """lets your AI embody different characters! inspired by characterAI, janitorAI, sillytavern, etc."""
+    """Lets your AI embody different characters! inspired by characterAI, janitorAI, sillytavern, etc."""
+
+    settings = {
+        "disable_agent_prompts_when_character_active": True,
+    }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

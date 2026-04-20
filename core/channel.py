@@ -18,6 +18,9 @@ class Channel:
 
         self.tc_manager = core.toolcalls.ToolcallManager(self)
 
+        # load channel config
+        self.config = core.config.get("channels", {}).get("settings", {}).get(self.name, {})
+
     async def _set_as_active_channel(self):
         self.manager.channel = self
 
@@ -67,7 +70,11 @@ class Channel:
         # process any /commands
         cmd_response = None
         if message.get("role", "user") == "user":
-            cmd_response = await self.commands.process_input(message)
+            try:
+                cmd_response = await self.commands.process_input(message)
+            except Exception as e:
+                core.log_error("error while executing command", e)
+
             if cmd_response:
                 return {"role": "assistant", "content": cmd_response}
             else:
@@ -139,7 +146,10 @@ class Channel:
 
         cmd_response = None
         if message.get("role", "user") == "user":
-            cmd_response = await self.commands.process_input(message)
+            try:
+                cmd_response = await self.commands.process_input(message)
+            except Exception as e:
+                core.log_error("error while executing command", e)
 
         if cmd_response:
             # insert and return the command response without sending it to the AI
@@ -183,9 +193,11 @@ class Channel:
             elif token_type == "reasoning":
                 final_reasoning.append(token.get("content"))
                 yield token
+            elif token_type == "tool_call_delta":
+                # yay toolcall arg streaming!
+                yield token
             elif token_type == "tool_calls":
                 yield token
-
                 tool_calls_occurred = True
 
                 # we add the accumulated content tokens so far to the initial_content argument

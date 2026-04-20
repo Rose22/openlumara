@@ -7,6 +7,7 @@ let settingsOriginal = {};
 let settingsHasChanges = false;
 let cachedModels = null;
 let modelsLoadError = null;
+let moduleInfoCache = {};
 
 // Category icons
 const SETTINGS_ICONS = {
@@ -65,7 +66,7 @@ async function fetchModels() {
 }
 
 // Organize settings into categories, grouping by second-level key (e.g. modules.X)
-function organizeSettingsIntoCategories(originalData) {
+function organizeSettingsIntoCategories(originalData, moduleInfo = {}) {
     const categories = {};
 
     // Always add appearance first
@@ -108,19 +109,28 @@ function organizeSettingsIntoCategories(originalData) {
         };
 
         // Special handling for modules and channels
-        if (topKey === 'modules' || topKey === 'channels') {
+        if (topKey === 'modules' || topKey === 'user_modules') {
             // Get list of enabled items to filter settings
             const enabledItems = new Set(topValue.enabled || []);
             const allItems = getAllToggleItems(topValue);
+
+            const itemDescriptions = {};
+            for (const itemName in moduleInfo) {
+                if (moduleInfo[itemName].description) {
+                    itemDescriptions[itemName] = moduleInfo[itemName].description;
+                }
+            }
 
             // Add the toggle list directly (ungrouped) at the top
             addToGroup('_direct_', null, {
                 key: topKey,
                 value: {
                     enabled: topValue.enabled || [],
-                    disabled: topValue.disabled || []
+                    disabled: topValue.disabled || [],
+                    descriptions: itemDescriptions // <--- Injecting descriptions here,
                 },
-                type: 'toggle_list'
+                type: 'toggle_list',
+                isModuleList: true
             }, true);
 
             // Only show settings for enabled items
@@ -372,40 +382,66 @@ async function loadSettings() {
     error.style.display = 'none';
     form.style.display = 'none';
 
+    let fetchError = null;
+
     try {
+        // 1. Attempt to fetch fresh data
         const response = await fetch('/settings/load', {
-            signal: AbortSignal.timeout(10000)
+            signal: AbortSignal.timeout(5000) // Reduced timeout for better responsiveness
         });
 
         if (!response.ok) {
             throw new Error(`Server returned ${response.status}`);
         }
 
-        settingsData = await response.json();
+        const newData = await response.json();
+
+        // 2. If successful, update the master cache and the original reference
+        settingsData = newData;
         settingsOriginal = JSON.parse(JSON.stringify(settingsData));
 
-        // Pre-fetch models if we have a model field
-        const hasModelField = checkForModelField(settingsData);
-        if (hasModelField) {
-            await fetchModels();
+        // 3. Attempt to fetch module info (gracefully)
+        try {
+            const infoResponse = await fetch('/settings/get_module_info', { signal: AbortSignal.timeout(3000) });
+            if (infoResponse.ok) {
+                const infoData = await infoResponse.json();
+                moduleInfoCache = infoData.module_info || {};
+            }
+        } catch (infoErr) {
+            console.warn('Failed to fetch module info (using cache):', infoErr);
         }
 
-        const categories = organizeSettingsIntoCategories(settingsData);
-
-        renderSettingsForm(categories);
-        renderSettingsNav(categories);
-
-        loading.style.display = 'none';
-        form.style.display = 'block';
-        settingsHasChanges = false;
-        updateUnsavedIndicator();
+        // 4. Pre-fetch models (gracefully)
+        if (checkForModelField(settingsData)) {
+            fetchModels().catch(e => console.warn("Model fetch failed:", e));
+        }
 
     } catch (err) {
-        console.error('Failed to load settings:', err);
-        loading.style.display = 'none';
-        error.style.display = 'flex';
-        errorMsg.textContent = err.message || 'Failed to load settings';
+        console.error('Failed to load settings from server:', err);
+        fetchError = err.message;
+
+        // 5. CHECK CACHE: If we have data in settingsData, don't show error, just use what we have
+        if (Object.keys(settingsData).length === 0) {
+            // No cache exists and server failed -> Hard error
+            loading.style.display = 'none';
+            error.style.display = 'flex';
+            errorMsg.textContent = fetchError || 'Failed to load settings and no cached data available.';
+            return;
+        } else {
+            // We have cache! We will proceed to render, but we've logged the error.
+            console.warn('Proceeding with cached settings due to connection error.');
+        }
     }
+
+    // 6. Render whatever we have (either the fresh data or the cached data)
+    const categories = organizeSettingsIntoCategories(settingsData, moduleInfoCache);
+    renderSettingsForm(categories);
+    renderSettingsNav(categories);
+
+    loading.style.display = 'none';
+    form.style.display = 'block';
+    settingsHasChanges = false;
+    updateUnsavedIndicator();
 }
 
 // Check if settings contain a model field
@@ -458,7 +494,6 @@ function switchSettingsCategory(category) {
     });
 }
 
-// Render settings form
 function renderSettingsForm(categories) {
     const form = document.getElementById('settings-form');
     form.innerHTML = '';
@@ -494,18 +529,27 @@ function renderSettingsForm(categories) {
 
         // Render groups - put direct items first
         if (data.groups) {
-            // First render direct (ungrouped) items
+            // First render direct (ungrouped) items into the main vertical stack
             const directGroup = data.groups.get('_direct_');
             if (directGroup && directGroup.isDirect) {
                 directGroup.items.forEach(item => {
                     const itemEl = createSettingItem(item);
+
+                    // Apply full-width class to module/user module toggle lists
+                    if (item.isModuleList) {
+                        itemEl.classList.add('full-width-item');
+                    }
+
                     itemsContainer.appendChild(itemEl);
                 });
             }
 
-            // Then render grouped items
+            // Create the grid container for grouped items
+            const groupsGrid = document.createElement('div');
+            groupsGrid.className = 'settings-groups-grid';
+
+            // Then render grouped items into the grid
             data.groups.forEach((groupData, groupKey) => {
-                // Skip direct items - already rendered
                 if (groupKey === '_direct_') return;
 
                 const groupContainer = document.createElement('div');
@@ -515,10 +559,8 @@ function renderSettingsForm(categories) {
                 // Create header (clickable to collapse)
                 const header = document.createElement('div');
                 header.className = 'settings-group-header';
-                header.onclick = () => toggleSettingsGroup(header);
                 header.innerHTML = `
                 <span class="settings-group-title">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
                 ${groupData.title}
                 </span>
                 `;
@@ -526,7 +568,6 @@ function renderSettingsForm(categories) {
                 // Create content container
                 const content = document.createElement('div');
                 content.className = 'settings-group-content';
-                content.style.display = 'none';
 
                 // Render items within the group
                 groupData.items.forEach(item => {
@@ -536,8 +577,10 @@ function renderSettingsForm(categories) {
 
                 groupContainer.appendChild(header);
                 groupContainer.appendChild(content);
-                itemsContainer.appendChild(groupContainer);
+                groupsGrid.appendChild(groupContainer); // Append to the grid
             });
+
+            itemsContainer.appendChild(groupsGrid); // Append grid to the main container
         }
 
         section.appendChild(itemsContainer);
@@ -580,7 +623,7 @@ function createSettingItem(item) {
             inputEl = createModelInput(item.key, item.value);
             break;
         case 'toggle_list':
-            inputEl = createToggleListInput(item.key, item.value);
+            inputEl = createToggleListInput(item.key, item.value, !!item.isModuleList);
             break;
         case 'boolean':
             inputEl = createToggleInput(item.key, item.value);
@@ -781,13 +824,14 @@ function createModelInput(key, value) {
 }
 
 // Create toggle list (for enabled/disabled arrays)
-function createToggleListInput(key, value) {
+function createToggleListInput(key, value, isModuleList = false) {
     const wrapper = document.createElement('div');
     wrapper.className = 'toggle-list';
     wrapper.dataset.key = key;
 
     const allItems = getAllToggleItems(value);
     const enabledSet = new Set(value.enabled || []);
+    const descriptions = value.descriptions || {};
 
     // Sort: enabled items first, then alphabetically within each group
     const sortedItems = allItems.sort((a, b) => {
@@ -798,13 +842,11 @@ function createToggleListInput(key, value) {
         return a.localeCompare(b);
     });
 
-    // Status bar
     const status = document.createElement('div');
     status.className = 'toggle-list-status';
     status.innerHTML = `<span class="toggle-count">${enabledSet.size} of ${sortedItems.length} enabled</span>`;
     wrapper.appendChild(status);
 
-    // Grid of toggles
     const grid = document.createElement('div');
     grid.className = 'toggle-list-grid';
 
@@ -812,49 +854,88 @@ function createToggleListInput(key, value) {
         const isEnabled = enabledSet.has(item);
 
         const itemWrapper = document.createElement('div');
-        itemWrapper.className = 'toggle-list-item' + (isEnabled ? ' enabled' : '');
+        // Add 'module-card' class only if isModuleList is true
+        itemWrapper.className = 'toggle-list-item' +
+        (isEnabled ? ' enabled' : '') +
+        (isModuleList ? ' module-card' : '');
 
-        const name = document.createElement('span');
-        name.className = 'toggle-list-name';
-        name.textContent = formatLabel(item);
+        if (isModuleList) {
+            // --- MODULE CARD STRUCTURE ---
+            const topRow = document.createElement('div');
+            topRow.className = 'toggle-list-top-row';
 
-        const toggle = document.createElement('label');
-        toggle.className = 'toggle-switch';
+            const name = document.createElement('div');
+            name.className = 'toggle-list-name';
+            name.textContent = formatLabel(item);
 
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.checked = isEnabled;
+            const toggle = document.createElement('label');
+            toggle.className = 'toggle-switch';
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = isEnabled;
+            const slider = document.createElement('span');
+            slider.className = 'toggle-slider';
+            toggle.appendChild(checkbox);
+            toggle.appendChild(slider);
 
-        const slider = document.createElement('span');
-        slider.className = 'toggle-slider';
+            topRow.appendChild(name);
+            topRow.appendChild(toggle);
+            itemWrapper.appendChild(topRow);
 
-        toggle.appendChild(checkbox);
-        toggle.appendChild(slider);
+            if (descriptions[item] !== "None") {
+                const descContainer = document.createElement('div');
+                descContainer.className = 'toggle-list-desc-container';
 
-        checkbox.onchange = () => {
-            const newState = checkbox.checked;
-            itemWrapper.classList.toggle('enabled', newState);
+                const desc = document.createElement('div');
+                desc.className = 'toggle-list-item-description';
+                desc.textContent = descriptions[item];
 
-            if (newState) {
-                enabledSet.add(item);
-            } else {
-                enabledSet.delete(item);
+                descContainer.appendChild(desc);
+                itemWrapper.appendChild(descContainer);
             }
 
-            status.querySelector('.toggle-count').textContent =
-            `${enabledSet.size} of ${sortedItems.length} enabled`;
+            checkbox.onchange = () => {
+                const newState = checkbox.checked;
+                itemWrapper.classList.toggle('enabled', newState);
+                newState ? enabledSet.add(item) : enabledSet.delete(item);
+                status.querySelector('.toggle-count').textContent = `${enabledSet.size} of ${sortedItems.length} enabled`;
+                updateToggleListData(key, Array.from(enabledSet), sortedItems);
+            };
+        } else {
+            // --- STANDARD LIST STRUCTURE ---
+            const name = document.createElement('div');
+            name.className = 'toggle-list-name';
+            name.textContent = formatLabel(item);
 
-            updateToggleListData(key, Array.from(enabledSet), sortedItems);
-        };
+            const toggle = document.createElement('label');
+            toggle.className = 'toggle-switch';
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = isEnabled;
+            const slider = document.createElement('span');
+            slider.className = 'toggle-slider';
+            toggle.appendChild(checkbox);
+            toggle.appendChild(slider);
 
-        itemWrapper.appendChild(name);
-        itemWrapper.appendChild(toggle);
+            itemWrapper.appendChild(name);
+            itemWrapper.appendChild(toggle);
+
+            checkbox.onchange = () => {
+                const newState = checkbox.checked;
+                itemWrapper.classList.toggle('enabled', newState);
+                newState ? enabledSet.add(item) : enabledSet.delete(item);
+                status.querySelector('.toggle-count').textContent = `${enabledSet.size} of ${sortedItems.length} enabled`;
+                updateToggleListData(key, Array.from(enabledSet), sortedItems);
+            };
+        }
+
         grid.appendChild(itemWrapper);
     });
 
     wrapper.appendChild(grid);
     return wrapper;
 }
+
 
 // Update toggle list data in settings
 function updateToggleListData(key, enabledItems, allItems) {
@@ -1246,10 +1327,10 @@ function resetSettingsForm() {
 
 // Save settings to backend
 async function saveSettings() {
-    // Check if we're on the Appearance tab - theme changes are applied immediately
     const activeCategory = document.querySelector('.settings-nav-item.active')?.dataset.category;
+
+    // Appearance changes are local/immediate and don't trigger server saves here
     if (activeCategory === 'appearance') {
-        // Just close the modal - theme changes are applied immediately
         toggleModal('settings');
         return;
     }
@@ -1259,8 +1340,6 @@ async function saveSettings() {
     const saveBtn = document.getElementById('settings-save-btn');
     const btnText = saveBtn.querySelector('.btn-text');
     const btnLoading = saveBtn.querySelector('.btn-loading');
-
-    // Check if there are non-theme changes (require restart)
     const hasNonThemeChanges = detectNonThemeChanges();
 
     saveBtn.disabled = true;
@@ -1272,7 +1351,7 @@ async function saveSettings() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(settingsData),
-                                     signal: AbortSignal.timeout(30000)
+                                     signal: AbortSignal.timeout(15000)
         });
 
         if (!response.ok) {
@@ -1280,10 +1359,10 @@ async function saveSettings() {
             throw new Error(error.message || `Server returned ${response.status}`);
         }
 
+        // Success: Update the original reference so "unsaved" indicator clears
         settingsOriginal = JSON.parse(JSON.stringify(settingsData));
         settingsHasChanges = false;
 
-        // Show appropriate success message
         if (hasNonThemeChanges) {
             showSettingsSuccessWithRestart();
             await restartServer();
@@ -1293,7 +1372,15 @@ async function saveSettings() {
 
     } catch (err) {
         console.error('Failed to save settings:', err);
-        showSettingsError(err.message || 'Failed to save settings');
+
+        // 7. IMPROVED ERROR HANDLING: Distinguish between server rejection and connection loss
+        // If the error is a TypeError (usually happens when fetch fails due to network), it's an offline issue
+        let userMessage = err.message;
+        if (err instanceof TypeError || err.message.includes('Failed to fetch')) {
+            userMessage = "Connection lost. Changes cannot be saved to the server, but you can still customize appearance locally.";
+        }
+
+        showSettingsError(userMessage);
     } finally {
         saveBtn.disabled = false;
         btnText.style.display = 'inline';
@@ -1955,7 +2042,6 @@ function createThemeSection() {
     const fontSizeDisplay = fontSizeRow.querySelector('#font-size-display');
     const fontSizeFill = fontSizeRow.querySelector('#font-size-fill');
     const fontSizeHandle = fontSizeRow.querySelector('#font-size-handle');
-    const fontPreview = fontSizeRow.querySelector('#font-preview-text');
 
     fontSizeSlider.addEventListener('input', function() {
         const size = parseInt(this.value);
@@ -1964,7 +2050,6 @@ function createThemeSection() {
         fontSizeDisplay.textContent = `${size}px`;
         fontSizeFill.style.width = `${percentage}%`;
         fontSizeHandle.style.left = `${percentage}%`;
-        fontPreview.style.fontSize = `${size}px`;
 
         document.documentElement.style.setProperty('--font-size-base', `${size}px`);
         localStorage.setItem('fontSize', size);
@@ -2621,6 +2706,12 @@ toggleModal = function(modalName) {
 (function initChatWidth() {
     const width = localStorage.getItem('chatContentWidth') || '100';
     document.documentElement.style.setProperty('--chat-content-width', width + '%');
+})();
+
+// Apply message max width on script load
+(function initMessageMaxWidth() {
+    const val = localStorage.getItem('messageMaxWidth') || '60';
+    document.documentElement.style.setProperty('--message-max-width', val + '%');
 })();
 
 // Apply token bar visibility on script load

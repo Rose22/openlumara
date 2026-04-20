@@ -19,7 +19,9 @@ class Telegram(core.channel.Channel):
     running = False
 
     settings =  {
-        "token": "TOKEN_HERE"
+        "token": "TOKEN_HERE",
+        "announce_startup": False,
+        "announce_shutdown": False
     }
 
     def __init__(self, *args, **kwargs):
@@ -27,7 +29,7 @@ class Telegram(core.channel.Channel):
         self.token = os.getenv("TELEGRAM_BOT_TOKEN")
         if not self.token:
             try:
-                self.token = core.config.get("channels").get("settings").get("telegram").get("token")
+                self.token = self.config.get("token")
             except AttributeError:
                 pass
 
@@ -71,7 +73,8 @@ class Telegram(core.channel.Channel):
             # Start the queue processor worker
             self.queue_task = asyncio.create_task(self._process_queue_worker())
 
-            await self._announce("Telegram channel connected.", "status")
+            if self.config.get("announce_startup"):
+                await self._announce("Telegram channel connected.", "status")
 
             while self.running and not self._shutting_down:
                 await asyncio.sleep(1)
@@ -95,11 +98,12 @@ class Telegram(core.channel.Channel):
                 await self.app.stop()
             await self.app.shutdown()
 
-    async def shutdown(self):
-        await self.announce("Shutting down Telegram channel...", "status")
-        self.running = False
-        self._shutting_down = True
-        return True
+    async def on_shutdown(self):
+        if self.config.get("announce_shutdown"):
+            await self.announce("Shutting down Telegram channel...", "status")
+            self.running = False
+            self._shutting_down = True
+            return True
 
     async def _tg_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id = update.effective_chat.id

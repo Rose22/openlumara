@@ -11,7 +11,8 @@ _registry_cache = None
 
 default_config = {
     "core": {
-        "data_folder": "data"
+        "data_folder": "data",
+        "auto_resume_chats": True
     },
     "api": {
         "url": "http://localhost:5001/v1",
@@ -24,6 +25,7 @@ default_config = {
     "model": {
         "name": "MODEL_HERE",
         "temperature": 0.2,
+        "reasoning_effort": "medium",
         "use_tools": True
     },
     "channels": {
@@ -52,6 +54,8 @@ DEFAULT_MODULES = (
     "chats",
     "context",
     "memory",
+    "notes",
+    "lists",
     "system",
     "scheduler",
     "tokens",
@@ -66,9 +70,9 @@ def _get_registry_data():
         return _registry_cache
 
     # load instances
-    mod_inst = list(core.modules.load(modules, core.module.Module, respect_config=False))
-    user_mod_inst = list(core.modules.load(user_modules, core.module.Module, respect_config=False))
-    chan_inst = list(core.modules.load(channels, core.channel.Channel, respect_config=False))
+    mod_inst = list(core.modules.load(modules, core.module.Module))
+    user_mod_inst = list(core.modules.load(user_modules, core.module.Module))
+    chan_inst = list(core.modules.load(channels, core.channel.Channel))
 
     # define the sections to be managed
     _registry_cache = [
@@ -156,7 +160,7 @@ def sync_module_settings(config_dict, instances, section_key):
     section = config_dict.setdefault(section_key, {})
     settings = section.setdefault("settings", {})
 
-    # 1. Top-level Prune
+    # 1. Top-level Prune: Remove settings for modules that no longer exist
     available_names = [core.modules.get_name(m) for m in instances]
     for k in [k for k in settings if k not in available_names]:
         del settings[k]
@@ -165,15 +169,26 @@ def sync_module_settings(config_dict, instances, section_key):
     for inst in instances:
         name = core.modules.get_name(inst)
         defaults = getattr(inst, 'settings', {})
-        if not isinstance(defaults, dict): continue
+        if not isinstance(defaults, dict):
+            continue
 
         if name in settings and isinstance(settings[name], dict):
             curr = settings[name]
-            for k in [k for k in curr if k not in defaults]: del curr[k]
+            # Remove keys that are no longer in the module's defaults
+            for k in [k for k in curr if k not in defaults]:
+                del curr[k]
+            # Add missing keys from defaults
             for k, v in defaults.items():
-                if k not in curr: curr[k] = v
-        else:
+                if k not in curr:
+                    curr[k] = v
+
+            # If the settings became empty after pruning, remove the entry entirely
+            if not curr:
+                del settings[name]
+
+        elif defaults:  # Only insert if the module actually has settings to add
             settings[name] = defaults.copy()
+
 
 
 def load(file_path=None):
@@ -190,8 +205,11 @@ def load(file_path=None):
     schema = get_schema()
     registry = _get_registry_data()
 
+    created_new_config = False
     if not config:
         target = copy.deepcopy(schema)
+        if not core.storage.TEMPORARY:
+            created_new_config = True
     else:
         target = sync_config(dict(config), schema)
 
@@ -205,17 +223,12 @@ def load(file_path=None):
         target[item['section_key']]['enabled'] = state['enabled']
         target[item['section_key']]['disabled'] = state['disabled']
 
-    if not config:
-        config.load(target)
-        config.save()
+    # load in the new edited config
+    config.load(target)
+    config.save()
+
+    if created_new_config:
         print(f"A new configuration file has been created at {config.path}.")
-    else:
-        user_config = dict(config)
-        if target != user_config:
-            config.clear()
-            config.update(target)
-            config.save()
-            core.log("core", "Your configuration was updated with new stuff!")
 
 def get(*args, **kwargs):
     """shorthand for accessing config values"""

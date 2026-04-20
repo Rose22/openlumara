@@ -1,13 +1,9 @@
 import core
 
 class Tokens(core.module.Module):
-    """makes an AI token-aware"""
+    """Makes the AI aware of how many tokens your requests are using up"""
     async def on_end_prompt(self):
-        prompt_tokens = await self.channel.context.chat.count_tokens()
-        # reserve about 100 tokens for the end prompt, just to be safe
-        prompt_tokens += 100
-
-        max_tokens = core.config.get("api").get("max_context", 8192)
-        prompt_length_text = f"{prompt_tokens} out of {max_tokens} used. ONLY notify user of their token use if it's approaching the token limit."
+        token_usage = await self.channel.context.get_token_usage()
+        prompt_length_text = f"{token_usage['current']} out of {token_usage['max']} used. ONLY notify user of their token use if it's approaching the token limit."
         return prompt_length_text
 
