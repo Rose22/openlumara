@@ -27,42 +27,63 @@ class ToolCallRenderer:
             self.current_tool = name
             self.printed_values = {}
 
-        # Extract key-value pairs
-        # Match "key": "value" or "key": value
-        # This regex captures the key, and the value (which might be partial if it's a string)
-        pattern = r'"([^"]+)"\s*:\s*(?:"((?:[^"\\]|\\.)*)"?|([^,}\s"]+)?)'
-        matches = list(re.finditer(pattern, args_str))
+        def repair_json(s):
+            stack = []
+            in_string = False
+            escape = False
+            for char in s:
+                if char == '"' and not escape:
+                    in_string = not in_string
+                if char == '\\' and not escape:
+                    escape = True
+                else:
+                    escape = False
+                if not in_string:
+                    if char == '{':
+                        stack.append('}')
+                    elif char == '[':
+                        stack.append(']')
+                    elif char == '}':
+                        if stack and stack[-1] == '}':
+                            stack.pop()
+                    elif char == ']':
+                        if stack and stack[-1] == ']':
+                            stack.pop()
+            repaired = s
+            if in_string:
+                repaired += '"'
+            repaired += "".join(reversed(stack))
+            return repaired
 
-        for match in matches:
-            key = match.group(1)
-            val = match.group(2) if match.group(2) is not None else match.group(3)
-            if val is None:
-                val = ""
+        try:
+            repaired_str = repair_json(args_str)
+            data = json.loads(repaired_str)
+            if not isinstance(data, dict):
+                return
 
-            previously_printed = self.printed_values.get(key, "")
+            for key, value in data.items():
+                val_str = str(value)
+                previously_printed = self.printed_values.get(key, "")
 
-            if val.startswith(previously_printed):
-                to_print = val[len(previously_printed):]
-            else:
-                # Fallback if the value somehow changed (shouldn't happen in well-formed streams)
-                to_print = val
+                if val_str.startswith(previously_printed):
+                    to_print = val_str[len(previously_printed):]
+                else:
+                    to_print = val_str
 
-            if key not in self.printed_values:
-                # If the parser detects a new key, print its label
-                prompt_toolkit.shortcuts.print_formatted_text(
-                    prompt_toolkit.formatted_text.HTML(f"\n<ansicyan>{key}:</ansicyan>\n"),
-                    end="",
-                    flush=True
-                )
+                if key not in self.printed_values:
+                    prompt_toolkit.shortcuts.print_formatted_text(
+                        prompt_toolkit.formatted_text.HTML(f"\n<ansicyan>{key}:</ansicyan>\n"),
+                        end="",
+                        flush=True
+                    )
 
-            if to_print:
-                # convert newlines to real newlines
-                to_print = to_print.replace("\\n", "\n")
+                if to_print:
+                    to_print = to_print.replace("\\n", "\n")
+                    print(to_print, end="", flush=True)
 
-                # Print the streamed value inline
-                print(to_print, end="", flush=True)
-
-            self.printed_values[key] = val
+                self.printed_values[key] = val_str
+        except Exception:
+            pass
 
     def reset(self):
         """Finalize the tool call block with a newline."""
@@ -85,6 +106,7 @@ class Cli(core.channel.Channel):
             "prompt": "ansicyan bold",
             "reasoning-label": "ansiyellow bold",
             "conclusion-label": "ansimagenta bold",
+            "toolcall-response-label": "ansiblue bold",
             "error": "ansired bold",
             "status": "ansiblue",
         })
@@ -167,7 +189,7 @@ class Cli(core.channel.Channel):
                     pass
 
                 if not isinstance(content_decoded, dict):
-                    self._print_formatted("\nToolcall response:", "reasoning-label")
+                    self._print_formatted("\nToolcall response:", "toolcall-response-label")
                     print(content)
                     print()
                     continue
