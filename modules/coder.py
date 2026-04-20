@@ -192,7 +192,7 @@ class YourClassName(core.module.Module):
 
                 project_list.append(filename)
 
-            output += f"## Current projects in sandbox\n"
+            output += "## Current projects in sandbox\n"
             if not project_list:
                 output += "No projects yet."
 
@@ -266,6 +266,22 @@ class YourClassName(core.module.Module):
     async def create_project(self, project_name: str, file_structure: dict):
         """
         Creates an entire project structure in one go!
+
+        file_structure format:
+        A dictionary where keys are directory names.
+        - If a value is a dictionary, it represents a subdirectory.
+        - If a value is a list, it represents a list of empty files to be created in that directory.
+
+        Example:
+        {
+            "src": {
+                "components": {
+                    "button.py": {} # Wait, this creates a directory 'button.py'
+                }
+            },
+            "tests": ["test_main.py", "test_utils.py"],
+            "README.md": [] # This is not quite right for a single file
+        }
         """
         if self.config.get("read-only_mode"):
             return self.result("User has disabled file modification. Provide the code directly to user.", False)
@@ -316,155 +332,155 @@ class YourClassName(core.module.Module):
 
         return self.result(result)
 
-    async def edit_file(self, project_name: str, file_path: list, edits: list = None):
-        """
-        Edits a file within a project using targeted replacements.
-        """
-        if self.config.get("read-only_mode"):
-            return self.result("User has disabled file modification. Provide the code directly to user.", False)
+    # async def edit_file(self, project_name: str, file_path: list, search: str, replace: str):
+    #     """
+    #     Edits a file within a project using search and replace.
 
-        file_path_str = self._get_file_path(project_name, file_path)
-        if not os.path.exists(file_path_str):
-            return self.result("file does not exist!", False)
+    #     Each replacement is applied to the entire file content.
+    #     """
+    #     if self.config.get("read-only_mode"):
+    #         return self.result("User has disabled file modification. Provide the code directly to user.", False)
 
-        try:
-            with open(file_path_str, 'rb') as f:
-                raw_bytes = f.read()
+    #     file_path_str = self._get_file_path(project_name, file_path)
+    #     if not os.path.exists(file_path_str):
+    #         return self.result("file does not exist!", False)
 
-            bom = b''
-            if raw_bytes.startswith(b'\xef\xbb\xbf'):
-                bom = b'\xef\xbb\xbf'
-                content = raw_bytes[len(bom):].decode('utf-8')
-            else:
-                content = raw_bytes.decode('utf-8')
+    #     try:
+    #         with open(file_path_str, 'rb') as f:
+    #             raw_bytes = f.read()
 
-            original_is_crlf = '\r\n' in content
-            normalized_content = content.replace('\r\n', '\n')
+    #         bom = b''
+    #         if raw_bytes.startswith(b'\xef\xbb\xbf'):
+    #             bom = b'\xef\xbb\xbf'
+    #             content = raw_bytes[len(bom):].decode('utf-8')
+    #         else:
+    #             content = raw_bytes.decode('utf-8')
 
-            if not edits:
-                return self.result("No edits provided.", False)
+    #         original_is_crlf = '\r\n' in content
+    #         normalized_content = content.replace('\r\n', '\n')
 
-            replacement_points = []
-            for edit in edits:
-                old_t = edit.get('old_text')
-                new_t = edit.get('new_text')
-                if not old_t or new_t is None:
-                    continue
+    #         if not search or not replace:
+    #             return self.result("You are missing one of search or replace..", False)
 
-                start_idx = 0
-                while True:
-                    idx = normalized_content.find(old_t, start_idx)
-                    if idx == -1:
-                        break
-                    replacement_points.append({
-                        'start': idx,
-                        'end': idx + len(old_t),
-                        'new_text': new_t
-                    })
-                    start_idx = idx + len(old_t)
+    #         replacement_points = []
 
-            replacement_points.sort(key=lambda x: x['start'], reverse=True)
+    #         old_t = search
+    #         new_t = replace
 
-            working_content = normalized_content
-            for point in replacement_points:
-                working_content = (
-                    working_content[:point['start']] +
-                    point['new_text'] +
-                    working_content[point['end']:]
-                )
+    #         start_idx = 0
+    #         while True:
+    #             idx = normalized_content.find(old_t, start_idx)
+    #             if idx == -1:
+    #                 break
+    #             replacement_points.append({
+    #                 'start': idx,
+    #                 'end': idx + len(old_t),
+    #                 'new_text': new_t
+    #             })
+    #             start_idx = idx + len(old_t)
 
-            if original_is_crlf:
-                final_content = working_content.replace('\n', '\r\n')
-            else:
-                final_content = working_content
+    #         replacement_points.sort(key=lambda x: x['start'], reverse=True)
 
-            with open(file_path_str, 'wb') as f:
-                f.write(bom)
-                f.write(final_content.encode('utf-8'))
+    #         working_content = normalized_content
+    #         for point in replacement_points:
+    #             working_content = (
+    #                 working_content[:point['start']] +
+    #                 point['new_text'] +
+    #                 working_content[point['end']:]
+    #             )
 
-            return self.result(f"Successfully replaced {len(edits)} block(s) in {'.'.join(file_path)}.")
+    #         if original_is_crlf:
+    #             final_content = working_content.replace('\n', '\r\n')
+    #         else:
+    #             final_content = working_content
 
-        except Exception as e:
-            return self.result(f"error: {e}", False)
+    #         with open(file_path_str, 'wb') as f:
+    #             f.write(bom)
+    #             f.write(final_content.encode('utf-8'))
 
-    async def overwrite_file(self, project_name: str, file_path: list, content: str):
-        """
-        Writes to a file within a project.
-        """
-        if self.config.get("read-only_mode"):
-            return self.result("User has disabled file modification. Provide the code directly to user.", False)
+    #         return self.result(f"Successfully replaced 1 block(s) in {'.'.join(file_path)}.")
 
-        file_path_str = self._get_file_path(project_name, file_path)
+    #     except Exception as e:
+    #         return self.result(f"error: {e}", False)
 
-        try:
-            with open(file_path_str, "w") as f:
-                f.write(content)
-            return self.result(True)
-        except Exception as e:
-            return self.result(f"error: {e}", False)
+    # async def overwrite_file(self, project_name: str, file_path: list, content: str):
+    #     """
+    #     Writes to a file within a project.
+    #     """
+    #     if self.config.get("read-only_mode"):
+    #         return self.result("User has disabled file modification. Provide the code directly to user.", False)
 
-    async def search(self, project_name: str, file_path: list, query: str, context_lines: int = 5, max_matches: int = 10, use_regex: bool = False):
-        """
-        Search for a query within the file and return snippets with line numbers and context.
-        """
-        file_path_str = self._get_file_path(project_name, file_path)
-        if not os.path.exists(file_path_str):
-            return self.result("file does not exist!", False)
+    #     file_path_str = self._get_file_path(project_name, file_path)
 
-        try:
-            with open(file_path_str, 'r') as f:
-                lines = f.readlines()
+    #     try:
+    #         with open(file_path_str, "w") as f:
+    #             f.write(content)
+    #         return self.result(True)
+    #     except Exception as e:
+    #         return self.result(f"error: {e}", False)
 
-            matches = []
-            num_lines = len(lines)
+    # async def search(self, project_name: str, file_path: list, query: str, context_lines: int = 5, max_matches: int = 10, use_regex: bool = False):
+    #     """
+    #     Search for a query within the file and return snippets with line numbers and context.
+    #     """
+    #     file_path_str = self._get_file_path(project_name, file_path)
+    #     if not os.path.exists(file_path_str):
+    #         return self.result("file does not exist!", False)
 
-            if use_regex:
-                try:
-                    pattern = re.compile(query, re.IGNORECASE)
-                except re.error as e:
-                    return self.result(f"Invalid regex pattern: {e}", False)
-            else:
-                query_lower = query.lower()
+    #     try:
+    #         with open(file_path_str, 'r') as f:
+    #             lines = f.readlines()
 
-            for i, line in enumerate(lines):
-                line_num = i + 1
-                match_found = False
+    #         matches = []
+    #         num_lines = len(lines)
+
+    #         if use_regex:
+    #             try:
+    #                 pattern = re.compile(query, re.IGNORECASE)
+    #             except re.error as e:
+    #                 return self.result(f"Invalid regex pattern: {e}", False)
+    #         else:
+    #             query_lower = query.lower()
+
+    #         for i, line in enumerate(lines):
+    #             line_num = i + 1
+    #             match_found = False
                 
-                if use_regex:
-                    if pattern.search(line):
-                        match_found = True
-                else:
-                    if query_lower in line.lower():
-                        match_found = True
+    #             if use_regex:
+    #                 if pattern.search(line):
+    #                     match_found = True
+    #             else:
+    #                 if query_lower in line.lower():
+    #                     match_found = True
                 
-                if match_found:
-                    snippet = [f"--- Match at line {line_num} ---"]
+    #             if match_found:
+    #                 snippet = [f"--- Match at line {line_num} ---"]
                     
-                    start_idx = max(0, i - context_lines)
-                    end_idx = min(num_lines, i + context_lines + 1)
+    #                 start_idx = max(0, i - context_lines)
+    #                 end_idx = min(num_lines, i + context_lines + 1)
                     
-                    for j in range(start_idx, end_idx):
-                        curr_line_num = j + 1
-                        curr_line_content = lines[j].rstrip('\n\r')
+    #                 for j in range(start_idx, end_idx):
+    #                     curr_line_num = j + 1
+    #                     curr_line_content = lines[j].rstrip('\n\r')
                         
-                        if curr_line_num == line_num:
-                            snippet.append(f"{curr_line_num:4}: {curr_line_content}  <-- MATCH")
-                        else:
-                            snippet.append(f"{curr_line_num:4}: {curr_line_content}")
+    #                     if curr_line_num == line_num:
+    #                         snippet.append(f"{curr_line_num:4}: {curr_line_content}  <-- MATCH")
+    #                     else:
+    #                         snippet.append(f"{curr_line_num:4}: {curr_line_content}")
                     
-                    matches.append("\n".join(snippet))
+    #                 matches.append("\n".join(snippet))
                     
-                    if len(matches) >= max_matches:
-                        break
+    #                 if len(matches) >= max_matches:
+    #                     break
             
-            if not matches:
-                return self.result(None)
+    #         if not matches:
+    #             return self.result(None)
             
-            result_str = "\n\n".join(matches)
-            return self.result(result_str)
+    #         result_str = "\n\n".join(matches)
+    #         return self.result(result_str)
 
-        except Exception as e:
-            return self.result(f"error: {e}", False)
+    #     except Exception as e:
+    #         return self.result(f"error: {e}", False)
 
     async def execute(self, project_name: str, file_path: list, timeout: int = 30):
         """

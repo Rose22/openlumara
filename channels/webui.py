@@ -350,6 +350,7 @@ def get_messages():
             'tool_calls': msg.get('tool_calls'),
             'tool_call_id': msg.get('tool_call_id'),
             'reasoning_content': msg.get('reasoning_content'),
+            'segments': msg.get('segments', []),  # NEW: Store segment order
             'index': i
         }
         result.append(msg_data)
@@ -442,10 +443,6 @@ def stream_message():
         async def collect_tokens():
             try:
                 async for token_data in channel_instance.send_stream(data):
-                    if token_data.get("type") == "tool_calls":
-                        # these get handled by the channel base class
-                        continue
-
                     if stream_id in stream_cancellations:
                         stream_cancellations.discard(stream_id)
                         token_queue.put(('cancelled', True))
@@ -468,35 +465,66 @@ def stream_message():
             channel_instance.main_loop
         )
 
-        yield f"data: {json.dumps({'id': stream_id})}\n\n"
+        # Initial connection signal (using _meta to stay out of the way)
+        yield f"data: {json.dumps({'_meta': {'type': 'connection', 'status': 'connected'}, 'id': stream_id})}\n\n"
 
         while True:
             item = token_queue.get()
 
+            # --- THE COMMIT PHASE (Hard Sync) ---
             if item is done:
-                total = len(_run_async(channel_instance.context.chat.get()))
-                yield f"data: {json.dumps({'done': True, 'total': total})}\n\n"
+                try:
+                    # Fetch the authoritative truth from the backend context
+                    full_history = _run_async(channel_instance.context.chat.get())
+                    # Serialize the history using the existing safe serializer
+                    serialized_history = [serialize_for_json(m) for m in full_history]
+
+                    yield f"data: {json.dumps({
+                        '_meta': {'type': 'commit'},
+                        'history': serialized_history
+                    })}\n\n"
+                except Exception as e:
+                    yield f"data: {json.dumps({'_meta': {'type': 'error'}, 'error': str(e)})}\n\n"
                 break
 
+            # --- ERROR & CANCELLATION ---
             elif isinstance(item, tuple):
                 if item[0] == 'error':
-                    # Error content is a dict with error details
                     error_data = item[1] if isinstance(item[1], dict) else {'message': str(item[1])}
-                    yield f"data: {json.dumps({'error': True, 'error_data': error_data})}\n\n"
+                    yield f"data: {json.dumps({'_meta': {'type': 'error'}, 'error_data': error_data})}\n\n"
                     break
                 elif item[0] == 'cancelled':
-                    yield f"data: {json.dumps({'cancelled': True})}\n\n"
+                    yield f"data: {json.dumps({'_meta': {'type': 'cancelled'}})}\n\n"
                     break
 
+            # --- THE DELTA PHASE (Streaming) ---
             elif isinstance(item, dict):
-                # FIX: Use the recursive serializer here!
-                yield f"data: {json.dumps(serialize_for_json(item))}\n\n"
+                # 1. Map the Core payload to a UI Status (The Decorator)
+                p_type = item.get('type')
+                status = "idle"
+                if p_type == 'reasoning':
+                    status = "thinking"
+                elif p_type in ['tool_call_delta', 'tool', 'tool_calls']:
+                    status = "tool_call"
+                elif p_type == 'tool':
+                    status = "tool_exec"
+
+                # 2. Serialize the original item (Remains OpenAI-compliant)
+                payload = serialize_for_json(item)
+
+                # 3. Inject metadata at the top level without changing existing keys
+                payload['_meta'] = {'type': 'delta', 'status': status}
+
+                yield f"data: {json.dumps(payload)}\n\n"
 
             else:
-                # This handles raw string tokens
-                yield f"data: {json.dumps({'type': 'content', 'text': str(item)})}\n\n"
+                # Fallback for raw string tokens
+                payload = {'type': 'content', 'text': str(item)}
+                payload['_meta'] = {'type': 'delta', 'status': 'idle'}
+                yield f"data: {json.dumps(payload)}\n\n"
 
         future.result()
+
 
     response = Response(generate(), mimetype='text/event-stream')
     response.headers['Cache-Control'] = 'no-cache'

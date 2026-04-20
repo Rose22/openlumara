@@ -1,42 +1,170 @@
 // =============================================================================
-// Main Send Function
+// Stream Segment State
 // =============================================================================
+
+let streamSegments = [];
+let segCounter = 0;
+let activeTypewriterSegId = -1;
+let streamingToolCalls = {};
+let toolCallsContainer = null;
 let placeholderUserWrapper = null;
-let typingStatusEl = null;
 
-async function send(providedContent = null) {
-    // 1. Pre-checks and State Reset
-    if (isStreaming) return;
+function resetStreamState() {
+    streamSegments = [];
+    segCounter = 0;
+    activeTypewriterSegId = -1;
+    clearStreamingToolCalls();
+}
 
-    // if the last message is a user message, and the user presses the Send button while no input is in the input box, regenerate
-    if (providedContent === null && inputField.value.trim() === '') {
-        const allMessages = chat.querySelectorAll('.message-wrapper');
-        const lastMsg = allMessages[allMessages.length - 1];
+function appendStreamText(type, text, typewriterEnabled = true) {
+    const last = streamSegments[streamSegments.length - 1];
 
-        // Only proceed if the last message in the chat is actually a user message
-        if (lastMsg && lastMsg.classList.contains('user')) {
-            const index = parseInt(lastMsg.dataset.index);
-            if (!isNaN(index)) {
-                regenerateMessage(index);
-                return;
-            }
+    if (last && last.type === type) {
+        last.text += text;
+        if (type === 'content' && !typewriterEnabled) {
+            last.displayed = last.text;
         }
-        // If the last message is an assistant message (or no messages exist), just exit
+    } else {
+        // Finalize previous content segment
+        if (last && last.type === 'content') {
+            last.displayed = last.text;
+            if (last.el) last.el.innerHTML = renderMarkdown(last.text);
+            typewriterQueue = [];
+        }
+
+        const newSeg = {
+            type,
+            text,
+            id: segCounter++,
+            el: null,
+            displayed: type === 'content' && !typewriterEnabled ? text : ''
+        };
+
+        if (type === 'content' && typewriterEnabled) {
+            activeTypewriterSegId = newSeg.id;
+        }
+
+        streamSegments.push(newSeg);
+    }
+}
+
+function ensureToolCallsSegment() {
+    const last = streamSegments[streamSegments.length - 1];
+    if (last && last.type === 'tool_calls') return last;
+
+    if (last && last.type === 'content') {
+        last.displayed = last.text;
+        if (last.el) last.el.innerHTML = renderMarkdown(last.text);
+        typewriterQueue = [];
+    }
+
+    const seg = { type: 'tool_calls', text: '', id: segCounter++, el: null };
+    streamSegments.push(seg);
+    return seg;
+}
+
+function finalizeAllContent() {
+    for (const seg of streamSegments) {
+        if (seg.type === 'content' && seg.displayed !== seg.text) {
+            seg.displayed = seg.text;
+            if (seg.el) seg.el.innerHTML = renderMarkdown(seg.text);
+        }
+    }
+    typewriterQueue = [];
+}
+
+// =============================================================================
+// Segment Rendering
+// =============================================================================
+
+function createSegmentElement(seg) {
+    if (seg.type === 'reasoning') {
+        const expandByDefault = localStorage.getItem('reasoningExpandedByDefault') === 'true';
+        const temp = document.createElement('div');
+        temp.innerHTML = renderReasoningBlock(seg.text, !expandByDefault, 'Thinking');
+        const el = temp.firstElementChild;
+        el.classList.add('is-reasoning-active');
+        return el;
+    }
+
+    if (seg.type === 'content') {
+        const el = document.createElement('div');
+        el.className = 'message-content-container';
+        return el;
+    }
+
+    if (seg.type === 'tool_calls') {
+        const el = document.createElement('div');
+        el.className = 'tool-calls-streaming-container';
+        return el;
+    }
+
+    return document.createElement('div');
+}
+
+function renderStreamSegments(msgDiv, onlyUpdateLast = false) {
+    for (let i = 0; i < streamSegments.length; i++) {
+        const seg = streamSegments[i];
+
+        if (!seg.el || !seg.el.parentNode) {
+            seg.el = createSegmentElement(seg);
+            msgDiv.appendChild(seg.el);
+        }
+
+        if (!onlyUpdateLast || i === streamSegments.length - 1) {
+            updateSegmentContent(seg, i);
+        }
+    }
+
+    highlightCode(msgDiv);
+    scrollToBottomDelayed();
+}
+
+function updateSegmentContent(seg, index) {
+    if (seg.type === 'reasoning') {
+        const contentDiv = seg.el.querySelector('.reasoning-content');
+        if (contentDiv) contentDiv.textContent = seg.text;
+
+        const isLast = (index === streamSegments.length - 1);
+        const nextSeg = isLast ? null : streamSegments[index + 1];
+        const label = seg.el.querySelector('.reasoning-label');
+
+        if (label) {
+            const stillActive = isLast || (nextSeg && nextSeg.type === 'reasoning');
+            label.textContent = stillActive ? 'Thinking' : 'Thoughts';
+        }
+
+        if (!isLast) {
+            seg.el.classList.remove('is-reasoning-active');
+            seg.el.classList.add('collapsed');
+        }
         return;
     }
+
+    if (seg.type === 'content') {
+        const textToDisplay = seg.displayed !== undefined ? seg.displayed : seg.text;
+        seg.el.innerHTML = renderMarkdown(textToDisplay);
+    }
+}
+
+// =============================================================================
+// Main Send Function
+// =============================================================================
+
+async function send(providedContent = null) {
+    if (isStreaming) return;
 
     const isRegenerate = providedContent !== null;
     const rawContent = providedContent !== null ? providedContent : inputField.value.trim();
     const message = typeof rawContent === 'string' ? rawContent : extractTextContent(rawContent);
 
-    if (!message) return;
+    if (!message && !isRegenerate) return;
 
-    // Reset typewriter state
     typewriterQueue = [];
     displayedContent = '';
     isTypewriterRunning = false;
+    resetStreamState();
 
-    // 2. Handle Commands
     if (!isRegenerate) {
         clearInput();
         if (message.trim().startsWith('/') || message.trim().startsWith("STOP")) {
@@ -44,20 +172,12 @@ async function send(providedContent = null) {
         }
     }
 
-    // 3. STAGE: SENDING (Optimistic UI)
     if (!isRegenerate) {
-        // Standard new message: Show the "Sending..." placeholder
         placeholderUserWrapper = createPlaceholderUserMessage(message);
         chat.insertBefore(placeholderUserWrapper, typing);
-    } else {
-        // REGENERATION: Create a standard user message immediately
-        // so it doesn't "vanish" while the AI is thinking.
-        const allMessages = chat.querySelectorAll('.message-wrapper')
-        const userMsgWrapper = createMessageElement({"role": "user", "content": message}, allMessages.length);
-        chat.insertBefore(userMsgWrapper, typing);
     }
 
-    // 4. API Status Check
+    // Check API status
     try {
         const statusResponse = await fetch('/api/status', { signal: AbortSignal.timeout(5000) });
         if (statusResponse.ok) {
@@ -65,7 +185,11 @@ async function send(providedContent = null) {
             if (!statusData.connected) {
                 removePlaceholder();
                 if (!isRegenerate) {
-                    showApiConfigError(statusData.error || 'API is not connected.', statusData.error_type, statusData.action);
+                    showApiConfigError(
+                        statusData.error || 'API is not connected.',
+                        statusData.error_type,
+                        statusData.action
+                    );
                 }
                 return;
             }
@@ -74,7 +198,7 @@ async function send(providedContent = null) {
         console.error('Could not check API status:', err);
     }
 
-    // 5. Prepare Payload
+    // Build payload
     const hasFiles = window.upload_queue && window.upload_queue.files.length > 0;
     const isMultimodalInput = typeof rawContent !== 'string';
     let payloadBody;
@@ -96,12 +220,12 @@ async function send(providedContent = null) {
         payloadBody = { role: "user", content: contentPayload };
     }
 
-    // 6. UI Preparation
     setInputState(true, true, true);
     isStreaming = true;
     isDataStreaming = true;
     currentController = new AbortController();
 
+    // Create AI wrapper
     const aiWrapper = document.createElement('div');
     aiWrapper.className = 'message-wrapper ai hidden streaming';
     aiWrapper.dataset.index = 'streaming';
@@ -114,6 +238,11 @@ async function send(providedContent = null) {
     aiWrapper.appendChild(aiActions);
 
     let streamHadError = false;
+    let streamStarted = false;
+
+    const typewriterEnabled = localStorage.getItem("typewriterEnabled") !== 'false';
+    const typewriterSpeed = parseInt(localStorage.getItem("typewriterSpeed") ?? "30", 10);
+    const useTypewriter = typewriterEnabled && typewriterSpeed > 0;
 
     try {
         const response = await fetch('/stream', {
@@ -130,7 +259,6 @@ async function send(providedContent = null) {
 
         await syncMessages();
 
-        // Handle file upload cleanup
         if (window.upload_queue) {
             window.upload_queue.wrappers.forEach(w => w.remove());
             window.upload_queue.files = [];
@@ -140,18 +268,9 @@ async function send(providedContent = null) {
 
         chat.insertBefore(aiWrapper, typing);
 
-        // 8. Stream Reading Loop
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
-
-        const typewriterEnabled = localStorage.getItem("typewriterEnabled") !== 'false';
-        const typewriterSpeed = parseInt(localStorage.getItem("typewriterSpeed") ?? "30", 10);
-        const useTypewriter = typewriterEnabled && typewriterSpeed > 0;
-
-        let aiContent = '';
-        let aiReasoning = '';
-        let streamStarted = false;
 
         while (true) {
             const { done, value } = await reader.read();
@@ -167,78 +286,97 @@ async function send(providedContent = null) {
                 try {
                     const data = JSON.parse(line.slice(6));
 
-                    if (data.id) currentStreamId = data.id;
+                    // Handle metadata
+                    if (data._meta) {
+                        const { type: metaType } = data._meta;
 
-                    if (data.cancelled) {
-                        aiWrapper.classList.remove('hidden');
-                        aiMsgDiv.innerHTML = '<span style="color:#f88;">[Cancelled]</span>';
-                        finishStream();
-                        return;
+                        if (metaType === 'commit') {
+                            // Backend has finalized - preserve our UI, just sync indices
+                            finalizeAllContent();
+                            collapseFinishedReasoning(aiMsgDiv);
+                            await finalizeStreamingUI(aiWrapper, aiMsgDiv);
+                            return;
+                        }
+
+                        if (metaType === 'cancelled') {
+                            aiWrapper.classList.remove('hidden');
+                            aiMsgDiv.innerHTML = '<span style="color:#f88;">[Cancelled]</span>';
+                            finishStream();
+                            return;
+                        }
+
+                        if (metaType === 'error') {
+                            handleInlineError(data, aiMsgDiv, aiWrapper, streamStarted);
+                            finishStream();
+                            return;
+                        }
                     }
 
-                    // 9. STAGE: STREAMING (No special text, clear indicators)
-                    if (data.type === 'content' || data.token || data.type === 'reasoning') {
+                    if (data.id) currentStreamId = data.id;
+
+                    // Content streaming
+                    if (data.type === 'content' || data.token) {
                         if (!streamStarted) {
-                            // Transition from "Processing" to real streaming
                             removePlaceholder();
                             startStreamingUI(aiWrapper, typing);
                             streamStarted = true;
                         }
-
-                        // Handle Content Tokens
-                        if (data.type === 'content' || data.token) {
-                            const token = data.content || data.token || '';
-                            if (token) {
-                                const reasoningWrapper = aiWrapper.querySelector('.reasoning-wrapper');
-                                if (reasoningWrapper) reasoningWrapper.classList.remove('is-reasoning-active');
-
-                                aiContent += token;
-
-                                if (useTypewriter) {
-                                    for (const char of token) typewriterQueue.push(char);
-                                    if (!isTypewriterRunning) startTypewriterProcess(aiMsgDiv, aiReasoning);
-                                } else {
-                                    displayedContent += token;
-                                    updateStreamingContent(aiMsgDiv, displayedContent, aiReasoning);
-                                    scrollToBottomDelayed();
+                        const token = data.content || data.token || '';
+                        if (token) {
+                            appendStreamText('content', token, useTypewriter);
+                            if (useTypewriter) {
+                                const activeSeg = streamSegments.find(s => s.id === activeTypewriterSegId);
+                                if (activeSeg && activeSeg.type === 'content') {
+                                    for (const char of token) {
+                                        typewriterQueue.push({ segId: activeSeg.id, char });
+                                    }
+                                    if (!isTypewriterRunning) startTypewriterProcessSegments(aiMsgDiv);
                                 }
-                            }
-                        }
-
-                        // Handle Reasoning Tokens
-                        if (data.type === 'reasoning') {
-                            if (!streamFrozen) {
-                                aiReasoning += data.content || '';
-                                updateStreamingContent(aiMsgDiv, aiContent, aiReasoning);
-                                const reasoningWrapper = aiWrapper.querySelector('.reasoning-wrapper');
-                                if (reasoningWrapper) reasoningWrapper.classList.add('is-reasoning-active');
-                                scrollToBottomDelayed();
+                            } else {
+                                renderStreamSegments(aiMsgDiv);
                             }
                         }
                     }
 
-                    // Handle New Turn
-                    if (data.type === 'new_turn') {
-                        currentTurnIndex++;
-                        aiContent = ''; aiReasoning = ''; displayedContent = '';
-                        if (!aiWrapper.querySelector('.turn-container')) {
-                            aiMsgDiv.innerHTML = '<div class="turn-container current"></div>';
+                    // Reasoning streaming
+                    if (data.type === 'reasoning') {
+                        const token = data.content || '';
+                        if (token) {
+                            if (!streamStarted) {
+                                removePlaceholder();
+                                startStreamingUI(aiWrapper, typing);
+                                streamStarted = true;
+                            }
+                            appendStreamText('reasoning', token);
+                            renderStreamSegments(aiMsgDiv);
                         }
-                        const prevTurns = streamingTurns.map(t => `<div class="assistant-turn">${renderMarkdown(t.content)}</div\>`).join('');
-                        aiMsgDiv.innerHTML = prevTurns + '<div class="turn-container current"></div>';
                     }
 
-                    if (data.done) {
-                        streamingTurns.push({ content: aiContent, reasoning: aiReasoning });
+                    // Tool call delta
+                    if (data.type === 'tool_call_delta') {
+                        if (!streamStarted) {
+                            removePlaceholder();
+                            startStreamingUI(aiWrapper, typing);
+                            streamStarted = true;
+                        }
+                        ensureToolCallsSegment();
+                        handleToolCallDelta(data, aiMsgDiv, aiWrapper);
                     }
 
-                    if (data.error) {
-                        streamHadError = true;
-                        typewriterQueue = [];
-                        handleInlineError(data, aiMsgDiv, aiWrapper, streamStarted);
+                    // Tool response
+                    if (data.type === 'tool') {
+                        handleToolResponse(data, aiMsgDiv);
                     }
 
-                } catch (e) { /* Ignore parse errors */ }
+                    // Complete tool calls
+                    if (data.type === 'tool_calls') {
+                        const toolCalls = data.content || [];
+                        finalizeStreamingToolCalls(toolCalls, aiMsgDiv);
+                    }
+
+                } catch (e) {
+                    console.error("Error parsing stream line:", e, line);
+                }
             }
         }
     } catch (err) {
@@ -246,10 +384,9 @@ async function send(providedContent = null) {
         if (err.name !== 'AbortError') {
             streamHadError = true;
             typewriterQueue = [];
-            handleCatchError(err, aiMsgDiv, aiWrapper, False);
+            handleCatchError(err, aiMsgDiv, aiWrapper, streamStarted);
         }
     } finally {
-        // 10. Cleanup and Finalization
         isDataStreaming = false;
 
         if (window.upload_queue && window.upload_queue.files.length > 0) {
@@ -263,23 +400,14 @@ async function send(providedContent = null) {
             await waitForTypewriter();
         }
 
-        const reasoningWrapper = aiWrapper.querySelector('.reasoning-wrapper');
-        if (reasoningWrapper && !reasoningWrapper.classList.contains('collapsed')) {
-            reasoningWrapper.classList.add('collapsed');
-            await new Promise(resolve => setTimeout(resolve, 300));
+        // Only finalize if not already done via commit
+        if (isStreaming) {
+            finalizeAllContent();
+            collapseFinishedReasoning(aiMsgDiv);
+            await finalizeStreamingUI(aiWrapper, aiMsgDiv);
         }
 
-        finishStream();
-
-        if (!streamHadError) {
-            aiWrapper.remove();
-            await syncMessages();
-        } else {
-            aiWrapper.classList.remove('streaming');
-            const actions = aiWrapper.querySelector('.message-actions');
-            if (actions) actions.querySelectorAll('button').forEach(btn => btn.disabled = false);
-        }
-
+        // Update chat info
         try {
             const chatResponse = await fetch('/chat/current');
             const chatData = await chatResponse.json();
@@ -287,239 +415,97 @@ async function send(providedContent = null) {
                 currentChatId = chatData.chat.id;
                 updateChatTitleBar(chatData.chat.title, chatData.chat.tags || []);
             }
-        } catch (e) { console.error("Failed to update chat info", e); }
+        } catch (e) {
+            console.error("Failed to update chat info", e);
+        }
 
         await loadChats();
     }
 }
 
-// =============================================================================
-// NEW OPTIMISTIC UI HELPERS
-// =============================================================================
-
-function createPlaceholderUserMessage(text) {
-    const wrapper = document.createElement('div');
-    wrapper.className = 'message-wrapper user user-placeholder';
-
-    const msgDiv = document.createElement('div');
-    msgDiv.className = 'message user';
-
-    const contentContainer = document.createElement('div');
-    contentContainer.className = 'message-content-container';
-    contentContainer.textContent = text;
-
-    const status = document.createElement('div');
-    status.className = 'placeholder-status';
-    status.textContent = 'Sending...';
-
-    msgDiv.appendChild(contentContainer);
-    msgDiv.appendChild(status);
-    wrapper.appendChild(msgDiv);
-
-    return wrapper;
-}
-
-function removePlaceholder() {
-    if (placeholderUserWrapper) {
-        placeholderUserWrapper.remove();
-        placeholderUserWrapper = null;
-    }
-}
-
-function startStreamingUI(aiWrapper, typingIndicator) {
-    typingIndicator.classList.remove('show');
-    aiWrapper.classList.remove('hidden');
-    return true;
-}
-
-async function handleServerError(response, aiWrapper) {
-    let errorMsg = 'An unexpected error occurred.';
-    let errorType = 'unknown';
-    let action = '';
-
-    // 1. Attempt to extract detailed error information from the response body
-    try {
-        const errorData = await response.json();
-        // The backend sends 'error' as the message in some routes,
-        // or 'error_type'/'action' in others.
-        errorMsg = errorData.error || errorData.message || errorMsg;
-        errorType = errorData.error_type || errorData.error || errorType;
-        action = errorData.action || '';
-    } catch (e) {
-        // If response is not JSON, fall back to status-based messages
-        if (response.status === 503) {
-            errorMsg = 'API is not available.';
-        } else if (response.status === 500) {
-            errorMsg = 'Internal Server Error.';
-        } else if (response.status === 401 || response.status === 403) {
-            errorMsg = 'Authentication failed.';
-            errorType = 'auth_failed';
-        }
-    }
-
-    // 2. Display the error using the global UI config error handler
-    // This ensures the user actually sees what went wrong.
-    showApiConfigError(errorMsg, errorType, action);
-
-    // 3. Cleanup UI state
-    removePlaceholder();
-
-    // Only attempt to remove aiWrapper if it has actually been added to the DOM
-    if (aiWrapper && aiWrapper.parentNode) {
-        aiWrapper.remove();
-    }
-
-    finishStream();
-}
-
-
-function handleInlineError(data, aiMsgDiv, aiWrapper, streamStarted) {
-    if (!streamStarted) aiWrapper.classList.remove('hidden');
-
-    const errorDetails = data.error_data || {};
-    const errorMessage = errorDetails.message || 'An error occurred';
-    const errorType = errorDetails.error || 'unknown';
-
-    const errorTypeInfo = {
-        'not_connected': { title: 'Not Connected', action: 'Please check your API configuration.' },
-        'auth_failed': { title: 'Authentication Failed', action: 'Your API key may be invalid. Please check your settings.' },
-        'connection_lost': { title: 'Connection Lost', action: 'Lost connection to the API server. Please try again.' },
-        'rate_limit': { title: 'Rate Limit Exceeded', action: 'Please wait a moment and try again.' },
-        'api_error': { title: 'API Error', action: 'The API returned an error. Please try again.' },
-        'stream_failed': { title: 'Stream Failed', action: 'The response stream was interrupted.' },
-        'processing_failed': { title: 'Processing Failed', action: 'Failed to process the AI response.' },
-        'invalid_response': { title: 'Invalid Response', action: 'Received an invalid response from the API.' }
-    };
-
-    const info = errorTypeInfo[errorType] || { title: 'Error', action: '' };
-
-    aiMsgDiv.innerHTML = `
-    <div class="api-error-inline">
-    <div class="api-error-header">
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-    </svg>
-    <span class="api-error-title">${escapeHtml(info.title)}</span>
-    </div>
-    <div class="api-error-message">${escapeHtml(errorMessage)}</div>
-    ${info.action ?`<div class="api-error-action">${escapeHtml(info.action)}</div>` : ''}
-    </div>`;
-}
-
-function handleCatchError(err, aiMsgDiv, aiWrapper, streamStarted) {
-    if (!streamStarted) aiWrapper.classList.remove('hidden');
-    aiMsgDiv.innerHTML = `
-    <div class="api-error-inline">
-    <div class="api-error-header">
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-    <circle cx="12" cy="12" r="10"/>
-    <line x1="12" y1="8" x2="12" y2="12"/>
-    <line x1="12" y1="16" x2="12.01" y2="16"/>
-    </svg>
-    <span class="api-error-title">Connection Error</span>
-    </div>
-    <div class="api-error-message">${escapeHtml(err.message)}</div>
-    <div class="api-error-action">Could not reach the server. Please check your connection.</div>
-    </div>
-    `;
-}
-
 /**
- * Helper to wait for the typewriter to finish via Promise.
+ * Collapse reasoning blocks that are no longer active.
  */
-function waitForTypewriter() {
-    return new Promise(resolve => {
-        const interval = setInterval(() => {
-            if (!isTypewriterRunning) {
-                clearInterval(interval);
-                resolve();
-            }
-        }, 20);
+function collapseFinishedReasoning(msgDiv) {
+    const wrappers = msgDiv.querySelectorAll('.reasoning-wrapper');
+    wrappers.forEach(wrapper => {
+        wrapper.classList.remove('is-reasoning-active');
+        wrapper.classList.add('collapsed');
     });
 }
 
-async function startTypewriterProcess(msgDiv, reasoning) {
-    isTypewriterRunning = true;
+/**
+ * Finalize streaming UI - preserve the rendered content, just update state.
+ */
+async function finalizeStreamingUI(aiWrapper, aiMsgDiv) {
+    removePlaceholder();
 
-    const typewriterEnabled = localStorage.getItem("typewriterEnabled") !== 'false';
-    if (!typewriterEnabled) {
-        // Safety flush if disabled mid-stream
-        displayedContent += typewriterQueue.join('');
-        typewriterQueue = [];
-        updateStreamingContent(msgDiv, displayedContent, reasoning);
-        isTypewriterRunning = false;
-        return;
+    // Remove active states
+    collapseFinishedReasoning(aiMsgDiv);
+
+    // Enable buttons
+    aiWrapper.classList.remove('streaming', 'hidden');
+    const actions = aiWrapper.querySelector('.message-actions');
+    if (actions) {
+        actions.querySelectorAll('button').forEach(btn => btn.disabled = false);
     }
 
-    const speed = parseInt(localStorage.getItem("typewriterSpeed") ?? "30", 10);
+    // Clear streaming state
+    clearStreamingToolCalls();
 
-    // Loop runs while:
-    // 1. There are characters to type OR
-    // 2. The network data hasn't finished arriving yet (isDataStreaming)
-    while (typewriterQueue.length > 0 || isDataStreaming) {
-        if (typewriterQueue.length > 0) {
-            const char = typewriterQueue.shift();
-            displayedContent += char;
+    // Reset stream state AFTER UI is finalized
+    resetStreamState();
 
-            updateStreamingContent(msgDiv, displayedContent, reasoning);
-            scrollToBottomDelayed();
-
-            // Play sound using AudioContext (CSP safe)
-            if (char.trim() !== '') {
-                TypewriterAudioManager.play('typewriter');
-            }
-
-            await new Promise(resolve => setTimeout(resolve, speed));
-        } else {
-            // Queue is empty, but network stream is still active.
-            // Wait briefly for more data to avoid spinning CPU.
-            await new Promise(resolve => setTimeout(resolve, 20));
-        }
-    }
-
-    // Play completion sound using AudioContext (CSP safe)
-    TypewriterAudioManager.play('completion');
-
+    setInputState(false, false, false);
+    isStreaming = false;
+    streamFrozen = false;
+    currentController = null;
+    currentStreamId = null;
+    typewriterQueue = [];
+    displayedContent = '';
     isTypewriterRunning = false;
+    inputField.focus();
+
+    // Sync to get proper indices, but don't re-render
+    await syncIndicesOnly();
 }
 
-async function stopGeneration(sent_from_command = false) {
-    // 1. Abort local fetch request
-    if (currentController) {
-        currentController.abort();
-        currentController = null;
-    }
+/**
+ * Sync only message indices without re-rendering content.
+ */
+async function syncIndicesOnly() {
+    try {
+        const response = await fetch('/messages');
+        const data = await response.json();
+        const messages = data.messages || [];
 
-    // 2. Notify backend to stop generating
-    if (currentStreamId) {
-        if (!sent_from_command) {
-            // Notify backend logic that user stopped it
-            fetch('/send', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ role: "user", content: "/stop" })
-            });
-        }
-        try {
-            await fetch('/cancel', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: currentStreamId })
-            });
-        } catch (e) {
-            // Ignore network errors during cancellation
-        }
-        currentStreamId = null;
-    }
+        lastMessageIndex = messages.length;
 
-    // 3. Force drain typewriter queue immediately
-    // This prevents the UI from "hanging" with partial text if stopped mid-stream
+        // Update indices on streaming wrappers
+        const streamingWrappers = chat.querySelectorAll('.message-wrapper[data-index="streaming"]');
+        streamingWrappers.forEach(wrapper => {
+            wrapper.dataset.index = lastMessageIndex - 1;
+        });
+
+        updateTokenUsage();
+    } catch (err) {
+        console.error('Index sync failed:', err);
+    }
+}
+
+function finishStream() {
+    removePlaceholder();
+    clearStreamingToolCalls();
+    resetStreamState();
+    setInputState(false, false, false);
+    isStreaming = false;
+    streamFrozen = false;
+    currentController = null;
+    currentStreamId = null;
     typewriterQueue = [];
-    isDataStreaming = false;
-
-    // 4. Sync UI state
-    await syncMessages();
-    finishStream();
+    displayedContent = '';
+    isTypewriterRunning = false;
+    inputField.focus();
 }
 
 async function sendCommand(message) {
@@ -579,153 +565,518 @@ async function sendCommand(message) {
     }
 }
 
-function updateStreamingContent(msgDiv, content, reasoning) {
-    // 1. Handle Reasoning Block
-    let reasoningWrapper = msgDiv.querySelector('.reasoning-wrapper');
+// =============================================================================
+// Typewriter for Segments
+// =============================================================================
 
-    if (reasoning) {
-        if (reasoningWrapper) {
-            // Update content
-            const contentDiv = reasoningWrapper.querySelector('.reasoning-content');
-            if (contentDiv) {
-                contentDiv.innerHTML = escapeHtml(reasoning);
-            }
+let typewriterQueue = [];
+let displayedContent = '';
+let isTypewriterRunning = false;
 
-            // NEW: If main content has started streaming, change "Thinking" to "Thoughts"
-            if (content) {
-                const label = reasoningWrapper.querySelector('.reasoning-label');
-                if (label && label.textContent === 'Thinking') {
-                    label.textContent = 'Thoughts';
+async function startTypewriterProcessSegments(msgDiv) {
+    isTypewriterRunning = true;
+
+    const typewriterEnabled = localStorage.getItem("typewriterEnabled") !== 'false';
+    if (!typewriterEnabled) {
+        typewriterQueue = [];
+        isTypewriterRunning = false;
+        return;
+    }
+
+    const speed = parseInt(localStorage.getItem("typewriterSpeed") ?? "30", 10);
+
+    while (typewriterQueue.length > 0 || isDataStreaming) {
+        if (typewriterQueue.length > 0) {
+            const item = typewriterQueue.shift();
+            const seg = streamSegments.find(s => s.id === item.segId);
+
+            if (seg && seg.type === 'content') {
+                seg.displayed = (seg.displayed || '') + item.char;
+                renderStreamSegments(msgDiv, true);
+                scrollToBottomDelayed();
+
+                if (item.char.trim() !== '') {
+                    TypewriterAudioManager.play('typewriter');
                 }
             }
+
+            await new Promise(resolve => setTimeout(resolve, speed));
         } else {
-            // Create new block (Note: we use 'Thinking' as default for the initial creation)
-            const expandByDefault = localStorage.getItem('reasoningExpandedByDefault') === 'true';
-            const isCollapsed = !expandByDefault;
-            const reasoningHtml = renderReasoningBlock(reasoning, isCollapsed, 'Thinking');
-
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = reasoningHtml;
-            const newBlock = tempDiv.firstElementChild;
-
-            msgDiv.insertBefore(newBlock, msgDiv.firstChild);
-            reasoningWrapper = newBlock;
+            await new Promise(resolve => setTimeout(resolve, 20));
         }
     }
 
-    // 2. Handle Main Content
-    let contentContainer = msgDiv.querySelector('.message-content-container');
+    TypewriterAudioManager.play('completion');
+    isTypewriterRunning = false;
+}
 
-    if (content) {
-        if (contentContainer) {
-            // CONTENT EXISTS: Update only the markdown inside the container
-            contentContainer.innerHTML = renderMarkdown(content);
-        } else {
-            // CONTENT NEW: Create a stable wrapper for the main content
-            contentContainer = document.createElement('div');
-            contentContainer.className = 'message-content-container';
-            contentContainer.innerHTML = renderMarkdown(content);
+function waitForTypewriter() {
+    return new Promise(resolve => {
+        const interval = setInterval(() => {
+            if (!isTypewriterRunning) {
+                clearInterval(interval);
+                resolve();
+            }
+        }, 20);
+    });
+}
 
-            // Insert it after the reasoning block if it exists, otherwise at the start
-            if (reasoningWrapper) {
-                msgDiv.insertBefore(contentContainer, reasoningWrapper.nextSibling);
-            } else {
-                msgDiv.insertBefore(contentContainer, msgDiv.firstChild);
+
+// =============================================================================
+// Optimistic UI Helpers
+// =============================================================================
+
+function createPlaceholderUserMessage(text) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'message-wrapper user user-placeholder';
+
+    const msgDiv = document.createElement('div');
+    msgDiv.className = 'message user';
+
+    const contentContainer = document.createElement('div');
+    contentContainer.className = 'message-content-container';
+    contentContainer.textContent = text;
+
+    const status = document.createElement('div');
+    status.className = 'placeholder-status';
+    status.textContent = 'Sending...';
+
+    msgDiv.appendChild(contentContainer);
+    msgDiv.appendChild(status);
+    wrapper.appendChild(msgDiv);
+
+    return wrapper;
+}
+
+function removePlaceholder() {
+    if (placeholderUserWrapper) {
+        placeholderUserWrapper.remove();
+        placeholderUserWrapper = null;
+    }
+}
+
+function startStreamingUI(aiWrapper, typingIndicator) {
+    typingIndicator.classList.remove('show');
+    aiWrapper.classList.remove('hidden');
+    return true;
+}
+
+// =============================================================================
+// Error Handlers
+// =============================================================================
+
+async function handleServerError(response, aiWrapper) {
+    let errorMsg = 'An unexpected error occurred.';
+    let errorType = 'unknown';
+    let action = '';
+
+    try {
+        const errorData = await response.json();
+        errorMsg = errorData.error || errorData.message || errorMsg;
+        errorType = errorData.error_type || errorData.error || errorType;
+        action = errorData.action || '';
+    } catch (e) {
+        if (response.status === 503) {
+            errorMsg = 'API is not available.';
+        } else if (response.status === 500) {
+            errorMsg = 'Internal Server Error.';
+        } else if (response.status === 401 || response.status === 403) {
+            errorMsg = 'Authentication failed.';
+            errorType = 'auth_failed';
+        }
+    }
+
+    showApiConfigError(errorMsg, errorType, action);
+    removePlaceholder();
+
+    if (aiWrapper && aiWrapper.parentNode) {
+        aiWrapper.remove();
+    }
+
+    finishStream();
+}
+
+function handleInlineError(data, aiMsgDiv, aiWrapper, streamStarted) {
+    if (!streamStarted) aiWrapper.classList.remove('hidden');
+
+    const errorDetails = data.error_data || {};
+    const errorMessage = errorDetails.message || 'An error occurred';
+    const errorType = errorDetails.error || 'unknown';
+
+    const errorTypeInfo = {
+        'not_connected': { title: 'Not Connected', action: 'Please check your API configuration.' },
+        'auth_failed': { title: 'Authentication Failed', action: 'Your API key may be invalid. Please check your settings.' },
+        'connection_lost': { title: 'Connection Lost', action: 'Lost connection to the API server. Please try again.' },
+        'rate_limit': { title: 'Rate Limit Exceeded', action: 'Please wait a moment and try again.' },
+        'api_error': { title: 'API Error', action: 'The API returned an error. Please try again.' },
+        'stream_failed': { title: 'Stream Failed', action: 'The response stream was interrupted.' },
+        'processing_failed': { title: 'Processing Failed', action: 'Failed to process the AI response.' },
+        'invalid_response': { title: 'Invalid Response', action: 'Received an invalid response from the API.' }
+    };
+
+    const info = errorTypeInfo[errorType] || { title: 'Error', action: '' };
+
+    aiMsgDiv.innerHTML = `
+    <div class="api-error-inline">
+    <div class="api-error-header">
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+    </svg>
+    <span class="api-error-title">${escapeHtml(info.title)}</span>
+    </div>
+    <div class="api-error-message">${escapeHtml(errorMessage)}</div>
+    ${info.action ? `<div class="api-error-action">${escapeHtml(info.action)}</div>` : ''}
+    </div>`;
+}
+
+function handleCatchError(err, aiMsgDiv, aiWrapper, streamStarted) {
+    if (!streamStarted) aiWrapper.classList.remove('hidden');
+    aiMsgDiv.innerHTML = `
+    <div class="api-error-inline">
+    <div class="api-error-header">
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <circle cx="12" cy="12" r="10"/>
+    <line x1="12" y1="8" x2="12" y2="12"/>
+    <line x1="12" y1="16" x2="12.01" y2="16"/>
+    </svg>
+    <span class="api-error-title">Connection Error</span>
+    </div>
+    <div class="api-error-message">${escapeHtml(err.message)}</div>
+    <div class="api-error-action">Could not reach the server. Please check your connection.</div>
+    </div>`;
+}
+
+// =============================================================================
+// Stop Generation
+// =============================================================================
+
+async function stopGeneration(sent_from_command = false) {
+    // Abort local fetch
+    if (currentController) {
+        currentController.abort();
+        currentController = null;
+    }
+
+    // Notify backend
+    if (currentStreamId) {
+        if (!sent_from_command) {
+            fetch('/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ role: "user", content: "/stop" })
+            });
+        }
+        try {
+            await fetch('/cancel', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: currentStreamId })
+            });
+        } catch (e) {
+            // Ignore network errors during cancellation
+        }
+        currentStreamId = null;
+    }
+
+    // Force drain typewriter
+    typewriterQueue = [];
+    isDataStreaming = false;
+
+    // Finalize all content segments so nothing is hidden
+    finalizeAllContent();
+
+    // Sync UI
+    await syncMessages();
+    finishStream();
+}
+
+// =============================================================================
+// Tool Call Streaming Handlers
+// =============================================================================
+
+/**
+ * Handle incoming tool_call_delta tokens during streaming.
+ */
+function handleToolCallDelta(data, aiMsgDiv, aiWrapper) {
+    const toolCalls = data.tool_calls;
+    if (!toolCalls || toolCalls.length === 0) return;
+
+    // Ensure tool_calls container element exists in the segment
+    const tcSeg = ensureToolCallsSegment();
+
+    // Create container element if needed
+    if (!tcSeg.el || !tcSeg.el.parentNode) {
+        tcSeg.el = document.createElement('div');
+        tcSeg.el.className = 'tool-calls-streaming-container';
+        aiMsgDiv.appendChild(tcSeg.el);
+    }
+
+    toolCallsContainer = tcSeg.el;
+
+    for (const tc of toolCalls) {
+        const index = tc.index !== undefined ? tc.index : 0;
+        const id = tc.id;
+        const funcName = tc.function?.name;
+        const funcArgs = tc.function?.arguments || '';
+
+        // Initialize or update streaming tool call
+        if (!streamingToolCalls[index]) {
+            streamingToolCalls[index] = {
+                id: id || `tc-stream-${index}`,
+                function: { name: funcName || '', arguments: '' }
+            };
+        }
+
+        if (id) streamingToolCalls[index].id = id;
+        if (funcName) streamingToolCalls[index].function.name = funcName;
+        if (funcArgs) streamingToolCalls[index].function.arguments += funcArgs;
+
+        renderStreamingToolCall(index, streamingToolCalls[index], aiMsgDiv);
+    }
+}
+
+/**
+ * Render or update a streaming tool call card.
+ */
+function renderStreamingToolCall(index, toolCall, aiMsgDiv) {
+    const callId = toolCall.id || `stream-tc-${index}`;
+    let cardEl = toolCallsContainer.querySelector(`[data-stream-tc-id="${callId}"]`);
+
+    const funcName = toolCall.function?.name || 'Calling...';
+    const rawArgs = toolCall.function?.arguments || '{}';
+
+    let argsDisplay = {};
+    let parseError = false;
+    try {
+        argsDisplay = parsePartialJson(rawArgs);
+    } catch (e) {
+        parseError = true;
+        argsDisplay = { _raw: rawArgs };
+    }
+
+    if (!cardEl) {
+        cardEl = document.createElement('div');
+        cardEl.className = 'tool-call-card streaming collapsed';
+        cardEl.dataset.streamTcId = callId;
+        cardEl.dataset.index = index;
+
+        cardEl.innerHTML = `
+        <div class="tool-call-header" onclick="toggleToolCard(this)">
+        <svg class="tool-call-toggle" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="9 18 15 12 9 6"></polyline>
+        </svg>
+        <svg class="tool-call-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+        </svg>
+        <span class="tool-call-name">${escapeHtml(funcName)}</span>
+        <span class="tool-call-arg-count"></span>
+        <span class="tool-call-status streaming">
+        <span class="streaming-dots"><span>.</span><span>.</span><span>.</span></span>
+        </span>
+        </div>
+        <div class="tool-call-body">
+        <div class="tool-call-section">
+        <div class="tool-call-section-title">Arguments</div>
+        <div class="tool-call-args"></div>
+        </div>
+        <div class="tool-call-section tool-response-section" style="display: none;">
+        <div class="tool-call-section-title">Response</div>
+        <div class="tool-response-content"></div>
+        </div>
+        </div>`;
+
+        // Insert in index order
+        const existingCards = toolCallsContainer.querySelectorAll('.tool-call-card');
+        let inserted = false;
+        for (const existing of existingCards) {
+            if (parseInt(existing.dataset.index) > index) {
+                toolCallsContainer.insertBefore(cardEl, existing);
+                inserted = true;
+                break;
             }
         }
-    }
-
-    // 3. Post-update updates (Highlighting/Fade)
-    // These work on the existing DOM elements now
-    highlightCode(msgDiv);
-
-    const fadeEnabled = localStorage.getItem('typewriterFadeEnabled') === 'true';
-    if (fadeEnabled && content) {
-        applyFastFade(msgDiv);
-    }
-}
-
-
-/**
- * Optimized fade effect: wraps the last N characters in a single span
- * with a CSS gradient mask.
- */
-function applyFastFade(rootElement) {
-    const fadeLength = 8;
-
-    // Find the deepest last text node in the DOM tree
-    let lastTextNode = findLastTextNode(rootElement);
-
-    if (!lastTextNode) return;
-
-    const textContent = lastTextNode.textContent;
-    const textLen = textContent.length;
-
-    // Determine how many characters to fade
-    const fadeCount = Math.min(fadeLength, textLen);
-
-    if (fadeCount <= 0) return;
-
-    // Split the text node at the boundary
-    // Example: "Hello World" (fade 5) -> Split at length-5
-    const splitIndex = textLen - fadeCount;
-
-    // If splitIndex is 0, we fade the whole node.
-    // If splitIndex > 0, we need to separate the stable part from the fade part.
-
-    if (splitIndex > 0) {
-        // Split the node: "Hello " (stable) and "World" (fade)
-        lastTextNode.splitText(splitIndex);
-        // Now lastTextNode is the stable part. The fade part is lastTextNode.nextSibling.
-        // We want to wrap the *next* sibling.
-        const fadeNode = lastTextNode.nextSibling;
-        if (fadeNode) {
-            const span = document.createElement('span');
-            span.className = 'typewriter-fade';
-            // Wrap the fade text node in the span
-            fadeNode.parentNode.insertBefore(span, fadeNode);
-            span.appendChild(fadeNode);
-        }
+        if (!inserted) toolCallsContainer.appendChild(cardEl);
     } else {
-        // We fade the whole node (content is shorter than fadeLength)
-        // We wrap the current lastTextNode itself.
-        const span = document.createElement('span');
-        span.className = 'typewriter-fade';
-        lastTextNode.parentNode.insertBefore(span, lastTextNode);
-        span.appendChild(lastTextNode);
+        const nameEl = cardEl.querySelector('.tool-call-name');
+        if (nameEl && funcName && funcName !== 'Calling...') {
+            nameEl.textContent = funcName;
+        }
+    }
+
+    // Update arguments
+    const argsContainer = cardEl.querySelector('.tool-call-args');
+    if (argsContainer) {
+        argsContainer.innerHTML = renderStreamingArgs(argsDisplay, rawArgs, parseError);
+    }
+
+    // Update arg count badge
+    const argCountEl = cardEl.querySelector('.tool-call-arg-count');
+    if (argCountEl) {
+        const entries = Object.entries(argsDisplay).filter(([k]) => k !== '_raw');
+        if (entries.length === 1) {
+            const [argName, argValue] = entries[0];
+            let displayValue = typeof argValue === 'object' ? JSON.stringify(argValue) : String(argValue);
+            if (displayValue.length > 50) displayValue = displayValue.substring(0, 50) + '...';
+            argCountEl.className = 'tool-call-arg-count inline';
+            argCountEl.innerHTML = `<span class="tool-call-inline-arg">${escapeHtml(displayValue)}</span>`;
+        } else if (entries.length > 1) {
+            argCountEl.className = 'tool-call-arg-count';
+            argCountEl.textContent = entries.length;
+        } else {
+            argCountEl.innerHTML = '';
+        }
     }
 }
 
 /**
- * Helper to find the last text node in a DOM tree (depth-first).
+ * Parse partial/incomplete JSON for display.
  */
+function parsePartialJson(str) {
+    if (!str || !str.trim()) return {};
+    try {
+        return JSON.parse(str);
+    } catch (e) {
+        // Continue to recovery
+    }
+
+    let result = {};
+    const keyValueRegex = /"([^"]+)"\s*:\s*("[^"]*"|[\d.]+|true|false|null|\[[^\]]*\]|\{[^}]*\})/g;
+    let match;
+    while ((match = keyValueRegex.exec(str)) !== null) {
+        const key = match[1];
+        let value = match[2];
+        try {
+            result[key] = JSON.parse(value);
+        } catch (e) {
+            result[key] = value;
+        }
+    }
+    return result;
+}
+
+/**
+    * Render arguments for a streaming tool call.
+    */
+function renderStreamingArgs(args, rawArgs, parseError) {
+    const entries = Object.entries(args).filter(([k]) => k !== '_raw');
+
+    if (entries.length === 0) {
+        return `<div class="tool-call-args-streaming">
+        <span class="tool-call-args-raw">${escapeHtml(rawArgs)}</span>
+        <span class="streaming-cursor">▌</span>
+        </div>`;
+    }
+
+    let html = '';
+    for (const [argName, argValue] of entries) {
+        let displayValue = typeof argValue === 'object' ? JSON.stringify(argValue) : String(argValue);
+        html += `
+        <div class="tool-call-arg-row">
+        <span class="tool-call-arg-name">${escapeHtml(argName)}</span>
+        <span class="tool-call-arg-value">${escapeHtml(displayValue)}</span>
+        </div>`;
+    }
+
+    if (parseError && rawArgs.length > 0) {
+        html += `<div class="tool-call-arg-row partial">
+        <span class="tool-call-arg-name">...</span>
+        <span class="tool-call-arg-value streaming">${escapeHtml(rawArgs.slice(-50))}<span class="streaming-cursor">▌</span></span>
+        </div>`;
+    }
+
+    return html;
+}
+
+/**
+    * Finalize streaming tool calls when complete tool_calls token arrives.
+    */
+function finalizeStreamingToolCalls(finalToolCalls, aiMsgDiv) {
+    if (!toolCallsContainer) return;
+
+    const cards = toolCallsContainer.querySelectorAll('.tool-call-card');
+    cards.forEach(card => {
+        card.classList.remove('streaming');
+        const status = card.querySelector('.tool-call-status');
+        if (status) {
+            status.classList.remove('streaming');
+            status.classList.add('pending');
+            status.textContent = 'calling...';
+        }
+    });
+
+    // Update IDs to match final tool calls
+    finalToolCalls.forEach((tc, idx) => {
+        const finalId = tc.id || `tool-${idx}`;
+        const card = toolCallsContainer.querySelector(`[data-stream-tc-id]`);
+        if (card) {
+            card.dataset.toolCallId = finalId;
+        }
+    });
+}
+
+/**
+    * Handle tool during streaming.
+    */
+function handleToolResponse(data, aiMsgDiv) {
+    const toolCallId = data.tool_call_id;
+    const content = data.content || '';
+
+    let cardEl = null;
+    if (toolCallsContainer) {
+        cardEl = toolCallsContainer.querySelector(`[data-tool-call-id="${toolCallId}"]`);
+        if (!cardEl) {
+            cardEl = toolCallsContainer.querySelector(`[data-stream-tc-id="${toolCallId}"]`);
+        }
+    }
+
+    if (cardEl) {
+        const status = cardEl.querySelector('.tool-call-status');
+        if (status) {
+            status.classList.remove('streaming', 'pending');
+            status.classList.add('completed');
+            status.textContent = 'done';
+        }
+
+        const responseSection = cardEl.querySelector('.tool-response-section');
+        const responseContent = cardEl.querySelector('.tool-response-content');
+        if (responseSection && responseContent) {
+            responseSection.style.display = 'block';
+            responseContent.innerHTML = renderToolResponseContent(content);
+        }
+    }
+}
+
+/**
+    * Clear streaming tool call state.
+    */
+function clearStreamingToolCalls() {
+    streamingToolCalls = {};
+    toolCallsContainer = null;
+}
+
+// =============================================================================
+// Utility: Apply Fast Fade Effect
+// =============================================================================
+
+function applyFastFade(rootElement) {
+    // Modified to be non-destructive. Instead of splitting text nodes (which breaks on next innerHTML update),
+    // we just apply a class that can be handled via CSS.
+    rootElement.classList.add('typewriter-fade-active');
+    setTimeout(() => {
+        rootElement.classList.remove('typewriter-fade-active');
+    }, 500);
+}
+
 function findLastTextNode(node) {
     if (node.nodeType === Node.TEXT_NODE) {
-        // Skip empty whitespace nodes if they are the *only* thing,
-        // but usually the last text node has content in a streaming message.
         if (node.textContent.trim().length === 0) return null;
         return node;
     }
 
-    // Iterate children backwards to find the last meaningful node
     for (let i = node.childNodes.length - 1; i >= 0; i--) {
         const child = node.childNodes[i];
         const result = findLastTextNode(child);
         if (result) return result;
     }
-
     return null;
-}
-
-function finishStream() {
-    removePlaceholder();
-    setInputState(false, false, false);
-    isStreaming = false;
-    streamFrozen = false;
-    currentController = null;
-    currentStreamId = null;
-    typewriterQueue = [];
-    displayedContent = '';
-    isTypewriterRunning = false;
-    inputField.focus();
 }
