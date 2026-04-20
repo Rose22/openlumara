@@ -207,6 +207,9 @@ class Channel:
                 ):
                     yield sub_token
                 # tc_manager.process() will loop until the AI no longer deems tool calls necessary
+            elif token_type == "tool":
+                # this is a toolcall response
+                yield token
             elif token_type == "usage":
                 # this is the final token usage count, usually emitted at the end of the stream
                 pass

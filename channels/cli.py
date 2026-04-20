@@ -34,6 +34,7 @@ class ToolCallRenderer:
                 return
 
             for key, value in data.items():
+                should_erase_line = False
                 val_str = str(value)
                 previously_printed = self.printed_values.get(key, "")
 
@@ -41,6 +42,7 @@ class ToolCallRenderer:
                     to_print = val_str[len(previously_printed):]
                 else:
                     to_print = val_str
+                    should_erase_line = True
 
                 if key not in self.printed_values:
                     prompt_toolkit.shortcuts.print_formatted_text(
@@ -51,7 +53,10 @@ class ToolCallRenderer:
 
                 if to_print:
                     to_print = to_print.replace("\\n", "\n")
-                    print(to_print, end="", flush=True)
+                    if should_erase_line:
+                        print("\r", end="", flush=True)
+
+                    print(f"{to_print}", end="", flush=True)
 
                 self.printed_values[key] = val_str
         except Exception:
@@ -60,8 +65,6 @@ class ToolCallRenderer:
     def reset(self):
         """Finalize the tool call block with a newline."""
         if self.current_tool is not None:
-            # Just print a newline to finish the inline streaming
-            print()
             self.current_tool = None
             self.printed_values = {}
 
@@ -133,45 +136,33 @@ class Cli(core.channel.Channel):
         message_state = None
         # Create a fresh renderer for this message session
         tool_renderer = ToolCallRenderer()
-        shown_reasoning = False
+        currently_reasoning = False
 
         async for token in self.send_stream({"role": "user", "content": msg}):
             token_type = token.get("type")
             content = token.get("content", "")
 
-            if token_type in ["content", "tool_calls", "tool_response"] and shown_reasoning:
+            # print headers
+            if token_type == "reasoning" and not currently_reasoning:
+                self._print_formatted("\n---\nReasoning:", "reasoning-label")
+                currently_reasoning = True
+                switched_state = True
+            elif token_type == "tool":
+                self._print_formatted("\n---\nToolcall response:", "toolcall-response-label")
+                switched_state = True
+            elif token_type == "content" and currently_reasoning:
+                self._print_formatted("\n---\nConclusion:", "conclusion-label")
+                switched_state = True
+
+            if token_type in ["content", "tool_calls", "tool"] and currently_reasoning:
                 # we can have multiple reasoning blocks
-                shown_reasoning = False
+                currently_reasoning = False
 
-            if token_type == "reasoning" and not shown_reasoning:
-                self._print_formatted("Reasoning:", "reasoning-label")
-                shown_reasoning = True
-
-            if token_type == "content" and message_state == "reasoning":
-                self._print_formatted("\nConclusion:", "conclusion-label")
-
-            if token_type in ["content", "reasoning"]:
-                print(content, end="", flush=True)
-
-            if token_type == "tool_response":
-                content_decoded = None
-                try:
-                    content_decoded = json.loads(content)
-                except:
-                    pass
-
-                if not isinstance(content_decoded, dict):
-                    self._print_formatted("\nToolcall response:", "toolcall-response-label")
-                    print(content)
-                    print()
-                    continue
-
-                content_str = None
-                if content_decoded:
-                    content_str = str(content_decoded.get("content"))
-
-                if content_str:
-                    print(f"{content_str}\n", flush=True)
+            if token_type == "tool":
+                # print toolcall response
+                result = json.loads(content)
+                subcontent = result.get("content")
+                print(str(subcontent).strip(), flush=True)
 
             elif token_type == "tool_call_delta":
                 # Extract the accumulated tool call from the delta
@@ -185,6 +176,10 @@ class Cli(core.channel.Channel):
                 # The final full tool call list is emitted at the end of the stream
                 tool_renderer.reset()
                 print("\n", end="", flush=True)
+
+            # print the actual tokens
+            if token_type in ["content", "reasoning"]:
+                print(content, end="", flush=True)
 
         print()
         print()

@@ -133,7 +133,7 @@ class ToolcallManager:
                     func_response = await func_callable(**tool_args)
 
                     # then build the openai toolcall response object
-                    func_response_str = json.dumps(str(func_response))
+                    func_response_str = json.dumps(func_response)
                     tool_response = {
                         "role": "tool",
                         "tool_call_id": tool_call_dict['id'],
@@ -141,7 +141,7 @@ class ToolcallManager:
                     }
 
                     # yield it so it can be displayed immediately
-                    yield {"type": "tool_response", "content": func_response_str}
+                    yield {"type": "tool", "tool_call_id": tool_call_dict['id'], "content": func_response_str}
 
                 except Exception as e:
                     core.log_error("error", e)
@@ -154,7 +154,7 @@ class ToolcallManager:
                     }
 
                     # yield it so it can be displayed immediately
-                    yield {"type": "tool_response", "content": f"error: {str(e)}"}
+                    yield {"type": "tool", "tool_call_id": tool_call_dict['id'], "content": f"error: {str(e)}"}
 
                 # add the tool response to the context window
                 await self.channel.context.chat.add(tool_response)
@@ -196,15 +196,14 @@ class ToolcallManager:
                 tools=self.channel.manager.tools
             ):
                 token_type = token.get("type")
+
                 if token_type == "content":
                     final_content.append(token.get("content"))
                     yield token
                 elif token_type == "reasoning":
-                    # only collect reasoning, in case there was no normal message content. but dont yield.
-                    # actually, do yield. we wanna see it!
-                    yield token
                     final_reasoning.append(token.get("content"))
-                elif token_type in ["tool_call_delta", "tool_response", "tool_calls"]:
+                    yield token
+                elif token_type in ["tool_call_delta", "tool", "tool_calls"]:
                     yield token
 
                 if token_type == "tool_calls":
@@ -225,7 +224,8 @@ class ToolcallManager:
                         initial_content=None
                     ):
                         yield sub_token
-                elif token_type == "usage":
+
+                if token_type == "usage":
                     pass
 
             if not final_content:
