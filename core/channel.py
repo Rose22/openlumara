@@ -203,7 +203,8 @@ class Channel:
                 # we add the accumulated content tokens so far to the initial_content argument
                 async for sub_token in self.tc_manager.process(
                     token.get("content"),
-                    initial_content="".join(final_content)
+                    initial_content="".join(final_content),
+                    initial_reasoning="".join(final_reasoning)
                 ):
                     yield sub_token
                 # tc_manager.process() will loop until the AI no longer deems tool calls necessary
