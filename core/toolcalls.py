@@ -228,10 +228,6 @@ class ToolcallManager:
                     ):
                         yield sub_token
 
-                    # allow adding another turn of content/reasoning
-                    final_content = None
-                    final_reasoning = None
-
                 if token_type == "usage":
                     pass
 
