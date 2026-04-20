@@ -217,8 +217,10 @@ async function send(providedContent = null) {
                         }
 
                         // NEW: Handle Streaming Tool Call Deltas (with safety check)
-                        if (data.type === 'tool_call_delta' && Array.isArray(data.tool_calls) && data.tool_calls.length > 0) {
-                            handleStreamingToolCall(aiWrapper, data.tool_calls[0]);
+                        if (data.type === 'tool_call_delta' && Array.isArray(data.tool_calls)) {
+                            for (const tc of data.tool_calls) {
+                                handleStreamingToolCall(aiWrapper, tc);
+                            }
                         }
 
                         // NEW: Handle Final Tool Call Signal

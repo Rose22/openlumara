@@ -11,6 +11,7 @@ import prompt_toolkit.shortcuts
 import prompt_toolkit.application
 import sys
 import re
+import json
 
 class ToolCallRenderer:
     def __init__(self):
@@ -144,7 +145,7 @@ class Cli(core.channel.Channel):
             token_type = token.get("type")
             content = token.get("content", "")
 
-            if token_type in ["content", "tool_calls"] and shown_reasoning:
+            if token_type in ["content", "tool_calls", "tool_response"] and shown_reasoning:
                 # we can have multiple reasoning blocks
                 shown_reasoning = False
 
@@ -157,6 +158,26 @@ class Cli(core.channel.Channel):
 
             if token_type in ["content", "reasoning"]:
                 print(content, end="", flush=True)
+
+            if token_type == "tool_response":
+                content_decoded = None
+                try:
+                    content_decoded = json.loads(content)
+                except:
+                    pass
+
+                if not isinstance(content_decoded, dict):
+                    self._print_formatted("\nToolcall response:", "reasoning-label")
+                    print(content)
+                    print()
+                    continue
+
+                content_str = None
+                if content_decoded:
+                    content_str = str(content_decoded.get("content"))
+
+                if content_str:
+                    print(f"{content_str}\n", flush=True)
 
             elif token_type == "tool_call_delta":
                 # Extract the accumulated tool call from the delta

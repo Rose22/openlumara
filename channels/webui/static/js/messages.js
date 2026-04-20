@@ -713,11 +713,12 @@ function handleStreamingToolCall(aiWrapper, toolCall) {
         let val = match[2] !== undefined ? match[2] : (match[3] || "");
         val = val.replace(/\\n/g, '\n');
 
-        let argRow = argsContainer.querySelector(`[data-arg-key="${escapeHtml(key)}"]`);
+        let argRow = Array.from(argsContainer.children).find(el => el.dataset.argKey === key);
         if (!argRow) {
             argRow = document.createElement('div');
             argRow.className = 'tool-call-arg-row';
             argRow.setAttribute('data-arg-key', key);
+            argRow.dataset.argKey = key;
             argRow.innerHTML = `<span class="tool-call-arg-name">${escapeHtml(key)}</span><span class="tool-call-arg-value"></span>`;
             argsContainer.appendChild(argRow);
         }
@@ -734,8 +735,8 @@ function handleStreamingToolCall(aiWrapper, toolCall) {
 * Finalizes the tool call UI when the full tool_calls list is emitted.
 */
 function finalizeStreamingToolCall(aiWrapper) {
-    const toolCard = aiWrapper.querySelector('.streaming-tool-call');
-    if (toolCard) {
+    const toolCards = aiWrapper.querySelectorAll('.streaming-tool-call');
+    toolCards.forEach(toolCard => {
         toolCard.classList.remove('streaming-tool-call');
         toolCard.classList.add('completed');
         const status = toolCard.querySelector('.tool-call-status');
@@ -744,5 +745,5 @@ function finalizeStreamingToolCall(aiWrapper) {
             status.classList.remove('calling');
             status.classList.add('completed');
         }
-    }
+    });
 }

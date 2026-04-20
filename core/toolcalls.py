@@ -123,18 +123,23 @@ class ToolcallManager:
                 # build a fancy toolcall display string
                 tool_call_str = self.display_call(tool_call_dict)
 
-                core.log("toolcall", tool_call_str)
+                # core.log("toolcall", tool_call_str)
 
                 try:
                     # do the function call and get it's result
                     func_response = await func_callable(**tool_args)
 
                     # then build the openai toolcall response object
+                    func_response_str = json.dumps(str(func_response))
                     tool_response = {
                         "role": "tool",
                         "tool_call_id": tool_call_dict['id'],
-                        "content": json.dumps(str(func_response))
+                        "content": func_response_str
                     }
+
+                    # yield it so it can be displayed immediately
+                    yield {"type": "tool_response", "content": func_response_str}
+
                 except Exception as e:
                     core.log_error("error", e)
 
@@ -144,6 +149,9 @@ class ToolcallManager:
                         "tool_call_id": tool_call_dict['id'],
                         "content": f"error: {str(e)}"
                     }
+
+                    # yield it so it can be displayed immediately
+                    yield {"type": "tool_response", "content": f"error: {str(e)}"}
 
                 # add the tool response to the context window
                 await self.channel.context.chat.add(tool_response)
@@ -190,8 +198,12 @@ class ToolcallManager:
                     yield token
                 elif token_type == "reasoning":
                     # only collect reasoning, in case there was no normal message content. but dont yield.
+                    # actually, do yield. we wanna see it!
+                    yield token
                     final_reasoning.append(token.get("content"))
                 elif token_type == "tool_call_delta":
+                    yield token
+                elif token_type == "tool_response":
                     yield token
                 elif token_type == "tool_calls":
                     yield token
