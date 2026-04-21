@@ -70,7 +70,9 @@ class Coder(modules.files_sandboxed.SandboxedFiles):
     settings = {
         "coding_style": "Write clean, well-commented code. Do not include your reasoning inside final code.",
         "sandbox_folder": "~/coder",
-        "read-only_mode": True,
+        "read-only": True,
+        "allow_function_editing": False,
+        "allow_full_file_overwrites": False,
         "allow_code_execution": False,
         "enable_progress_messages": False,
         "openlumara_module_creation_mode": False,
@@ -274,15 +276,23 @@ class YourClassName(core.module.Module):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.path = self.sandbox_path
-        if self.config.get("read-only_mode"):
-            self.disabled_tools.extend([
-                "create_project",
-                "overwrite_file",
-                "edit_file"
-            ])
+
+        # disable any tools that were disabled via config
+        if self.config.get("read-only"):
+            self.disabled_tools.append("create_project")
+
+        if not self.config.get("allow_function_editing") or self.config.get("read-only"):
+            self.disabled_tools.append("edit_symbol_content")
+
+        if not self.config.get("allow_full_file_overwrites") or self.config.get("read-only"):
+            self.disabled_tools.append("overwrite_file")
 
         if not self.config.get("allow_code_execution"):
             self.disabled_tools.append("execute")
+
+        # disable search if treesitter is available
+        if HAS_TREE_SITTER:
+            self.disabled_tools.append("search")
 
     def _get_language_from_ext(self, file_path_str: str) -> str:
         ext = os.path.splitext(file_path_str)[1].lower()
@@ -329,7 +339,7 @@ class YourClassName(core.module.Module):
         rel_path = os.path.join(project_name, *file_path)
         return self._get_sandbox_path(rel_path)
 
-    async def list_project(self, project_name: str, depth_limit: int = 3):
+    async def list_full_project_tree(self, project_name: str, depth_limit: int = 3):
         """
         Returns a recursive tree representation of the project structure (directories only).
         Structure: [name, [children]]
@@ -358,7 +368,7 @@ class YourClassName(core.module.Module):
         except Exception as e:
             return self.result(f"error: {e}", False)
 
-    async def list_project_contents(self, project_name: str, sub_path: list = None):
+    async def list_project_folder(self, project_name: str, sub_path: list = None):
         """
         Lists the immediate contents of a specific path within a project.
         This is non-recursive.
@@ -393,11 +403,11 @@ class YourClassName(core.module.Module):
         {
             "src": {
                 "components": {
-                    "button.py": {} # Wait, this creates a directory 'button.py'
+                    "button.py": "#!/bin/env python3\\nhi this is some example code!"
                 }
             },
             "tests": ["test_main.py", "test_utils.py"],
-            "README.md": [] # This is not quite right for a single file
+            "README.md": "this is a readme"
         }
         """
         if self.config.get("read-only_mode"):
@@ -420,7 +430,8 @@ class YourClassName(core.module.Module):
                     for filename in content:
                         file_path = os.path.join(target_path, filename)
                         with open(file_path, "w") as f:
-                            pass
+                            if content:
+                                f.write(content)
                         if self.config.get("enable_progress_messages"):
                             await self.manager.channel.announce(f"Created file: {file_path}")
 
@@ -536,69 +547,6 @@ class YourClassName(core.module.Module):
         except Exception as e:
             return self.result(f"error: {e}", False)
 
-    # async def search(self, project_name: str, file_path: list, query: str, context_lines: int = 5, max_matches: int = 10, use_regex: bool = False):
-    #     """
-    #     Search for a query within the file and return snippets with line numbers and context.
-    #     """
-    #     file_path_str = self._get_file_path(project_name, file_path)
-    #     if not os.path.exists(file_path_str):
-    #         return self.result("file does not exist!", False)
-
-    #     try:
-    #         with open(file_path_str, 'r') as f:
-    #             lines = f.readlines()
-
-    #         matches = []
-    #         num_lines = len(lines)
-
-    #         if use_regex:
-    #             try:
-    #                 pattern = re.compile(query, re.IGNORECASE)
-    #             except re.error as e:
-    #                 return self.result(f"Invalid regex pattern: {e}", False)
-    #         else:
-    #             query_lower = query.lower()
-
-    #         for i, line in enumerate(lines):
-    #             line_num = i + 1
-    #             match_found = False
-                
-    #             if use_regex:
-    #                 if pattern.search(line):
-    #                     match_found = True
-    #             else:
-    #                 if query_lower in line.lower():
-    #                     match_found = True
-                
-    #             if match_found:
-    #                 snippet = [f"--- Match at line {line_num} ---"]
-                    
-    #                 start_idx = max(0, i - context_lines)
-    #                 end_idx = min(num_lines, i + context_lines + 1)
-                    
-    #                 for j in range(start_idx, end_idx):
-    #                     curr_line_num = j + 1
-    #                     curr_line_content = lines[j].rstrip('\n\r')
-                        
-    #                     if curr_line_num == line_num:
-    #                         snippet.append(f"{curr_line_num:4}: {curr_line_content}  <-- MATCH")
-    #                     else:
-    #                         snippet.append(f"{curr_line_num:4}: {curr_line_content}")
-                    
-    #                 matches.append("\n".join(snippet))
-                    
-    #                 if len(matches) >= max_matches:
-    #                     break
-            
-    #         if not matches:
-    #             return self.result(None)
-            
-    #         result_str = "\n\n".join(matches)
-    #         return self.result(result_str)
-
-    #     except Exception as e:
-    #         return self.result(f"error: {e}", False)
-
     async def execute(self, project_name: str, file_path: list, timeout: int = 30):
         """
         executes a file within a project.
@@ -650,12 +598,8 @@ class YourClassName(core.module.Module):
         if not language:
             language = self._get_language_from_ext(file_path_str)
 
-        # --- DIAGNOSTIC LOGGING ---
-        core.log("coder", f"[DEBUG] get_outline called: lang={language}")
-
         # 1. Try Tree-sitter
         if HAS_TREE_SITTER and language in LANGUAGE_MAP:
-            core.log("coder", f"[DEBUG] Attempting Tree-sitter for {language}...")
             try:
                 parser = Parser(LANGUAGE_MAP[language])
                 with open(file_path_str, 'rb') as f:
@@ -666,10 +610,9 @@ class YourClassName(core.module.Module):
                 self._walk_for_symbols(tree.root_node, language, symbols)
                 symbols.sort(key=lambda x: x['line'])
 
-                core.log("coder", f"[DEBUG] Tree-sitter parsed.")
                 return self.result(symbols)
             except Exception as e:
-                core.log("coder", f"falling back to regex: {e}")
+                core.log("coder", f"Couldn't use tree-sitter! Falling back to regex: {e}")
                 pass # Fallback to regex
 
         # 2. Fallback to Regex
@@ -744,12 +687,8 @@ class YourClassName(core.module.Module):
         if not language:
             language = self._get_language_from_ext(file_path_str)
 
-        # --- DIAGNOSTIC LOGGING ---
-        core.log("coder", f"[DEBUG] get_symbol_body called: line={line_number}, lang={language}")
-
         # 1. Try Tree-sitter
         if HAS_TREE_SITTER and language in LANGUAGE_MAP:
-            core.log("coder", f"[DEBUG] Attempting Tree-sitter for {language}...")
             try:
                 parser = Parser(LANGUAGE_MAP[language])
                 with open(file_path_str, 'rb') as f:
@@ -757,7 +696,6 @@ class YourClassName(core.module.Module):
 
                 tree = parser.parse(source_bytes)
                 target_row = line_number - 1
-                core.log("coder", f"[DEBUG] Tree-sitter parsed. target_row={target_row}")
 
                 # Strategy: Find the smallest node that covers this specific line
                 # that is also recognized as a symbol.
@@ -774,7 +712,6 @@ class YourClassName(core.module.Module):
                         find_nodes(child)
 
                 find_nodes(tree.root_node)
-                core.log("coder", f"[DEBUG] Found {len(candidate_nodes)} candidate nodes.")
 
                 if candidate_nodes:
                     # Pick the "tightest" node (the one with the smallest byte range)
@@ -783,16 +720,12 @@ class YourClassName(core.module.Module):
                 else:
                     core.log("coder", "[DEBUG] Tree-sitter found 0 matching symbols for this line. Falling back.")
             except Exception as e:
-                core.log("coder", f"[DEBUG] Tree-sitter ERROR: {e}")
+                core.log("coder", f"Couldn't use tree-sitter! Falling back to regex: {e}")
                 pass # Fallback to regex
-        else:
-            if not HAS_TREE_SITTER:
-                core.log("coder", "[DEBUG] Fallback: HAS_TREE_SITTER is False")
-            elif language not in LANGUAGE_MAP:
-                core.log("coder", f"[DEBUG] Fallback: Language '{language}' not in LANGUAGE_MAP")
+        elif language not in LANGUAGE_MAP:
+            core.log("coder", f"Couldn't use tree-sitter! Language '{language}' not supported.")
 
         # 2. Fallback to original Indentation/Brace logic
-        core.log("coder", "[DEBUG] Entering Fallback (Regex/Indentation) logic...")
         config = self.LANGUAGE_CONFIG.get(language)
         body_type = config.get('body_type', 'brace') if config else 'brace'
 
@@ -839,5 +772,198 @@ class YourClassName(core.module.Module):
                 body_lines = lines[start_idx:end_idx]
 
             return self.result("".join(body_lines))
+        except Exception as e:
+            return self.result(f"error: {e}", False)
+
+    async def edit_symbol_body(self, project_name: str, file_path: list, line_number: int, new_content: str, language: str = None) -> bool:
+        """
+        Replaces the content of a symbol with new content.
+        Uses the same logic as get_symbol_body to identify the symbol's boundaries.
+
+        :param project_name: Name of the project.
+        :param file_path: List representing the path to the file.
+        :param line_number: The line number where the symbol starts.
+        :param new_content: The new string content to place in the symbol.
+        :param language: Optional language identifier.
+        :return: True if successful, False otherwise.
+        """
+        file_path_str = self._get_file_path(project_name, file_path)
+        if not os.path.exists(file_path_str):
+            return False
+
+        if not language:
+            language = self._get_language_from_ext(file_path_str)
+
+        # 1. Try Tree-sitter for precise byte-level replacement
+        if HAS_TREE_SITTER and language in LANGUAGE_MAP:
+            try:
+                from tree_sitter import Parser
+                parser = Parser(LANGUAGE_MAP[language])
+                with open(file_path_str, 'rb') as f:
+                    source_bytes = f.read()
+
+                tree = parser.parse(source_bytes)
+                target_row = line_number - 1
+
+                candidate_nodes = []
+                def find_nodes(node):
+                    if node.start_point[0] <= target_row <= node.end_point[0]:
+                        if node.type in self.SYMBOL_MAP.get(language, {}):
+                            candidate_nodes.append(node)
+                    for child in node.children:
+                        find_nodes(child)
+
+                find_nodes(tree.root_node)
+
+                if candidate_nodes:
+                    # Pick the "tightest" node (the one with the smallest byte range)
+                    best_node = min(candidate_nodes, key=lambda n: n.end_byte - n.start_byte)
+                    start_byte = best_node.start_byte
+                    end_byte = best_node.end_byte
+
+                    # Perform the replacement in bytes to preserve exact encoding/spacing
+                    new_content_bytes = new_content.encode('utf-8')
+                    updated_bytes = source_bytes[:start_byte] + new_content_bytes + source_bytes[end_byte:]
+
+                    with open(file_path_str, 'wb') as f:
+                        f.write(updated_bytes)
+                    return True
+            except Exception as e:
+                core.log("coder", f"Couldn't use tree-sitter: {e}")
+                pass
+
+        # 2. Fallback to line-based replacement matching get_symbol_body's logic
+        try:
+            with open(file_path_str, 'r') as f:
+                lines = f.readlines()
+
+            if not (1 <= line_number <= len(lines)):
+                return False
+
+            config = self.LANGUAGE_CONFIG.get(language)
+            body_type = config.get('body_type', 'brace') if config else 'brace'
+
+            start_idx = line_number - 1
+            end_idx = -1
+
+            if body_type == 'indentation':
+                def get_indent(l): return len(l) - len(l.lstrip())
+                base_indent = get_indent(lines[start_idx])
+                end_idx = start_idx + 1
+                for i in range(start_idx + 1, len(lines)):
+                    line = lines[i]
+                    if not line.strip() or line.strip().startswith('#'):
+                        continue
+                    if get_indent(line) <= base_indent:
+                        break
+                    end_idx = i + 1
+            else:
+                # Brace-based logic
+                brace_found = False
+                start_brace_idx = -1
+                for i in range(start_idx, len(lines)):
+                    if '{' in lines[i]:
+                        start_brace_idx = i
+                        brace_found = True
+                        break
+
+                if not brace_found:
+                    end_idx = start_idx + 1
+                else:
+                    brace_count = 0
+                    end_idx = len(lines)
+                    for i in range(start_brace_idx, len(lines)):
+                        line = lines[i]
+                        brace_count += line.count('{')
+                        brace_count -= line.count('}')
+                        if brace_count <= 0:
+                            end_idx = i + 1
+                            break
+                    # Ensure we replace starting from the original line_number
+                    # as get_symbol_body does with lines[start_idx:end_idx]
+                    pass
+
+            # Final safety check for end_idx
+            if end_idx == -1:
+                end_idx = start_idx + 1
+
+            # Split new content into lines, preserving line endings
+            new_lines = new_content.splitlines(keepends=True)
+            if not new_lines:
+                new_lines = [""]
+
+            # Replace the identified slice of lines with the new content
+            lines[start_idx:end_idx] = new_lines
+
+            with open(file_path_str, 'w') as f:
+                f.writelines(lines)
+            return True
+
+        except Exception as e:
+            core.log("coder", f"Couldn't use tree-sitter: {e}")
+            return False
+
+    async def search(self, project_name: str, file_path: list, query: str, context_lines: int = 5, max_matches: int = 10, use_regex: bool = False):
+        """
+        Search for a query within the file and return snippets with line numbers and context.
+        """
+        # only use this when treesitter is not available, since searching manually is inferior
+
+        file_path_str = self._get_file_path(project_name, file_path)
+        if not os.path.exists(file_path_str):
+            return self.result("file does not exist!", False)
+
+        try:
+            with open(file_path_str, 'r') as f:
+                lines = f.readlines()
+
+            matches = []
+            num_lines = len(lines)
+
+            if use_regex:
+                try:
+                    pattern = re.compile(query, re.IGNORECASE)
+                except re.error as e:
+                    return self.result(f"Invalid regex pattern: {e}", False)
+            else:
+                query_lower = query.lower()
+
+            for i, line in enumerate(lines):
+                line_num = i + 1
+                match_found = False
+
+                if use_regex:
+                    if pattern.search(line):
+                        match_found = True
+                else:
+                    if query_lower in line.lower():
+                        match_found = True
+
+                if match_found:
+                    snippet = [f"--- Match at line {line_num} ---"]
+
+                    start_idx = max(0, i - context_lines)
+                    end_idx = min(num_lines, i + context_lines + 1)
+
+                    for j in range(start_idx, end_idx):
+                        curr_line_num = j + 1
+                        curr_line_content = lines[j].rstrip('\n\r')
+
+                        if curr_line_num == line_num:
+                            snippet.append(f"{curr_line_num:4}: {curr_line_content}  <-- MATCH")
+                        else:
+                            snippet.append(f"{curr_line_num:4}: {curr_line_content}")
+
+                    matches.append("\n".join(snippet))
+
+                    if len(matches) >= max_matches:
+                        break
+
+            if not matches:
+                return self.result(None)
+
+            result_str = "\n\n".join(matches)
+            return self.result(result_str)
+
         except Exception as e:
             return self.result(f"error: {e}", False)
