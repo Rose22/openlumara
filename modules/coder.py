@@ -72,6 +72,7 @@ class Coder(modules.files_sandboxed.SandboxedFiles):
         "sandbox_folder": "~/coder",
         "read-only": True,
         "allow_function_editing": False,
+        "allow_full_file_reads": False,
         "allow_full_file_overwrites": False,
         "allow_code_execution": False,
         "enable_progress_messages": False,
@@ -283,6 +284,9 @@ class YourClassName(core.module.Module):
 
         if not self.config.get("allow_function_editing") or self.config.get("read-only"):
             self.disabled_tools.append("edit_symbol_content")
+
+        if not self.config.get("allow_full_file_reads") or self.config.get("read-only"):
+            self.disabled_tools.append("read_file")
 
         if not self.config.get("allow_full_file_overwrites") or self.config.get("read-only"):
             self.disabled_tools.append("overwrite_file")
