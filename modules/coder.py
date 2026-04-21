@@ -124,6 +124,7 @@ class Coder(modules.files_sandboxed.SandboxedFiles):
                 (r'^\s*class\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'class'),
                 (r'^\s*(?:public|protected|private|static)\s+[\w<>\[\]]+\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(', 'function'),
             ],
+
             'body_type': 'brace'
         }
     }
@@ -581,7 +582,7 @@ class YourClassName(core.module.Module):
         except Exception as e:
             return self.result(f"error: {e}", False)
 
-    def _walk_for_symbols(self, node, language, symbols):
+    def _walk_for_symbols(self, node, language, symbols, prefix=""):
         """Recursive tree walker for Tree-sitter nodes."""
         target_types = self.SYMBOL_MAP.get(language, {})
 
@@ -590,7 +591,6 @@ class YourClassName(core.module.Module):
             name = None
 
             # Search children for the identifier/name of the symbol
-            # This is a simplified heuristic for extracting the symbol name
             for child in node.children:
                 if child.type in ['identifier', 'property_identifier', 'name', 'field_identifier']:
                     try:
@@ -600,14 +600,19 @@ class YourClassName(core.module.Module):
                         continue
 
             if name:
+                full_name = f"{prefix}{name}"
                 symbols.append({
-                    'name': name,
+                    'name': full_name,
                     'type': sym_type,
                     'line': node.start_point[0] + 1
                 })
+                # For children, use this symbol's name as prefix
+                for child in node.children:
+                    self._walk_for_symbols(child, language, symbols, prefix=f"{full_name}.")
+                return # We've already explored descendants with the prefix
 
         for child in node.children:
-            self._walk_for_symbols(child, language, symbols)
+            self._walk_for_symbols(child, language, symbols, prefix=prefix)
 
     def _find_symbol_line(self, file_path_str: str, symbol_name: str, language: str) -> int:
         """Helper to find the line number of a symbol by its name."""
@@ -620,37 +625,52 @@ class YourClassName(core.module.Module):
                 tree = parser.parse(source_bytes)
 
                 target_node = None
+                parts = symbol_name.split('.')
 
-                def find_node(node):
+                def find_node(node, parts_to_match):
                     nonlocal target_node
-                    if target_node:
+                    if target_node or not parts_to_match:
                         return
 
+                    current_part = parts_to_match[0]
+                    remaining_parts = parts_to_match[1:]
+
+                    # Check if this node is a symbol and matches current_part
                     if node.type in self.SYMBOL_MAP.get(language, {}):
-                        # Search children for the identifier/name of the symbol
                         for child in node.children:
                             if child.type in ['identifier', 'property_identifier', 'name', 'field_identifier']:
                                 try:
-                                    if child.text.decode('utf-8') == symbol_name:
-                                        target_node = node
-                                        return
+                                    if child.text.decode('utf-8') == current_part:
+                                        if not remaining_parts:
+                                            target_node = node
+                                            return
+                                        else:
+                                            # Search within this node for the rest of the parts
+                                            for next_child in node.children:
+                                                find_node(next_child, remaining_parts)
+                                            return
                                 except:
                                     continue
-                    for child in node.children:
-                        find_node(child)
 
-                find_node(tree.root_node)
+                    # Search children for the current part
+                    for child in node.children:
+                        find_node(child, parts_to_match)
+
+                find_node(tree.root_node, parts)
                 if target_node:
                     return target_node.start_point[0] + 1
             except Exception:
                 pass
 
         # 2. Fallback to Regex
+        parts = symbol_name.split('.')
+        last_part = parts[-1]
         config = self.LANGUAGE_CONFIG.get(language)
         patterns = []
         if config and 'outline_patterns' in config:
             patterns = config['outline_patterns']
         else:
+            # Generic fallback patterns
             patterns = [
                 (r'^\s*class\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'class'),
                 (r'^\s*(?:async\s+)?def\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'function'),
@@ -662,7 +682,7 @@ class YourClassName(core.module.Module):
                 for idx, line in enumerate(f):
                     for pattern, sym_type in patterns:
                         match = re.search(pattern, line)
-                        if match and match.group(1) == symbol_name:
+                        if match and match.group(1) == last_part:
                             return idx + 1
         except Exception:
             pass
@@ -687,6 +707,7 @@ class YourClassName(core.module.Module):
         # 1. Try Tree-sitter
         if HAS_TREE_SITTER and language in LANGUAGE_MAP:
             try:
+                from tree_sitter import Parser
                 parser = Parser(LANGUAGE_MAP[language])
                 with open(file_path_str, 'rb') as f:
                     source_bytes = f.read()
@@ -817,7 +838,7 @@ class YourClassName(core.module.Module):
                 find_nodes(tree.root_node)
 
                 if candidate_nodes:
-                    # Pick the "tightest" node (the one with the smallest byte range)
+                    # Pick the \"tightest\" node (the one with the smallest byte range)
                     best_node = min(candidate_nodes, key=lambda n: n.end_byte - n.start_byte)
                     start_byte = best_node.start_byte
                     end_byte = best_node.end_byte
