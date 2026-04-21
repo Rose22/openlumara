@@ -1000,7 +1000,7 @@ class YourClassName(core.module.Module):
             # Ensure the new symbol ends with a newline for clean insertion
             if not new_symbol.endswith('\n'):
                 new_symbol += '\n'
-            new_symbol += \n # and an extra one for better separation
+            new_symbol += '\n' # and an extra one for better separation
 
             # 4. Insert the new symbol into the lines list before the target line
             lines.insert(line_number - 1, new_symbol)
