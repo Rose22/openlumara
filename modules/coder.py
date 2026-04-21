@@ -346,28 +346,42 @@ class YourClassName(core.module.Module):
 
     async def list_full_project_tree(self, project_name: str, depth_limit: int = 3):
         """
-        Returns a recursive tree representation of the project structure (including files).
-        Structure: {"name": name, "type": "directory" | "file", "children": [...]}
+        Returns a recursive tree representation of the project structure.
+        Structure:
+        {
+           "root": ["file1.py", "file2.md"],
+           "subfolder": ["file1.txt", "file2.txt", {"another_subfolder": ["subfile1.txt", "subfile2.txt"]}]
+        }
         """
         project_path = self._get_project_path(project_name)
         if not os.path.exists(project_path):
             return self.result("project does not exist", False)
 
         def _build_tree(path, current_depth):
-            name = os.path.basename(os.path.normpath(path))
             is_dir = os.path.isdir(path)
-            node = {"name": name, "type": "directory" if is_dir else "file"}
+            if not is_dir:
+                return os.path.basename(path)
 
-            if is_dir and current_depth < depth_limit:
-                children = []
-                try:
-                    for entry in os.scandir(path):
-                        children.append(_build_tree(entry.path, current_depth + 1))
-                except Exception:
-                    pass
-                node["children"] = children
-            
-            return node
+            contents = []
+            subdirs = {}
+            try:
+                for entry in os.scandir(path):
+                    if entry.is_file():
+                        contents.append(entry.name)
+                    elif entry.is_dir():
+                        if current_depth < depth_limit:
+                            subdirs[entry.name] = _build_tree(entry.path, current_depth + 1)
+                        else:
+                            contents.append(entry.name)
+            except Exception:
+                pass
+
+            if current_depth > 0:
+                return contents + list(subdirs.values())
+            else:
+                result = {"root": contents}
+                result.update(subdirs)
+                return result
 
         try:
             tree = _build_tree(project_path, 0)
