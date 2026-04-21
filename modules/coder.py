@@ -345,8 +345,8 @@ class YourClassName(core.module.Module):
 
     async def list_full_project_tree(self, project_name: str, depth_limit: int = 3):
         """
-        Returns a recursive tree representation of the project structure (directories only).
-        Structure: [name, [children]]
+        Returns a recursive tree representation of the project structure (including files).
+        Structure: {"name": name, "type": "directory" | "file", "children": [...]}
         """
         project_path = self._get_project_path(project_name)
         if not os.path.exists(project_path):
@@ -354,17 +354,19 @@ class YourClassName(core.module.Module):
 
         def _build_tree(path, current_depth):
             name = os.path.basename(os.path.normpath(path))
-            children = []
+            is_dir = os.path.isdir(path)
+            node = {"name": name, "type": "directory" if is_dir else "file"}
 
-            if current_depth < depth_limit:
+            if is_dir and current_depth < depth_limit:
+                children = []
                 try:
                     for entry in os.scandir(path):
-                        if entry.is_dir():
-                            children.append(_build_tree(entry.path, current_depth + 1))
+                        children.append(_build_tree(entry.path, current_depth + 1))
                 except Exception:
                     pass
-
-            return [name, children]
+                node["children"] = children
+            
+            return node
 
         try:
             tree = _build_tree(project_path, 0)
