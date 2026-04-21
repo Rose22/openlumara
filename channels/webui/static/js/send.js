@@ -8,6 +8,7 @@ let activeTypewriterSegId = -1;
 let streamingToolCalls = {};
 let toolCallsContainer = null;
 let placeholderUserWrapper = null;
+let manuallyCollapsedReasoning = new Set();
 
 function resetStreamState() {
     streamSegments = [];
@@ -80,10 +81,19 @@ function finalizeAllContent() {
 function createSegmentElement(seg) {
     if (seg.type === 'reasoning') {
         const expandByDefault = localStorage.getItem('reasoningExpandedByDefault') === 'true';
+
+        // Generate unique ID for this reasoning block
+        const reasoningId = `reasoning-${seg.id}`;
+
+        // Check if user manually collapsed this block
+        const userCollapsed = manuallyCollapsedReasoning.has(reasoningId);
+        const shouldCollapse = userCollapsed || !expandByDefault;
+
         const temp = document.createElement('div');
-        temp.innerHTML = renderReasoningBlock(seg.text, !expandByDefault, 'Thinking');
+        temp.innerHTML = renderReasoningBlock(seg.text, shouldCollapse, 'Thinking');
         const el = temp.firstElementChild;
         el.classList.add('is-reasoning-active');
+        el.dataset.reasoningId = reasoningId;
         return el;
     }
 
@@ -136,7 +146,15 @@ function updateSegmentContent(seg, index) {
 
         if (!isLast) {
             seg.el.classList.remove('is-reasoning-active');
-            seg.el.classList.add('collapsed');
+
+            // Only collapse if user hasn't manually expanded it
+            const reasoningId = seg.el.dataset.reasoningId;
+            if (!manuallyCollapsedReasoning.has(reasoningId)) {
+                const expandByDefault = localStorage.getItem('reasoningExpandedByDefault') === 'true';
+                if (!expandByDefault) {
+                    seg.el.classList.add('collapsed');
+                }
+            }
         }
         return;
     }
@@ -429,8 +447,22 @@ async function send(providedContent = null) {
 function collapseFinishedReasoning(msgDiv) {
     const wrappers = msgDiv.querySelectorAll('.reasoning-wrapper');
     wrappers.forEach(wrapper => {
+        const reasoningId = wrapper.dataset.reasoningId;
+
+        // Don't collapse if user manually expanded it during streaming
+        if (manuallyCollapsedReasoning.has(reasoningId)) {
+            // Keep it collapsed - user wanted it that way
+            return;
+        }
+
+        // Check localStorage for default behavior
+        const expandByDefault = localStorage.getItem('reasoningExpandedByDefault') === 'true';
+
         wrapper.classList.remove('is-reasoning-active');
-        wrapper.classList.add('collapsed');
+
+        if (!expandByDefault) {
+            wrapper.classList.add('collapsed');
+        }
     });
 }
 
@@ -1008,7 +1040,7 @@ function renderStreamingToolCall(index, toolCall, aiMsgDiv) {
 
     if (!cardEl) {
         cardEl = document.createElement('div');
-        cardEl.className = 'tool-call-card streaming collapsed';
+        cardEl.className = 'tool-call-card streaming';
         cardEl.dataset.streamTcId = callId;
         cardEl.dataset.index = index;
 

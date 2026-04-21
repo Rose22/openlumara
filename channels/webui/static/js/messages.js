@@ -557,11 +557,21 @@ function renderReasoningBlock(reasoningContent, isCollapsed = true, label = 'Thi
     </div>`;
 }
 
-function toggleReasoningBlock(headerElement) {
-    const wrapper = headerElement.closest('.reasoning-wrapper');
-    if (wrapper) {
-        wrapper.classList.toggle('collapsed');
-        wrapper.classList.toggle('expanded');
+function toggleReasoningBlock(header) {
+    const wrapper = header.closest('.reasoning-wrapper');
+    if (!wrapper) return;
+
+    const reasoningId = wrapper.dataset.reasoningId;
+    const isCollapsed = wrapper.classList.contains('collapsed');
+
+    if (isCollapsed) {
+        wrapper.classList.remove('collapsed');
+        wrapper.classList.add('expanded');
+        manuallyCollapsedReasoning.delete(reasoningId);
+    } else {
+        wrapper.classList.remove('expanded');
+        wrapper.classList.add('collapsed');
+        manuallyCollapsedReasoning.add(reasoningId);
     }
 }
 
