@@ -800,6 +800,9 @@ class YourClassName(core.module.Module):
         if not language:
             language = self._get_language_from_ext(file_path_str)
 
+        # remove any extra whitespace
+        new_body = new_body.strip()
+
         # 1. Try Tree-sitter for precise byte-level replacement
         if HAS_TREE_SITTER and language in LANGUAGE_MAP:
             try:
