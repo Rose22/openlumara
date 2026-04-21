@@ -202,7 +202,6 @@
     background: var(--bg-tertiary);
     border-radius: var(--radius-sm);
     overflow: hidden;
-    max-height: 2000px;
     opacity: 1;
     transition: max-height 0.3s ease, opacity 0.25s ease, padding 0.25s ease;
 }
@@ -213,8 +212,6 @@
     color: var(--text-secondary);
     white-space: pre-wrap;
     word-break: break-word;
-    max-height: 400px;
-    overflow-y: auto;
     line-height: 1.5;
 }
 
@@ -1445,10 +1442,6 @@
 
     .tool-call-section {
         padding: 10px;
-    }
-
-    .reasoning-content {
-        max-height: 250px;
     }
 }
 
