@@ -341,6 +341,9 @@ async function send(providedContent = null) {
                         }
                         const token = data.content || data.token || '';
                         if (token) {
+                            // Clear processing indicators when content starts
+                            clearProcessingIndicators();
+
                             appendStreamText('content', token, useTypewriter);
                             if (useTypewriter) {
                                 const activeSeg = streamSegments.find(s => s.id === activeTypewriterSegId);
@@ -365,6 +368,9 @@ async function send(providedContent = null) {
                                 startStreamingUI(aiWrapper, typing);
                                 streamStarted = true;
                             }
+                            // Clear processing indicators when reasoning starts
+                            clearProcessingIndicators();
+
                             appendStreamText('reasoning', token);
                             renderStreamSegments(aiMsgDiv);
                         }
@@ -474,6 +480,9 @@ async function finalizeStreamingUI(aiWrapper, aiMsgDiv) {
 
     // Remove active states
     collapseFinishedReasoning(aiMsgDiv);
+
+    // Clear any remaining processing indicators
+    clearProcessingIndicators();
 
     // Enable buttons
     aiWrapper.classList.remove('streaming', 'hidden');
@@ -843,6 +852,12 @@ function handleToolCallDelta(data, aiMsgDiv, aiWrapper) {
 
     toolCallsContainer = tcSeg.el;
 
+    // Stop reasoning pulsing when tool calls start streaming
+    const activeReasoning = aiMsgDiv.querySelectorAll('.reasoning-wrapper.is-reasoning-active');
+    activeReasoning.forEach(wrapper => {
+        wrapper.classList.remove('is-reasoning-active');
+    });
+
     for (const tc of toolCalls) {
         const index = tc.index !== undefined ? tc.index : 0;
         const id = tc.id;
@@ -1097,7 +1112,6 @@ function renderStreamingToolCall(index, toolCall, aiMsgDiv) {
             // Still streaming, show raw with cursor
             argsContainer.innerHTML = `<div class="tool-call-args-streaming">
             <span class="tool-call-args-raw">${escapeHtml(rawArgs)}</span>
-            <span class="streaming-cursor">▌</span>
             </div>`;
         } else {
             let html = '';
@@ -1133,11 +1147,6 @@ function renderStreamingToolCall(index, toolCall, aiMsgDiv) {
                 </div>`;
             }
 
-            // If JSON is incomplete, show streaming cursor
-            if (!complete) {
-                html += `<span class="streaming-cursor">▌</span>`;
-            }
-
             argsContainer.innerHTML = html;
         }
     }
@@ -1159,6 +1168,8 @@ function renderStreamingToolCall(index, toolCall, aiMsgDiv) {
             argCountEl.innerHTML = '';
         }
     }
+
+    scrollToBottom();
 }
 
 
@@ -1346,7 +1357,6 @@ function renderStreamingArgs(args, rawArgs, parseError) {
     if (entries.length === 0) {
         return `<div class="tool-call-args-streaming">
         <span class="tool-call-args-raw">${escapeHtml(rawArgs)}</span>
-        <span class="streaming-cursor">▌</span>
         </div>`;
     }
 
@@ -1417,13 +1427,53 @@ function handleToolResponse(data, aiMsgDiv) {
             status.textContent = 'done';
         }
 
+        cardEl.classList.add('collapsed');
+
         const responseSection = cardEl.querySelector('.tool-response-section');
         const responseContent = cardEl.querySelector('.tool-response-content');
         if (responseSection && responseContent) {
             responseSection.style.display = 'block';
             responseContent.innerHTML = renderToolResponseContent(content);
         }
+
+        // Add "processing result..." indicator after the card
+        addProcessingIndicator(cardEl);
+
+        scrollToBottom();
     }
+}
+
+/**
+ * Add a "processing result..." indicator below a tool call card.
+ */
+function addProcessingIndicator(cardEl) {
+    // Remove any existing processing indicator first
+    const existing = cardEl.parentElement.querySelector('.tool-processing-indicator');
+    if (existing) existing.remove();
+
+    const indicator = document.createElement('div');
+    indicator.className = 'tool-processing-indicator';
+    indicator.innerHTML = `
+    <div class="tool-processing-content">
+    <svg class="tool-processing-spinner" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M21 12a9 9 0 11-6.219-8.56"/>
+    </svg>
+    <span class="tool-processing-text">processing result...</span>
+    </div>
+    `;
+
+    // Insert after the card
+    cardEl.parentElement.insertBefore(indicator, cardEl.nextSibling);
+}
+
+/**
+ * Remove all processing indicators from the streaming container.
+ */
+function clearProcessingIndicators() {
+    if (!toolCallsContainer) return;
+
+    const indicators = toolCallsContainer.querySelectorAll('.tool-processing-indicator');
+    indicators.forEach(ind => ind.remove());
 }
 
 /**
@@ -1432,6 +1482,7 @@ function handleToolResponse(data, aiMsgDiv) {
 function clearStreamingToolCalls() {
     streamingToolCalls = {};
     toolCallsContainer = null;
+    clearProcessingIndicators();
 }
 
 // =============================================================================

@@ -7,7 +7,7 @@ let autoScrollEnabled = true;
 
 // Check if scrolled to bottom (with small threshold for floating point issues)
 function isScrolledToBottom() {
-    const threshold = 10; // pixels from bottom to consider "at bottom"
+    const threshold = 50; // pixels from bottom to consider "at bottom"
     return chat.scrollHeight - chat.scrollTop - chat.clientHeight < threshold;
 }
 

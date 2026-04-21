@@ -586,6 +586,10 @@ function toggleToolCard(headerElement) {
 // Tool Response Rendering
 // =============================================================================
 
+// =============================================================================
+// Tool Response Rendering - Compact & Clean
+// =============================================================================
+
 function renderToolResponseContent(content) {
     let displayContent = content;
     let isJson = false;
@@ -599,77 +603,181 @@ function renderToolResponseContent(content) {
     }
 
     if (isJson && parsedData !== null) {
-        return renderJsonResponseCompact(parsedData);
+        return renderJsonResponseCompact(parsedData, 0);
     }
 
     return `<div class="tool-response-string">${escapeHtml(displayContent)}</div>`;
 }
 
-function renderJsonResponseCompact(data) {
+/**
+ * Render JSON response in a compact, depth-aware format.
+ */
+function renderJsonResponseCompact(data, depth = 0) {
+    // Handle double-encoded strings
     if (typeof data === 'string') {
         try {
             const inner = JSON.parse(data);
-            return renderJsonResponseCompact(inner);
+            return renderJsonResponseCompact(inner, depth);
         } catch (e) {
-            return `<div class="tool-response-string">${escapeHtml(data)}</div>`;
+            return `<span class="tool-response-scalar string">${escapeHtml(data)}</span>`;
         }
     }
 
+    // Null
+    if (data === null) {
+        return `<span class="tool-response-null">null</span>`;
+    }
+
+    // Boolean
+    if (typeof data === 'boolean') {
+        return `<span class="tool-response-scalar boolean">${data}</span>`;
+    }
+
+    // Number
+    if (typeof data === 'number') {
+        return `<span class="tool-response-scalar number">${data}</span>`;
+    }
+
+    // Array
     if (Array.isArray(data)) {
-        if (data.length === 0) {
-            return `<div class="tool-response-empty">Empty array</div>`;
-        }
-
-        let html = `<div class="tool-response-header-compact">Array (${data.length} items)</div>`;
-        html += `<div class="tool-response-array-compact">`;
-        const maxItems = Math.min(data.length, 5);
-        for (let i = 0; i < maxItems; i++) {
-            const item = data[i];
-            html += `<div class="tool-response-item-compact">`;
-            html += `<span class="tool-response-item-index">[${i}]</span>`;
-            if (typeof item === 'object' && item !== null) {
-                html += renderJsonResponseCompact(item);
-            } else {
-                let strVal = String(item);
-                html += `<span class="tool-response-scalar">${escapeHtml(strVal)}</span>`;
-            }
-            html += `</div>`;
-        }
-        if (data.length > 5) {
-            html += `<div class="tool-response-more">+ ${data.length - 5} more items</div>`;
-        }
-        html += `</div>`;
-        return html;
+        return renderArrayCompact(data, depth);
     }
 
-    if (typeof data === 'object' && data !== null) {
-        const entries = Object.entries(data);
-
-        if (entries.length === 0) {
-            return `<div class="tool-response-empty">Empty object</div>`;
-        }
-
-        let html = `<div class="tool-response-object-compact">`;
-        for (const [key, value] of entries) {
-            html += `<div class="tool-response-kv-compact">`;
-            html += `<span class="tool-response-key">${escapeHtml(key)}</span>`;
-            html += `<span class="tool-response-colon">:</span>`;
-
-            if (typeof value === 'object' && value !== null) {
-                html += renderJsonResponseCompact(value);
-            } else {
-                let strVal = String(value);
-                html += `<span class="tool-response-scalar">${escapeHtml(strVal)}</span>`;
-            }
-
-            html += `</div>`;
-        }
-        html += `</div>`;
-        return html;
+    // Object
+    if (typeof data === 'object') {
+        return renderObjectCompact(data, depth);
     }
 
-    let strVal = String(data);
-    return `<span class="tool-response-scalar">${escapeHtml(strVal)}</span>`;
+    // Fallback
+    return `<span class="tool-response-scalar">${escapeHtml(String(data))}</span>`;
+}
+
+/**
+ * Render array with smart truncation.
+ */
+function renderArrayCompact(arr, depth) {
+    if (arr.length === 0) {
+        return `<span class="tool-response-empty">[]</span>`;
+    }
+
+    // Only collapse to summary at depth 3+, not depth 2
+    if (depth >= 3) {
+        const preview = getArrayPreview(arr);
+        return `<span class="tool-response-summary" onclick="this.classList.toggle('expanded')">
+        <span class="tool-response-summary-icon">[${arr.length}]</span>
+        <span class="tool-response-summary-text">${preview}</span>
+        </span>`;
+    }
+
+    // For arrays of primitives at depth 0-1, show inline
+    if (depth <= 1 && arr.every(item => typeof item !== 'object' || item === null)) {
+        const maxInline = depth === 0 ? 10 : 6;
+        if (arr.length <= maxInline) {
+            const items = arr.map(item => renderJsonResponseCompact(item, depth + 1));
+            return `<span class="tool-response-preview-bracket">[</span> ${items.join(', ')} <span class="tool-response-preview-bracket">]</span>`;
+        }
+    }
+
+    // Normal vertical rendering with generous limits
+    const maxItems = depth === 0 ? 8 : depth === 1 ? 6 : 4;
+    const showItems = arr.slice(0, maxItems);
+    const hasMore = arr.length > maxItems;
+
+    const depthClass = `tool-response-depth-${Math.min(depth, 3)}`;
+    const nestedClass = depth > 0 ? 'tool-response-nested' : '';
+
+    let html = `<div class="${nestedClass} ${depthClass}">`;
+
+    for (let i = 0; i < showItems.length; i++) {
+        const item = showItems[i];
+        html += `<div class="tool-response-array-item">`;
+        html += `<span class="tool-response-index">${i}</span>`;
+        html += `<span class="tool-response-value">${renderJsonResponseCompact(item, depth + 1)}</span>`;
+        html += `</div>`;
+    }
+
+    if (hasMore) {
+        const remaining = arr.length - maxItems;
+        html += `<div class="tool-response-truncated">+ ${remaining} more</div>`;
+    }
+
+    html += `</div>`;
+    return html;
+}
+
+/**
+ * Render object with smart key handling.
+ */
+function renderObjectCompact(obj, depth) {
+    const entries = Object.entries(obj);
+
+    if (entries.length === 0) {
+        return `<span class="tool-response-empty">{}</span>`;
+    }
+
+    // Only collapse to summary at depth 3+
+    if (depth >= 3) {
+        const keyPreview = entries.slice(0, 2).map(([k]) => k).join(', ');
+        return `<span class="tool-response-summary">
+        <span class="tool-response-summary-icon">{${entries.length}}</span>
+        <span class="tool-response-summary-text">${escapeHtml(keyPreview)}${entries.length > 2 ? '...' : ''}</span>
+        </span>`;
+    }
+
+    // Show all keys for reasonably-sized objects
+    const maxKeys = depth === 0 ? 10 : depth === 1 ? 8 : 5;
+
+    const depthClass = `tool-response-depth-${Math.min(depth, 3)}`;
+    const nestedClass = depth > 0 ? 'tool-response-nested' : '';
+
+    let html = `<div class="${nestedClass} ${depthClass}">`;
+
+    const showEntries = entries.slice(0, maxKeys);
+    for (const [key, value] of showEntries) {
+        html += `<div class="tool-response-kv">`;
+        html += `<span class="tool-response-key">${escapeHtml(key)}</span>`;
+        html += `<span class="tool-response-colon">:</span>`;
+        html += `<span class="tool-response-value">${renderJsonResponseCompact(value, depth + 1)}</span>`;
+        html += `</div>`;
+    }
+
+    if (entries.length > maxKeys) {
+        const remaining = entries.length - maxKeys;
+        html += `<div class="tool-response-truncated">+ ${remaining} more keys</div>`;
+    }
+
+    html += `</div>`;
+    return html;
+}
+
+/**
+ * Get a brief preview of array contents.
+ */
+function getArrayPreview(arr) {
+    if (!arr || arr.length === 0) return '';
+
+    const samples = arr.slice(0, 3);
+    const previews = samples.map(item => {
+        if (typeof item === 'string') {
+            const truncated = item.length > 15 ? item.substring(0, 15) + '...' : item;
+            return `"${escapeHtml(truncated)}"`;
+        }
+        if (typeof item === 'number') return String(item);
+        if (typeof item === 'boolean') return String(item);
+        if (item === null) return 'null';
+        if (Array.isArray(item)) return '[...]';
+        if (typeof item === 'object') {
+            const keys = Object.keys(item);
+            return keys.length > 0 ? `{${keys[0]}...}` : '{}';
+        }
+        return String(item);
+    });
+
+    let preview = previews.join(', ');
+    if (arr.length > 3) {
+        preview += ', ...';
+    }
+    return preview;
 }
 
 // =============================================================================
