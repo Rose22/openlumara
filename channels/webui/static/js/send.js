@@ -1112,7 +1112,7 @@ function renderStreamingToolCall(index, toolCall, aiMsgDiv) {
         } else if (entries.length === 0) {
             // Still streaming, show raw with cursor
             argsContainer.innerHTML = `<div class="tool-call-args-streaming">
-            <span class="tool-call-args-raw">${escapeHtml(rawArgs)}</span>
+            <span class="tool-call-args-raw">${escapeHtml(rawArgs ? rawArgs.replace(/\\n/g, '\n') : '')}</span>
             </div>`;
         } else {
             let html = '';
@@ -1124,6 +1124,7 @@ function renderStreamingToolCall(index, toolCall, aiMsgDiv) {
                 } else {
                     valStr = String(argValue);
                 }
+                valStr = valStr.replace(/\\n/g, '\n');
 
                 // Track per-key printed values like CLI does
                 const previouslyPrinted = printedValues[argName] || '';
@@ -1159,6 +1160,7 @@ function renderStreamingToolCall(index, toolCall, aiMsgDiv) {
         if (entries.length === 1) {
             const [argName, argValue] = entries[0];
             let displayValue = typeof argValue === 'object' ? JSON.stringify(argValue) : String(argValue);
+            displayValue = displayValue.replace(/\\n/g, '\n');
             if (displayValue.length > 50) displayValue = displayValue.substring(0, 50) + '...';
             argCountEl.className = 'tool-call-arg-count inline';
             argCountEl.innerHTML = `<span class="tool-call-inline-arg">${escapeHtml(displayValue)}</span>`;
@@ -1357,7 +1359,7 @@ function renderStreamingArgs(args, rawArgs, parseError) {
 
     if (entries.length === 0) {
         return `<div class="tool-call-args-streaming">
-        <span class="tool-call-args-raw">${escapeHtml(rawArgs)}</span>
+        <span class="tool-call-args-raw">${escapeHtml(rawArgs ? rawArgs.replace(/\\n/g, '\n') : '')}</span>
         </div>`;
     }
 
@@ -1369,6 +1371,7 @@ function renderStreamingArgs(args, rawArgs, parseError) {
         } else {
             displayValue = String(argValue);
         }
+        displayValue = displayValue.replace(/\\n/g, '\n');
         html += `
         <div class="tool-call-arg-row">
         <span class="tool-call-arg-name">${escapeHtml(argName)}</span>

@@ -285,6 +285,7 @@ function renderToolCallsWithResponses(toolCallsData) {
         if (argEntries.length === 1) {
             const [argName, argValue] = argEntries[0];
             let displayValue = typeof argValue === 'object' ? JSON.stringify(argValue) : String(argValue);
+            displayValue = displayValue.replace(/\\n/g, '\n');
             if (displayValue.length > 50) displayValue = displayValue.substring(0, 50) + '...';
             headerExtraHtml = `<span class="tool-call-inline-arg">${escapeHtml(displayValue)}</span>`;
         } else if (argEntries.length > 1) {
@@ -315,7 +316,7 @@ function renderToolCallsWithResponses(toolCallsData) {
 
         if (argEntries.length > 0) {
             for (const [argName, argValue] of argEntries) {
-                const displayValue = typeof argValue === 'object' ? JSON.stringify(argValue) : String(argValue);
+                const displayValue = (typeof argValue === 'object' ? JSON.stringify(argValue) : String(argValue)).replace(/\\n/g, '\n');
                 html += `
                 <div class="tool-call-arg-row">
                 <span class="tool-call-arg-name">${escapeHtml(argName)}</span>
