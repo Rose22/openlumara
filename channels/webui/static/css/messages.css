@@ -816,7 +816,7 @@
 .tool-processing-spinner {
     width: 14px;
     height: 14px;
-    color: var(--accent);
+    color: var(--text-muted);
     animation: processingSpin 1s linear infinite;
 }
 
