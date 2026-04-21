@@ -795,12 +795,12 @@ class YourClassName(core.module.Module):
         Replaces the content of a symbol with new content.
         Uses the same logic as get_symbol_body to identify the symbol's boundaries.
 
-        :param project_name: Name of the project.
-        :param file_path: List representing the path to the file.
-        :param symbol_name: Name of the symbol.
-        :param new_content: The new string content to place in the symbol.
-        :param language: Optional language identifier.
-        :return: True if successful, False otherwise.
+        Args:
+            project_name: Name of the project.
+            file_path: List representing the path to the file.
+            symbol_name: Name of the symbol.
+            new_content: The new string content to place in the symbol.
+            language: Optional language identifier.
         """
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
@@ -921,6 +921,88 @@ class YourClassName(core.module.Module):
         except Exception as e:
             core.log("coder", f"Couldn't use tree-sitter: {e}")
             return False
+
+    async def add_symbol_before(self, project_name: str, file_path: list, target_symbol_name: str, name: str, content_body: str, language: str = None) -> bool:
+        """
+        Inserts a new symbol (function or method) before the target symbol.
+
+        Args:
+            project_name: Name of the project.
+            file_path: List representing the path to the file.
+            target_symbol_name: The name of the symbol to insert before.
+            name: The name of the new symbol.
+            content_body: The content of the new symbol. If it doesn't contain a definition, one will be constructed.
+            language: Optional language identifier.
+        """
+        file_path_str = self._get_file_path(project_name, file_path)
+        if not os.path.exists(file_path_str):
+            return False
+
+        if not language:
+            language = self._get_language_from_ext(file_path_str)
+
+        # 1. Find the line number of the target symbol
+        line_number = self._find_symbol_line(file_path_str, target_symbol_name, language)
+        if not line_number:
+            return False
+
+        try:
+            with open(file_path_str, 'r') as f:
+                lines = f.readlines()
+
+            # 2. Determine indentation of the target symbol to match it
+            target_line = lines[line_number - 1]
+            indent_len = len(target_line) - len(target_line.lstrip())
+            indent_str = " " * indent_len
+
+            # 3. Construct the new symbol content
+            stripped_body = content_body.strip()
+            is_method = "." in target_symbol_name
+
+            # Check if content_body is just a body or a full definition
+            if not stripped_body.startswith(('def ', 'class ', 'async def ')):
+                # It's a body; construct the definition line
+                if is_method:
+                    new_symbol = f"{indent_str}def {name}(self):\n"
+                else:
+                    new_symbol = f"{indent_str}def {name}():\n"
+
+                # If the body itself isn't indented, indent it to match
+                if stripped_body and not content_body.startswith((' ', '\t')):
+                    body_lines = content_body.splitlines(keepends=True)
+                    indented_body = "".join([f"{indent_str}{line}" for line in body_lines])
+                    new_symbol += indented_body
+                else:
+                    new_symbol += content_body
+            else:
+                # It's already a full definition.
+                # If it's a method, we must ensure the whole definition is indented.
+                if is_method:
+                    body_lines = content_body.splitlines(keepends=True)
+                    new_symbol = "".join([f"{indent_str}{line}" for line in body_lines])
+                else:
+                    new_symbol = content_body
+
+            # Ensure the new symbol ends with a newline for clean insertion
+            if not new_symbol.endswith('\n'):
+                new_symbol += '\n'
+
+            # 4. Insert the new symbol into the lines list before the target line
+            lines.insert(line_number - 1, new_symbol)
+
+            with open(file_path_str, 'w') as f:
+                f.writelines(lines)
+            return True
+
+        except Exception as e:
+            # Assuming 'core' is available in the namespace as seen in other methods
+            try:
+                import core
+                core.log("coder", f"Error in add_symbol_before: {e}")
+            except:
+                print(f"Error in add_symbol_before: {e}")
+            return False
+
 
     async def search(self, project_name: str, file_path: list, query: str, context_lines: int = 5, max_matches: int = 10, use_regex: bool = False):
         """
