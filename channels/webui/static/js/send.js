@@ -801,10 +801,8 @@ function handleToolCallDelta(data, aiMsgDiv, aiWrapper) {
     const toolCalls = data.tool_calls;
     if (!toolCalls || toolCalls.length === 0) return;
 
-    // Ensure tool_calls container element exists in the segment
     const tcSeg = ensureToolCallsSegment();
 
-    // Create container element if needed
     if (!tcSeg.el || !tcSeg.el.parentNode) {
         tcSeg.el = document.createElement('div');
         tcSeg.el.className = 'tool-calls-streaming-container';
@@ -819,20 +817,177 @@ function handleToolCallDelta(data, aiMsgDiv, aiWrapper) {
         const funcName = tc.function?.name;
         const funcArgs = tc.function?.arguments || '';
 
-        // Initialize or update streaming tool call
+        // Initialize streaming tool call if needed
         if (!streamingToolCalls[index]) {
             streamingToolCalls[index] = {
                 id: id || `tc-stream-${index}`,
-                function: { name: funcName || '', arguments: '' }
+                function: { name: funcName || '', arguments: '' },
+                // Track per-key printed values like the CLI does
+                _printedValues: {}
             };
         }
 
         if (id) streamingToolCalls[index].id = id;
         if (funcName) streamingToolCalls[index].function.name = funcName;
-        if (funcArgs) streamingToolCalls[index].function.arguments += funcArgs;
+
+        // The backend sends accumulated arguments string
+        // We just use it directly - no += accumulation needed
+        streamingToolCalls[index].function.arguments = funcArgs;
 
         renderStreamingToolCall(index, streamingToolCalls[index], aiMsgDiv);
     }
+}
+
+/**
+ * Parse accumulated JSON, handling incomplete JSON gracefully.
+ */
+function parseAccumulatedJson(argsStr) {
+    if (!argsStr || !argsStr.trim()) {
+        return { parsed: {}, raw: argsStr };
+    }
+
+    // Try complete JSON first
+    try {
+        const parsed = JSON.parse(argsStr);
+        return { parsed, raw: argsStr, complete: true };
+    } catch (e) {
+        // Not complete - try json_repair style parsing
+    }
+
+    // Parse key-value pairs from incomplete JSON
+    const result = {};
+
+    // Match string keys and their values (strings, numbers, bools, null, arrays, objects)
+    // This regex captures: "key": value where value can be many forms
+    const keyValuePattern = /"([^"\\]*(?:\\.[^"\\]*)*)"\s*:\s*/g;
+    let match;
+
+    while ((match = keyValuePattern.exec(argsStr)) !== null) {
+        const key = match[1];
+        const valueStart = keyValuePattern.lastIndex;
+
+        // Extract the value starting from valueStart
+        const value = extractJsonValue(argsStr, valueStart);
+        if (value !== null) {
+            result[key] = value.parsed;
+        }
+    }
+
+    return { parsed: result, raw: argsStr, complete: false };
+}
+
+/**
+ * Extract a JSON value starting at a given position.
+ * Returns { parsed: value, end: position after value }
+ */
+function extractJsonValue(str, start) {
+    let i = start;
+
+    // Skip whitespace
+    while (i < str.length && /\s/.test(str[i])) i++;
+    if (i >= str.length) return { parsed: null, end: i, incomplete: true };
+
+    const c = str[i];
+
+    // String
+    if (c === '"') {
+        let j = i + 1;
+        while (j < str.length) {
+            if (str[j] === '\\' && j + 1 < str.length) {
+                j += 2;
+                continue;
+            }
+            if (str[j] === '"') {
+                // Complete string
+                try {
+                    return { parsed: JSON.parse(str.slice(i, j + 1)), end: j + 1 };
+                } catch (e) {
+                    return { parsed: str.slice(i + 1, j), end: j + 1 };
+                }
+            }
+            j++;
+        }
+        // Incomplete string - return what we have
+        return { parsed: str.slice(i + 1, j), end: j, incomplete: true };
+    }
+
+    // Array
+    if (c === '[') {
+        let depth = 1;
+        let j = i + 1;
+        let inString = false;
+
+        while (j < str.length && depth > 0) {
+            const ch = str[j];
+            if (ch === '"' && str[j - 1] !== '\\') inString = !inString;
+            else if (!inString) {
+                if (ch === '[') depth++;
+                else if (ch === ']') depth--;
+            }
+            j++;
+        }
+
+        const arrStr = str.slice(i, j);
+        try {
+            return { parsed: JSON.parse(arrStr), end: j };
+        } catch (e) {
+            // Try to parse incomplete array
+            try {
+                return { parsed: JSON.parse(arrStr + ']'), end: j };
+            } catch (e2) {
+                return { parsed: arrStr, end: j, incomplete: true };
+            }
+        }
+    }
+
+    // Object
+    if (c === '{') {
+        let depth = 1;
+        let j = i + 1;
+        let inString = false;
+
+        while (j < str.length && depth > 0) {
+            const ch = str[j];
+            if (ch === '"' && str[j - 1] !== '\\') inString = !inString;
+            else if (!inString) {
+                if (ch === '{') depth++;
+                else if (ch === '}') depth--;
+            }
+            j++;
+        }
+
+        const objStr = str.slice(i, j);
+        try {
+            return { parsed: JSON.parse(objStr), end: j };
+        } catch (e) {
+            try {
+                return { parsed: JSON.parse(objStr + '}'), end: j };
+            } catch (e2) {
+                return { parsed: objStr, end: j, incomplete: true };
+            }
+        }
+    }
+
+    // Number
+    if (c === '-' || /[0-9]/.test(c)) {
+        let j = i;
+        while (j < str.length && /[0-9.eE+-]/.test(str[j])) j++;
+        const numStr = str.slice(i, j);
+        const num = parseFloat(numStr);
+        return { parsed: isNaN(num) ? numStr : num, end: j };
+    }
+
+    // Boolean
+    if (str.slice(i, i + 4) === 'true') return { parsed: true, end: i + 4 };
+    if (str.slice(i, i + 5) === 'false') return { parsed: false, end: i + 5 };
+
+    // Null
+    if (str.slice(i, i + 4) === 'null') return { parsed: null, end: i + 4 };
+
+    // Unknown - scan until delimiter
+    let j = i;
+    while (j < str.length && !/[,}\]]/.test(str[j])) j++;
+    return { parsed: str.slice(i, j).trim(), end: j, incomplete: true };
 }
 
 /**
@@ -843,16 +998,13 @@ function renderStreamingToolCall(index, toolCall, aiMsgDiv) {
     let cardEl = toolCallsContainer.querySelector(`[data-stream-tc-id="${callId}"]`);
 
     const funcName = toolCall.function?.name || 'Calling...';
-    const rawArgs = toolCall.function?.arguments || '{}';
+    const rawArgs = toolCall.function?.arguments || '';
 
-    let argsDisplay = {};
-    let parseError = false;
-    try {
-        argsDisplay = parsePartialJson(rawArgs);
-    } catch (e) {
-        parseError = true;
-        argsDisplay = { _raw: rawArgs };
-    }
+    // Track per-key printed values (like CLI does)
+    const printedValues = toolCall._printedValues || {};
+
+    // Parse the accumulated JSON
+    const { parsed: argsDisplay, complete } = parseAccumulatedJson(rawArgs);
 
     if (!cardEl) {
         cardEl = document.createElement('div');
@@ -885,7 +1037,6 @@ function renderStreamingToolCall(index, toolCall, aiMsgDiv) {
         </div>
         </div>`;
 
-        // Insert in index order
         const existingCards = toolCallsContainer.querySelectorAll('.tool-call-card');
         let inserted = false;
         for (const existing of existingCards) {
@@ -903,16 +1054,66 @@ function renderStreamingToolCall(index, toolCall, aiMsgDiv) {
         }
     }
 
-    // Update arguments
+    // Update arguments display
     const argsContainer = cardEl.querySelector('.tool-call-args');
     if (argsContainer) {
-        argsContainer.innerHTML = renderStreamingArgs(argsDisplay, rawArgs, parseError);
+        const entries = Object.entries(argsDisplay);
+
+        if (entries.length === 0 && !rawArgs) {
+            argsContainer.innerHTML = `<div class="tool-call-no-args">No arguments</div>`;
+        } else if (entries.length === 0) {
+            // Still streaming, show raw with cursor
+            argsContainer.innerHTML = `<div class="tool-call-args-streaming">
+            <span class="tool-call-args-raw">${escapeHtml(rawArgs)}</span>
+            <span class="streaming-cursor">▌</span>
+            </div>`;
+        } else {
+            let html = '';
+            for (const [argName, argValue] of entries) {
+                // Convert value to string for comparison
+                let valStr;
+                if (typeof argValue === 'object' && argValue !== null) {
+                    valStr = JSON.stringify(argValue);
+                } else {
+                    valStr = String(argValue);
+                }
+
+                // Track per-key printed values like CLI does
+                const previouslyPrinted = printedValues[argName] || '';
+
+                // Determine what's new
+                let displayVal;
+                if (valStr.startsWith(previouslyPrinted)) {
+                    // Accumulated mode: value grew, show only new part
+                    displayVal = valStr;
+                } else {
+                    // Value changed completely (e.g., type change, array -> object)
+                    displayVal = valStr;
+                }
+
+                // Store the full accumulated value for next comparison
+                printedValues[argName] = valStr;
+
+                html += `
+                <div class="tool-call-arg-row">
+                <span class="tool-call-arg-name">${escapeHtml(argName)}</span>
+                <span class="tool-call-arg-value">${escapeHtml(displayVal)}</span>
+                </div>`;
+            }
+
+            // If JSON is incomplete, show streaming cursor
+            if (!complete) {
+                html += `<span class="streaming-cursor">▌</span>`;
+            }
+
+            argsContainer.innerHTML = html;
+        }
     }
 
     // Update arg count badge
     const argCountEl = cardEl.querySelector('.tool-call-arg-count');
     if (argCountEl) {
-        const entries = Object.entries(argsDisplay).filter(([k]) => k !== '_raw');
+        const entries = Object.entries(argsDisplay);
         if (entries.length === 1) {
             const [argName, argValue] = entries[0];
             let displayValue = typeof argValue === 'object' ? JSON.stringify(argValue) : String(argValue);
@@ -928,29 +1129,175 @@ function renderStreamingToolCall(index, toolCall, aiMsgDiv) {
     }
 }
 
+
 /**
  * Parse partial/incomplete JSON for display.
  */
 function parsePartialJson(str) {
     if (!str || !str.trim()) return {};
+
+    // Try complete JSON first
     try {
-        return JSON.parse(str);
+        const parsed = JSON.parse(str);
+        if (typeof parsed === 'object' && parsed !== null) {
+            return parsed;
+        }
+        return { value: parsed };
     } catch (e) {
-        // Continue to recovery
+        // Not complete JSON - try partial parsing
     }
 
-    let result = {};
-    const keyValueRegex = /"([^"]+)"\s*:\s*("[^"]*"|[\d.]+|true|false|null|\[[^\]]*\]|\{[^}]*\})/g;
-    let match;
-    while ((match = keyValueRegex.exec(str)) !== null) {
-        const key = match[1];
-        let value = match[2];
-        try {
-            result[key] = JSON.parse(value);
-        } catch (e) {
-            result[key] = value;
+    const result = {};
+
+    // Track brace/bracket depth for nested structures
+    const extractValue = (start, s) => {
+        let i = start;
+        const firstChar = s[i];
+
+        // Skip whitespace
+        while (i < s.length && /\s/.test(s[i])) i++;
+        if (i >= s.length) return { value: null, end: i };
+
+        const c = s[i];
+
+        // String
+        if (c === '"') {
+            let j = i + 1;
+            while (j < s.length) {
+                if (s[j] === '\\' && j + 1 < s.length) {
+                    j += 2;
+                    continue;
+                }
+                if (s[j] === '"') break;
+                j++;
+            }
+            return { value: s.slice(i + 1, j), end: j + 1, incomplete: j >= s.length };
         }
+
+        // Array
+        if (c === '[') {
+            let depth = 1;
+            let j = i + 1;
+            while (j < s.length && depth > 0) {
+                if (s[j] === '[') depth++;
+                else if (s[j] === ']') depth--;
+                else if (s[j] === '"') {
+                    j++;
+                    while (j < s.length) {
+                        if (s[j] === '\\' && j + 1 < s.length) { j += 2; continue; }
+                        if (s[j] === '"') break;
+                        j++;
+                    }
+                }
+                j++;
+            }
+            const arrStr = s.slice(i, j);
+            let parsedArr;
+            try {
+                parsedArr = JSON.parse(arrStr + (depth > 0 ? ']' : ''));
+            } catch (e) {
+                try {
+                    parsedArr = JSON.parse(arrStr);
+                } catch (e2) {
+                    return { value: arrStr, end: j, incomplete: depth > 0 };
+                }
+            }
+            return { value: parsedArr, end: j, incomplete: depth > 0 };
+        }
+
+        // Object
+        if (c === '{') {
+            let depth = 1;
+            let j = i + 1;
+            while (j < s.length && depth > 0) {
+                if (s[j] === '{') depth++;
+                else if (s[j] === '}') depth--;
+                else if (s[j] === '"') {
+                    j++;
+                    while (j < s.length) {
+                        if (s[j] === '\\' && j + 1 < s.length) { j += 2; continue; }
+                        if (s[j] === '"') break;
+                        j++;
+                    }
+                }
+                j++;
+            }
+            const objStr = s.slice(i, j);
+            let parsedObj;
+            try {
+                parsedObj = JSON.parse(objStr + (depth > 0 ? '}' : ''));
+            } catch (e) {
+                try {
+                    parsedObj = JSON.parse(objStr);
+                } catch (e2) {
+                    return { value: objStr, end: j, incomplete: depth > 0 };
+                }
+            }
+            return { value: parsedObj, end: j, incomplete: depth > 0 };
+        }
+
+        // Number
+        if (c === '-' || /\d/.test(c)) {
+            let j = i;
+            while (j < s.length && /[\d.+-eE]/.test(s[j])) j++;
+            const numStr = s.slice(i, j);
+            const num = parseFloat(numStr);
+            return { value: isNaN(num) ? numStr : num, end: j };
+        }
+
+        // Boolean/null
+        if (s.slice(i, i + 4) === 'true') return { value: true, end: i + 4 };
+        if (s.slice(i, i + 5) === 'false') return { value: false, end: i + 5 };
+        if (s.slice(i, i + 4) === 'null') return { value: null, end: i + 4 };
+
+        // Unknown - return rest as string
+        let j = i;
+        while (j < s.length && !/[,}\]]/.test(s[j])) j++;
+        return { value: s.slice(i, j).trim(), end: j };
+    };
+
+    // Parse key-value pairs
+    let i = 0;
+    const s = str.trim();
+    if (s[0] === '{') i = 1;
+
+    while (i < s.length) {
+        // Skip whitespace
+        while (i < s.length && /\s/.test(s[i])) i++;
+        if (i >= s.length) break;
+
+        // Find key
+        if (s[i] !== '"') { i++; continue; }
+        let keyEnd = i + 1;
+        while (keyEnd < s.length) {
+            if (s[keyEnd] === '\\' && keyEnd + 1 < s.length) { keyEnd += 2; continue; }
+            if (s[keyEnd] === '"') break;
+            keyEnd++;
+        }
+        const key = s.slice(i + 1, keyEnd);
+        i = keyEnd + 1;
+
+        // Skip to colon
+        while (i < s.length && s[i] !== ':') i++;
+        if (i >= s.length) break;
+        i++;
+
+        // Skip whitespace
+        while (i < s.length && /\s/.test(s[i])) i++;
+        if (i >= s.length) break;
+
+        // Extract value
+        const valueResult = extractValue(i, s);
+        if (key) {
+            result[key] = valueResult.value;
+        }
+        i = valueResult.end;
+
+        // Skip comma
+        while (i < s.length && s[i] !== ',' && s[i] !== '}') i++;
+        if (s[i] === ',') i++;
     }
+
     return result;
 }
 
@@ -958,7 +1305,11 @@ function parsePartialJson(str) {
     * Render arguments for a streaming tool call.
     */
 function renderStreamingArgs(args, rawArgs, parseError) {
-    const entries = Object.entries(args).filter(([k]) => k !== '_raw');
+    const entries = Object.entries(args);
+
+    if (entries.length === 0 && !rawArgs) {
+        return `<div class="tool-call-no-args">No arguments</div>`;
+    }
 
     if (entries.length === 0) {
         return `<div class="tool-call-args-streaming">
@@ -969,7 +1320,12 @@ function renderStreamingArgs(args, rawArgs, parseError) {
 
     let html = '';
     for (const [argName, argValue] of entries) {
-        let displayValue = typeof argValue === 'object' ? JSON.stringify(argValue) : String(argValue);
+        let displayValue;
+        if (typeof argValue === 'object' && argValue !== null) {
+            displayValue = JSON.stringify(argValue);
+        } else {
+            displayValue = String(argValue);
+        }
         html += `
         <div class="tool-call-arg-row">
         <span class="tool-call-arg-name">${escapeHtml(argName)}</span>
@@ -977,19 +1333,12 @@ function renderStreamingArgs(args, rawArgs, parseError) {
         </div>`;
     }
 
-    if (parseError && rawArgs.length > 0) {
-        html += `<div class="tool-call-arg-row partial">
-        <span class="tool-call-arg-name">...</span>
-        <span class="tool-call-arg-value streaming">${escapeHtml(rawArgs.slice(-50))}<span class="streaming-cursor">▌</span></span>
-        </div>`;
-    }
-
     return html;
 }
 
 /**
-    * Finalize streaming tool calls when complete tool_calls token arrives.
-    */
+ * Finalize streaming tool calls when complete tool_calls token arrives.
+ */
 function finalizeStreamingToolCalls(finalToolCalls, aiMsgDiv) {
     if (!toolCallsContainer) return;
 
@@ -1004,7 +1353,6 @@ function finalizeStreamingToolCalls(finalToolCalls, aiMsgDiv) {
         }
     });
 
-    // Update IDs to match final tool calls
     finalToolCalls.forEach((tc, idx) => {
         const finalId = tc.id || `tool-${idx}`;
         const card = toolCallsContainer.querySelector(`[data-stream-tc-id]`);
@@ -1015,8 +1363,8 @@ function finalizeStreamingToolCalls(finalToolCalls, aiMsgDiv) {
 }
 
 /**
-    * Handle tool during streaming.
-    */
+ * Handle tool response during streaming.
+ */
 function handleToolResponse(data, aiMsgDiv) {
     const toolCallId = data.tool_call_id;
     const content = data.content || '';
@@ -1047,8 +1395,8 @@ function handleToolResponse(data, aiMsgDiv) {
 }
 
 /**
-    * Clear streaming tool call state.
-    */
+ * Clear streaming tool call state.
+ */
 function clearStreamingToolCalls() {
     streamingToolCalls = {};
     toolCallsContainer = null;
