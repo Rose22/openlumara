@@ -71,7 +71,10 @@ class Coder(modules.files_sandboxed.SandboxedFiles):
         "coding_style": "Write clean, well-commented code. Do not include your reasoning inside final code.",
         "sandbox_folder": "~/coder",
         "read-only": True,
-        "allow_function_editing": False,
+        "folder_blacklist": ["venv"],
+        "allow_function_adding": True,
+        "allow_function_editing": True,
+        "allow_function_deleting": True,
         "allow_full_file_reads": False,
         "allow_full_file_overwrites": False,
         "allow_code_execution": False,
@@ -283,8 +286,14 @@ class YourClassName(core.module.Module):
         if self.config.get("read-only"):
             self.disabled_tools.append("create_project")
 
+        if not self.config.get("allow_function_adding") or self.config.get("read-only"):
+            self.disabled_tools.append("add_symbol_before")
+
         if not self.config.get("allow_function_editing") or self.config.get("read-only"):
             self.disabled_tools.append("edit_symbol_content")
+
+        if not self.config.get("allow_function_deleting") or self.config.get("read-only"):
+            self.disabled_tools.append("delete_symbol")
 
         if not self.config.get("allow_full_file_reads") or self.config.get("read-only"):
             self.disabled_tools.append("read_file")
@@ -369,6 +378,12 @@ class YourClassName(core.module.Module):
                     if entry.is_file():
                         contents.append(entry.name)
                     elif entry.is_dir():
+                        if entry.name in self.config.get("folder_blacklist"):
+                            continue
+
+                        if entry.name[0] == '.': # first char is . so its a hidden folder
+                            continue
+
                         if current_depth < depth_limit:
                             subdirs[entry.name] = _build_tree(entry.path, current_depth + 1)
                         else:
