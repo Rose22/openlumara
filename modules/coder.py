@@ -89,6 +89,7 @@ class Coder(modules.files_sandboxed.SandboxedFiles):
             'outline_patterns': [
                 (r'^\s*class\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'class'),
                 (r'^\s*(?:async\s+)?def\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'function'),
+                (r'^\s*[a-zA-Z_][a-zA-Z0-9_]*\s*[:=]', 'variable'),
             ],
             'body_type': 'indentation'
         },
@@ -99,6 +100,18 @@ class Coder(modules.files_sandboxed.SandboxedFiles):
                 (r'^\s*function\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'function'),
                 (r'^\s*(?:const|let|var)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=', 'variable'),
                 (r'^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*\([^)]*\)\s*=>', 'function'),
+                (r'^\s*this\.([a-zA-Z_][a-zA-Z0-9_]*)\s*=', 'variable'),
+            ],
+            'body_type': 'brace'
+        },
+        'typescript': {
+            'extensions': ['.ts', '.tsx'],
+            'outline_patterns': [
+                (r'^\s*class\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'class'),
+                (r'^\s*function\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'function'),
+                (r'^\s*(?:const|let|var)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=', 'variable'),
+                (r'^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*\([^)]*\)\s*=>', 'function'),
+                (r'^\s*this\.([a-zA-Z_][a-zA-Z0-9_]*)\s*=', 'variable'),
             ],
             'body_type': 'brace'
         },
@@ -107,9 +120,8 @@ class Coder(modules.files_sandboxed.SandboxedFiles):
             'outline_patterns': [
                 (r'^\s*class\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'class'),
                 (r'^\s*struct\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'struct'),
-                # Note: full function signatures in C++ are hard for regex, 
-                # but we can catch many common patterns
-                (r'^\s*[\w:<>*]+\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(', 'function'),
+                (r'^\s*[\w:<>\*]+\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*[;=]', 'variable'),
+                (r'^\s*[\w:<>\*]+\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\([^)]*\)', 'function'),
             ],
             'body_type': 'brace'
         },
@@ -118,6 +130,8 @@ class Coder(modules.files_sandboxed.SandboxedFiles):
             'outline_patterns': [
                 (r'^\s*type\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+struct', 'struct'),
                 (r'^\s*func\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'function'),
+                (r'^\s*[a-zA-Z_][a-zA-Z0-9_]*\s*:=', 'variable'),
+                (r'^\s*var\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'variable'),
             ],
             'body_type': 'brace'
         },
@@ -125,12 +139,42 @@ class Coder(modules.files_sandboxed.SandboxedFiles):
             'extensions': ['.java'],
             'outline_patterns': [
                 (r'^\s*class\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'class'),
-                (r'^\s*(?:public|protected|private|static)\s+[\w<>\[\]]+\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(', 'function'),
+                (r'^\s*(?:public|protected|private|static|\s)+\w+\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*[;=]', 'variable'),
+                (r'^\s*(?:public|protected|private|static|\s)+\w+\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\([^)]*\)', 'function'),
             ],
-
+            'body_type': 'brace'
+        },
+        'rust': {
+            'extensions': ['.rs'],
+            'outline_patterns': [
+                (r'^\s*struct\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'struct'),
+                (r'^\s*enum\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'enum'),
+                (r'^\s*fn\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'function'),
+                (r'^\s*let\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=', 'variable'),
+            ],
+            'body_type': 'brace'
+        },
+        'ruby': {
+            'extensions': ['.rb'],
+            'outline_patterns': [
+                (r'^\s*class\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'class'),
+                (r'^\s*module\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'module'),
+                (r'^\s*def\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'function'),
+                (r'^\s*(@?[a-zA-Z_][a-zA-Z0-9_]*)\s*=', 'variable'),
+            ],
+            'body_type': 'indentation'
+        },
+        'c-sharp': {
+            'extensions': ['.cs'],
+            'outline_patterns': [
+                (r'^\s*class\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'class'),
+                (r'^\s*(?:public|private|protected|internal|static|\s)+\w+\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*[;=]', 'variable'),
+                (r'^\s*(?:public|private|protected|internal|static|\s)+\w+\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\([^)]*\)', 'function'),
+            ],
             'body_type': 'brace'
         }
     }
+
 
     # Mapping extensions to language keys
     LANGUAGE_CONFIG = {
@@ -151,51 +195,70 @@ class Coder(modules.files_sandboxed.SandboxedFiles):
     SYMBOL_MAP = {
         'python': {
             'class_definition': 'class',
-            'function_definition': 'function'
+            'function_definition': 'function',
+            'assignment': 'variable',
+            'name': 'variable'
         },
         'javascript': {
             'class_declaration': 'class',
             'function_declaration': 'function',
             'method_definition': 'method',
-            'arrow_function': 'function'
+            'arrow_function': 'function',
+            'variable_declarator': 'variable',
+            'property_identifier': 'variable'
         },
         'typescript': {
             'class_declaration': 'class',
             'function_declaration': 'function',
-            'method_definition': 'method'
+            'method_definition': 'method',
+            'variable_declarator': 'variable',
+            'property_identifier': 'variable'
         },
         'cpp': {
             'class_specifier': 'class',
             'struct_specifier': 'struct',
             'function_definition': 'function',
-            'method_definition': 'method'
+            'method_definition': 'method',
+            'declaration': 'variable',
+            'field_declaration': 'variable'
         },
         'go': {
             'type_declaration': 'struct',
             'function_declaration': 'function',
-            'method_declaration': 'method'
+            'method_declaration': 'method',
+            'value_spec': 'variable',
+            'short_var_declaration': 'variable'
         },
         'java': {
             'class_declaration': 'class',
             'method_declaration': 'method',
-            'constructor_declaration': 'method'
+            'constructor_declaration': 'method',
+            'field_declaration': 'variable',
+            'variable_declarator': 'variable'
         },
         'rust': {
             'struct_item': 'struct',
             'enum_item': 'enum',
             'fn': 'function',
-            'impl_item': 'impl'
+            'impl_item': 'impl',
+            'let_binding': 'variable',
+            'field_declaration': 'variable'
         },
         'ruby': {
             'class': 'class',
             'module': 'module',
-            'def': 'function'
+            'def': 'function',
+            'lvascribable': 'variable',
+            'ivascribable': 'variable'
         },
         'c-sharp': {
             'class_declaration': 'class',
-            'method_declaration': 'method'
+            'method_declaration': 'method',
+            'field_declaration': 'variable',
+            'variable_declarator': 'variable'
         }
     }
+
 
     OPENLUMARA_MODULE_PROMPT = """
 To create modules for OpenLumara, follow this spec:
@@ -576,15 +639,17 @@ class YourClassName(core.module.Module):
 
         # 2. Fallback to Regex
         patterns = []
-        config = self.LANGUAGE_CONFIG.get(language)
-        if config and 'outline_patterns' in config:
-            patterns = config['outline_patterns']
+        # We look in LANGUAGE_REGEXES because that's where the patterns are actually stored
+        regex_config = self.LANGUAGE_REGEXES.get(language)
+        if regex_config and 'outline_patterns' in regex_config:
+            patterns = regex_config['outline_patterns']
         else:
             # Generic fallback patterns
             patterns = [
                 (r'^\s*class\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'class'),
                 (r'^\s*(?:async\s+)?def\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'function'),
                 (r'^\s*function\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'function'),
+                (r'^\s*[a-zA-Z_][a-zA-Z0-9_]*\s*=\s*[^=]', 'variable'),
             ]
 
         try:
