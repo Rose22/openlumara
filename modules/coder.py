@@ -430,11 +430,6 @@ class YourClassName(core.module.Module):
         """
         Creates an entire project structure in one go!
 
-        file_structure format:
-        A dictionary where keys are directory names.
-        - If a value is a dictionary, it represents a subdirectory.
-        - If a value is a list, it represents a list of empty files to be created in that directory.
-
         Example:
         {
             "src": {
@@ -442,13 +437,13 @@ class YourClassName(core.module.Module):
                     "button.py": "#!/bin/env python3\\nhi this is some example code!"
                 }
             },
-            "tests": ["test_main.py", "test_utils.py"],
+            "tests": {
+                "test_main.py": "",
+                "test_utils.py": ""
+            },
             "README.md": "this is a readme"
         }
         """
-        if self.config.get("read-only_mode"):
-            return self.result("User has disabled file modification. Provide the code directly to user.", False)
-
         async def _build_structure(current_path: str, structure: dict):
             for name, content in structure.items():
                 if name == "root":
@@ -461,15 +456,11 @@ class YourClassName(core.module.Module):
                     if self.config.get("enable_progress_messages"):
                         await self.manager.channel.announce(f"Created directory: {target_path}")
                     await _build_structure(target_path, content)
-                elif isinstance(content, list):
-                    os.makedirs(target_path, exist_ok=True)
-                    for filename in content:
-                        file_path = os.path.join(target_path, filename)
-                        with open(file_path, "w") as f:
-                            if content:
-                                f.write(content)
-                        if self.config.get("enable_progress_messages"):
-                            await self.manager.channel.announce(f"Created file: {file_path}")
+                elif isinstance(content, str):
+                    with open(target_path, "w") as f:
+                        f.write(content)
+                    if self.config.get("enable_progress_messages"):
+                        await self.manager.channel.announce(f"Created file: {target_path}")
 
         base_path = self._get_project_path(project_name)
 
