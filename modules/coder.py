@@ -1005,6 +1005,124 @@ class YourClassName(core.module.Module):
             return False
 
 
+    async def delete_symbol(self, project_name: str, file_path: list, symbol_name: str, language: str = None) -> bool:
+        """
+        Deletes a symbol from a file.
+        """
+        file_path_str = self._get_file_path(project_name, file_path)
+        if not os.path.exists(file_path_str):
+            return False
+
+        if not language:
+            language = self._get_language_from_ext(file_path_str)
+
+        line_number = self._find_symbol_line(file_path_str, symbol_name, language)
+        if not line_number:
+            return False
+
+        # 1. Try Tree-sitter for precise byte-level removal
+        if HAS_TREE_SITTER and language in LANGUAGE_MAP:
+            try:
+                from tree_sitter import Parser
+                parser = Parser(LANGUAGE_MAP[language])
+                with open(file_path_str, 'rb') as f:
+                    source_bytes = f.read()
+
+                tree = parser.parse(source_bytes)
+                target_row = line_number - 1
+
+                candidate_nodes = []
+                def find_nodes(node):
+                    if node.start_point[0] <= target_row <= node.end_point[0]:
+                        if node.type in self.SYMBOL_MAP.get(language, {}):
+                            candidate_nodes.append(node)
+                    for child in node.children:
+                        find_nodes(child)
+
+                find_nodes(tree.root_node)
+
+                if candidate_nodes:
+                    best_node = min(candidate_nodes, key=lambda n: n.end_byte - n.start_byte)
+                    start_byte = best_node.start_byte
+                    end_byte = best_node.end_byte
+
+                    updated_bytes = source_bytes[:start_byte] + source_bytes[end_byte:]
+
+                    with open(file_path_str, 'wb') as f:
+                        f.write(updated_bytes)
+                    return True
+            except Exception as e:
+                try:
+                    import core
+                    core.log("coder", f"Couldn't use tree-sitter for delete: {e}")
+                except:
+                    pass
+
+        # 2. Fallback to line-based removal
+        try:
+            with open(file_path_str, 'r') as f:
+                lines = f.readlines()
+
+            if not (1 <= line_number <= len(lines)):
+                return False
+
+            config = self.LANGUAGE_CONFIG.get(language)
+            body_type = config.get('body_type', 'brace') if config else 'brace'
+
+            start_idx = line_number - 1
+            end_idx = -1
+
+            if body_type == 'indentation':
+                def get_indent(l): return len(l) - len(l.lstrip())
+                base_indent = get_indent(lines[start_idx])
+                end_idx = start_idx + 1
+                for i in range(start_idx + 1, len(lines)):
+                    line = lines[i]
+                    if not line.strip() or line.strip().startswith('#'):
+                        continue
+                    if get_indent(line) <= base_indent:
+                        break
+                    end_idx = i + 1
+            else:
+                # Brace-based logic
+                brace_found = False
+                start_brace_idx = -1
+                for i in range(start_idx, len(lines)):
+                    if '{' in lines[i]:
+                        start_brace_idx = i
+                        brace_found = True
+                        break
+
+                if not brace_found:
+                    end_idx = start_idx + 1
+                else:
+                    brace_count = 0
+                    end_idx = len(lines)
+                    for i in range(start_brace_idx, len(lines)):
+                        line = lines[i]
+                        brace_count += line.count('{')
+                        brace_count -= line.count('}')
+                        if brace_count <= 0:
+                            end_idx = i + 1
+                            break
+
+            if end_idx == -1:
+                end_idx = start_idx + 1
+
+            del lines[start_idx:end_idx]
+
+            with open(file_path_str, 'w') as f:
+                f.writelines(lines)
+            return True
+
+        except Exception as e:
+            try:
+                import core
+                core.log("coder", f"Error in delete_symbol: {e}")
+            except:
+                pass
+            return False
+
     async def search(self, project_name: str, file_path: list, query: str, context_lines: int = 5, max_matches: int = 10, use_regex: bool = False):
         """
         Search for a query within the file and return snippets with line numbers and context.
