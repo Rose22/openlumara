@@ -7,19 +7,62 @@ import stat
 import shutil
 import itertools
 import asyncio
+import importlib
 import modules.files_sandboxed
 from typing import List, Dict, Any, Optional, Union
+
+# --- Improved Tree-sitter Setup ---
+HAS_TREE_SITTER = False
+LANGUAGE_MAP = {}
 
 try:
     import tree_sitter
     from tree_sitter import Language, Parser
-    import tree_sitter_python as tspython
     HAS_TREE_SITTER = True
-    # Pre-load the python language for efficiency
-    PYTHON_LANGUAGE = tspython.language()
-except ImportError:
+
+    def _try_import_lang(mod_name, lang_key):
+        """Attempts to import a language parser and add it to the map."""
+        try:
+            mod = importlib.import_module(mod_name)
+            # tree-sitter 0.22+ returns a PyCapsule from .language()
+            # We MUST wrap it in Language() to create the expected object
+            LANGUAGE_MAP[lang_key] = Language(mod.language())
+            return True
+        except (ImportError, AttributeError):
+            return False
+
+    # Define the list of parsers we want to attempt to load
+    languages_to_attempt = [
+        ('tree_sitter_python', 'python'),
+        ('tree_sitter_javascript', 'javascript'),
+        ('tree_sitter_typescript', 'typescript'),
+        ('tree_sitter_html', 'html'),
+        ('tree_sitter_css', 'css'),
+        ('tree_sitter_cpp', 'cpp'),
+        ('tree_sitter_c_sharp', 'c-sharp'),
+        ('tree_sitter_rust', 'rust'),
+        ('tree_sitter_ruby', 'ruby'),
+        ('tree_sitter_go', 'go'),
+        ('tree_sitter_java', 'java'),
+    ]
+
+    loaded_languages = []
+    for mod_name, lang_key in languages_to_attempt:
+        if _try_import_lang(mod_name, lang_key):
+            loaded_languages.append(lang_key)
+
+    # Report status based on what was actually loaded
+    if not loaded_languages:
+        core.log("coder", "Tree-sitter is installed, but NO language parsers (e.g., tree_sitter_python) were detected.")
+    else:
+        core.log("coder", f"Tree-sitter is ENABLED. Loaded languages: {loaded_languages}")
+
+except ImportError as e:
     HAS_TREE_SITTER = False
-    PYTHON_LANGUAGE = None
+    core.log("coder", f"Tree-sitter is NOT enabled. Reason: The 'tree_sitter' core library is missing. ({e})")
+except Exception as e:
+    HAS_TREE_SITTER = False
+    core.log("coder", f"Tree-sitter setup encountered an unexpected error: {e}")
 
 class Coder(modules.files_sandboxed.SandboxedFiles):
     """Allows your AI to write, edit and test code for you."""
@@ -34,7 +77,7 @@ class Coder(modules.files_sandboxed.SandboxedFiles):
     }
 
     # Language heuristics for symbol searching and outline generation
-    LANGUAGE_CONFIG = {
+    LANGUAGE_REGEXES = {
         'python': {
             'extensions': ['.py'],
             'outline_patterns': [
@@ -79,6 +122,71 @@ class Coder(modules.files_sandboxed.SandboxedFiles):
                 (r'^\s*(?:public|protected|private|static)\s+[\w<>[\]]+\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(', 'function'),
             ],
             'body_type': 'brace'
+        }
+    }
+
+    # Mapping extensions to language keys
+    LANGUAGE_CONFIG = {
+        'python': {'extensions': ['.py']},
+        'javascript': {'extensions': ['.js', '.ts', '.jsx', '.tsx']},
+        'typescript': {'extensions': ['.ts', '.tsx']},
+        'html': {'extensions': ['.html']},
+        'css': {'extensions': ['.css']},
+        'cpp': {'extensions': ['.cpp', '.c', '.h', '.hpp', '.cc']},
+        'c-sharp': {'extensions': ['.cs']},
+        'rust': {'extensions': ['.rs']},
+        'ruby': {'extensions': ['.rb']},
+        'go': {'extensions': ['.go']},
+        'java': {'extensions': ['.java']}
+    }
+
+    # AST Node Type -> Symbol Type mapping
+    SYMBOL_MAP = {
+        'python': {
+            'class_definition': 'class',
+            'function_definition': 'function'
+        },
+        'javascript': {
+            'class_declaration': 'class',
+            'function_declaration': 'function',
+            'method_definition': 'method',
+            'arrow_function': 'function'
+        },
+        'typescript': {
+            'class_declaration': 'class',
+            'function_declaration': 'function',
+            'method_definition': 'method'
+        },
+        'cpp': {
+            'class_specifier': 'class',
+            'struct_specifier': 'struct',
+            'function_definition': 'function',
+            'method_definition': 'method'
+        },
+        'go': {
+            'type_declaration': 'struct',
+            'function_declaration': 'function',
+            'method_declaration': 'method'
+        },
+        'java': {
+            'class_declaration': 'class',
+            'method_declaration': 'method',
+            'constructor_declaration': 'method'
+        },
+        'rust': {
+            'struct_item': 'struct',
+            'enum_item': 'enum',
+            'fn': 'function',
+            'impl_item': 'impl'
+        },
+        'ruby': {
+            'class': 'class',
+            'module': 'module',
+            'def': 'function'
+        },
+        'c-sharp': {
+            'class_declaration': 'class',
+            'method_declaration': 'method'
         }
     }
 
@@ -166,6 +274,15 @@ class YourClassName(core.module.Module):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.path = self.sandbox_path
+        if self.config.get("read-only_mode"):
+            self.disabled_tools.extend([
+                "create_project",
+                "overwrite_file",
+                "edit_file"
+            ])
+
+        if not self.config.get("allow_code_execution"):
+            self.disabled_tools.append("execute")
 
     def _get_language_from_ext(self, file_path_str: str) -> str:
         ext = os.path.splitext(file_path_str)[1].lower()
@@ -523,10 +640,8 @@ class YourClassName(core.module.Module):
 
     async def get_outline(self, project_name: str, file_path: list, language: str = None) -> List[Dict[str, Any]]:
         """
-        Returns a list of symbols (classes, functions, etc.) with their names, types, and line numbers.
-        The language can be specified, or it will be guessed from the extension.
-
-        ALWAYS use this to read code! Only ever use read_file if get_outline didn't provide enough information.
+        Returns a list of symbols (classes, functions, etc.) using Tree-sitter if available,
+        otherwise falling back to regex.
         """
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
@@ -535,22 +650,44 @@ class YourClassName(core.module.Module):
         if not language:
             language = self._get_language_from_ext(file_path_str)
 
+        # --- DIAGNOSTIC LOGGING ---
+        core.log("coder", f"[DEBUG] get_outline called: lang={language}")
+
+        # 1. Try Tree-sitter
+        if HAS_TREE_SITTER and language in LANGUAGE_MAP:
+            core.log("coder", f"[DEBUG] Attempting Tree-sitter for {language}...")
+            try:
+                parser = Parser(LANGUAGE_MAP[language])
+                with open(file_path_str, 'rb') as f:
+                    source_bytes = f.read()
+
+                tree = parser.parse(source_bytes)
+                symbols = []
+                self._walk_for_symbols(tree.root_node, language, symbols)
+                symbols.sort(key=lambda x: x['line'])
+
+                core.log("coder", f"[DEBUG] Tree-sitter parsed.")
+                return self.result(symbols)
+            except Exception as e:
+                core.log("coder", f"falling back to regex: {e}")
+                pass # Fallback to regex
+
+        # 2. Fallback to Regex
+        patterns = []
         config = self.LANGUAGE_CONFIG.get(language)
-        
-        # If we don't have specific patterns, use a very generic fallback
-        if not config:
+        if config and 'outline_patterns' in config:
+            patterns = config['outline_patterns']
+        else:
+            # Generic fallback patterns
             patterns = [
                 (r'^\s*class\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'class'),
                 (r'^\s*(?:async\s+)?def\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'function'),
                 (r'^\s*function\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'function'),
             ]
-        else:
-            patterns = config['outline_patterns']
 
         try:
             with open(file_path_str, 'r') as f:
                 lines = f.readlines()
-
             outline = []
             for idx, line in enumerate(lines):
                 for pattern, sym_type in patterns:
@@ -562,15 +699,43 @@ class YourClassName(core.module.Module):
                             "line": idx + 1
                         })
                         break
-            
             return self.result(outline)
         except Exception as e:
             return self.result(f"error: {e}", False)
 
+    def _walk_for_symbols(self, node, language, symbols):
+        """Recursive tree walker for Tree-sitter nodes."""
+        target_types = self.SYMBOL_MAP.get(language, {})
+
+        if node.type in target_types:
+            sym_type = target_types[node.type]
+            name = None
+
+            # Search children for the identifier/name of the symbol
+            # This is a simplified heuristic for extracting the symbol name
+            for child in node.children:
+                if child.type in ['identifier', 'property_identifier', 'name', 'field_identifier']:
+                    try:
+                        name = child.text.decode('utf-8')
+                        break
+                    except:
+                        continue
+
+            if name:
+                symbols.append({
+                    'name': name,
+                    'type': sym_type,
+                    'line': node.start_point[0] + 1
+                })
+
+        for child in node.children:
+            self._walk_for_symbols(child, language, symbols)
+
     async def get_symbol_body(self, project_name: str, file_path: list, line_number: int, language: str = None) -> str:
         """
-        Returns the actual block of code for a symbol starting at the given line number.
-        Uses indentation-based logic for Python and brace-counting for C-style languages.
+        Returns the code block for a symbol.
+        Uses Tree-sitter to find the exact node covering the line,
+        falling back to indentation/brace logic.
         """
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
@@ -578,9 +743,58 @@ class YourClassName(core.module.Module):
 
         if not language:
             language = self._get_language_from_ext(file_path_str)
-        
+
+        # --- DIAGNOSTIC LOGGING ---
+        core.log("coder", f"[DEBUG] get_symbol_body called: line={line_number}, lang={language}")
+
+        # 1. Try Tree-sitter
+        if HAS_TREE_SITTER and language in LANGUAGE_MAP:
+            core.log("coder", f"[DEBUG] Attempting Tree-sitter for {language}...")
+            try:
+                parser = Parser(LANGUAGE_MAP[language])
+                with open(file_path_str, 'rb') as f:
+                    source_bytes = f.read()
+
+                tree = parser.parse(source_bytes)
+                target_row = line_number - 1
+                core.log("coder", f"[DEBUG] Tree-sitter parsed. target_row={target_row}")
+
+                # Strategy: Find the smallest node that covers this specific line
+                # that is also recognized as a symbol.
+                candidate_nodes = []
+                def find_nodes(node):
+                    if node.start_point[0] <= target_row <= node.end_point[0]:
+                        node_type = node.type
+                        if node_type in self.SYMBOL_MAP.get(language, {}):
+                            candidate_nodes.append(node)
+                        else:
+                            # Log nodes that are on the right line but not in our map
+                            pass
+                    for child in node.children:
+                        find_nodes(child)
+
+                find_nodes(tree.root_node)
+                core.log("coder", f"[DEBUG] Found {len(candidate_nodes)} candidate nodes.")
+
+                if candidate_nodes:
+                    # Pick the "tightest" node (the one with the smallest byte range)
+                    best_node = min(candidate_nodes, key=lambda n: n.end_byte - n.start_byte)
+                    return self.result(source_bytes[best_node.start_byte:best_node.end_byte].decode('utf-8'))
+                else:
+                    core.log("coder", "[DEBUG] Tree-sitter found 0 matching symbols for this line. Falling back.")
+            except Exception as e:
+                core.log("coder", f"[DEBUG] Tree-sitter ERROR: {e}")
+                pass # Fallback to regex
+        else:
+            if not HAS_TREE_SITTER:
+                core.log("coder", "[DEBUG] Fallback: HAS_TREE_SITTER is False")
+            elif language not in LANGUAGE_MAP:
+                core.log("coder", f"[DEBUG] Fallback: Language '{language}' not in LANGUAGE_MAP")
+
+        # 2. Fallback to original Indentation/Brace logic
+        core.log("coder", "[DEBUG] Entering Fallback (Regex/Indentation) logic...")
         config = self.LANGUAGE_CONFIG.get(language)
-        body_type = config['body_type'] if config else 'brace'
+        body_type = config.get('body_type', 'brace') if config else 'brace'
 
         try:
             with open(file_path_str, 'r') as f:
@@ -590,55 +804,38 @@ class YourClassName(core.module.Module):
                 return self.result("line number out of range", False)
 
             start_idx = line_number - 1
-            
+
             if body_type == 'indentation':
-                # Python indentation-based logic
-                def get_indent(l):
-                    return len(l) - len(l.lstrip())
-                
+                def get_indent(l): return len(l) - len(l.lstrip())
                 base_indent = get_indent(lines[start_idx])
                 end_idx = start_idx + 1
-                
                 for i in range(start_idx + 1, len(lines)):
                     line = lines[i]
-                    stripped = line.strip()
-                    if not stripped or stripped.startswith('#'):
-                        continue
-                    if get_indent(line) <= base_indent:
-                        break
+                    if not line.strip() or line.strip().startswith('#'): continue
+                    if get_indent(line) <= base_indent: break
                     end_idx = i + 1
-                
                 body_lines = lines[start_idx:end_idx]
-            
             else:
-                # Brace-based logic (JS, C++, Java, etc.)
-                # 1. Find the first '{' after or at the start line
+                # Brace-based logic
                 brace_found = False
                 start_brace_idx = -1
-                
                 for i in range(start_idx, len(lines)):
                     if '{' in lines[i]:
                         start_brace_idx = i
                         brace_found = True
                         break
-                
                 if not brace_found:
-                    # If no brace found (e.g. single line function), return just that line
                     return self.result("".join(lines[start_idx:start_idx+1]))
 
-                # 2. Count braces
                 brace_count = 0
                 end_idx = len(lines)
                 for i in range(start_brace_idx, len(lines)):
                     line = lines[i]
-                    # Very simple brace counting (ignores braces in strings/comments)
                     brace_count += line.count('{')
                     brace_count -= line.count('}')
-                    
                     if brace_count <= 0:
                         end_idx = i + 1
                         break
-                
                 body_lines = lines[start_idx:end_idx]
 
             return self.result("".join(body_lines))
