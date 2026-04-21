@@ -443,6 +443,9 @@ class Manager:
                 # builtin function
                 continue
 
+            if func_name in loaded_module.disabled_tools:
+                continue
+
             try:
                 func_obj = getattr(module, func_name)
             except:
