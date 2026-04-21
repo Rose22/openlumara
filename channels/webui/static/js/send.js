@@ -539,6 +539,7 @@ function finishStream() {
     clearStreamingToolCalls();
     resetStreamState();
     setInputState(false, false, false);
+    updateTokenUsage();
     isStreaming = false;
     streamFrozen = false;
     currentController = null;
@@ -1402,6 +1403,8 @@ function finalizeStreamingToolCalls(finalToolCalls, aiMsgDiv) {
             card.dataset.toolCallId = finalId;
         }
     });
+
+    updateTokenUsage();
 }
 
 /**
@@ -1440,6 +1443,7 @@ function handleToolResponse(data, aiMsgDiv) {
         addProcessingIndicator(cardEl);
 
         scrollToBottom();
+        updateTokenUsage();
     }
 }
 

@@ -17,6 +17,7 @@ class Chat:
         self.channel = channel
         self.current = None
         self.current_save_path = os.path.join(core.get_data_path(), f"{self.channel.name}_current_chat")
+        self.token_usage = 0 # uses API results to cache last message's token usage
 
         for index, chat in enumerate(self.data):
             # find any blank chats and delete them
@@ -339,6 +340,13 @@ class Chat:
         Counts tokens locally using tiktoken.
         Used as a fallback if the API doesn't return usage data.
         """
+        # if we have API token usage results (happens in core/channel.py),
+        # just return that
+        if self.token_usage > 0:
+            return self.token_usage
+
+        # otherwise fall back to counting with tiktoken
+
         import tiktoken
         try:
             # Try to get the specific tokenizer for the model (e.g. gpt-4)

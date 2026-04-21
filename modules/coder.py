@@ -403,21 +403,21 @@ class YourClassName(core.module.Module):
     #     except Exception as e:
     #         return self.result(f"error: {e}", False)
 
-    # async def overwrite_file(self, project_name: str, file_path: list, content: str):
-    #     """
-    #     Writes to a file within a project.
-    #     """
-    #     if self.config.get("read-only_mode"):
-    #         return self.result("User has disabled file modification. Provide the code directly to user.", False)
+    async def overwrite_file(self, project_name: str, file_path: list, content: str):
+        """
+        Writes to a file within a project.
+        """
+        if self.config.get("read-only_mode"):
+            return self.result("User has disabled file modification. Provide the code directly to user.", False)
 
-    #     file_path_str = self._get_file_path(project_name, file_path)
+        file_path_str = self._get_file_path(project_name, file_path)
 
-    #     try:
-    #         with open(file_path_str, "w") as f:
-    #             f.write(content)
-    #         return self.result(True)
-    #     except Exception as e:
-    #         return self.result(f"error: {e}", False)
+        try:
+            with open(file_path_str, "w") as f:
+                f.write(content)
+            return self.result(True)
+        except Exception as e:
+            return self.result(f"error: {e}", False)
 
     # async def search(self, project_name: str, file_path: list, query: str, context_lines: int = 5, max_matches: int = 10, use_regex: bool = False):
     #     """

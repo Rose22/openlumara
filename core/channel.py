@@ -61,6 +61,13 @@ class Channel:
         # fallback
         return ""
 
+    async def get_token_usage(self):
+        if not self.token_usage:
+            # fall back to manual counting
+            return self.context.get_token_usage()
+
+        return self.token_usage
+
     async def send(self, message: dict):
         """sends a message to the AI from within the current channel"""
 
@@ -213,19 +220,20 @@ class Channel:
             elif token_type == "tool":
                 # this is a toolcall response
                 yield token
-            elif token_type == "usage":
+            elif token_type == "token_usage":
                 # this is the final token usage count, usually emitted at the end of the stream
-                pass
+                self.context.chat.token_usage = int(token.get("content"))
 
-        assistant_message = {
-            "role": "assistant",
-            "content": "".join(final_content)
-        }
+        if not tool_calls_occurred:
+            assistant_message = {
+                "role": "assistant",
+                "content": "".join(final_content)
+            }
 
-        if final_reasoning:
-            assistant_message["reasoning_content"] = "".join(final_reasoning)
+            if final_reasoning:
+                assistant_message["reasoning_content"] = "".join(final_reasoning)
 
-        await self.context.chat.add(assistant_message)
+            await self.context.chat.add(assistant_message)
 
     async def announce(self, message: str, type=None):
         """called externally to announce things in this channel, such as a reminder sent by the AI"""

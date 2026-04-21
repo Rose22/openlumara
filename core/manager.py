@@ -63,7 +63,6 @@ class Manager:
         elif self.coding_mode:
             enabled_modules = ["coder"]
             enabled_user_modules = []
-            enabled_channels = ["cli"]
 
         if not enabled_channels:
             print("ERROR: At least one channel must be enabled in the config! Try the `cli` channel for a basic terminal UI.")
