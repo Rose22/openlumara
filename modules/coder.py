@@ -75,6 +75,7 @@ class Coder(modules.files_sandboxed.SandboxedFiles):
         "allow_function_adding": True,
         "allow_function_editing": True,
         "allow_function_deleting": True,
+        "allow_file_creation": True,
         "allow_full_file_reads": False,
         "allow_full_file_overwrites": False,
         "allow_code_execution": False,
@@ -357,6 +358,9 @@ class YourClassName(core.module.Module):
         if not self.config.get("allow_function_deleting") or self.config.get("read-only"):
             self.disabled_tools.append("delete_symbol")
 
+        if not self.config.get("allow_file_creation") or self.config.get("read-only"):
+            self.disabled_tools.append("create_file")
+
         if not self.config.get("allow_full_file_reads") or self.config.get("read-only"):
             self.disabled_tools.append("read_file")
 
@@ -483,45 +487,24 @@ class YourClassName(core.module.Module):
         except Exception as e:
             return self.result(f"error: {e}", False)
 
-    async def create_project(self, project_name: str, file_structure: dict):
+    async def create_file(self, project_name: str, file_path: list, content: str):
         """
-        Creates an entire project structure in one go!
-
-        Example:
-        {
-            "src": {
-                "components": {
-                    "button.py": "#!/bin/env python3\\nhi this is some example code!"
-                }
-            },
-            "tests": {
-                "test_main.py": "",
-                "test_utils.py": ""
-            },
-            "README.md": "this is a readme"
-        }
+        Creates a new file within a project. Fails if the file already exists.
         """
-        async def _build_structure(current_path: str, structure: dict):
-            for name, content in structure.items():
-                if name == "root":
-                    target_path = current_path
-                else:
-                    target_path = os.path.join(current_path, name)
+        if self.config.get("read-only_mode"):
+            return self.result("User has disabled file modification. Provide the code directly to user.", False)
 
-                if isinstance(content, dict):
-                    os.makedirs(target_path, exist_ok=True)
-                    await _build_structure(target_path, content)
-                elif isinstance(content, str):
-                    with open(target_path, "w") as f:
-                        f.write(content)
+        file_path_str = self._get_file_path(project_name, file_path)
 
-        base_path = self._get_project_path(project_name)
+        import os
+        if os.path.exists(file_path_str):
+            return self.result(f"error: file already exists at {file_path_str}", False)
 
         try:
-            os.makedirs(base_path, exist_ok=True)
-            await _build_structure(base_path, file_structure)
+            with open(file_path_str, "w") as f:
+                f.write(content)
             return self.result(True)
-        except OSError as e:
+        except Exception as e:
             return self.result(f"error: {e}", False)
 
     async def read_file(self, project_name: str, file_path: list):
@@ -543,9 +526,6 @@ class YourClassName(core.module.Module):
         """
         Writes to a file within a project.
         """
-        if self.config.get("read-only_mode"):
-            return self.result("User has disabled file modification. Provide the code directly to user.", False)
-
         file_path_str = self._get_file_path(project_name, file_path)
 
         try:
@@ -559,9 +539,6 @@ class YourClassName(core.module.Module):
         """
         executes a file within a project.
         """
-        if not self.config.get("allow_code_execution"):
-            return self.result("Code execution is disabled for security", False)
-
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
             return self.result("file does not exist!", False)
