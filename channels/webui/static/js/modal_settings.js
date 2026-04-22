@@ -839,14 +839,26 @@ function createToggleListInput(key, value, isModuleList = false) {
     const descriptions = value.descriptions || {};
     const unsafeModules = value.unsafeModules || {};
 
-    // Sort: enabled items first, then alphabetically within each group
     const sortedItems = allItems.sort((a, b) => {
         const aEnabled = enabledSet.has(a);
         const bEnabled = enabledSet.has(b);
+        const aUnsafe = unsafeModules[a] === true;
+        const bUnsafe = unsafeModules[b] === true;
+
+        // 1. Enabled items come first
         if (aEnabled && !bEnabled) return -1;
         if (!aEnabled && bEnabled) return 1;
+
+        // 2. If both are disabled, unsafe ones go to the bottom
+        if (!aEnabled && !bEnabled) {
+            if (aUnsafe && !bUnsafe) return 1;
+            if (!aUnsafe && bUnsafe) return -1;
+        }
+
+        // 3. Alphabetical sort within groups
         return a.localeCompare(b);
     });
+
 
     const status = document.createElement('div');
     status.className = 'toggle-list-status';

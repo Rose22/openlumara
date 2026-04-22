@@ -1,34 +1,4 @@
 /* =============================================================================
- *  Messages CSS - Complete Refactor
- *  ============================================================================= */
-
-/* =============================================================================
- *  Message Body - Wrapper for reasoning, content, and tool calls
- *  ============================================================================= */
-
-.message-body {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.message-body > .reasoning-wrapper {
-    margin: 0;
-}
-
-.message-body > .tool-calls-container {
-    margin: 0;
-}
-
-.message-body > .tool-calls-streaming-container {
-    margin: 0;
-}
-
-.message-body > .message-content-container {
-    margin: 0;
-}
-
-/* =============================================================================
  *  Message Wrapper - Container for each message
  *  ============================================================================= */
 
@@ -327,13 +297,14 @@
 .tool-calls-container {
     display: flex;
     flex-direction: column;
+    width: 100%;
     gap: 14px;
 }
 
 .tool-calls-streaming-container {
-    margin: 8px 0;
     display: flex;
     flex-direction: column;
+    width: 100%;
     gap: 8px;
 }
 

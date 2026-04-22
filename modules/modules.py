@@ -3,9 +3,7 @@ import core
 class Modules(core.module.Module):
     """Lets your AI turn modules on/off. Caution! This can be bad for security."""
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._header = "modules"
+    unsafe = True
 
     async def on_system_prompt(self):
         module_list = {
