@@ -188,25 +188,39 @@ function renderAssistantMessageParts(msg, toolResponseMap) {
 function renderSingleMessage(msg, index, animate) {
     const role = msg.role || 'user';
     const rawContent = msg.content || '';
+    const reasoningContent = msg.reasoning_content || null;
+    const toolCalls = msg.tool_calls || null;
+    const toolCallId = msg.tool_call_id || null;
     const rawText = extractTextContent(rawContent);
     const parsed = parseMessageContent(rawContent);
 
     if (rawText === '[SYSTEM_TICK]') return;
 
     let wrapperClass, msgClass;
+
     if (parsed.isAnnouncement) {
         wrapperClass = 'announce';
         msgClass = `announce ${parsed.type}`;
     } else if (parsed.isCommandOutput) {
         wrapperClass = 'command_response';
         msgClass = 'command_response';
-    } else if (role === 'user') {
-        wrapperClass = rawText.trim().startsWith('/') ? 'user_command' : 'user';
-        msgClass = wrapperClass;
     } else if (role === 'tool') {
-        // Orphaned tool message
-        wrapperClass = 'ai';
-        msgClass = 'ai';
+        wrapperClass = 'tool';
+        msgClass = 'tool';
+    } else if (toolCalls && toolCalls.length > 0) {
+        wrapperClass = 'tool_call';
+        msgClass = 'tool_call';
+    } else if (role === 'schedule') {
+        wrapperClass = 'schedule';
+        msgClass = 'schedule';
+    } else if (role === 'user') {
+        if (rawText.trim().startsWith('/')) {
+            wrapperClass = 'user_command';
+            msgClass = 'user_command';
+        } else {
+            wrapperClass = 'user';
+            msgClass = 'user';
+        }
     } else {
         wrapperClass = 'ai';
         msgClass = 'ai';
@@ -221,33 +235,49 @@ function renderSingleMessage(msg, index, animate) {
     const msgDiv = document.createElement('div');
     msgDiv.className = `message ${msgClass}`;
 
+    // Build message content
     let messageHtml = '';
+
+    // Add reasoning block BEFORE the main content (only for assistant messages)
+    if (role === 'assistant' && reasoningContent) {
+        messageHtml += renderReasoningBlock(reasoningContent, true, 'Thoughts');
+    }
+
+    // Render based on message type
     if (parsed.isAnnouncement) {
-        messageHtml = escapeHtml(parsed.displayContent);
-    } else if (parsed.isCommandOutput) {
-        messageHtml = `<pre>${escapeHtml(parsed.displayContent)}</pre>`;
-    } else if (wrapperClass === 'user_command') {
-        messageHtml = `<pre>${escapeHtml(rawText)}</pre>`;
+        messageHtml += escapeHtml(parsed.displayContent);
+    } else if (parsed.isCommandOutput || wrapperClass === 'user_command') {
+        messageHtml += `<pre>${escapeHtml(parsed.displayContent || rawText)}</pre>`;
+    } else if (role === 'tool' && !toolCallId) {
+        messageHtml += renderStandaloneToolResponse(rawText);
+    } else if (toolCalls && toolCalls.length > 0) {
+        if (parsed.displayContent && parsed.displayContent.trim()) {
+            messageHtml += `<div class="tool-decision-text">${renderMarkdown(parsed.displayContent)}</div>`;
+        }
+        messageHtml += renderToolCalls(toolCalls);
+    } else if (role === 'schedule') {
+        messageHtml += renderScheduleMessage(rawText);
     } else {
-        messageHtml = renderContentBody(rawContent);
+        messageHtml += renderContentBody(rawContent);
     }
 
     msgDiv.innerHTML = messageHtml;
 
-    if (!parsed.isAnnouncement && !parsed.isCommandOutput && wrapperClass !== 'user_command') {
+    // Highlight code if not announcement/command
+    if (!parsed.isAnnouncement && !parsed.isCommandOutput && !wrapperClass.includes('command')) {
         highlightCode(msgDiv);
     }
 
     const ts = document.createElement('span');
     ts.className = 'timestamp';
-    ts.classList.add(wrapperClass === 'user' || wrapperClass === 'user_command' ? 'timestamp-right' : 'timestamp-left');
+    ts.classList.add(wrapperClass === 'user' || wrapperClass === 'user_command' ? 'timestamp-right' : (wrapperClass === 'ai' || wrapperClass === 'command_response' ? 'timestamp-left' : 'timestamp-center'));
     ts.textContent = msg.timestamp || formatTime();
-    ts.innerHTML += ` <span class="index-badge">#${index}</span>`;
+    ts.innerHTML += ` <span class=\"index-badge\">#${index}</span>`;
     msgDiv.appendChild(ts);
 
     wrapper.appendChild(msgDiv);
 
-    if (role === 'user' || role === 'assistant') {
+    if ((role === 'user' || role === 'assistant') && !(toolCalls && toolCalls.length > 0)) {
         const actions = createActionButtons(role, index, rawText);
         wrapper.appendChild(actions);
     }
@@ -361,7 +391,7 @@ async function pollMessages() {
 
     try {
         const response = await fetch('/messages/since?index=' + lastMessageIndex, {
-            signal: AbortSignal.timeout(CONFIG.POLL_INTERVAL)
+            signal: AbortSignal.timeout(CONFIG.CONNECTION_TIMEOUT)
         });
 
         if (!response.ok) {
@@ -374,11 +404,13 @@ async function pollMessages() {
         // Check if backend switched chats
         if (data.current_chat_id !== undefined) {
             if (data.current_chat_id !== currentChatId) {
+                // Different chat - full reload
                 await restoreCurrentChat();
                 await loadChats();
                 return;
             }
 
+            // Same chat but title/tags might have changed
             if (data.current_chat_title !== undefined) {
                 updateChatTitleBar(
                     data.current_chat_title,
@@ -390,20 +422,18 @@ async function pollMessages() {
         const messages = data.messages || [];
 
         if (messages.length > 0) {
-            // Use turn-based rendering for polled messages too
-            const turns = groupMessagesIntoTurns(messages);
-
-            for (const turn of turns) {
-                // Check if this turn is already rendered
-                const existingWrapper = chat.querySelector(
-                    `[data-index="${turn.lastIndex}"]`
-                );
-
-                if (!existingWrapper) {
-                    renderTurn(turn, true);
+            let i = 0;
+            while (i < messages.length) {
+                const msg = messages[i];
+                if (msg.role === 'assistant') {
+                    const turnInfo = collectAssistantTurn(messages, i);
+                    renderAssistantTurn(turnInfo.messages, turnInfo.endIndex, true);
+                    i = turnInfo.endIndex + 1;
+                } else {
+                    renderSingleMessage(msg, msg.index, true);
+                    i++;
                 }
             }
-
             lastMessageIndex = data.total;
             scrollToBottom();
             updateTokenUsage();
@@ -454,6 +484,35 @@ function extractTextContent(content) {
     return '';
 }
 
+/**
+ * Determine the CSS class for a role based on its content.
+ * @param {string} role 
+ * @param {string} content 
+ * @returns {string}
+ */
+function getRoleClass(role, content) {
+    const textContent = extractTextContent(content);
+    const parsed = parseMessageContent(content);
+
+    if (parsed.isAnnouncement) {
+        return `announce ${parsed.type}`;
+    }
+    if (parsed.isCommandOutput) {
+        return 'command_response';
+    }
+
+    if (role === 'user' && textContent.trim().startsWith('/')) {
+        return 'user_command';
+    }
+
+    const roleMap = {
+        'user': 'user',
+        'assistant': 'ai'
+    };
+
+    return roleMap[role] || role;
+}
+
 function parseMessageContent(content) {
     const textContent = extractTextContent(content);
 
@@ -483,6 +542,35 @@ function parseMessageContent(content) {
         type: null,
         displayContent: textContent
     };
+}
+
+/**
+ * Determine the display name for a role based on its content.
+ * @param {string} role 
+ * @param {string} content 
+ * @returns {string}
+ */
+function getRoleDisplay(role, content) {
+    const textContent = extractTextContent(content);
+    const parsed = parseMessageContent(content);
+
+    if (parsed.isAnnouncement) {
+        const type = parsed.type.replace('announce_', '');
+        return type.charAt(0).toUpperCase() + type.slice(1);
+    }
+    if (parsed.isCommandOutput) {
+        return 'Command';
+    }
+    if (role === 'user' && textContent.trim().startsWith('/')) {
+        return 'Command';
+    }
+
+    const displayMap = {
+        'user': 'You',
+        'assistant': 'AI'
+    };
+
+    return displayMap[role] || role;
 }
 
 function renderContentBody(content) {

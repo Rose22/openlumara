@@ -8,7 +8,7 @@ async function pollMessages() {
 
     try {
         const response = await fetch('/messages/since?index=' + lastMessageIndex, {
-            signal: AbortSignal.timeout(CONFIG.POLL_INTERVAL)
+            signal: AbortSignal.timeout(CONFIG.CONNECTION_TIMEOUT)
         });
 
         if (!response.ok) {
@@ -67,7 +67,7 @@ async function pollMessages() {
 
                 const existing = chat.querySelector(`[data-index="${msgIndex}"]`);
                 if (!existing) {
-                    createMessageElement(msg, msgIndex, true);
+                    renderSingleMessage(msg, msgIndex, true);
                 }
             }
             lastMessageIndex = data.total;
