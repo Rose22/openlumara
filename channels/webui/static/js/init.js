@@ -57,6 +57,7 @@ async function init() {
             await restoreCurrentChat();
         }
     } catch (err) {
+        console.error('Initialization error:', err);
         isConnected = false;
         updateConnectionStatus('disconnected');
         scheduleReconnect();

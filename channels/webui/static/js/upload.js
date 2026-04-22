@@ -137,72 +137,77 @@ async function handleFileUpload(event) {
 
         let contentPart = {};
 
-        if (isImage) {
-            // Image processing
-            const imgContainer = document.createElement('div');
-            imgContainer.className = 'uploaded-image-container';
-            const img = document.createElement('img');
-            const imageDataUrl = await new Promise((res, rej) => {
-                const r = new FileReader();
-                r.onload = () => res(r.result);
-                r.onerror = rej;
-                r.readAsDataURL(file);
-            });
+        try {
+            if (isImage) {
+                // Image processing
+                const imgContainer = document.createElement('div');
+                imgContainer.className = 'uploaded-image-container';
+                const img = document.createElement('img');
+                const imageDataUrl = await new Promise((res, rej) => {
+                    const r = new FileReader();
+                    r.onload = () => res(r.result);
+                    r.onerror = rej;
+                    r.readAsDataURL(file);
+                });
 
-            img.src = imageDataUrl;
-            img.className = 'uploaded-image-preview';
+                img.src = imageDataUrl;
+                img.className = 'uploaded-image-preview';
 
-            // Resize/Compress logic for the preview
-            const imgObj = new Image();
-            imgObj.src = imageDataUrl;
-            await new Promise(r => imgObj.onload = r);
+                // Resize/Compress logic for the preview
+                const imgObj = new Image();
+                imgObj.src = imageDataUrl;
+                await new Promise(r => imgObj.onload = r);
 
-            const maxDimension = 512;
-            let width = imgObj.width;
-            let height = imgObj.height;
+                const maxDimension = 512;
+                let width = imgObj.width;
+                let height = imgObj.height;
 
-            if (width > maxDimension || height > maxDimension) {
-                if (width > height) {
-                    height = (maxDimension / width) * height;
-                    width = maxDimension;
-                } else {
-                    width = (maxDimension / height) * width;
-                    height = maxDimension;
+                if (width > maxDimension || height > maxDimension) {
+                    if (width > height) {
+                        height = (maxDimension / width) * height;
+                        width = maxDimension;
+                    } else {
+                        width = (maxDimension / height) * width;
+                        height = maxDimension;
+                    }
                 }
-            }
-            img.style.width = `${width}px`;
-            img.style.height = `${height}px`;
+                img.style.width = `${width}px`;
+                img.style.height = `${height}px`;
 
-            // Prepare the parts for the final payload
-            contentPart = [
-                {
+                // Prepare the parts for the final payload
+                contentPart = [
+                    {
+                        type: "text",
+                        text: `[Image: ${file.name}]`
+                    },
+                    {
+                        type: "image_url",
+                        image_url: { url: imageDataUrl }
+                    }
+                ];
+            } else {
+                // Text file processing
+                const content = await new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result);
+                    reader.readAsText(file);
+                });
+
+                contentPart = {
                     type: "text",
-                    text: `[Image: ${file.name}]`
-                },
-                {
-                    type: "image_url",
-                    image_url: { url: imageDataUrl }
-                }
-            ];
-        } else {
-            // Text file processing
-            const content = await new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result);
-                reader.readAsText(file);
+                    text: `[File: ${file.name}]\n${content}`
+                };
+            }
+
+            window.upload_queue.files.push({
+                content: contentPart,
+                name: file.name
             });
-
-            contentPart = {
-                type: "text",
-                text: `[File: ${file.name}]\n${content}`
-            };
+            window.upload_queue.wrappers.push(previewWrapper);
+        } catch (err) {
+            console.error(`Failed to process file ${file.name}:`, err);
+            alert(`Failed to process file: ${file.name}`);
         }
-
-        window.upload_queue.files.push({
-            content: contentPart,
-            name: file.name
-        });
-        window.upload_queue.wrappers.push(previewWrapper);
     }
 
     window.updateUploadQueueUI();

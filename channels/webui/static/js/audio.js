@@ -65,7 +65,10 @@ const TypewriterAudioManager = {
                     }
                     resolve();
                 };
-                request.onerror = () => resolve();
+                request.onerror = () => {
+                    console.warn(`Failed to load audio from IndexedDB for ${id}:`, request.error);
+                    resolve();
+                };
             });
         };
 
