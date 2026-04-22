@@ -78,7 +78,6 @@ class Coder(modules.files_sandboxed.SandboxedFiles):
         "allow_full_file_reads": False,
         "allow_full_file_overwrites": False,
         "allow_code_execution": False,
-        "enable_progress_messages": False,
         "openlumara_module_creation_mode": False,
     }
 
@@ -511,14 +510,10 @@ class YourClassName(core.module.Module):
 
                 if isinstance(content, dict):
                     os.makedirs(target_path, exist_ok=True)
-                    if self.config.get("enable_progress_messages"):
-                        await self.manager.channel.announce(f"Created directory: {target_path}")
                     await _build_structure(target_path, content)
                 elif isinstance(content, str):
                     with open(target_path, "w") as f:
                         f.write(content)
-                    if self.config.get("enable_progress_messages"):
-                        await self.manager.channel.announce(f"Created file: {target_path}")
 
         base_path = self._get_project_path(project_name)
 

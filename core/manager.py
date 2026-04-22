@@ -135,13 +135,14 @@ class Manager:
             print(f"Please open the WebUI at http://{host}:{port}")
 
         try:
-            should_swallow_exceptions = not core.debug
+            should_swallow_exceptions = (not core.debug)
             await asyncio.gather(*self._async_tasks, return_exceptions=should_swallow_exceptions)
         except KeyboardInterrupt:
             pass
         except Exception as e:
-            import traceback
-            traceback.print_exc()
+            if core.debug:
+                import traceback
+                traceback.print_exc()
         finally:
             if self._restart_requested:
                 return "restart"

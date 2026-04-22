@@ -112,12 +112,16 @@ args_main.add_argument("--cli", help="CLI-only mode", action="store_true")
 args_main.add_argument("--coder", help="enable only the coder module (coding agent mode)", action="store_true")
 args_main.add_argument("--quiet", help="surpress logs", action="store_true")
 args_main.add_argument("--insecure_tls", help="Disable verification for SSL/TLS certs. Use when your API uses self-signed or unvalid certificates.", action="store_true")
+args_main.add_argument("--debug", help="Enable debug mode (display all warnings and errors)")
 
 # do the arg parsing
 args = arg_parser.parse_args(sys.argv[1:])
 
 if args.tmp:
     core.storage.TEMPORARY = True
+
+if args.debug:
+    core.debug = True
 
 while True:
     result = None
