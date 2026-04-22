@@ -140,6 +140,7 @@ function renderDictEditor(keys, data) {
     jsonRootData = null;
     currentDictKey = null;
     jsonEditingKey = null;
+    jsonTreeHidden = false;
 
     renderDictKeysList(keys, data);
 
@@ -194,6 +195,7 @@ function selectDictKey(key) {
     jsonPath = [];
     jsonRootData = currentStorageData[key];
     jsonEditingKey = null;
+    jsonTreeHidden = false;
 
     // Update active state in list
     document.querySelectorAll('.storage-dict-key').forEach(el => {
