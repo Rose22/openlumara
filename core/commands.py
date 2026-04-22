@@ -513,7 +513,7 @@ core:
                     return sysprompt if sysprompt else "BLANK"
                 else:
                     module_name = args[0].strip().replace(" ", "_")
-                    module_obj = self.manager.modules.get(module_name, None)
+                    module_obj = self.channel.manager.modules.get(module_name, None)
                     if module_obj:
                         if hasattr(module_obj, "on_system_prompt"):
                             return await module_obj.on_system_prompt() or "BLANK"
