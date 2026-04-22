@@ -3,6 +3,32 @@
  *  ============================================================================= */
 
 /* =============================================================================
+ *  Message Body - Wrapper for reasoning, content, and tool calls
+ *  ============================================================================= */
+
+.message-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.message-body > .reasoning-wrapper {
+    margin: 0;
+}
+
+.message-body > .tool-calls-container {
+    margin: 0;
+}
+
+.message-body > .tool-calls-streaming-container {
+    margin: 0;
+}
+
+.message-body > .message-content-container {
+    margin: 0;
+}
+
+/* =============================================================================
  *  Message Wrapper - Container for each message
  *  ============================================================================= */
 
@@ -10,7 +36,6 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
-    margin-bottom: 4px;
     position: relative;
 }
 
@@ -62,7 +87,8 @@
  *  ============================================================================= */
 
 .message {
-    padding: 12px 16px;
+    display: grid;
+    padding: 12px 12px;
     border-radius: var(--radius-lg);
     border: var(--message-decoration, 1px solid transparent);
     box-shadow: var(--shadow-soft);
@@ -70,6 +96,7 @@
     position: relative;
     max-width: var(--message-max-width, 75%);
     width: fit-content;
+    gap: 8px;
 }
 
 /* Highlight for search results */
@@ -111,6 +138,7 @@
 /* Content container for AI messages */
 .message-content-container {
     width: 100%;
+    gap:8px;
 }
 
 /* =============================================================================
@@ -118,7 +146,6 @@
  *  ============================================================================= */
 
 .reasoning-wrapper {
-    margin-bottom: 12px;
     width: 100%;
 }
 
@@ -131,18 +158,17 @@
     align-items: center;
     gap: 8px;
     padding: 8px 12px;
-    background: transparent;
+    background: var(--bg-tertiary);
     cursor: pointer;
     user-select: none;
     font-size: 0.85rem;
     color: var(--text-muted);
     border-radius: var(--radius-sm);
-    margin-bottom: 4px;
     transition: all 0.2s ease;
 }
 
 .reasoning-header:hover {
-    background: var(--bg-tertiary);
+    filter: brightness(1.2);
 }
 
 .reasoning-header svg {
@@ -297,10 +323,9 @@
  *  ============================================================================= */
 
 .tool-calls-container {
-    margin-top: 12px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 14px;
 }
 
 .tool-calls-streaming-container {
@@ -350,7 +375,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 10px 14px;
+    padding: 8px 12px;
     cursor: pointer;
     user-select: none;
     background: rgba(0, 0, 0, 0.2);
@@ -1222,7 +1247,6 @@
     align-items: center;
     gap: 8px;
     padding: 8px 12px;
-    background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-sm);
 }

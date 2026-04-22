@@ -154,10 +154,9 @@ class Scheduler(core.module.Module):
 
             final_content_list = []
             async for token in tc_manager.process(
-                tool_calls,
-                assistant_content=response.get("content", "")
+                tool_calls
             ):
-                if token.get("type") in ("content", "reasoning"):
+                if token.get("type") == "content":
                     final_content_list.append(token.get("content", ""))
             final_content = "".join(final_content_list)
         else:

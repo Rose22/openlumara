@@ -449,11 +449,17 @@ async function pollMessages() {
 
                 if (msg.role === 'assistant') {
                     const turnInfo = collectAssistantTurn(messages, i);
-                    // Check if the turn's first message is already rendered to avoid partial duplicates
-                    if (!chat.querySelector(`[data-index="${turnInfo.messages[0].index}"]`)) {
-                        renderAssistantTurn(turnInfo.messages, turnInfo.endIndex, true);
+                    if (turnInfo.messages.length > 0) {
+                        // Check if the turn is already rendered by checking the wrapper's data-index (which stores endIndex)
+                        if (!chat.querySelector(`[data-index="${turnInfo.endIndex}"]`)) {
+                            renderAssistantTurn(turnInfo.messages, turnInfo.endIndex, true);
+                        }
+                        i = turnInfo.endIndex + 1;
+                    } else {
+                        // Empty turn (e.g., starts with announcement or command output) - render as single message
+                        renderSingleMessage(msg, i, true);
+                        i++;
                     }
-                    i = turnInfo.endIndex + 1;
                 } else {
                     renderSingleMessage(msg, msgIndex, true);
                     i++;
