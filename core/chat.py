@@ -19,15 +19,21 @@ class Chat:
         self.current_save_path = os.path.join(core.get_data_path(), f"{self.channel.name}_current_chat")
         self.token_usage = 0 # uses API results to cache last message's token usage
 
-        for index, chat in enumerate(self.data):
+        for index in range(len(self.data) - 1, -1, -1):
+            chat = self.data[index]
+            messages = chat.get("messages", [])
+            
             # find any blank chats and delete them
-            if not chat.get("messages"):
+            if not messages:
                 self.data.pop(index)
-
+            # find chats that only contain command/responses and delete them
+            elif self._is_command_only(messages):
+                self.data.pop(index)
             # find any missing metadata fields and add them
-            for key, default_value in self.DEFAULT_DATA.items():
-                if key not in chat.keys():
-                    self.data[index][key] = default_value
+            else:
+                for key, default_value in self.DEFAULT_DATA.items():
+                    if key not in chat.keys():
+                        self.data[index][key] = default_value
 
         # chat autoresume
         if os.path.exists(self.current_save_path) and core.config.get("core", {}).get("auto_resume_chats"):
@@ -39,6 +45,32 @@ class Chat:
                     self.current = target_index
             except Exception as e:
                 core.log_error("couldn't autoresume chat", e)
+
+    def _is_command_only(self, messages):
+        """Check if a messages array contains only user commands and command responses"""
+        if not messages:
+            return False
+        
+        cmd_prefix = core.config.get("cmd_prefix", "/")
+        
+        for msg in messages:
+            role = msg.get("role")
+            content = msg.get("content", "")
+
+            if not isinstance(content, str):
+                # this is definitely not a command or command response lol
+                continue
+
+            # User command messages start with the configured command prefix
+            if role == "user" and content.strip().startswith(cmd_prefix):
+                continue
+            # Command response messages start with [Command Output]:
+            elif role == "assistant" and content.strip().startswith("[Command Output]:"):
+                continue
+            else:
+                # Found a message that isn't a command or response
+                return False
+        return True
 
     def _set_current(self, index: int):
         self.current = index
