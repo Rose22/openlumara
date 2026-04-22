@@ -33,6 +33,9 @@ function appendStreamText(type, text, typewriterEnabled = true) {
             typewriterQueue = [];
         }
 
+        // Update token usage on every segment type transition (reasoning/content/tool_calls finished)
+        updateTokenUsage();
+
         const newSeg = {
             type,
             text,
@@ -72,6 +75,7 @@ function finalizeAllContent() {
         }
     }
     typewriterQueue = [];
+    updateTokenUsage();
 }
 
 // =============================================================================
