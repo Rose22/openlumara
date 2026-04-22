@@ -398,6 +398,11 @@ async function send(providedContent = null) {
                         finalizeStreamingToolCalls(toolCalls, aiMsgDiv);
                     }
 
+                    // Token usage updates (from API)
+                    if (data.type === 'token_usage') {
+                        updateTokenUsage();
+                    }
+
                 } catch (e) {
                     console.error("Error parsing stream line:", e, line);
                 }
@@ -1446,8 +1451,10 @@ function handleToolResponse(data, aiMsgDiv) {
         addProcessingIndicator(cardEl);
 
         scrollToBottom();
-        updateTokenUsage();
     }
+
+    // Always update token usage when a tool response arrives, as execution consumes tokens
+    updateTokenUsage();
 }
 
 /**

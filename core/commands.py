@@ -1,6 +1,7 @@
 import core
 import textwrap
 import asyncio
+import shlex
 
 def get_commands_help(modules_dict):
     """
@@ -215,7 +216,7 @@ core:
         cmd_prefix = core.config.get("cmd_prefix", "/")
         cmd_prefix_index = message_content.lower().find(cmd_prefix.lower())+len(cmd_prefix)
 
-        cmd = message_content[cmd_prefix_index:].split()
+        cmd = shlex.split(message_content[cmd_prefix_index:])
         args = cmd[1:]
 
         return (cmd_prefix, cmd, args)

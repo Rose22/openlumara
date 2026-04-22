@@ -141,6 +141,7 @@ async function reconnectApi() {
             apiErrorType = null;
             apiAction = null;
             updateApiStatus({ connected: true });
+            updateTokenUsage();
 
             // Show success message
             const wrapper = document.createElement('div');

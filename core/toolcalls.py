@@ -191,6 +191,7 @@ class ToolcallManager:
         final_content = []
         final_reasoning = []
         had_recursive_call = False
+        total_tool_usage = 0
 
         try:
             async for token in self.channel.manager.API.send_stream(
@@ -228,8 +229,12 @@ class ToolcallManager:
                     ):
                         yield sub_token
 
-                if token_type == "usage":
-                    pass
+                if token_type == "token_usage":
+                    usage = token.get("content")
+                    if usage is not None:
+                        total_tool_usage += usage
+                        # Yield it to the frontend so the token bar updates in real-time
+                        yield token
 
             # only add final message if we didn't make a recursive call
             # (the innermost call handles adding the final message)
@@ -253,3 +258,6 @@ class ToolcallManager:
                 f"Error while handling tool calls: {e}",
                 "error"
             )
+
+        if total_tool_usage > 0:
+            self.channel.context.chat.token_usage = total_tool_usage
