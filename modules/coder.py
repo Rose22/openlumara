@@ -1041,29 +1041,12 @@ class YourClassName(core.module.Module):
             stripped_body = content_body.strip()
             is_method = "." in target_symbol_name
 
-            # Check if content_body is just a body or a full definition
-            if not stripped_body.startswith(('def ', 'class ', 'async def ')):
-                # It's a body; construct the definition line
-                if is_method:
-                    new_symbol = f"{indent_str}def {name}(self):\n"
-                else:
-                    new_symbol = f"{indent_str}def {name}():\n"
-
-                # If the body itself isn't indented, indent it to match
-                if stripped_body and not content_body.startswith((' ', '\t')):
-                    body_lines = content_body.splitlines(keepends=True)
-                    indented_body = "".join([f"{indent_str}{line}" for line in body_lines])
-                    new_symbol += indented_body
-                else:
-                    new_symbol += content_body
+            # If it's a method, we must ensure the whole definition is indented.
+            if is_method:
+                body_lines = content_body.splitlines(keepends=True)
+                new_symbol = "".join([f"{indent_str}{line}" for line in body_lines])
             else:
-                # It's already a full definition.
-                # If it's a method, we must ensure the whole definition is indented.
-                if is_method:
-                    body_lines = content_body.splitlines(keepends=True)
-                    new_symbol = "".join([f"{indent_str}{line}" for line in body_lines])
-                else:
-                    new_symbol = content_body
+                new_symbol = content_body
 
             # Ensure the new symbol ends with a newline for clean insertion
             if not new_symbol.endswith('\n'):
