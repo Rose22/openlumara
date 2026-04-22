@@ -135,7 +135,8 @@ class Manager:
             print(f"Please open the WebUI at http://{host}:{port}")
 
         try:
-            await asyncio.gather(*self._async_tasks, return_exceptions=False)
+            should_swallow_exceptions = not core.debug
+            await asyncio.gather(*self._async_tasks, return_exceptions=should_swallow_exceptions)
         except KeyboardInterrupt:
             pass
         except Exception as e:

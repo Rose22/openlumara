@@ -16,6 +16,7 @@ class Module:
         self.channel = channel # later set by the channel base class, _set_as_active_channel()
         self.name = core.modules.get_name(self) # shorthand alias
         self.disabled_tools = [] # gets scanned when adding tools from the module. you can alter this in a module's __init__() to selectively disable tools.
+        self.unsafe = False # unsafe flag for special display of unsafe modules in UI's
 
         # load module config
         config_target = "modules" if not is_user_module else "user_modules"

@@ -1083,11 +1083,13 @@ def get_module_info():
     for module_class in loaded_module_classes:
         module_name = core.modules.get_name(module_class)
         docstring = str(module_class.__doc__).strip()
+        is_unsafe = getattr(module_class, 'unsafe', False)
 
         if docstring not in [None, "None"] and module_name not in module_info.keys():
             # only get the first class's docstring, dont overwrite it with docstrings from other classes in the file
             module_info[module_name] = {
-                "description": docstring
+                "description": docstring,
+                "unsafe": is_unsafe
             }
 
     return jsonify({"success": True, "module_info": module_info})

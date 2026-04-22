@@ -115,9 +115,13 @@ function organizeSettingsIntoCategories(originalData, moduleInfo = {}) {
             const allItems = getAllToggleItems(topValue);
 
             const itemDescriptions = {};
+            const unsafeModules = {};
             for (const itemName in moduleInfo) {
                 if (moduleInfo[itemName].description) {
                     itemDescriptions[itemName] = moduleInfo[itemName].description;
+                }
+                if (moduleInfo[itemName].unsafe) {
+                    unsafeModules[itemName] = true;
                 }
             }
 
@@ -127,7 +131,8 @@ function organizeSettingsIntoCategories(originalData, moduleInfo = {}) {
                 value: {
                     enabled: topValue.enabled || [],
                     disabled: topValue.disabled || [],
-                    descriptions: itemDescriptions // <--- Injecting descriptions here,
+                    descriptions: itemDescriptions,
+                    unsafeModules: unsafeModules
                 },
                 type: 'toggle_list',
                 isModuleList: true
@@ -832,6 +837,7 @@ function createToggleListInput(key, value, isModuleList = false) {
     const allItems = getAllToggleItems(value);
     const enabledSet = new Set(value.enabled || []);
     const descriptions = value.descriptions || {};
+    const unsafeModules = value.unsafeModules || {};
 
     // Sort: enabled items first, then alphabetically within each group
     const sortedItems = allItems.sort((a, b) => {
@@ -852,12 +858,14 @@ function createToggleListInput(key, value, isModuleList = false) {
 
     sortedItems.forEach(item => {
         const isEnabled = enabledSet.has(item);
+        const isUnsafe = unsafeModules[item] === true;
 
         const itemWrapper = document.createElement('div');
         // Add 'module-card' class only if isModuleList is true
         itemWrapper.className = 'toggle-list-item' +
         (isEnabled ? ' enabled' : '') +
-        (isModuleList ? ' module-card' : '');
+        (isModuleList ? ' module-card' : '') +
+        (isUnsafe ? ' module-unsafe' : '');
 
         if (isModuleList) {
             // --- MODULE CARD STRUCTURE ---
@@ -867,6 +875,13 @@ function createToggleListInput(key, value, isModuleList = false) {
             const name = document.createElement('div');
             name.className = 'toggle-list-name';
             name.textContent = formatLabel(item);
+
+            if (isUnsafe) {
+                const unsafeBadge = document.createElement('span');
+                unsafeBadge.className = 'module-unsafe-badge';
+                unsafeBadge.textContent = 'UNSAFE';
+                name.appendChild(unsafeBadge);
+            }
 
             const toggle = document.createElement('label');
             toggle.className = 'toggle-switch';
@@ -894,13 +909,23 @@ function createToggleListInput(key, value, isModuleList = false) {
                 itemWrapper.appendChild(descContainer);
             }
 
-            checkbox.onchange = () => {
+            checkbox.addEventListener('change', async () => {
+                if (checkbox.checked && isUnsafe) {
+                    const confirmed = await showConfirmDialog(
+                        "You are about to activate an unsafe module. This module can perform actions that could potentially harm your system! Please be very sure of what you're doing. Proceed?"
+                    );
+                    if (!confirmed) {
+                        checkbox.checked = false;
+                        return;
+                    }
+                }
+
                 const newState = checkbox.checked;
                 itemWrapper.classList.toggle('enabled', newState);
                 newState ? enabledSet.add(item) : enabledSet.delete(item);
                 status.querySelector('.toggle-count').textContent = `${enabledSet.size} of ${sortedItems.length} enabled`;
                 updateToggleListData(key, Array.from(enabledSet), sortedItems);
-            };
+            });
         } else {
             // --- STANDARD LIST STRUCTURE ---
             const name = document.createElement('div');
