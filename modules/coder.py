@@ -519,12 +519,9 @@ class YourClassName(core.module.Module):
 
         try:
             os.makedirs(base_path, exist_ok=True)
-            await self.manager.channel.announce(f"Initializing project: {project_name} at {base_path}")
             await _build_structure(base_path, file_structure)
-            await self.manager.channel.announce("Project structure creation complete.")
             return self.result(True)
         except OSError as e:
-            await self.manager.channel.announce(f"Error creating project structure: {e}")
             return self.result(f"error: {e}", False)
 
     async def read_file(self, project_name: str, file_path: list):

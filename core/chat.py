@@ -340,10 +340,10 @@ class Chat:
             if request_too_big:
                 # the entire thing was too big including user's input! inform them
                 await self.channel.announce("Your request exceeds the max amount of tokens allowed. Please send a smaller request!", "error")
-            elif message_count_exceeded:
-                await self.channel.announce(f"You exceeded the max amount of messages set in your settings! Context size trimmed.\n\nAmount of messages: {len(messages)}\nMax messages allowed: {max_messages}", "error")
-            elif context_trimmed:
-                await self.channel.announce("Input was too large! Context size trimmed.\n\nSent tokens: {num_tokens}\nMax allowed tokens: {max_tokens}", "error")
+            # elif message_count_exceeded:
+            #     await self.channel.announce(f"You exceeded the max amount of messages set in your settings! Context size trimmed.\n\nAmount of messages: {len(messages)}\nMax messages allowed: {max_messages}", "error")
+            # elif context_trimmed:
+            #     await self.channel.announce("Input was too large! Context size trimmed.\n\nSent tokens: {num_tokens}\nMax allowed tokens: {max_tokens}", "error")
         return len(messages) <= max_messages
 
     async def _insert_blank_user_msg(self, message: dict):
