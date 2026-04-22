@@ -2651,17 +2651,7 @@ function createThemeSection() {
 }
 
 
-function getThemeFamilies() {
-    const families = new Map();
-    Object.keys(themes).forEach(themeId => {
-        const { mode, family } = parseThemeId(themeId);
-        if (!families.has(family)) {
-            families.set(family, { dark: null, light: null });
-        }
-        families.get(family)[mode] = themeId;
-    });
-    return families;
-}
+
 
 function updateThemeButtonsInSettings() {
     const grid = document.getElementById('theme-grid-settings');

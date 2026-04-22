@@ -455,46 +455,13 @@ async function pollMessages() {
     }
 }
 
-async function syncMessages() {
-    try {
-        const response = await fetch('/messages');
-        const data = await response.json();
 
-        const messages = data.messages || [];
-
-        if (messages.length > 0) {
-            renderAllMessages(messages);
-            lastMessageIndex = messages[messages.length - 1].index;
-            updateTokenUsage();
-        } else {
-            const wrappers = chat.querySelectorAll('.message-wrapper');
-            wrappers.forEach(wrapper => wrapper.remove());
-            lastMessageIndex = 0;
-        }
-    } catch (err) {
-        console.error('Failed to sync messages:', err);
-    }
-}
 
 // =============================================================================
 // Content Helpers
 // =============================================================================
 
-function extractTextContent(content) {
-    if (typeof content === 'string') return content;
-    if (Array.isArray(content)) {
-        return content
-        .map(part => {
-            if (part.type === 'text') return part.text;
-            if (part.type === 'file') return `File: ${part.filename}`;
-            if (part.type === 'image_url') return `[Image]`;
-            return '';
-        })
-        .filter(t => t.trim() !== '')
-        .join('\n');
-    }
-    return '';
-}
+
 
 /**
  * Determine the CSS class for a role based on its content.
@@ -585,48 +552,7 @@ function getRoleDisplay(role, content) {
     return displayMap[role] || role;
 }
 
-function renderContentBody(content) {
-    if (!content) return '';
 
-    if (typeof content === 'string') {
-        return renderMarkdown(content);
-    }
-
-    const parts = Array.isArray(content) ? content : [content];
-
-    return parts.map(part => {
-        if (part.type === 'text') {
-            const filePattern = /^\[(File|Image): (.*?)\](\n([\s\S]*))?$/;
-            const match = part.text.match(filePattern);
-
-            if (match) {
-                const type = match[1];
-                const filename = match[2];
-                const icon = type === 'File' ? '📄' : '🖼️';
-
-                return `
-                <div class="file-preview-container">
-                <div class="file-preview">
-                <span class="file-icon">${icon}</span>
-                <span class="file-name">${escapeHtml(filename)}</span>
-                </div>
-                </div>`;
-            }
-
-            return renderMarkdown(part.text);
-        } else if (part.type === 'image_url') {
-            const url = part.image_url?.url || '';
-            if (url.startsWith('data:image') || url.startsWith('http')) {
-                return `
-                <div class="uploaded-image-container">
-                <img src="${escapeHtml(url)}" class="uploaded-image-preview" alt="Uploaded image">
-                </div>`;
-            }
-            return '';
-        }
-        return '';
-    }).join('');
-}
 
 // =============================================================================
 // Reasoning Block Rendering
@@ -885,15 +811,9 @@ function getArrayPreview(arr) {
 // Utility Functions
 // =============================================================================
 
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
 
-function formatTime() {
-    return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
+
+
 
 function createActionButtons(role, index, content, disabled = false) {
     const actions = document.createElement('div');

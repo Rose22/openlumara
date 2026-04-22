@@ -447,47 +447,7 @@ function performGlobalSearch(query) {
     input.onkeydown = handleGlobalSearchKeyboard;
 }
 
-function extractSnippet(content, query, maxLength) {
-    if (!content) return '';
 
-    const lowerContent = content.toLowerCase();
-    const queryLower = query.toLowerCase();
-    const matchIndex = lowerContent.indexOf(queryLower);
-
-    if (matchIndex === -1) return '';
-
-    // Calculate snippet boundaries
-    const contextChars = Math.floor((maxLength - query.length) / 2);
-    let start = Math.max(0, matchIndex - contextChars);
-    let end = Math.min(content.length, matchIndex + query.length + contextChars);
-
-    // Adjust to not cut words
-    if (start > 0) {
-        const spaceIndex = content.lastIndexOf(' ', start);
-        if (spaceIndex > matchIndex - contextChars - 10) {
-            start = spaceIndex + 1;
-        }
-    }
-    if (end < content.length) {
-        const spaceIndex = content.indexOf(' ', end);
-        if (spaceIndex !== -1 && spaceIndex < end + 10) {
-            end = spaceIndex;
-        }
-    }
-
-    let snippet = content.substring(start, end);
-
-    // Add ellipsis
-    if (start > 0) snippet = '...' + snippet;
-    if (end < content.length) snippet = snippet + '...';
-
-    // Escape HTML and highlight match
-    snippet = escapeHtml(snippet);
-    const regex = new RegExp(`(${escapeRegex(query)})`, 'gi');
-    snippet = snippet.replace(regex, '<mark>$1</mark>');
-
-    return snippet;
-}
 
 function handleGlobalSearchKeyboard(event) {
     const resultsContainer = document.getElementById('global-search-results');
