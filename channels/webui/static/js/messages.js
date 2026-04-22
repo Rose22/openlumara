@@ -400,6 +400,8 @@ function renderToolCallsWithResponses(toolCallsData) {
 async function pollMessages() {
     if (!isConnected) return;
     if (userIsEditing) return;
+    // Don't poll during active streaming to avoid race conditions with the streaming UI updates
+    if (isStreaming) return;
 
     try {
         const response = await fetch('/messages/since?index=' + lastMessageIndex, {
@@ -437,12 +439,23 @@ async function pollMessages() {
             let i = 0;
             while (i < messages.length) {
                 const msg = messages[i];
+                const msgIndex = msg.index;
+
+                // Skip if this specific message is already in the DOM
+                if (chat.querySelector(`[data-index="${msgIndex}"]`)) {
+                    i++;
+                    continue;
+                }
+
                 if (msg.role === 'assistant') {
                     const turnInfo = collectAssistantTurn(messages, i);
-                    renderAssistantTurn(turnInfo.messages, turnInfo.endIndex, true);
+                    // Check if the turn's first message is already rendered to avoid partial duplicates
+                    if (!chat.querySelector(`[data-index="${turnInfo.messages[0].index}"]`)) {
+                        renderAssistantTurn(turnInfo.messages, turnInfo.endIndex, true);
+                    }
                     i = turnInfo.endIndex + 1;
                 } else {
-                    renderSingleMessage(msg, msg.index, true);
+                    renderSingleMessage(msg, msgIndex, true);
                     i++;
                 }
             }
