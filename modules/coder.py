@@ -383,7 +383,7 @@ class YourClassName(core.module.Module):
 
         coding_style = self.config.get("coding_style")
         if coding_style:
-            output += f"## Your coding style\\nWhen coding, keep this coding style guide in mind:\\n{coding_style}\\n\\n"
+            output += f"## Your coding style\nWhen coding, keep this coding style guide in mind:\n{coding_style}\n\n"
 
         if self.config.get("openlumara_module_creation_mode"):
             output += self.OPENLUMARA_MODULE_PROMPT.strip()
@@ -396,12 +396,12 @@ class YourClassName(core.module.Module):
 
                 project_list.append(filename)
 
-            output += "## Current projects in sandbox\\n"
+            output += "## Current projects in sandbox\n"
             if not project_list:
                 output += "No projects yet."
 
             try:
-                output += "\\n".join(project_list)
+                output += "\n".join(project_list)
             except Exception as e:
                 return f"error: {e}", False
 
@@ -771,106 +771,113 @@ class YourClassName(core.module.Module):
 
         return None
 
-    async def get_symbol_body(self, project_name: str, file_path: list, symbol_name: str, language: str = None) -> str:
+    async def get_symbol_body(self, project_name: str, file_path: list, symbols: list, language: str = None) -> dict:
         """
-        Returns the code block for a symbol.
+        Returns the code blocks for multiple symbols.
+        symbols: list of symbol names to retrieve.
+        Returns a dict mapping symbol names to their content bodies.
         """
-        file_path_str = self._get_file_path(project_name, file_path)
-        if not os.path.exists(file_path_str):
-            return self.result("file does not exist", False)
+        results = {}
+        for name in symbols:
+            file_path_str = self._get_file_path(project_name, file_path)
+            if not os.path.exists(file_path_str):
+                results[name] = "file does not exist"
+                continue
 
-        if not language:
-            language = self._get_language_from_ext(file_path_str)
+            if not language:
+                language = self._get_language_from_ext(file_path_str)
 
-        line_number = self._find_symbol_line(file_path_str, symbol_name, language)
-        if not line_number:
-            return self.result(f"symbol '{symbol_name}' not found", False)
+            line_number = self._find_symbol_line(file_path_str, name, language)
+            if not line_number:
+                results[name] = f"symbol '{name}' not found", False
+                continue
 
-        # 1. Try Tree-sitter
-        if HAS_TREE_SITTER and language in LANGUAGE_MAP:
+            # 1. Try Tree-sitter
+            if HAS_TREE_SITTER and language in LANGUAGE_MAP:
+                try:
+                    from tree_sitter import Parser
+                    parser = Parser(LANGUAGE_MAP[language])
+                    with open(file_path_str, 'rb') as f:
+                        source_bytes = f.read()
+
+                    tree = parser.parse(source_bytes)
+                    target_row = line_number - 1
+
+                    candidate_nodes = []
+                    def find_nodes(node):
+                        if node.start_point[0] <= target_row <= node.end_point[0]:
+                            node_type = node.type
+                            if node_type in self.SYMBOL_MAP.get(language, {}):
+                                candidate_nodes.append(node)
+                        for child in node.children:
+                            find_nodes(child)
+
+                    find_nodes(tree.root_node)
+
+                    if candidate_nodes:
+                        best_node = min(candidate_nodes, key=lambda n: n.end_byte - n.start_byte)
+                        results[name] = source_bytes[best_node.start_byte:best_node.end_byte].decode('utf-8')
+                        continue
+                    else:
+                        core.log("coder", "[DEBUG] Tree-sitter found 0 matching symbols for this line. Falling back.")
+                except Exception as e:
+                    core.log("coder", f"Couldn't use tree-sitter! Falling back to regex: {e}")
+                    pass
+            elif language not in LANGUAGE_MAP:
+                core.log("coder", f"Couldn't use tree-sitter! Language '{language}' not supported.")
+
+            # 2. Fallback to original Indentation/Brace logic
+            config = self.LANGUAGE_CONFIG.get(language)
+            body_type = config.get('body_type', 'brace') if config else 'brace'
+
             try:
-                from tree_sitter import Parser
-                parser = Parser(LANGUAGE_MAP[language])
-                with open(file_path_str, 'rb') as f:
-                    source_bytes = f.read()
+                with open(file_path_str, 'r') as f:
+                    lines = f.readlines()
 
-                tree = parser.parse(source_bytes)
-                target_row = line_number - 1
+                if not (1 <= line_number <= len(lines)):
+                    results[name] = "line number out of range"
+                    continue
 
-                # Strategy: Find the smallest node that covers this specific line
-                # that is also recognized as a symbol.
-                candidate_nodes = []
-                def find_nodes(node):
-                    if node.start_point[0] <= target_row <= node.end_point[0]:
-                        node_type = node.type
-                        if node_type in self.SYMBOL_MAP.get(language, {}):
-                            candidate_nodes.append(node)
-                    for child in node.children:
-                        find_nodes(child)
+                start_idx = line_number - 1
 
-                find_nodes(tree.root_node)
-
-                if candidate_nodes:
-                    # Pick the "tightest" node (the one with the smallest byte range)
-                    best_node = min(candidate_nodes, key=lambda n: n.end_byte - n.start_byte)
-                    return self.result(source_bytes[best_node.start_byte:best_node.end_byte].decode('utf-8'))
-                else:
-                    core.log("coder", "[DEBUG] Tree-sitter found 0 matching symbols for this line. Falling back.")
-            except Exception as e:
-                core.log("coder", f"Couldn't use tree-sitter! Falling back to regex: {e}")
-                pass # Fallback to regex
-        elif language not in LANGUAGE_MAP:
-            core.log("coder", f"Couldn't use tree-sitter! Language '{language}' not supported.")
-
-        # 2. Fallback to original Indentation/Brace logic
-        config = self.LANGUAGE_CONFIG.get(language)
-        body_type = config.get('body_type', 'brace') if config else 'brace'
-
-        try:
-            with open(file_path_str, 'r') as f:
-                lines = f.readlines()
-
-            if not (1 <= line_number <= len(lines)):
-                return self.result("line number out of range", False)
-
-            start_idx = line_number - 1
-
-            if body_type == 'indentation':
-                def get_indent(l): return len(l) - len(l.lstrip())
-                base_indent = get_indent(lines[start_idx])
-                end_idx = start_idx + 1
-                for i in range(start_idx + 1, len(lines)):
-                    line = lines[i]
-                    if not line.strip() or line.strip().startswith('#'): continue
-                    if get_indent(line) <= base_indent: break
-                    end_idx = i + 1
-                body_lines = lines[start_idx:end_idx]
-            else:
-                # Brace-based logic
-                brace_found = False
-                start_brace_idx = -1
-                for i in range(start_idx, len(lines)):
-                    if '{' in lines[i]:
-                        start_brace_idx = i
-                        brace_found = True
-                        break
-                if not brace_found:
-                    return self.result("".join(lines[start_idx:start_idx+1]))
-
-                brace_count = 0
-                end_idx = len(lines)
-                for i in range(start_brace_idx, len(lines)):
-                    line = lines[i]
-                    brace_count += line.count('{')
-                    brace_count -= line.count('}')
-                    if brace_count <= 0:
+                if body_type == 'indentation':
+                    def get_indent(l): return len(l) - len(l.lstrip())
+                    base_indent = get_indent(lines[start_idx])
+                    end_idx = start_idx + 1
+                    for i in range(start_idx + 1, len(lines)):
+                        line = lines[i]
+                        if not line.strip() or line.strip().startswith('#'): continue
+                        if get_indent(line) <= base_indent: break
                         end_idx = i + 1
-                        break
-                body_lines = lines[start_idx:end_idx]
+                    body_lines = lines[start_idx:end_idx]
+                else:
+                    brace_found = False
+                    start_brace_idx = -1
+                    for i in range(start_idx, len(lines)):
+                        if '{' in lines[i]:
+                            start_brace_idx = i
+                            brace_found = True
+                            break
+                    if not brace_found:
+                        results[name] = "".join(lines[start_idx:start_idx+1])
+                        continue
 
-            return self.result("".join(body_lines))
-        except Exception as e:
-            return self.result(f"error: {e}", False)
+                    brace_count = 0
+                    end_idx = len(lines)
+                    for i in range(start_brace_idx, len(lines)):
+                        line = lines[i]
+                        brace_count += line.count('{')
+                        brace_count -= line.count('}')
+                        if brace_count <= 0:
+                            end_idx = i + 1
+                            break
+                    body_lines = lines[start_idx:end_idx]
+
+                results[name] = "".join(body_lines)
+            except Exception as e:
+                results[name] = f"error: {e}"
+
+        return self.result(results)
 
     async def edit_symbol_body(self, project_name: str, file_path: list, symbol_name: str, new_content: str, language: str = None) -> bool:
         """
