@@ -435,7 +435,6 @@ class YourClassName(core.module.Module):
                 return os.path.basename(path)
 
             contents = []
-            subdirs = {}
             try:
                 for entry in os.scandir(path):
                     if entry.is_file():
@@ -443,23 +442,19 @@ class YourClassName(core.module.Module):
                     elif entry.is_dir():
                         if entry.name in self.config.get("folder_blacklist"):
                             continue
-
-                        if entry.name[0] == '.': # first char is . so its a hidden folder
+                        if entry.name[0] == '.':
                             continue
 
                         if current_depth < depth_limit:
-                            subdirs[entry.name] = _build_tree(entry.path, current_depth + 1)
+                            contents.append({entry.name: _build_tree(entry.path, current_depth + 1)})
                         else:
                             contents.append(entry.name)
             except Exception:
                 pass
 
-            if current_depth > 0:
-                return contents + list(subdirs.values())
-            else:
-                result = {"root": contents}
-                result.update(subdirs)
-                return result
+            if current_depth == 0:
+                return {"root": contents}
+            return contents
 
         try:
             tree = _build_tree(project_path, 0)
