@@ -115,7 +115,7 @@ class Cli(core.channel.Channel):
             mouse_support=False,
             enable_system_prompt=True,
             enable_suspend=True,
-            search_ignore_case=True,
+            search_ignore_case=True
         )
 
         with prompt_toolkit.patch_stdout.patch_stdout():
@@ -123,6 +123,7 @@ class Cli(core.channel.Channel):
                 msg = await prompt_session.prompt_async(
                     self._get_prompt(),
                     refresh_interval=0.5,
+                    set_exception_handler=False
                 )
 
                 if not msg.strip():
