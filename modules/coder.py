@@ -771,11 +771,15 @@ class YourClassName(core.module.Module):
 
         return None
 
-    async def get_symbol_body(self, project_name: str, file_path: list, symbols: list, language: str = None) -> dict:
+    async def get_symbols(self, project_name: str, file_path: list, symbols: list, language: str = None) -> dict:
         """
         Returns the code blocks for multiple symbols.
-        symbols: list of symbol names to retrieve.
+        Symbols are functions, variables, etc.
+
         Returns a dict mapping symbol names to their content bodies.
+
+        Args:
+            symbols: list of symbol names to retrieve.
         """
         results = {}
         for name in symbols:
@@ -879,7 +883,7 @@ class YourClassName(core.module.Module):
 
         return self.result(results)
 
-    async def edit_symbol_body(self, project_name: str, file_path: list, symbol_name: str, new_content: str, language: str = None) -> bool:
+    async def edit_symbol(self, project_name: str, file_path: list, symbol_name: str, new_content: str, language: str = None) -> bool:
         """
         Replaces the content of a symbol with new content.
         Uses the same logic as get_symbol_body to identify the symbol's boundaries.
