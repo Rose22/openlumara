@@ -205,9 +205,13 @@ function scheduleReconnect() {
     updateConnectionStatus('connecting');
 
     reconnectTimer = setTimeout(async () => {
-        await checkConnection();
-        if (!isConnected) {
-            scheduleReconnect();
+        try {
+            await checkConnection();
+            if (!isConnected) {
+                scheduleReconnect();
+            }
+        } catch (err) {
+            console.error('Reconnection attempt failed:', err);
         }
     }, delay);
 }

@@ -120,93 +120,99 @@ window.updateUploadQueueUI = function() {
 };
 
 async function handleFileUpload(event) {
-    const filesList = event.target.files || event.dataTransfer.files;
-    if (!filesList || filesList.length === 0) return;
-    const rawFiles = Array.from(filesList);
+    try {
+        const filesList = event.target.files || event.dataTransfer.files;
+        if (!filesList || filesList.length === 0) return;
+        const rawFiles = Array.from(filesList);
 
-    const previewWrappers = [];
+        const previewWrappers = [];
 
-    for (const file of rawFiles) {
-        const isImage = SUPPORTED_IMAGE_TYPES.includes(file.type);
-        const previewWrapper = document.createElement('div');
-        previewWrapper.className = 'message-wrapper user animate-in';
-        previewWrapper.dataset.index = 'pending';
+        for (const file of rawFiles) {
+            const isImage = SUPPORTED_IMAGE_TYPES.includes(file.type);
+            const previewWrapper = document.createElement('div');
+            previewWrapper.className = 'message-wrapper user animate-in';
+            previewWrapper.dataset.index = 'pending';
 
-        const previewMsg = document.createElement('div');
-        previewMsg.className = 'message user';
+            const previewMsg = document.createElement('div');
+            previewMsg.className = 'message user';
 
-        let contentPart = {};
+            let contentPart = {};
 
-        if (isImage) {
-            // Image processing
-            const imgContainer = document.createElement('div');
-            imgContainer.className = 'uploaded-image-container';
-            const img = document.createElement('img');
-            const imageDataUrl = await new Promise((res, rej) => {
-                const r = new FileReader();
-                r.onload = () => res(r.result);
-                r.onerror = rej;
-                r.readAsDataURL(file);
-            });
+            if (isImage) {
+                // Image processing
+                const imgContainer = document.createElement('div');
+                imgContainer.className = 'uploaded-image-container';
+                const img = document.createElement('img');
+                const imageDataUrl = await new Promise((res, rej) => {
+                    const r = new FileReader();
+                    r.onload = () => res(r.result);
+                    r.onerror = () => rej(new Error('Failed to read image file'));
+                    r.readAsDataURL(file);
+                });
 
-            img.src = imageDataUrl;
-            img.className = 'uploaded-image-preview';
+                img.src = imageDataUrl;
+                img.className = 'uploaded-image-preview';
 
-            // Resize/Compress logic for the preview
-            const imgObj = new Image();
-            imgObj.src = imageDataUrl;
-            await new Promise(r => imgObj.onload = r);
+                // Resize/Compress logic for the preview
+                const imgObj = new Image();
+                imgObj.src = imageDataUrl;
+                await new Promise(r => imgObj.onload = r);
 
-            const maxDimension = 512;
-            let width = imgObj.width;
-            let height = imgObj.height;
+                const maxDimension = 512;
+                let width = imgObj.width;
+                let height = imgObj.height;
 
-            if (width > maxDimension || height > maxDimension) {
-                if (width > height) {
-                    height = (maxDimension / width) * height;
-                    width = maxDimension;
-                } else {
-                    width = (maxDimension / height) * width;
-                    height = maxDimension;
+                if (width > maxDimension || height > maxDimension) {
+                    if (width > height) {
+                        height = (maxDimension / width) * height;
+                        width = maxDimension;
+                    } else {
+                        width = (maxDimension / height) * width;
+                        height = maxDimension;
+                    }
                 }
-            }
-            img.style.width = `${width}px`;
-            img.style.height = `${height}px`;
+                img.style.width = `${width}px`;
+                img.style.height = `${height}px`;
 
-            // Prepare the parts for the final payload
-            contentPart = [
-                {
+                // Prepare the parts for the final payload
+                contentPart = [
+                    {
+                        type: "text",
+                        text: `[Image: ${file.name}]`
+                    },
+                    {
+                        type: "image_url",
+                        image_url: { url: imageDataUrl }
+                    }
+                ];
+            } else {
+                // Text file processing
+                const content = await new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = () => resolve('');
+                    reader.readAsText(file);
+                });
+
+                contentPart = {
                     type: "text",
-                    text: `[Image: ${file.name}]`
-                },
-                {
-                    type: "image_url",
-                    image_url: { url: imageDataUrl }
-                }
-            ];
-        } else {
-            // Text file processing
-            const content = await new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result);
-                reader.readAsText(file);
-            });
+                    text: `[File: ${file.name}]\n${content}`
+                };
+            }
 
-            contentPart = {
-                type: "text",
-                text: `[File: ${file.name}]\n${content}`
-            };
+            window.upload_queue.files.push({
+                content: contentPart,
+                name: file.name
+            });
+            window.upload_queue.wrappers.push(previewWrapper);
         }
 
-        window.upload_queue.files.push({
-            content: contentPart,
-            name: file.name
-        });
-        window.upload_queue.wrappers.push(previewWrapper);
+        window.updateUploadQueueUI();
+        scrollToBottom();
+        inputField.focus();
+    } catch (err) {
+        console.error('Failed to process uploaded files:', err);
+        alert('Failed to process uploaded files. Please try again.');
     }
-
-    window.updateUploadQueueUI();
-    scrollToBottom();
-    inputField.focus();
 }
 

@@ -6,8 +6,12 @@ function toggleModal(modalName) {
     const overlay = document.getElementById(modalName + '-overlay');
     const modal = document.getElementById(modalName + '-modal');
 
-    overlay.classList.toggle('show');
-    modal.classList.toggle('show');
+    if (overlay) {
+        overlay.classList.toggle('show');
+    }
+    if (modal) {
+        modal.classList.toggle('show');
+    }
 }
 
 function closeModalOnOverlay(event, modalName) {

@@ -336,153 +336,172 @@ function handleGlobalSearch(query) {
 }
 
 function performGlobalSearch(query) {
-    const contentToggle = document.getElementById('global-search-content-toggle');
-    const searchInContent = contentToggle ? contentToggle.checked : true;
-    const queryLower = query.toLowerCase();
-    const resultsContainer = document.getElementById('global-search-results');
+    try {
+        const contentToggle = document.getElementById('global-search-content-toggle');
+        const searchInContent = contentToggle ? contentToggle.checked : true;
+        const queryLower = query.toLowerCase();
+        const resultsContainer = document.getElementById('global-search-results');
 
-    // Use allChats which is populated by loadChats()
-    const results = [];
-
-    allChats.forEach(chat => {
-        const titleMatch = (chat.title || '').toLowerCase().includes(queryLower);
-        let contentMatches = [];
-
-        // Search in content if enabled
-        if (searchInContent && chat.messages && chat.messages.length > 0) {
-            chat.messages.forEach(msg => {
-                const content = msg.content || '';
-                if (content.toLowerCase().includes(queryLower)) {
-                    contentMatches.push({
-                        content: content,
-                        role: msg.role,
-                        snippet: extractSnippet(content, query, 100)
-                    });
-                }
-            });
+        if (!resultsContainer) {
+            console.warn('Global search results container not found');
+            return;
         }
 
-        // Include if title matches or content matches found
-        if (titleMatch || contentMatches.length > 0) {
-            results.push({
-                chat: chat,
-                titleMatch: titleMatch,
-                contentMatches: contentMatches.slice(0, 3), // Limit to 3 snippets per chat
-                         snippet: contentMatches.length > 0
-                         ? contentMatches[0].snippet
-                         : null
-            });
+        // Use allChats which is populated by loadChats()
+        const results = [];
+
+        allChats.forEach(chat => {
+            const titleMatch = (chat.title || '').toLowerCase().includes(queryLower);
+            let contentMatches = [];
+
+            // Search in content if enabled
+            if (searchInContent && chat.messages && chat.messages.length > 0) {
+                chat.messages.forEach(msg => {
+                    const content = msg.content || '';
+                    if (content.toLowerCase().includes(queryLower)) {
+                        contentMatches.push({
+                            content: content,
+                            role: msg.role,
+                            snippet: extractSnippet(content, query, 100)
+                        });
+                    }
+                });
+            }
+
+            // Include if title matches or content matches found
+            if (titleMatch || contentMatches.length > 0) {
+                results.push({
+                    chat: chat,
+                    titleMatch: titleMatch,
+                    contentMatches: contentMatches.slice(0, 3), // Limit to 3 snippets per chat
+                             snippet: contentMatches.length > 0
+                             ? contentMatches[0].snippet
+                             : null
+                });
+            }
+        });
+
+        // Sort results: title matches first, then by date
+        results.sort((a, b) => {
+            if (a.titleMatch && !b.titleMatch) return -1;
+            if (!a.titleMatch && b.titleMatch) return 1;
+
+            const dateA = new Date(a.chat.updated || a.chat.created || 0);
+            const dateB = new Date(b.chat.updated || b.chat.created || 0);
+            return dateB - dateA;
+        });
+
+        // Limit results
+        const limitedResults = results.slice(0, 50);
+
+        if (limitedResults.length === 0) {
+            resultsContainer.innerHTML = `
+            <div class="global-search-no-results">
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="11" cy="11" r="8"></circle>
+            <path d="m21 21-4.35-4.35"></path>
+            </svg>
+            <p>No results found for "${escapeHtml(query)}"</p>
+            </div>
+            `;
+            return;
         }
-    });
 
-    // Sort results: title matches first, then by date
-    results.sort((a, b) => {
-        if (a.titleMatch && !b.titleMatch) return -1;
-        if (!a.titleMatch && b.titleMatch) return 1;
+        // Render results
+        let html = `<div class="global-search-result-count">${limitedResults.length} result${limitedResults.length !== 1 ? 's' : ''}</div>`;
 
-        const dateA = new Date(a.chat.updated || a.chat.created || 0);
-        const dateB = new Date(b.chat.updated || b.chat.created || 0);
-        return dateB - dateA;
-    });
+        limitedResults.forEach((result, index) => {
+            const chat = result.chat;
+            const title = chat.title || 'New chat';
+            const date = formatDate(chat.updated || chat.created);
+            const tags = chat.tags || [];
 
-    // Limit results
-    const limitedResults = results.slice(0, 50);
+            html += `
+            <div class="global-search-result"
+            data-chat-id="${chat.id}"
+            data-index="${index}"
+            onclick="selectGlobalSearchResult('${chat.id}')"
+            tabindex="0"
+            role="button"
+            aria-label="Open chat: ${escapeHtml(title)}">
+            <div class="global-search-result-header">
+            <span class="global-search-result-title">${escapeHtml(title)}</span>
+            <span class="global-search-result-date">${date}</span>
+            </div>
+            ${result.snippet ? `
+                <div class="global-search-result-snippet">${result.snippet}</div>
+                ` : ''}
+                ${tags.length > 0 ? `
+                    <div class="global-search-result-tags">
+                    ${tags.slice(0, 3).map(tag => `
+                        <span class="global-search-result-tag">${escapeHtml(tag)}</span>
+                        `).join('')}
+                        ${tags.length > 3 ? `<span class="global-search-result-tag">+${tags.length - 3}</span>` : ''}
+                        </div>
+                        ` : ''}
+                        </div>
+                        `;
+        });
 
-    if (limitedResults.length === 0) {
-        resultsContainer.innerHTML = `
-        <div class="global-search-no-results">
-        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <circle cx="11" cy="11" r="8"></circle>
-        <path d="m21 21-4.35-4.35"></path>
-        </svg>
-        <p>No results found for "${escapeHtml(query)}"</p>
-        </div>
-        `;
-        return;
+        resultsContainer.innerHTML = html;
+
+        // Reset active index
+        globalSearchActiveIndex = -1;
+
+        // Add keyboard navigation
+        const input = document.getElementById('global-search-input');
+        if (input) {
+            input.onkeydown = handleGlobalSearchKeyboard;
+        }
+    } catch (err) {
+        console.error('Failed to perform global search:', err);
     }
-
-    // Render results
-    let html = `<div class="global-search-result-count">${limitedResults.length} result${limitedResults.length !== 1 ? 's' : ''}</div>`;
-
-    limitedResults.forEach((result, index) => {
-        const chat = result.chat;
-        const title = chat.title || 'New chat';
-        const date = formatDate(chat.updated || chat.created);
-        const tags = chat.tags || [];
-
-        html += `
-        <div class="global-search-result"
-        data-chat-id="${chat.id}"
-        data-index="${index}"
-        onclick="selectGlobalSearchResult('${chat.id}')"
-        tabindex="0"
-        role="button"
-        aria-label="Open chat: ${escapeHtml(title)}">
-        <div class="global-search-result-header">
-        <span class="global-search-result-title">${escapeHtml(title)}</span>
-        <span class="global-search-result-date">${date}</span>
-        </div>
-        ${result.snippet ? `
-            <div class="global-search-result-snippet">${result.snippet}</div>
-            ` : ''}
-            ${tags.length > 0 ? `
-                <div class="global-search-result-tags">
-                ${tags.slice(0, 3).map(tag => `
-                    <span class="global-search-result-tag">${escapeHtml(tag)}</span>
-                    `).join('')}
-                    ${tags.length > 3 ? `<span class="global-search-result-tag">+${tags.length - 3}</span>` : ''}
-                    </div>
-                    ` : ''}
-                    </div>
-                    `;
-    });
-
-    resultsContainer.innerHTML = html;
-
-    // Reset active index
-    globalSearchActiveIndex = -1;
-
-    // Add keyboard navigation
-    const input = document.getElementById('global-search-input');
-    input.onkeydown = handleGlobalSearchKeyboard;
 }
 
 
 
 function handleGlobalSearchKeyboard(event) {
-    const resultsContainer = document.getElementById('global-search-results');
-    const results = resultsContainer.querySelectorAll('.global-search-result');
+    try {
+        const resultsContainer = document.getElementById('global-search-results');
+        if (!resultsContainer) {
+            console.warn('Global search results container not found');
+            return;
+        }
+        const results = resultsContainer.querySelectorAll('.global-search-result');
 
-    if (results.length === 0) {
-        if (event.key === 'Escape') {
+        if (results.length === 0) {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                closeGlobalSearch();
+            }
+            return;
+        }
+
+        if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            globalSearchActiveIndex = Math.min(globalSearchActiveIndex + 1, results.length - 1);
+            updateGlobalSearchActiveResult(results);
+        } else if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            globalSearchActiveIndex = Math.max(globalSearchActiveIndex - 1, 0);
+            updateGlobalSearchActiveResult(results);
+        } else if (event.key === 'Enter') {
+            event.preventDefault();
+            if (globalSearchActiveIndex >= 0) {
+                const activeResult = results[globalSearchActiveIndex];
+                const chatId = activeResult.dataset.chatId;
+                selectGlobalSearchResult(chatId);
+            } else if (results.length > 0) {
+                // Select first result if none active
+                const chatId = results[0].dataset.chatId;
+                selectGlobalSearchResult(chatId);
+            }
+        } else if (event.key === 'Escape') {
             event.preventDefault();
             closeGlobalSearch();
         }
-        return;
-    }
-
-    if (event.key === 'ArrowDown') {
-        event.preventDefault();
-        globalSearchActiveIndex = Math.min(globalSearchActiveIndex + 1, results.length - 1);
-        updateGlobalSearchActiveResult(results);
-    } else if (event.key === 'ArrowUp') {
-        event.preventDefault();
-        globalSearchActiveIndex = Math.max(globalSearchActiveIndex - 1, 0);
-        updateGlobalSearchActiveResult(results);
-    } else if (event.key === 'Enter') {
-        event.preventDefault();
-        if (globalSearchActiveIndex >= 0) {
-            const activeResult = results[globalSearchActiveIndex];
-            const chatId = activeResult.dataset.chatId;
-            selectGlobalSearchResult(chatId);
-        } else if (results.length > 0) {
-            // Select first result if none active
-            const chatId = results[0].dataset.chatId;
-            selectGlobalSearchResult(chatId);
-        }
-    } else if (event.key === 'Escape') {
-        event.preventDefault();
-        closeGlobalSearch();
+    } catch (err) {
+        console.error('Failed to handle global search keyboard event:', err);
     }
 }
 

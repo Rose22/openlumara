@@ -581,37 +581,45 @@ function populateChatItem(item, chat) {
 }
 
 function renderChatList(chats) {
-    const list = document.getElementById('chat-list');
-    const searchInput = document.getElementById('chat-search');
-    const currentSearchQuery = searchInput ? searchInput.value : '';
+    try {
+        const list = document.getElementById('chat-list');
+        if (!list) {
+            console.warn('Chat list container not found');
+            return;
+        }
+        const searchInput = document.getElementById('chat-search');
+        const currentSearchQuery = searchInput ? searchInput.value : '';
 
-    const fragment = document.createDocumentFragment();
+        const fragment = document.createDocumentFragment();
 
-    if (chats.length === 0) {
-        const emptyMsg = document.createElement('div');
-        emptyMsg.className = 'chat-empty';
-        emptyMsg.textContent = 'No chats in this category';
-        emptyMsg.style.cssText = 'padding: 20px; text-align: center; color: var(--text-muted); font-size: 0.85rem;';
-        fragment.appendChild(emptyMsg);
-    } else {
-        chats.sort((a, b) => (b.updated || 0) - (a.updated || 0));
-        chats.forEach(chat => {
-            // Create the shell instead of the full element
-            const shell = createChatItemShell(chat);
-            fragment.appendChild(shell);
-        });
+        if (chats.length === 0) {
+            const emptyMsg = document.createElement('div');
+            emptyMsg.className = 'chat-empty';
+            emptyMsg.textContent = 'No chats in this category';
+            emptyMsg.style.cssText = 'padding: 20px; text-align: center; color: var(--text-muted); font-size: 0.85rem;';
+            fragment.appendChild(emptyMsg);
+        } else {
+            chats.sort((a, b) => (b.updated || 0) - (a.updated || 0));
+            chats.forEach(chat => {
+                // Create the shell instead of the full element
+                const shell = createChatItemShell(chat);
+                fragment.appendChild(shell);
+            });
+        }
+
+        list.innerHTML = '';
+        list.appendChild(fragment);
+
+        // Initialize observer on the new shells
+        const shells = list.querySelectorAll('.chat-item-shell');
+        shells.forEach(shell => chatListObserver.observe(shell));
+
+        // Re-apply filters if active
+        if (activeTagFilter) filterChatsByTag();
+        if (currentSearchQuery) filterChats(currentSearchQuery);
+    } catch (err) {
+        console.error('Failed to render chat list:', err);
     }
-
-    list.innerHTML = '';
-    list.appendChild(fragment);
-
-    // Initialize observer on the new shells
-    const shells = list.querySelectorAll('.chat-item-shell');
-    shells.forEach(shell => chatListObserver.observe(shell));
-
-    // Re-apply filters if active
-    if (activeTagFilter) filterChatsByTag();
-    if (currentSearchQuery) filterChats(currentSearchQuery);
 }
 
 async function newChat() {
