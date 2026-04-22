@@ -35,26 +35,6 @@ async def main(args):
     # run main loop
     return await manager.run()
 
-def do_restart():
-    """cross-platform restart with TTY/console inheritance"""
-    print("----------------")
-
-    script = os.path.abspath(sys.argv[0])
-    args = [sys.executable, script] + sys.argv[1:]
-
-    if sys.platform == "win32":
-        # windows: spawn new process, inherit same console
-        subprocess.Popen(
-            args,
-            stdin=sys.stdin,
-            stdout=sys.stdout,
-            stderr=sys.stderr,
-        )
-        sys.exit(0)
-    else:
-        # unix: replace process, inherits TTY automatically
-        os.execv(sys.executable, args)
-
 def add_arguments_recursive(parser, config, prefix=""):
     """
     Recursively traverses the config dict and adds arguments to the parser.
@@ -147,7 +127,9 @@ while True:
         pass
 
     if result == "restart":
-        do_restart()
+        # run the loop again
+        core.config.config = None # unload config
+        pass
     else:
         exit()
 

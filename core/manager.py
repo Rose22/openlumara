@@ -185,6 +185,13 @@ class Manager:
         for task in list(self._async_tasks):
             task.cancel()
 
+        # unload everything from memory
+        self.modules = None
+        self.channels = None
+        self.tools = None
+        self.savedata = None
+        self.API = None
+
         core.log("core", "Shutdown complete")
 
     async def _initialize_api_connection(self):
