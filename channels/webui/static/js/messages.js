@@ -206,7 +206,7 @@ function renderSingleMessage(msg, index, animate) {
     const rawText = extractTextContent(rawContent);
     const parsed = parseMessageContent(rawContent);
 
-    if (rawText === '[SYSTEM_TICK]') return;
+    if (rawText === '[SYSTEM_TICK]' || rawText.startsWith('[AUTOMATED SYSTEM INSTRUCTION]')) return;
 
     let wrapperClass, msgClass;
 
