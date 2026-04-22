@@ -567,7 +567,7 @@ async function sendCommand(message) {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({role: "user", content: message })
-            }).catch(err => console.error('Stop command fetch failed:', err));
+            });
             await stopGeneration(true);
         } else {
             const response = await fetch('/send', {

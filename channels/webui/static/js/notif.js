@@ -11,8 +11,6 @@ function requestNotificationPermission() {
     if (Notification.permission === 'default') {
         Notification.requestPermission().then(permission => {
             notificationPermission = permission;
-        }).catch(err => {
-            console.error('Failed to request notification permission:', err);
         });
     } else {
         notificationPermission = Notification.permission;

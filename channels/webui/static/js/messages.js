@@ -98,18 +98,6 @@ function collectAssistantTurn(messages, startIndex) {
 function renderAssistantTurn(messages, index, animate) {
     if (!messages || messages.length === 0) return;
 
-    // Prevent duplicate rendering if assistant turn with this index already exists
-    if (chat.querySelector(`.message-wrapper[data-index="${index}"]`)) {
-        console.warn(`Duplicate assistant turn index ${index} detected, skipping render.`);
-        return;
-    }
-
-    // During streaming, skip rendering assistant turns.
-    // The streaming UI actively manages these DOM elements.
-    if (isStreaming) {
-        return;
-    }
-
     const wrapper = document.createElement('div');
     wrapper.className = 'message-wrapper ai';
     if (animate) wrapper.classList.add('animate-in');
@@ -210,12 +198,6 @@ function renderAssistantMessageParts(msg, toolResponseMap) {
  * Render a single message (non-assistant).
  */
 function renderSingleMessage(msg, index, animate) {
-    // Prevent duplicate rendering if message with this index already exists
-    if (chat.querySelector(`.message-wrapper[data-index="${index}"]`)) {
-        console.warn(`Duplicate message index ${index} detected, skipping render.`);
-        return;
-    }
-
     const role = msg.role || 'user';
     const rawContent = msg.content || '';
     const reasoningContent = msg.reasoning_content || null;
@@ -223,12 +205,6 @@ function renderSingleMessage(msg, index, animate) {
     const toolCallId = msg.tool_call_id || null;
     const rawText = extractTextContent(rawContent);
     const parsed = parseMessageContent(rawContent);
-
-    // During streaming, skip rendering assistant/tool/schedule messages.
-    // The streaming UI actively manages these DOM elements, and polling should not create duplicates.
-    if (isStreaming && (role === 'assistant' || role === 'tool' || role === 'schedule')) {
-        return;
-    }
 
     if (rawText === '[SYSTEM_TICK]') return;
 
@@ -290,6 +266,7 @@ function renderSingleMessage(msg, index, animate) {
         if (parsed.displayContent && parsed.displayContent.trim()) {
             messageHtml += `<div class="tool-decision-text">${renderMarkdown(parsed.displayContent)}</div>`;
         }
+        messageHtml += renderToolCalls(toolCalls);
     } else if (role === 'schedule') {
         messageHtml += renderScheduleMessage(rawText);
     } else {

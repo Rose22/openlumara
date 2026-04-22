@@ -114,7 +114,6 @@ async function checkConnection() {
             throw new Error('Server error');
         }
     } catch (err) {
-        console.error('Connection check failed:', err);
         handleConnectionError();
     }
 }

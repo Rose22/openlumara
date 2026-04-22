@@ -1497,7 +1497,6 @@ function pollForServerRestart() {
             }
         } catch (err) {
             // Server not ready yet, keep polling
-            console.debug(`Server restart poll ${attempts}/${maxAttempts}: waiting for server...`);
         }
     }, 500);
 }

@@ -65,7 +65,7 @@ async function pollMessages() {
                     );
                 }
 
-                const existing = chat.querySelector(`[data-index=\\\"${msgIndex}\\\"]`);
+                const existing = chat.querySelector(`[data-index=\"${msgIndex}\"]`);
                 if (!existing) {
                     renderSingleMessage(msg, msgIndex, true);
                 }
@@ -75,7 +75,7 @@ async function pollMessages() {
             updateTokenUsage();
         }
     } catch (err) {
-        console.error('Message polling error:', err);
+        // Connection issues handled elsewhere
     }
 }
 
