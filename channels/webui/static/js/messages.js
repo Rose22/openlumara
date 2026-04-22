@@ -21,8 +21,14 @@ function renderAllMessages(messages, animate = false) {
         if (msg.role === 'assistant') {
             // Collect complete assistant turn (may span multiple messages due to tool calls)
             const turnInfo = collectAssistantTurn(messages, i);
-            renderAssistantTurn(turnInfo.messages, turnInfo.endIndex, animate);
-            i = turnInfo.endIndex + 1;
+            if (turnInfo.messages.length > 0) {
+                renderAssistantTurn(turnInfo.messages, turnInfo.endIndex, animate);
+                i = turnInfo.endIndex + 1;
+            } else {
+                // Empty turn (e.g., starts with announcement or command output) - render as single message
+                renderSingleMessage(msg, i, animate);
+                i++;
+            }
         } else {
             // Single message (user, tool, command, etc.)
             renderSingleMessage(msg, i, animate);
@@ -47,6 +53,12 @@ function collectAssistantTurn(messages, startIndex) {
         const msg = messages[i];
 
         if (msg.role === 'assistant') {
+            // Check if this message is an announcement or command output
+            const msgParsed = parseMessageContent(msg.content || '');
+            if (msgParsed.isAnnouncement || msgParsed.isCommandOutput) {
+                break; // Separate announcements and command outputs from assistant turns
+            }
+
             collected.push(msg);
             endIndex = i;
 

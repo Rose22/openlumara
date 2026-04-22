@@ -65,7 +65,7 @@ async function pollMessages() {
                     );
                 }
 
-                const existing = chat.querySelector(`[data-index="${msgIndex}"]`);
+                const existing = chat.querySelector(`[data-index=\"${msgIndex}\"]`);
                 if (!existing) {
                     renderSingleMessage(msg, msgIndex, true);
                 }
