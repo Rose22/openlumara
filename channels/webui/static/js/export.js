@@ -8,6 +8,24 @@ function showExportModal() {
 
 async function exportChat(format) {
     try {
+        // Fetch chat title for filename
+        let chatTitle = 'chat-export';
+        try {
+            const chatId = await getCurrentChatId();
+            if (chatId) {
+                const chatResponse = await fetch(`/chat/load?id=${chatId}`);
+                const chatData = await chatResponse.json();
+                if (chatData.success && chatData.chat && chatData.chat.title) {
+                    chatTitle = chatData.chat.title;
+                }
+            }
+        } catch (e) {
+            console.error('Failed to get chat title for export:', e);
+        }
+        
+        // Sanitize title for filename
+        const safeTitle = (chatTitle || 'chat-export').replace(/[\/\\:*?"<>|]/g, '_');
+
         const response = await fetch('/messages');
         const data = await response.json();
         const messages = data.messages || [];
@@ -84,7 +102,7 @@ async function exportChat(format) {
 
         if (format === 'json') {
             content = JSON.stringify(messages, null, 2);
-            filename = 'chat-export.json';
+            filename = `${safeTitle}.json`;
             mimeType = 'application/json';
         } else if (format === 'markdown') {
             let md = '# Chat Export\n\n';
@@ -114,7 +132,7 @@ async function exportChat(format) {
             });
 
             content = md;
-            filename = 'chat-export.md';
+            filename = `${safeTitle}.md`;
             mimeType = 'text/markdown';
         } else {
             let txt = 'Chat Export\n';
@@ -162,7 +180,7 @@ async function exportChat(format) {
             });
 
             content = txt;
-            filename = 'chat-export.txt';
+            filename = `${safeTitle}.txt`;
             mimeType = 'text/plain';
         }
 
