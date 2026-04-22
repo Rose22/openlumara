@@ -867,6 +867,49 @@ def rename_chat():
 
     return jsonify({'success': True, 'title': new_title})
 
+@app.route('/chat/update_category', methods=['POST'])
+def update_chat_category():
+    """Update the category of a specific chat."""
+    global channel_instance
+
+    if not channel_instance:
+        return jsonify({'success': False, 'error': 'Channel not available'})
+
+    data = request.get_json()
+    chat_id = data.get('chat_id')
+    new_category = data.get('category', '')
+
+    if not chat_id:
+        return jsonify({'success': False, 'error': 'Chat ID is required'})
+
+    # Check if the requested chat is the current one
+    current_id = _run_async(channel_instance.context.chat.get_id())
+    was_current = (current_id == chat_id)
+
+    try:
+        # If it's not the current chat, we need to load it first to set category
+        if not was_current:
+            load_response = _run_async(channel_instance.context.chat.load(chat_id))
+            if not load_response:
+                return jsonify({'success': False, 'error': 'Failed to load chat'})
+
+        # Set the category
+        _run_async(channel_instance.context.chat.set_category(new_category))
+
+        # If we loaded a different chat, restore the previous one to maintain UI state
+        if not was_current and current_id:
+            _run_async(channel_instance.context.chat.load(current_id))
+
+        return jsonify({'success': True})
+    except Exception as e:
+        # Restore previous chat if something went wrong
+        if not was_current and current_id:
+            try:
+                _run_async(channel_instance.context.chat.load(current_id))
+            except:
+                pass
+        return jsonify({'success': False, 'error': str(e)})
+
 @app.route('/chat/new', methods=['POST'])
 def new_chat():
     """

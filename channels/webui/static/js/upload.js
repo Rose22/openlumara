@@ -33,6 +33,11 @@ chat.addEventListener('drop', (e) => {
 }, false);
 
 document.body.addEventListener('dragover', (e) => {
+    // Prevent file upload overlay when dragging a chat item
+    if (window.isDraggingChat) {
+        e.preventDefault();
+        return;
+    }
     e.preventDefault();
     dropOverlay.classList.add('active');
 });
@@ -44,6 +49,11 @@ document.body.addEventListener('dragleave', (e) => {
 });
 
 document.body.addEventListener('drop', (e) => {
+    // Prevent file upload when dropping a chat item
+    if (window.isDraggingChat) {
+        e.preventDefault();
+        return;
+    }
     e.preventDefault();
     dropOverlay.classList.remove('active');
 
@@ -215,4 +225,3 @@ async function handleFileUpload(event) {
         alert('Failed to process uploaded files. Please try again.');
     }
 }
-

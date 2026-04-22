@@ -217,6 +217,32 @@ function createCategoryElement(key, name, icon) {
     <span class="category-item-icon">${icon}</span>
     <span class="category-item-name">${escapeHtml(name)}</span>
     `;
+
+    // Allow dropping chats onto this category
+    btn.addEventListener('dragover', (e) => {
+        console.log('Drag over category', key, 'classList:', btn.classList);
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        btn.classList.add('drag-over');
+        console.log('After add class:', btn.classList);
+        e.stopPropagation();
+    });
+
+    btn.addEventListener('dragleave', () => {
+        console.log('Drag leave category', key);
+        btn.classList.remove('drag-over');
+    });
+
+    btn.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        btn.classList.remove('drag-over');
+        const chatId = e.dataTransfer.getData('text/plain');
+        if (chatId) {
+            await moveChatToCategory(chatId, key);
+        }
+    });
+
     btn.onclick = () => selectCategory(key);
     return btn;
 }
@@ -433,10 +459,25 @@ function createGroupContainer() {
 function createChatElement(chat) {
     const item = document.createElement('div');
     item.className = 'chat-item' + (chat.id === currentChatId ? ' active' : '');
-
+    item.setAttribute('draggable', 'true');
     item.dataset.chatId = chat.id;
-    // PERFORMANCE FIX: Removed JSON.stringify.
-    // Data is retrieved from chatDataMap using the ID when needed.
+
+    console.log('Created chat element', chat.id, 'draggable:', item.draggable);
+
+    // Drag start event
+    item.addEventListener('dragstart', (e) => {
+        console.log('Drag start', chat.id);
+        e.dataTransfer.setData('text/plain', chat.id);
+        e.dataTransfer.effectAllowed = 'move';
+        // Add a class for styling while dragging
+        setTimeout(() => item.classList.add('dragging'), 0);
+    });
+
+    item.addEventListener('dragend', () => {
+        item.classList.remove('dragging');
+        // Remove any drop target highlights
+        document.querySelectorAll('.category-item').forEach(el => el.classList.remove('drag-over'));
+    });
 
     item.onclick = (e) => {
         if (e.target.closest('.chat-item-actions') || e.target.closest('.inline-rename-container')) {
@@ -505,11 +546,44 @@ function createChatElement(chat) {
 function createChatItemShell(chat) {
     const item = document.createElement('div');
     item.className = 'chat-item chat-item-shell' + (chat.id === currentChatId ? ' active' : '');
+    item.setAttribute('draggable', 'true');
     item.dataset.chatId = chat.id;
 
     // Crucial: Set a min-height so the scrollbar behaves correctly
     // before the item is fully rendered.
     item.style.minHeight = '55px';
+
+    // Only enable drag-and-drop on desktop (not mobile)
+    const isMobile = window.matchMedia('(max-width: 768px)').matches || 'ontouchstart' in window;
+    if (isMobile) {
+        return item;
+    }
+
+    // Drag start event
+    item.addEventListener('dragstart', (e) => {
+        console.log('Drag start', chat.id);
+        e.dataTransfer.setData('text/plain', chat.id);
+        e.dataTransfer.effectAllowed = 'move';
+        // Add a class for styling while dragging
+        setTimeout(() => item.classList.add('dragging'), 0);
+        // Set flag to prevent file upload overlay
+        window.isDraggingChat = true;
+        // Prevent the drag from bubbling up to the main content area
+        e.stopPropagation();
+    });
+
+    // Prevent dragover events from bubbling up to the document body
+    item.addEventListener('dragover', (e) => {
+        e.stopPropagation();
+    }, true); // Use capture phase to catch events before they bubble
+
+    item.addEventListener('dragend', () => {
+        item.classList.remove('dragging');
+        // Remove any drop target highlights
+        document.querySelectorAll('.category-item').forEach(el => el.classList.remove('drag-over'));
+        // Clear flag when drag ends
+        window.isDraggingChat = false;
+    });
 
     item.onclick = (e) => {
         if (e.target.closest('.chat-item-actions') || e.target.closest('.inline-rename-container')) {
@@ -619,6 +693,29 @@ function renderChatList(chats) {
         if (currentSearchQuery) filterChats(currentSearchQuery);
     } catch (err) {
         console.error('Failed to render chat list:', err);
+    }
+}
+
+async function moveChatToCategory(chatId, newCategory) {
+    if (!chatId || !newCategory) return;
+
+    try {
+        const response = await fetch('/chat/update_category', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: chatId, category: newCategory })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            // Refresh the chat list to reflect the change
+            await loadChats();
+        } else {
+            console.error('Failed to move chat:', data.error);
+        }
+    } catch (e) {
+        console.error('Error moving chat:', e);
     }
 }
 

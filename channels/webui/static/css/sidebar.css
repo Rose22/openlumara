@@ -924,3 +924,28 @@ pointer-events: none; /* Let click pass to header */
     border-color: var(--accent);
     color: var(--bg-primary);
 }
+
+/* Drag and Drop Styling */
+.chat-item {
+    cursor: default;
+    user-select: none; /* Prevents text selection from interfering with drag */
+    -webkit-user-select: none;
+    pointer-events: auto; /* Ensure it can receive events */
+}
+
+.chat-item.dragging {
+    cursor: grabbing;
+    opacity: 0;
+}
+
+.category-item {
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+    position: relative; /* Ensure ::after pseudo-element works correctly */
+}
+
+.category-item.drag-over {
+    background-color: var(--accent);
+    color: var(--bg-primary);
+}
+
+
