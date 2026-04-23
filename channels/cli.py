@@ -71,11 +71,6 @@ class ToolCallRenderer:
 class Cli(core.channel.Channel):
     running = True
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._setup_style()
-        self._setup_history()
-
     def _setup_style(self):
         self.style = prompt_toolkit.styles.Style.from_dict({
             "prompt": "ansicyan bold",
@@ -115,6 +110,9 @@ class Cli(core.channel.Channel):
     async def run(self):
         if not sys.stdin.isatty():
             return False
+
+        self._setup_style()
+        self._setup_history()
 
         prompt_session = prompt_toolkit.PromptSession(
             history=self.history,

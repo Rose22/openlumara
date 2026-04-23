@@ -154,14 +154,12 @@ class Webui(core.channel.Channel):
         "use_short_replies": False
     }
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    async def run(self):
+        """Start the Flask web server."""
         self.main_loop = None
         self.server = None
         self._shutdown_requested = False
 
-    async def run(self):
-        """Start the Flask web server."""
         core.log("webui", "Starting WebUI")
 
         self.main_loop = asyncio.get_running_loop()
@@ -171,7 +169,7 @@ class Webui(core.channel.Channel):
         channel_instance = self
 
         # Start Flask in a separate thread
-        flask_thread = Thread(target=self._run_flask, daemon=True)
+        flask_thread = Thread(target=self._run_flask, daemon=False)
         flask_thread.start()
 
         host = core.config.get("channels").get("settings").get("webui").get("host", "127.0.0.1")
@@ -196,14 +194,21 @@ class Webui(core.channel.Channel):
 
         try:
             self.server.serve_forever()
-        except:
-            pass  # Server shutdown
+        except Exception as e:
+            core.log("webui", f"Server error: {e}")
+        finally:
+            core.log("webui", "WebUI server down")
 
     def on_shutdown(self):
-        """Shutdown the Flask server."""
+        """Shutdown the Flask server gracefully."""
         self._shutdown_requested = True
         if self.server:
+            core.log("webui", "Shutting down WebUI server...")
             self.server.shutdown()
+
+        # wait for the thread to actually finish cleaning up the socket
+        if hasattr(self, 'flask_thread') and self.flask_thread.is_alive():
+            self.flask_thread.join()
 
     async def _announce(self, message: str, type: str = None):
         """
