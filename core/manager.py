@@ -36,6 +36,8 @@ class Manager:
     async def run(self):
         """main loop"""
 
+        should_swallow_exceptions = (not core.debug)
+
         if self.args.pure:
             self.pure_mode = True
         elif self.args.coder:
@@ -127,7 +129,6 @@ class Manager:
             print(f"Please open the WebUI at http://{host}:{port}")
 
         try:
-            should_swallow_exceptions = (not core.debug)
             await asyncio.gather(*self._async_tasks, return_exceptions=should_swallow_exceptions)
         except KeyboardInterrupt:
             pass
@@ -178,6 +179,8 @@ class Manager:
         # Cancel all running tasks so gather() returns
         for task in list(self._async_tasks):
             task.cancel()
+
+        await asyncio.sleep(0.1)
 
         # unload everything from memory
         self.modules = None

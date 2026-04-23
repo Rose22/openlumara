@@ -540,7 +540,7 @@ core:
                 return f"== modules with active prompts ==\n{enabled_str}"
             case "restart":
                 await self.channel.manager.restart()
-                return "restarting.."
+                return "restarting server"
             case "stop":
                 await self.channel.manager.API.cancel()
                 return "stopped!"
@@ -561,6 +561,6 @@ core:
                                     try:
                                         return await bound_method(cmd[1:])
                                     except Exception as e:
-                                        return f"error while executing command: {e}"
+                                        core.log_error("error while executing command", e)
 
                 return "no such command! check /help"
