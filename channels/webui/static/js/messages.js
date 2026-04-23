@@ -141,13 +141,6 @@ function renderAssistantTurn(messages, index, animate) {
     msgDiv.innerHTML = html;
     highlightCode(msgDiv);
 
-    // Timestamp
-    const ts = document.createElement('span');
-    ts.className = 'timestamp timestamp-left';
-    ts.textContent = formatTime();
-    ts.innerHTML += ` <span class="index-badge">#${index}</span>`;
-    msgDiv.appendChild(ts);
-
     wrapper.appendChild(msgDiv);
 
     // Get combined content for action buttons
@@ -279,13 +272,6 @@ function renderSingleMessage(msg, index, animate) {
     if (!parsed.isAnnouncement && !parsed.isCommandOutput && !wrapperClass.includes('command')) {
         highlightCode(msgDiv);
     }
-
-    const ts = document.createElement('span');
-    ts.className = 'timestamp';
-    ts.classList.add(wrapperClass === 'user' || wrapperClass === 'user_command' ? 'timestamp-right' : (wrapperClass === 'ai' || wrapperClass === 'command_response' ? 'timestamp-left' : 'timestamp-center'));
-    ts.textContent = msg.timestamp || formatTime();
-    ts.innerHTML += ` <span class=\"index-badge\">#${index}</span>`;
-    msgDiv.appendChild(ts);
 
     wrapper.appendChild(msgDiv);
 

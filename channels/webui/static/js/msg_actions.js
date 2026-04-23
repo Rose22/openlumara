@@ -126,14 +126,35 @@ async function regenerateMessage(targetIndex) {
         }
 
         const targetMsg = messages[targetIndex];
+        
+        // If it's an assistant message, find the last message in its turn group
+        let effectiveIndex = targetIndex;
+        if (targetMsg.role === 'assistant') {
+            let i = targetIndex + 1;
+            while (i < messages.length) {
+                const nextMsg = messages[i];
+                const nextContent = String(nextMsg.content || '');
+                const nextText = nextContent.trim();
+                const isAnnouncement = nextText.startsWith('[System ');
+                const isCommandOutput = nextText.startsWith('[Command Output]:');
+                
+                if (nextMsg.role === 'tool' || (nextMsg.role === 'assistant' && !isAnnouncement && !isCommandOutput)) {
+                    effectiveIndex = i;
+                    i++;
+                } else {
+                    break;
+                }
+            }
+        }
+
         let contentToResend = '';
         let deleteIndex = -1;
 
         // Determine logic based on role
-        if (targetMsg.role === 'assistant') {
+        if (messages[effectiveIndex].role === 'assistant') {
             // CASE 1: Assistant Message
             // Find the user message that triggered this response to roll back to it
-            let userMsgIndex = targetIndex - 1;
+            let userMsgIndex = effectiveIndex - 1;
             while (userMsgIndex >= 0 && messages[userMsgIndex].role !== 'user') {
                 userMsgIndex--;
             }
@@ -146,14 +167,30 @@ async function regenerateMessage(targetIndex) {
             contentToResend = messages[userMsgIndex].content;
             deleteIndex = userMsgIndex; // Deletes from user message onwards
         }
+        else if (targetMsg.role === 'tool') {
+            // CASE 2: Tool Message (or tool response)
+            // Find the last user message and regenerate from there
+            let userMsgIndex = targetIndex - 1;
+            while (userMsgIndex >= 0 && messages[userMsgIndex].role !== 'user') {
+                userMsgIndex--;
+            }
+
+            if (userMsgIndex < 0) {
+                console.error('No user message found before this tool message');
+                return;
+            }
+
+            contentToResend = messages[userMsgIndex].content;
+            deleteIndex = userMsgIndex;
+        }
         else if (targetMsg.role === 'user') {
-            // CASE 2: User Message
+            // CASE 3: User Message
             // Delete the specific user message and prepare to re-send its content
             contentToResend = targetMsg.content;
             deleteIndex = targetIndex;
         }
         else {
-            console.error('Can only regenerate assistant or user messages');
+            console.error('Can only regenerate assistant, tool, or user messages');
             return;
         }
 
