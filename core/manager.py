@@ -71,11 +71,8 @@ class Manager:
         core.log("core", "Loading channels")
         import channels
         for channel in core.modules.load(channels, core.channel.Channel, filter=enabled_channels):
-            channel_name = core.modules.get_name(channel)
-            if channel_name not in enabled_channels:
-                continue
-
             # add an instance of the channel's class to self.channels
+            channel_name = core.modules.get_name(channel)
             self.channels[channel_name] = channel(self)
 
         # start channels (execute their .run() method)
@@ -95,32 +92,27 @@ class Manager:
             # load modules
             import modules
             for module in core.modules.load(modules, core.module.Module, filter=enabled_modules):
-                if core.modules.get_name(module) not in enabled_modules:
-                    continue
-
-                await self.add_module_class(module)
-                loaded_module = module(self)
+                loaded_module = await self.add_module_class(module)
                 await loaded_module._start()
 
                 self.modules[loaded_module.name] = loaded_module
                 loaded_module_names.append(loaded_module.name)
 
+        if enabled_user_modules:
             # load user modules
             import user_modules
             core.log("core", "Loading user modules")
             for module in core.modules.load(user_modules, core.module.Module, filter=enabled_user_modules):
-                if core.modules.get_name(module) not in enabled_user_modules:
-                    continue
-
                 loaded_module = await self.add_module_class(module, is_user_module=True)
                 await loaded_module._start()
 
                 self.modules[loaded_module.name] = loaded_module
                 loaded_module_names.append(loaded_module.name)
 
+        if enabled_modules or enabled_user_modules:
             core.log("core", f"Modules loaded: {', '.join(loaded_module_names)}")
         else:
-            core.log("core", "all modules disabled in config")
+            core.log("core", "All modules are disabled")
 
         # Attempt API connection but don't fail if it doesn't work
         await self._initialize_api_connection()
