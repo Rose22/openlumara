@@ -61,7 +61,7 @@ class Manager:
             enabled_user_modules = []
             enabled_user_modules = []
         elif self.coding_mode:
-            enabled_modules = ["coder"]
+            enabled_modules = ["coder", "openlumara_prompt"]
             enabled_user_modules = []
 
         if not enabled_channels:
