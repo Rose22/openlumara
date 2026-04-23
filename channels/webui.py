@@ -478,11 +478,12 @@ def stream_message():
                     full_history = _run_async(channel_instance.context.chat.get())
                     # Serialize the history using the existing safe serializer
                     serialized_history = [serialize_for_json(m) for m in full_history]
-
-                    yield f"data: {json.dumps({
+                    serialized_history_str = json.dumps({
                         '_meta': {'type': 'commit'},
                         'history': serialized_history
-                    })}\n\n"
+                    })
+
+                    yield f"data: {serialized_history_str}\n\n"
                 except Exception as e:
                     yield f"data: {json.dumps({'_meta': {'type': 'error'}, 'error': str(e)})}\n\n"
                 break
