@@ -23,7 +23,7 @@ default_config = {
         "custom_fields": {}
     },
     "model": {
-        "name": "MODEL_HERE",
+        "name": "",
         "temperature": 0.2,
         "reasoning_effort": "medium",
         "use_tools": True

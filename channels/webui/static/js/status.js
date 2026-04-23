@@ -141,6 +141,7 @@ async function reconnectApi() {
             apiErrorType = null;
             apiAction = null;
             updateApiStatus({ connected: true });
+            updateTokenUsage();
 
             // Show success message
             const wrapper = document.createElement('div');
@@ -204,9 +205,13 @@ function scheduleReconnect() {
     updateConnectionStatus('connecting');
 
     reconnectTimer = setTimeout(async () => {
-        await checkConnection();
-        if (!isConnected) {
-            scheduleReconnect();
+        try {
+            await checkConnection();
+            if (!isConnected) {
+                scheduleReconnect();
+            }
+        } catch (err) {
+            console.error('Reconnection attempt failed:', err);
         }
     }, delay);
 }

@@ -17,16 +17,23 @@ class Chat:
         self.channel = channel
         self.current = None
         self.current_save_path = os.path.join(core.get_data_path(), f"{self.channel.name}_current_chat")
+        self.token_usage = 0 # uses API results to cache last message's token usage
 
-        for index, chat in enumerate(self.data):
+        for index in range(len(self.data) - 1, -1, -1):
+            chat = self.data[index]
+            messages = chat.get("messages", [])
+            
             # find any blank chats and delete them
-            if not chat.get("messages"):
+            if not messages:
                 self.data.pop(index)
-
+            # find chats that only contain command/responses and delete them
+            elif self._is_command_only(messages):
+                self.data.pop(index)
             # find any missing metadata fields and add them
-            for key, default_value in self.DEFAULT_DATA.items():
-                if key not in chat.keys():
-                    self.data[index][key] = default_value
+            else:
+                for key, default_value in self.DEFAULT_DATA.items():
+                    if key not in chat.keys():
+                        self.data[index][key] = default_value
 
         # chat autoresume
         if os.path.exists(self.current_save_path) and core.config.get("core", {}).get("auto_resume_chats"):
@@ -38,6 +45,32 @@ class Chat:
                     self.current = target_index
             except Exception as e:
                 core.log_error("couldn't autoresume chat", e)
+
+    def _is_command_only(self, messages):
+        """Check if a messages array contains only user commands and command responses"""
+        if not messages:
+            return False
+        
+        cmd_prefix = core.config.get("cmd_prefix", "/")
+        
+        for msg in messages:
+            role = msg.get("role")
+            content = msg.get("content", "")
+
+            if not isinstance(content, str):
+                # this is definitely not a command or command response lol
+                continue
+
+            # User command messages start with the configured command prefix
+            if role == "user" and content.strip().startswith(cmd_prefix):
+                continue
+            # Command response messages start with [Command Output]:
+            elif role == "assistant" and content.strip().startswith("[Command Output]:"):
+                continue
+            else:
+                # Found a message that isn't a command or response
+                return False
+        return True
 
     def _set_current(self, index: int):
         self.current = index
@@ -307,10 +340,10 @@ class Chat:
             if request_too_big:
                 # the entire thing was too big including user's input! inform them
                 await self.channel.announce("Your request exceeds the max amount of tokens allowed. Please send a smaller request!", "error")
-            elif message_count_exceeded:
-                await self.channel.announce(f"You exceeded the max amount of messages set in your settings! Context size trimmed.\n\nAmount of messages: {len(messages)}\nMax messages allowed: {max_messages}", "error")
-            elif context_trimmed:
-                await self.channel.announce("Input was too large! Context size trimmed.\n\nSent tokens: {num_tokens}\nMax allowed tokens: {max_tokens}", "error")
+            # elif message_count_exceeded:
+            #     await self.channel.announce(f"You exceeded the max amount of messages set in your settings! Context size trimmed.\n\nAmount of messages: {len(messages)}\nMax messages allowed: {max_messages}", "error")
+            # elif context_trimmed:
+            #     await self.channel.announce("Input was too large! Context size trimmed.\n\nSent tokens: {num_tokens}\nMax allowed tokens: {max_tokens}", "error")
         return len(messages) <= max_messages
 
     async def _insert_blank_user_msg(self, message: dict):
@@ -339,6 +372,13 @@ class Chat:
         Counts tokens locally using tiktoken.
         Used as a fallback if the API doesn't return usage data.
         """
+        # if we have API token usage results (happens in core/channel.py),
+        # just return that
+        if self.token_usage > 0:
+            return self.token_usage
+
+        # otherwise fall back to counting with tiktoken
+
         import tiktoken
         try:
             # Try to get the specific tokenizer for the model (e.g. gpt-4)

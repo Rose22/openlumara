@@ -7,19 +7,62 @@ import stat
 import shutil
 import itertools
 import asyncio
+import importlib
 import modules.files_sandboxed
 from typing import List, Dict, Any, Optional, Union
+
+# --- Improved Tree-sitter Setup ---
+HAS_TREE_SITTER = False
+LANGUAGE_MAP = {}
 
 try:
     import tree_sitter
     from tree_sitter import Language, Parser
-    import tree_sitter_python as tspython
     HAS_TREE_SITTER = True
-    # Pre-load the python language for efficiency
-    PYTHON_LANGUAGE = tspython.language()
-except ImportError:
+
+    def _try_import_lang(mod_name, lang_key):
+        """Attempts to import a language parser and add it to the map."""
+        try:
+            mod = importlib.import_module(mod_name)
+            # tree-sitter 0.22+ returns a PyCapsule from .language()
+            # We MUST wrap it in Language() to create the expected object
+            LANGUAGE_MAP[lang_key] = Language(mod.language())
+            return True
+        except (ImportError, AttributeError):
+            return False
+
+    # Define the list of parsers we want to attempt to load
+    languages_to_attempt = [
+        ('tree_sitter_python', 'python'),
+        ('tree_sitter_javascript', 'javascript'),
+        ('tree_sitter_typescript', 'typescript'),
+        ('tree_sitter_html', 'html'),
+        ('tree_sitter_css', 'css'),
+        ('tree_sitter_cpp', 'cpp'),
+        ('tree_sitter_c_sharp', 'c-sharp'),
+        ('tree_sitter_rust', 'rust'),
+        ('tree_sitter_ruby', 'ruby'),
+        ('tree_sitter_go', 'go'),
+        ('tree_sitter_java', 'java'),
+    ]
+
+    loaded_languages = []
+    for mod_name, lang_key in languages_to_attempt:
+        if _try_import_lang(mod_name, lang_key):
+            loaded_languages.append(lang_key)
+
+    # Report status based on what was actually loaded
+    if not loaded_languages:
+        core.log("coder", "Tree-sitter is installed, but NO language parsers (e.g., tree_sitter_python) were detected.")
+    else:
+        core.log("coder", f"Tree-sitter is ENABLED. Loaded languages: {loaded_languages}")
+
+except ImportError as e:
     HAS_TREE_SITTER = False
-    PYTHON_LANGUAGE = None
+    core.log("coder", f"Tree-sitter is NOT enabled. Reason: The 'tree_sitter' core library is missing. ({e})")
+except Exception as e:
+    HAS_TREE_SITTER = False
+    core.log("coder", f"Tree-sitter setup encountered an unexpected error: {e}")
 
 class Coder(modules.files_sandboxed.SandboxedFiles):
     """Allows your AI to write, edit and test code for you."""
@@ -27,19 +70,26 @@ class Coder(modules.files_sandboxed.SandboxedFiles):
     settings = {
         "coding_style": "Write clean, well-commented code. Do not include your reasoning inside final code.",
         "sandbox_folder": "~/coder",
-        "read-only_mode": True,
+        "read-only": True,
+        "folder_blacklist": ["venv"],
+        "allow_function_adding": True,
+        "allow_function_editing": True,
+        "allow_function_deleting": True,
+        "allow_file_creation": True,
+        "allow_full_file_reads": False,
+        "allow_full_file_overwrites": False,
         "allow_code_execution": False,
-        "enable_progress_messages": False,
         "openlumara_module_creation_mode": False,
     }
 
     # Language heuristics for symbol searching and outline generation
-    LANGUAGE_CONFIG = {
+    LANGUAGE_REGEXES = {
         'python': {
             'extensions': ['.py'],
             'outline_patterns': [
                 (r'^\s*class\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'class'),
                 (r'^\s*(?:async\s+)?def\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'function'),
+                (r'^\s*[a-zA-Z_][a-zA-Z0-9_]*\s*[:=]', 'variable'),
             ],
             'body_type': 'indentation'
         },
@@ -50,6 +100,18 @@ class Coder(modules.files_sandboxed.SandboxedFiles):
                 (r'^\s*function\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'function'),
                 (r'^\s*(?:const|let|var)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=', 'variable'),
                 (r'^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*\([^)]*\)\s*=>', 'function'),
+                (r'^\s*this\.([a-zA-Z_][a-zA-Z0-9_]*)\s*=', 'variable'),
+            ],
+            'body_type': 'brace'
+        },
+        'typescript': {
+            'extensions': ['.ts', '.tsx'],
+            'outline_patterns': [
+                (r'^\s*class\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'class'),
+                (r'^\s*function\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'function'),
+                (r'^\s*(?:const|let|var)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=', 'variable'),
+                (r'^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*\([^)]*\)\s*=>', 'function'),
+                (r'^\s*this\.([a-zA-Z_][a-zA-Z0-9_]*)\s*=', 'variable'),
             ],
             'body_type': 'brace'
         },
@@ -58,9 +120,8 @@ class Coder(modules.files_sandboxed.SandboxedFiles):
             'outline_patterns': [
                 (r'^\s*class\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'class'),
                 (r'^\s*struct\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'struct'),
-                # Note: full function signatures in C++ are hard for regex, 
-                # but we can catch many common patterns
-                (r'^\s*[\w:<>\*]+\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(', 'function'),
+                (r'^\s*[\w:<>\*]+\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*[;=]', 'variable'),
+                (r'^\s*[\w:<>\*]+\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\([^)]*\)', 'function'),
             ],
             'body_type': 'brace'
         },
@@ -69,6 +130,8 @@ class Coder(modules.files_sandboxed.SandboxedFiles):
             'outline_patterns': [
                 (r'^\s*type\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+struct', 'struct'),
                 (r'^\s*func\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'function'),
+                (r'^\s*[a-zA-Z_][a-zA-Z0-9_]*\s*:=', 'variable'),
+                (r'^\s*var\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'variable'),
             ],
             'body_type': 'brace'
         },
@@ -76,11 +139,126 @@ class Coder(modules.files_sandboxed.SandboxedFiles):
             'extensions': ['.java'],
             'outline_patterns': [
                 (r'^\s*class\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'class'),
-                (r'^\s*(?:public|protected|private|static)\s+[\w<>[\]]+\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(', 'function'),
+                (r'^\s*(?:public|protected|private|static|\s)+\w+\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*[;=]', 'variable'),
+                (r'^\s*(?:public|protected|private|static|\s)+\w+\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\([^)]*\)', 'function'),
+            ],
+            'body_type': 'brace'
+        },
+        'rust': {
+            'extensions': ['.rs'],
+            'outline_patterns': [
+                (r'^\s*struct\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'struct'),
+                (r'^\s*enum\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'enum'),
+                (r'^\s*fn\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'function'),
+                (r'^\s*let\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=', 'variable'),
+            ],
+            'body_type': 'brace'
+        },
+        'ruby': {
+            'extensions': ['.rb'],
+            'outline_patterns': [
+                (r'^\s*class\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'class'),
+                (r'^\s*module\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'module'),
+                (r'^\s*def\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'function'),
+                (r'^\s*(@?[a-zA-Z_][a-zA-Z0-9_]*)\s*=', 'variable'),
+            ],
+            'body_type': 'indentation'
+        },
+        'c-sharp': {
+            'extensions': ['.cs'],
+            'outline_patterns': [
+                (r'^\s*class\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'class'),
+                (r'^\s*(?:public|private|protected|internal|static|\s)+\w+\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*[;=]', 'variable'),
+                (r'^\s*(?:public|private|protected|internal|static|\s)+\w+\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\([^)]*\)', 'function'),
             ],
             'body_type': 'brace'
         }
     }
+
+
+    # Mapping extensions to language keys
+    LANGUAGE_CONFIG = {
+        'python': {'extensions': ['.py']},
+        'javascript': {'extensions': ['.js', '.ts', '.jsx', '.tsx']},
+        'typescript': {'extensions': ['.ts', '.tsx']},
+        'html': {'extensions': ['.html']},
+        'css': {'extensions': ['.css']},
+        'cpp': {'extensions': ['.cpp', '.c', '.h', '.hpp', '.cc']},
+        'c-sharp': {'extensions': ['.cs']},
+        'rust': {'extensions': ['.rs']},
+        'ruby': {'extensions': ['.rb']},
+        'go': {'extensions': ['.go']},
+        'java': {'extensions': ['.java']}
+    }
+
+    # AST Node Type -> Symbol Type mapping
+    SYMBOL_MAP = {
+        'python': {
+            'class_definition': 'class',
+            'function_definition': 'function',
+            'assignment': 'variable',
+            'name': 'variable'
+        },
+        'javascript': {
+            'class_declaration': 'class',
+            'function_declaration': 'function',
+            'method_definition': 'method',
+            'arrow_function': 'function',
+            'variable_declarator': 'variable',
+            'property_identifier': 'variable'
+        },
+        'typescript': {
+            'class_declaration': 'class',
+            'function_declaration': 'function',
+            'method_definition': 'method',
+            'variable_declarator': 'variable',
+            'property_identifier': 'variable'
+        },
+        'cpp': {
+            'class_specifier': 'class',
+            'struct_specifier': 'struct',
+            'function_definition': 'function',
+            'method_definition': 'method',
+            'declaration': 'variable',
+            'field_declaration': 'variable'
+        },
+        'go': {
+            'type_declaration': 'struct',
+            'function_declaration': 'function',
+            'method_declaration': 'method',
+            'value_spec': 'variable',
+            'short_var_declaration': 'variable'
+        },
+        'java': {
+            'class_declaration': 'class',
+            'method_declaration': 'method',
+            'constructor_declaration': 'method',
+            'field_declaration': 'variable',
+            'variable_declarator': 'variable'
+        },
+        'rust': {
+            'struct_item': 'struct',
+            'enum_item': 'enum',
+            'fn': 'function',
+            'impl_item': 'impl',
+            'let_binding': 'variable',
+            'field_declaration': 'variable'
+        },
+        'ruby': {
+            'class': 'class',
+            'module': 'module',
+            'def': 'function',
+            'lvascribable': 'variable',
+            'ivascribable': 'variable'
+        },
+        'c-sharp': {
+            'class_declaration': 'class',
+            'method_declaration': 'method',
+            'field_declaration': 'variable',
+            'variable_declarator': 'variable'
+        }
+    }
+
 
     OPENLUMARA_MODULE_PROMPT = """
 To create modules for OpenLumara, follow this spec:
@@ -149,7 +327,7 @@ class YourClassName(core.module.Module):
         "<name> <profile>": "set <name>'s profile to <profile>"
     })
     async def my_command(self, args: list):
-        # arguments is 0-indexed. args[0] is the first argument, not the name of the command
+        # arguments is 0-indexed. args[0] is not the name of the command, but the first argument
         match len(args):
             case 0:
                 return self.saved_dict.keys()
@@ -166,6 +344,35 @@ class YourClassName(core.module.Module):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.path = self.sandbox_path
+
+        # disable any tools that were disabled via config
+        if self.config.get("read-only"):
+            self.disabled_tools.append("create_project")
+
+        if not self.config.get("allow_function_adding") or self.config.get("read-only"):
+            self.disabled_tools.append("add_symbol_before")
+
+        if not self.config.get("allow_function_editing") or self.config.get("read-only"):
+            self.disabled_tools.append("edit_symbol_content")
+
+        if not self.config.get("allow_function_deleting") or self.config.get("read-only"):
+            self.disabled_tools.append("delete_symbol")
+
+        if not self.config.get("allow_file_creation") or self.config.get("read-only"):
+            self.disabled_tools.append("create_file")
+
+        if not self.config.get("allow_full_file_reads") or self.config.get("read-only"):
+            self.disabled_tools.append("read_file")
+
+        if not self.config.get("allow_full_file_overwrites") or self.config.get("read-only"):
+            self.disabled_tools.append("overwrite_file")
+
+        if not self.config.get("allow_code_execution"):
+            self.disabled_tools.append("execute")
+
+        # disable search if treesitter is available
+        if HAS_TREE_SITTER:
+            self.disabled_tools.append("search")
 
     def _get_language_from_ext(self, file_path_str: str) -> str:
         ext = os.path.splitext(file_path_str)[1].lower()
@@ -192,7 +399,7 @@ class YourClassName(core.module.Module):
 
                 project_list.append(filename)
 
-            output += f"## Current projects in sandbox\n"
+            output += "## Current projects in sandbox\n"
             if not project_list:
                 output += "No projects yet."
 
@@ -212,28 +419,45 @@ class YourClassName(core.module.Module):
         rel_path = os.path.join(project_name, *file_path)
         return self._get_sandbox_path(rel_path)
 
-    async def list_project(self, project_name: str, depth_limit: int = 3):
+    async def list_full_project_tree(self, project_name: str, depth_limit: int = 3):
         """
-        Returns a recursive tree representation of the project structure (directories only).
-        Structure: [name, [children]]
+        Returns a recursive tree representation of the project structure.
+        Structure:
+        {
+           "root": ["file1.py", "file2.md"],
+           "subfolder": ["file1.txt", "file2.txt", {"another_subfolder": ["subfile1.txt", "subfile2.txt"]}]
+        }
         """
         project_path = self._get_project_path(project_name)
         if not os.path.exists(project_path):
             return self.result("project does not exist", False)
 
         def _build_tree(path, current_depth):
-            name = os.path.basename(os.path.normpath(path))
-            children = []
+            is_dir = os.path.isdir(path)
+            if not is_dir:
+                return os.path.basename(path)
 
-            if current_depth < depth_limit:
-                try:
-                    for entry in os.scandir(path):
-                        if entry.is_dir():
-                            children.append(_build_tree(entry.path, current_depth + 1))
-                except Exception:
-                    pass
+            contents = []
+            try:
+                for entry in os.scandir(path):
+                    if entry.is_file():
+                        contents.append(entry.name)
+                    elif entry.is_dir():
+                        if entry.name in self.config.get("folder_blacklist"):
+                            continue
+                        if entry.name[0] == '.':
+                            continue
 
-            return [name, children]
+                        if current_depth < depth_limit:
+                            contents.append({entry.name: _build_tree(entry.path, current_depth + 1)})
+                        else:
+                            contents.append(entry.name)
+            except Exception:
+                pass
+
+            if current_depth == 0:
+                return {"root": contents}
+            return contents
 
         try:
             tree = _build_tree(project_path, 0)
@@ -241,7 +465,7 @@ class YourClassName(core.module.Module):
         except Exception as e:
             return self.result(f"error: {e}", False)
 
-    async def list_project_contents(self, project_name: str, sub_path: list = None):
+    async def list_project_folder(self, project_name: str, sub_path: list = None):
         """
         Lists the immediate contents of a specific path within a project.
         This is non-recursive.
@@ -263,43 +487,25 @@ class YourClassName(core.module.Module):
         except Exception as e:
             return self.result(f"error: {e}", False)
 
-    async def create_project(self, project_name: str, file_structure: dict):
+    async def create_file(self, project_name: str, file_path: list, content: str):
         """
-        Creates an entire project structure in one go!
+        Creates a new file within a project. Fails if the file already exists.
         """
         if self.config.get("read-only_mode"):
             return self.result("User has disabled file modification. Provide the code directly to user.", False)
 
-        async def _build_structure(current_path: str, structure: dict):
-            for name, content in structure.items():
-                if name == "root":
-                    target_path = current_path
-                else:
-                    target_path = os.path.join(current_path, name)
+        file_path_str = self._get_file_path(project_name, file_path)
 
-                if isinstance(content, dict):
-                    os.makedirs(target_path, exist_ok=True)
-                    if self.config.get("enable_progress_messages"):
-                        await self.manager.channel.announce(f"Created directory: {target_path}")
-                    await _build_structure(target_path, content)
-                elif isinstance(content, list):
-                    os.makedirs(target_path, exist_ok=True)
-                    for filename in content:
-                        file_path = os.path.join(target_path, filename)
-                        with open(file_path, "w") as f:
-                            pass
-                        if self.config.get("enable_progress_messages"):
-                            await self.manager.channel.announce(f"Created file: {file_path}")
-
-        base_path = self._get_project_path(project_name)
+        import os
+        if os.path.exists(file_path_str):
+            return self.result(f"error: file already exists at {file_path_str}", False)
 
         try:
-            os.makedirs(base_path, exist_ok=True)
-            await self.manager.channel.announce(f"Initializing project: {project_name} at {base_path}")
-            await _build_structure(base_path, file_structure)
-            await self.manager.channel.announce("Project structure creation complete.")
-        except OSError as e:
-            await self.manager.channel.announce(f"Error creating project structure: {e}")
+            with open(file_path_str, "w") as f:
+                f.write(content)
+            return self.result(True)
+        except Exception as e:
+            return self.result(f"error: {e}", False)
 
     async def read_file(self, project_name: str, file_path: list):
         """
@@ -316,84 +522,10 @@ class YourClassName(core.module.Module):
 
         return self.result(result)
 
-    async def edit_file(self, project_name: str, file_path: list, edits: list = None):
-        """
-        Edits a file within a project using targeted replacements.
-        """
-        if self.config.get("read-only_mode"):
-            return self.result("User has disabled file modification. Provide the code directly to user.", False)
-
-        file_path_str = self._get_file_path(project_name, file_path)
-        if not os.path.exists(file_path_str):
-            return self.result("file does not exist!", False)
-
-        try:
-            with open(file_path_str, 'rb') as f:
-                raw_bytes = f.read()
-
-            bom = b''
-            if raw_bytes.startswith(b'\xef\xbb\xbf'):
-                bom = b'\xef\xbb\xbf'
-                content = raw_bytes[len(bom):].decode('utf-8')
-            else:
-                content = raw_bytes.decode('utf-8')
-
-            original_is_crlf = '\r\n' in content
-            normalized_content = content.replace('\r\n', '\n')
-
-            if not edits:
-                return self.result("No edits provided.", False)
-
-            replacement_points = []
-            for edit in edits:
-                old_t = edit.get('old_text')
-                new_t = edit.get('new_text')
-                if not old_t or new_t is None:
-                    continue
-
-                start_idx = 0
-                while True:
-                    idx = normalized_content.find(old_t, start_idx)
-                    if idx == -1:
-                        break
-                    replacement_points.append({
-                        'start': idx,
-                        'end': idx + len(old_t),
-                        'new_text': new_t
-                    })
-                    start_idx = idx + len(old_t)
-
-            replacement_points.sort(key=lambda x: x['start'], reverse=True)
-
-            working_content = normalized_content
-            for point in replacement_points:
-                working_content = (
-                    working_content[:point['start']] +
-                    point['new_text'] +
-                    working_content[point['end']:]
-                )
-
-            if original_is_crlf:
-                final_content = working_content.replace('\n', '\r\n')
-            else:
-                final_content = working_content
-
-            with open(file_path_str, 'wb') as f:
-                f.write(bom)
-                f.write(final_content.encode('utf-8'))
-
-            return self.result(f"Successfully replaced {len(edits)} block(s) in {'.'.join(file_path)}.")
-
-        except Exception as e:
-            return self.result(f"error: {e}", False)
-
     async def overwrite_file(self, project_name: str, file_path: list, content: str):
         """
         Writes to a file within a project.
         """
-        if self.config.get("read-only_mode"):
-            return self.result("User has disabled file modification. Provide the code directly to user.", False)
-
         file_path_str = self._get_file_path(project_name, file_path)
 
         try:
@@ -403,10 +535,752 @@ class YourClassName(core.module.Module):
         except Exception as e:
             return self.result(f"error: {e}", False)
 
+    async def execute(self, project_name: str, file_path: list, timeout: int = 30):
+        """
+        executes a file within a project.
+        """
+        file_path_str = self._get_file_path(project_name, file_path)
+        if not os.path.exists(file_path_str):
+            return self.result("file does not exist!", False)
+
+        os.chmod(file_path_str, os.stat(file_path_str).st_mode | stat.S_IEXEC)
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                file_path_str,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+
+            try:
+                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+                stdout_str = stdout.decode().strip()
+                stderr_str = stderr.decode().strip()
+
+                if proc.returncode != 0:
+                    error_msg = stderr_str if stderr_str else f"Process exited with code {proc.returncode}"
+                    return self.result(f"Error (exit code {proc.returncode}):\\n{error_msg}", False)
+                
+                return self.result(stdout_str)
+            except asyncio.TimeoutError:
+                try:
+                    proc.kill()
+                    await proc.wait()
+                except:
+                    pass
+                return self.result(f"Execution timed out after {timeout} seconds", False)
+        except Exception as e:
+            return self.result(f"error: {e}", False)
+
+    async def get_outline(self, project_name: str, file_path: list, language: str = None) -> List[Dict[str, Any]]:
+        """
+        Returns a list of symbols (classes, functions, etc.) using Tree-sitter if available,
+        otherwise falling back to regex.
+        """
+        file_path_str = self._get_file_path(project_name, file_path)
+        if not os.path.exists(file_path_str):
+            return self.result("file does not exist", False)
+
+        if not language:
+            language = self._get_language_from_ext(file_path_str)
+
+        # 1. Try Tree-sitter
+        if HAS_TREE_SITTER and language in LANGUAGE_MAP:
+            try:
+                parser = Parser(LANGUAGE_MAP[language])
+                with open(file_path_str, 'rb') as f:
+                    source_bytes = f.read()
+
+                tree = parser.parse(source_bytes)
+                symbols = []
+                self._walk_for_symbols(tree.root_node, language, symbols)
+                symbols.sort(key=lambda x: x['line'])
+
+                # Return only name and type as requested
+                return self.result([{"name": s["name"], "type": s["type"]} for s in symbols])
+            except Exception as e:
+                core.log("coder", f"Couldn't use tree-sitter! Falling back to regex: {e}")
+                pass # Fallback to regex
+
+        # 2. Fallback to Regex
+        patterns = []
+        # We look in LANGUAGE_REGEXES because that's where the patterns are actually stored
+        regex_config = self.LANGUAGE_REGEXES.get(language)
+        if regex_config and 'outline_patterns' in regex_config:
+            patterns = regex_config['outline_patterns']
+        else:
+            # Generic fallback patterns
+            patterns = [
+                (r'^\s*class\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'class'),
+                (r'^\s*(?:async\s+)?def\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'function'),
+                (r'^\s*function\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'function'),
+                (r'^\s*[a-zA-Z_][a-zA-Z0-9_]*\s*=\s*[^=]', 'variable'),
+            ]
+
+        try:
+            with open(file_path_str, 'r') as f:
+                lines = f.readlines()
+            outline = []
+            for idx, line in enumerate(lines):
+                for pattern, sym_type in patterns:
+                    match = re.search(pattern, line)
+                    if match:
+                        outline.append({
+                            "name": match.group(1),
+                            "type": sym_type
+                        })
+                        break
+            return self.result(outline)
+        except Exception as e:
+            return self.result(f"error: {e}", False)
+
+    def _walk_for_symbols(self, node, language, symbols, prefix=""):
+        """Recursive tree walker for Tree-sitter nodes."""
+        target_types = self.SYMBOL_MAP.get(language, {})
+
+        if node.type in target_types:
+            sym_type = target_types[node.type]
+            name = None
+
+            # Search children for the identifier/name of the symbol
+            for child in node.children:
+                if child.type in ['identifier', 'property_identifier', 'name', 'field_identifier']:
+                    try:
+                        name = child.text.decode('utf-8')
+                        break
+                    except:
+                        continue
+
+            if name:
+                full_name = f"{prefix}{name}"
+                symbols.append({
+                    'name': full_name,
+                    'type': sym_type,
+                    'line': node.start_point[0] + 1
+                })
+                # For children, use this symbol's name as prefix
+                for child in node.children:
+                    self._walk_for_symbols(child, language, symbols, prefix=f"{full_name}.")
+                return # We've already explored descendants with the prefix
+
+        for child in node.children:
+            self._walk_for_symbols(child, language, symbols, prefix=prefix)
+
+    def _find_symbol_line(self, file_path_str: str, symbol_name: str, language: str) -> int:
+        """Helper to find the line number of a symbol by its name."""
+        # 1. Try Tree-sitter
+        if HAS_TREE_SITTER and language in LANGUAGE_MAP:
+            try:
+                parser = Parser(LANGUAGE_MAP[language])
+                with open(file_path_str, 'rb') as f:
+                    source_bytes = f.read()
+                tree = parser.parse(source_bytes)
+
+                target_node = None
+                parts = symbol_name.split('.')
+
+                def find_node(node, parts_to_match):
+                    nonlocal target_node
+                    if target_node or not parts_to_match:
+                        return
+
+                    current_part = parts_to_match[0]
+                    remaining_parts = parts_to_match[1:]
+
+                    # Check if this node is a symbol and matches current_part
+                    if node.type in self.SYMBOL_MAP.get(language, {}):
+                        for child in node.children:
+                            if child.type in ['identifier', 'property_identifier', 'name', 'field_identifier']:
+                                try:
+                                    if child.text.decode('utf-8') == current_part:
+                                        if not remaining_parts:
+                                            target_node = node
+                                            return
+                                        else:
+                                            # Search within this node for the rest of the parts
+                                            for next_child in node.children:
+                                                find_node(next_child, remaining_parts)
+                                            return
+                                except:
+                                    continue
+
+                    # Search children for the current part
+                    for child in node.children:
+                        find_node(child, parts_to_match)
+
+                find_node(tree.root_node, parts)
+                if target_node:
+                    return target_node.start_point[0] + 1
+            except Exception:
+                pass
+
+        # 2. Fallback to Regex
+        parts = symbol_name.split('.')
+        last_part = parts[-1]
+        config = self.LANGUAGE_CONFIG.get(language)
+        patterns = []
+        if config and 'outline_patterns' in config:
+            patterns = config['outline_patterns']
+        else:
+            # Generic fallback patterns
+            patterns = [
+                (r'^\s*class\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'class'),
+                (r'^\s*(?:async\s+)?def\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'function'),
+                (r'^\s*function\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'function'),
+            ]
+
+        try:
+            with open(file_path_str, 'r') as f:
+                for idx, line in enumerate(f):
+                    for pattern, sym_type in patterns:
+                        match = re.search(pattern, line)
+                        if match and match.group(1) == last_part:
+                            return idx + 1
+        except Exception:
+            pass
+
+        return None
+
+    async def get_symbols(self, project_name: str, file_path: list, symbols: list, language: str = None) -> dict:
+        """
+        Returns the code blocks for multiple symbols.
+        Symbols are functions, variables, etc.
+
+        Returns a dict mapping symbol names to their content bodies.
+
+        Args:
+            symbols: list of symbol names to retrieve.
+        """
+        results = {}
+        for name in symbols:
+            file_path_str = self._get_file_path(project_name, file_path)
+            if not os.path.exists(file_path_str):
+                results[name] = "file does not exist"
+                continue
+
+            if not language:
+                language = self._get_language_from_ext(file_path_str)
+
+            line_number = self._find_symbol_line(file_path_str, name, language)
+            if not line_number:
+                results[name] = f"symbol '{name}' not found", False
+                continue
+
+            # 1. Try Tree-sitter
+            if HAS_TREE_SITTER and language in LANGUAGE_MAP:
+                try:
+                    from tree_sitter import Parser
+                    parser = Parser(LANGUAGE_MAP[language])
+                    with open(file_path_str, 'rb') as f:
+                        source_bytes = f.read()
+
+                    tree = parser.parse(source_bytes)
+                    target_row = line_number - 1
+
+                    candidate_nodes = []
+                    def find_nodes(node):
+                        if node.start_point[0] <= target_row <= node.end_point[0]:
+                            node_type = node.type
+                            if node_type in self.SYMBOL_MAP.get(language, {}):
+                                candidate_nodes.append(node)
+                        for child in node.children:
+                            find_nodes(child)
+
+                    find_nodes(tree.root_node)
+
+                    if candidate_nodes:
+                        best_node = min(candidate_nodes, key=lambda n: n.end_byte - n.start_byte)
+                        results[name] = source_bytes[best_node.start_byte:best_node.end_byte].decode('utf-8')
+                        continue
+                    else:
+                        core.log("coder", "[DEBUG] Tree-sitter found 0 matching symbols for this line. Falling back.")
+                except Exception as e:
+                    core.log("coder", f"Couldn't use tree-sitter! Falling back to regex: {e}")
+                    pass
+            elif language not in LANGUAGE_MAP:
+                core.log("coder", f"Couldn't use tree-sitter! Language '{language}' not supported.")
+
+            # 2. Fallback to original Indentation/Brace logic
+            config = self.LANGUAGE_CONFIG.get(language)
+            body_type = config.get('body_type', 'brace') if config else 'brace'
+
+            try:
+                with open(file_path_str, 'r') as f:
+                    lines = f.readlines()
+
+                if not (1 <= line_number <= len(lines)):
+                    results[name] = "line number out of range"
+                    continue
+
+                start_idx = line_number - 1
+
+                if body_type == 'indentation':
+                    def get_indent(l): return len(l) - len(l.lstrip())
+                    base_indent = get_indent(lines[start_idx])
+                    end_idx = start_idx + 1
+                    for i in range(start_idx + 1, len(lines)):
+                        line = lines[i]
+                        if not line.strip() or line.strip().startswith('#'): continue
+                        if get_indent(line) <= base_indent: break
+                        end_idx = i + 1
+                    body_lines = lines[start_idx:end_idx]
+                else:
+                    brace_found = False
+                    start_brace_idx = -1
+                    for i in range(start_idx, len(lines)):
+                        if '{' in lines[i]:
+                            start_brace_idx = i
+                            brace_found = True
+                            break
+                    if not brace_found:
+                        results[name] = "".join(lines[start_idx:start_idx+1])
+                        continue
+
+                    brace_count = 0
+                    end_idx = len(lines)
+                    for i in range(start_brace_idx, len(lines)):
+                        line = lines[i]
+                        brace_count += line.count('{')
+                        brace_count -= line.count('}')
+                        if brace_count <= 0:
+                            end_idx = i + 1
+                            break
+                    body_lines = lines[start_idx:end_idx]
+
+                results[name] = "".join(body_lines)
+            except Exception as e:
+                results[name] = f"error: {e}"
+
+        return self.result(results)
+
+    async def edit_symbol(self, project_name: str, file_path: list, symbol_name: str, new_content: str, language: str = None) -> bool:
+        """
+        Replaces the content of a symbol with new content.
+        Uses the same logic as get_symbol_body to identify the symbol's boundaries.
+
+        Args:
+            project_name: Name of the project.
+            file_path: List representing the path to the file.
+            symbol_name: Name of the symbol.
+            new_content: The new string content to place in the symbol.
+            language: Optional language identifier.
+        """
+        file_path_str = self._get_file_path(project_name, file_path)
+        if not os.path.exists(file_path_str):
+            return False
+
+        if not language:
+            language = self._get_language_from_ext(file_path_str)
+
+        line_number = self._find_symbol_line(file_path_str, symbol_name, language)
+        if not line_number:
+            return False
+
+        # remove any extra whitespace
+        new_content = new_content.strip()
+
+        # 1. Try Tree-sitter for precise byte-level replacement
+        if HAS_TREE_SITTER and language in LANGUAGE_MAP:
+            try:
+                from tree_sitter import Parser
+                parser = Parser(LANGUAGE_MAP[language])
+                with open(file_path_str, 'rb') as f:
+                    source_bytes = f.read()
+
+                tree = parser.parse(source_bytes)
+                target_row = line_number - 1
+
+                candidate_nodes = []
+                def find_nodes(node):
+                    if node.start_point[0] <= target_row <= node.end_point[0]:
+                        if node.type in self.SYMBOL_MAP.get(language, {}):
+                            candidate_nodes.append(node)
+                    for child in node.children:
+                        find_nodes(child)
+
+                find_nodes(tree.root_node)
+
+                if candidate_nodes:
+                    # Pick the \"tightest\" node (the one with the smallest byte range)
+                    best_node = min(candidate_nodes, key=lambda n: n.end_byte - n.start_byte)
+                    start_byte = best_node.start_byte
+                    end_byte = best_node.end_byte
+
+                    # Perform the replacement in bytes to preserve exact encoding/spacing
+                    new_content_bytes = new_content.encode('utf-8')
+                    updated_bytes = source_bytes[:start_byte] + new_content_bytes + source_bytes[end_byte:]
+
+                    with open(file_path_str, 'wb') as f:
+                        f.write(updated_bytes)
+                    return True
+            except Exception as e:
+                core.log("coder", f"Couldn't use tree-sitter: {e}")
+                pass
+
+        # 2. Fallback to line-based replacement matching get_symbol_body's logic
+        try:
+            with open(file_path_str, 'r') as f:
+                lines = f.readlines()
+
+            if not (1 <= line_number <= len(lines)):
+                return False
+
+            config = self.LANGUAGE_CONFIG.get(language)
+            body_type = config.get('body_type', 'brace') if config else 'brace'
+
+            start_idx = line_number - 1
+            end_idx = -1
+
+            if body_type == 'indentation':
+                def get_indent(l): return len(l) - len(l.lstrip())
+                base_indent = get_indent(lines[start_idx])
+                end_idx = start_idx + 1
+                for i in range(start_idx + 1, len(lines)):
+                    line = lines[i]
+                    if not line.strip() or line.strip().startswith('#'):
+                        continue
+                    if get_indent(line) <= base_indent:
+                        break
+                    end_idx = i + 1
+            else:
+                # Brace-based logic
+                brace_found = False
+                start_brace_idx = -1
+                for i in range(start_idx, len(lines)):
+                    if '{' in lines[i]:
+                        start_brace_idx = i
+                        brace_found = True
+                        break
+
+                if not brace_found:
+                    end_idx = start_idx + 1
+                else:
+                    brace_count = 0
+                    end_idx = len(lines)
+                    for i in range(start_brace_idx, len(lines)):
+                        line = lines[i]
+                        brace_count += line.count('{')
+                        brace_count -= line.count('}')
+                        if brace_count <= 0:
+                            end_idx = i + 1
+                            break
+
+            # Final safety check for end_idx
+            if end_idx == -1:
+                end_idx = start_idx + 1
+
+            # Split new content into lines, preserving line endings
+            new_lines = new_content.splitlines(keepends=True)
+            if not new_lines:
+                new_lines = [""]
+
+            # Replace the identified slice of lines with the new content
+            lines[start_idx:end_idx] = new_lines
+
+            with open(file_path_str, 'w') as f:
+                f.writelines(lines)
+            return True
+
+        except Exception as e:
+            core.log("coder", f"Couldn't use tree-sitter: {e}")
+            return False
+
+    async def add_symbol_before(self, project_name: str, file_path: list, target_symbol_name: str, name: str, content_body: str, language: str = None) -> bool:
+        """
+        Inserts a new symbol (function or method) before the target symbol.
+
+        Args:
+            project_name: Name of the project.
+            file_path: List representing the path to the file.
+            target_symbol_name: The name of the symbol to insert before.
+            name: The name of the new symbol.
+            content_body: The content of the new symbol. If it doesn't contain a definition, one will be constructed.
+            language: Optional language identifier.
+        """
+        file_path_str = self._get_file_path(project_name, file_path)
+        if not os.path.exists(file_path_str):
+            return False
+
+        if not language:
+            language = self._get_language_from_ext(file_path_str)
+
+        # 1. Find the line number of the target symbol
+        line_number = self._find_symbol_line(file_path_str, target_symbol_name, language)
+        if not line_number:
+            return False
+
+        try:
+            with open(file_path_str, 'r') as f:
+                lines = f.readlines()
+
+            # 2. Determine indentation of the target symbol to match it
+            target_line = lines[line_number - 1]
+            indent_len = len(target_line) - len(target_line.lstrip())
+            indent_str = " " * indent_len
+
+            # 3. Construct the new symbol content
+            stripped_body = content_body.strip()
+            is_method = "." in target_symbol_name
+
+            # If it's a method, we must ensure the whole definition is indented.
+            if is_method:
+                body_lines = content_body.splitlines(keepends=True)
+                new_symbol = "".join([f"{indent_str}{line}" for line in body_lines])
+            else:
+                new_symbol = content_body
+
+            # Ensure the new symbol ends with a newline for clean insertion
+            if not new_symbol.endswith('\n'):
+                new_symbol += '\n'
+            new_symbol += '\n' # and an extra one for better separation
+
+            # 4. Insert the new symbol into the lines list before the target line
+            lines.insert(line_number - 1, new_symbol)
+
+            with open(file_path_str, 'w') as f:
+                f.writelines(lines)
+            return True
+
+        except Exception as e:
+            # Assuming 'core' is available in the namespace as seen in other methods
+            try:
+                import core
+                core.log("coder", f"Error in add_symbol_before: {e}")
+            except:
+                print(f"Error in add_symbol_before: {e}")
+            return False
+
+
+    async def add_symbol_after(self, project_name: str, file_path: list, target_symbol_name: str, name: str, content_body: str, language: str = None) -> bool:
+        """
+        Inserts a new symbol (function or method) after the target symbol.
+
+        Args:
+            project_name: Name of the project.
+            file_path: List representing the path to the file.
+            target_symbol_name: The name of the symbol to insert after.
+            name: The name of the new symbol.
+            content_body: The content of the new symbol. If it doesn't contain a definition, one will be constructed.
+            language: Optional language identifier.
+        """
+        file_path_str = self._get_file_path(project_name, file_path)
+        if not os.path.exists(file_path_str):
+            return False
+
+        if not language:
+            language = self._get_language_from_ext(file_path_str)
+
+        # 1. Find the line number of the target symbol
+        line_number = self._find_symbol_line(file_path_str, target_symbol_name, language)
+        if not line_number:
+            return False
+
+        try:
+            with open(file_path_str, 'r') as f:
+                lines = f.readlines()
+
+            # 2. Determine the end line of the target symbol
+            config = self.LANGUAGE_CONFIG.get(language)
+            body_type = config.get('body_type', 'brace') if config else 'brace'
+
+            start_idx = line_number - 1
+            end_idx = -1
+
+            if body_type == 'indentation':
+                def get_indent(l): return len(l) - len(l.lstrip())
+                base_indent = get_indent(lines[start_idx])
+                end_idx = start_idx + 1
+                for i in range(start_idx + 1, len(lines)):
+                    line = lines[i]
+                    if not line.strip() or line.strip().startswith('#'):
+                        continue
+                    if get_indent(line) <= base_indent:
+                        break
+                    end_idx = i + 1
+            else:
+                # Brace-based logic
+                brace_found = False
+                start_brace_idx = -1
+                for i in range(start_idx, len(lines)):
+                    if '{' in lines[i]:
+                        start_brace_idx = i
+                        brace_found = True
+                        break
+
+                if not brace_found:
+                    end_idx = start_idx + 1
+                else:
+                    brace_count = 0
+                    end_idx = len(lines)
+                    for i in range(start_brace_idx, len(lines)):
+                        line = lines[i]
+                        brace_count += line.count('{')
+                        brace_count -= line.count('}')
+                        if brace_count <= 0:
+                            end_idx = i + 1
+                            break
+
+            if end_idx == -1:
+                end_idx = start_idx + 1
+
+            # 3. Determine indentation of the target symbol to match it
+            target_line = lines[line_number - 1]
+            indent_len = len(target_line) - len(target_line.lstrip())
+            indent_str = " " * indent_len
+
+            # 4. Construct the new symbol content
+            stripped_body = content_body.strip()
+            is_method = "." in target_symbol_name
+
+            if is_method:
+                body_lines = content_body.splitlines(keepends=True)
+                new_symbol = "".join([f"{indent_str}{line}" for line in body_lines])
+            else:
+                new_symbol = content_body
+
+            # Ensure the new symbol ends with a newline for clean insertion
+            if not new_symbol.endswith('\n'):
+                new_symbol += '\n'
+            new_symbol += '\n' # and an extra one for better separation
+
+            # 5. Insert the new symbol into the lines list after the target symbol
+            lines.insert(end_idx, new_symbol)
+
+            with open(file_path_str, 'w') as f:
+                f.writelines(lines)
+            return True
+
+        except Exception as e:
+            try:
+                import core
+                core.log("coder", f"Error in add_symbol_after: {e}")
+            except:
+                print(f"Error in add_symbol_after: {e}")
+            return False
+
+    async def delete_symbol(self, project_name: str, file_path: list, symbol_name: str, language: str = None) -> bool:
+        """
+        Deletes a symbol from a file.
+        """
+        file_path_str = self._get_file_path(project_name, file_path)
+        if not os.path.exists(file_path_str):
+            return False
+
+        if not language:
+            language = self._get_language_from_ext(file_path_str)
+
+        line_number = self._find_symbol_line(file_path_str, symbol_name, language)
+        if not line_number:
+            return False
+
+        # 1. Try Tree-sitter for precise byte-level removal
+        if HAS_TREE_SITTER and language in LANGUAGE_MAP:
+            try:
+                from tree_sitter import Parser
+                parser = Parser(LANGUAGE_MAP[language])
+                with open(file_path_str, 'rb') as f:
+                    source_bytes = f.read()
+
+                tree = parser.parse(source_bytes)
+                target_row = line_number - 1
+
+                candidate_nodes = []
+                def find_nodes(node):
+                    if node.start_point[0] <= target_row <= node.end_point[0]:
+                        if node.type in self.SYMBOL_MAP.get(language, {}):
+                            candidate_nodes.append(node)
+                    for child in node.children:
+                        find_nodes(child)
+
+                find_nodes(tree.root_node)
+
+                if candidate_nodes:
+                    best_node = min(candidate_nodes, key=lambda n: n.end_byte - n.start_byte)
+                    start_byte = best_node.start_byte
+                    end_byte = best_node.end_byte
+
+                    updated_bytes = source_bytes[:start_byte] + source_bytes[end_byte:]
+
+                    with open(file_path_str, 'wb') as f:
+                        f.write(updated_bytes)
+                    return True
+            except Exception as e:
+                try:
+                    import core
+                    core.log("coder", f"Couldn't use tree-sitter for delete: {e}")
+                except:
+                    pass
+
+        # 2. Fallback to line-based removal
+        try:
+            with open(file_path_str, 'r') as f:
+                lines = f.readlines()
+
+            if not (1 <= line_number <= len(lines)):
+                return False
+
+            config = self.LANGUAGE_CONFIG.get(language)
+            body_type = config.get('body_type', 'brace') if config else 'brace'
+
+            start_idx = line_number - 1
+            end_idx = -1
+
+            if body_type == 'indentation':
+                def get_indent(l): return len(l) - len(l.lstrip())
+                base_indent = get_indent(lines[start_idx])
+                end_idx = start_idx + 1
+                for i in range(start_idx + 1, len(lines)):
+                    line = lines[i]
+                    if not line.strip() or line.strip().startswith('#'):
+                        continue
+                    if get_indent(line) <= base_indent:
+                        break
+                    end_idx = i + 1
+            else:
+                # Brace-based logic
+                brace_found = False
+                start_brace_idx = -1
+                for i in range(start_idx, len(lines)):
+                    if '{' in lines[i]:
+                        start_brace_idx = i
+                        brace_found = True
+                        break
+
+                if not brace_found:
+                    end_idx = start_idx + 1
+                else:
+                    brace_count = 0
+                    end_idx = len(lines)
+                    for i in range(start_brace_idx, len(lines)):
+                        line = lines[i]
+                        brace_count += line.count('{')
+                        brace_count -= line.count('}')
+                        if brace_count <= 0:
+                            end_idx = i + 1
+                            break
+
+            if end_idx == -1:
+                end_idx = start_idx + 1
+
+            del lines[start_idx:end_idx]
+
+            with open(file_path_str, 'w') as f:
+                f.writelines(lines)
+            return True
+
+        except Exception as e:
+            try:
+                import core
+                core.log("coder", f"Error in delete_symbol: {e}")
+            except:
+                pass
+            return False
+
     async def search(self, project_name: str, file_path: list, query: str, context_lines: int = 5, max_matches: int = 10, use_regex: bool = False):
         """
         Search for a query within the file and return snippets with line numbers and context.
         """
+        # only use this when treesitter is not available, since searching manually is inferior
+
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
             return self.result("file does not exist!", False)
@@ -429,202 +1303,39 @@ class YourClassName(core.module.Module):
             for i, line in enumerate(lines):
                 line_num = i + 1
                 match_found = False
-                
+
                 if use_regex:
                     if pattern.search(line):
                         match_found = True
                 else:
                     if query_lower in line.lower():
                         match_found = True
-                
+
                 if match_found:
                     snippet = [f"--- Match at line {line_num} ---"]
-                    
+
                     start_idx = max(0, i - context_lines)
                     end_idx = min(num_lines, i + context_lines + 1)
-                    
+
                     for j in range(start_idx, end_idx):
                         curr_line_num = j + 1
-                        curr_line_content = lines[j].rstrip('\n\r')
-                        
+                        curr_line_content = lines[j].rstrip('\\n\\r')
+
                         if curr_line_num == line_num:
                             snippet.append(f"{curr_line_num:4}: {curr_line_content}  <-- MATCH")
                         else:
                             snippet.append(f"{curr_line_num:4}: {curr_line_content}")
-                    
-                    matches.append("\n".join(snippet))
-                    
+
+                    matches.append("\\n".join(snippet))
+
                     if len(matches) >= max_matches:
                         break
-            
+
             if not matches:
                 return self.result(None)
-            
-            result_str = "\n\n".join(matches)
+
+            result_str = "\\n\\n".join(matches)
             return self.result(result_str)
 
-        except Exception as e:
-            return self.result(f"error: {e}", False)
-
-    async def execute(self, project_name: str, file_path: list, timeout: int = 30):
-        """
-        executes a file within a project.
-        """
-        if not self.config.get("allow_code_execution"):
-            return self.result("Code execution is disabled for security", False)
-
-        file_path_str = self._get_file_path(project_name, file_path)
-        if not os.path.exists(file_path_str):
-            return self.result("file does not exist!", False)
-
-        os.chmod(file_path_str, os.stat(file_path_str).st_mode | stat.S_IEXEC)
-        try:
-            proc = await asyncio.create_subprocess_exec(
-                file_path_str,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-
-            try:
-                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
-                stdout_str = stdout.decode().strip()
-                stderr_str = stderr.decode().strip()
-
-                if proc.returncode != 0:
-                    error_msg = stderr_str if stderr_str else f"Process exited with code {proc.returncode}"
-                    return self.result(f"Error (exit code {proc.returncode}):\n{error_msg}", False)
-                
-                return self.result(stdout_str)
-            except asyncio.TimeoutError:
-                try:
-                    proc.kill()
-                    await proc.wait()
-                except:
-                    pass
-                return self.result(f"Execution timed out after {timeout} seconds", False)
-        except Exception as e:
-            return self.result(f"error: {e}", False)
-
-    async def get_outline(self, project_name: str, file_path: list, language: str = None) -> List[Dict[str, Any]]:
-        """
-        Returns a list of symbols (classes, functions, etc.) with their names, types, and line numbers.
-        The language can be specified, or it will be guessed from the extension.
-
-        ALWAYS use this to read code! Only ever use read_file if get_outline didn't provide enough information.
-        """
-        file_path_str = self._get_file_path(project_name, file_path)
-        if not os.path.exists(file_path_str):
-            return self.result("file does not exist", False)
-
-        if not language:
-            language = self._get_language_from_ext(file_path_str)
-
-        config = self.LANGUAGE_CONFIG.get(language)
-        
-        # If we don't have specific patterns, use a very generic fallback
-        if not config:
-            patterns = [
-                (r'^\s*class\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'class'),
-                (r'^\s*(?:async\s+)?def\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'function'),
-                (r'^\s*function\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'function'),
-            ]
-        else:
-            patterns = config['outline_patterns']
-
-        try:
-            with open(file_path_str, 'r') as f:
-                lines = f.readlines()
-
-            outline = []
-            for idx, line in enumerate(lines):
-                for pattern, sym_type in patterns:
-                    match = re.search(pattern, line)
-                    if match:
-                        outline.append({
-                            "name": match.group(1),
-                            "type": sym_type,
-                            "line": idx + 1
-                        })
-                        break
-            
-            return self.result(outline)
-        except Exception as e:
-            return self.result(f"error: {e}", False)
-
-    async def get_symbol_body(self, project_name: str, file_path: list, line_number: int, language: str = None) -> str:
-        """
-        Returns the actual block of code for a symbol starting at the given line number.
-        Uses indentation-based logic for Python and brace-counting for C-style languages.
-        """
-        file_path_str = self._get_file_path(project_name, file_path)
-        if not os.path.exists(file_path_str):
-            return self.result("file does not exist", False)
-
-        if not language:
-            language = self._get_language_from_ext(file_path_str)
-        
-        config = self.LANGUAGE_CONFIG.get(language)
-        body_type = config['body_type'] if config else 'brace'
-
-        try:
-            with open(file_path_str, 'r') as f:
-                lines = f.readlines()
-
-            if not (1 <= line_number <= len(lines)):
-                return self.result("line number out of range", False)
-
-            start_idx = line_number - 1
-            
-            if body_type == 'indentation':
-                # Python indentation-based logic
-                def get_indent(l):
-                    return len(l) - len(l.lstrip())
-                
-                base_indent = get_indent(lines[start_idx])
-                end_idx = start_idx + 1
-                
-                for i in range(start_idx + 1, len(lines)):
-                    line = lines[i]
-                    stripped = line.strip()
-                    if not stripped or stripped.startswith('#'):
-                        continue
-                    if get_indent(line) <= base_indent:
-                        break
-                    end_idx = i + 1
-                
-                body_lines = lines[start_idx:end_idx]
-            
-            else:
-                # Brace-based logic (JS, C++, Java, etc.)
-                # 1. Find the first '{' after or at the start line
-                brace_found = False
-                start_brace_idx = -1
-                
-                for i in range(start_idx, len(lines)):
-                    if '{' in lines[i]:
-                        start_brace_idx = i
-                        brace_found = True
-                        break
-                
-                if not brace_found:
-                    # If no brace found (e.g. single line function), return just that line
-                    return self.result("".join(lines[start_idx:start_idx+1]))
-
-                # 2. Count braces
-                brace_count = 0
-                end_idx = len(lines)
-                for i in range(start_brace_idx, len(lines)):
-                    line = lines[i]
-                    # Very simple brace counting (ignores braces in strings/comments)
-                    brace_count += line.count('{')
-                    brace_count -= line.count('}')
-                    
-                    if brace_count <= 0:
-                        end_idx = i + 1
-                        break
-                
-                body_lines = lines[start_idx:end_idx]
-
-            return self.result("".join(body_lines))
         except Exception as e:
             return self.result(f"error: {e}", False)

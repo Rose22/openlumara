@@ -69,10 +69,10 @@ class ToolcallManager:
             repaired_tool_calls.append(tool_call)
         return repaired_tool_calls
 
-    async def process(self, tool_calls, initial_content=""):
+    async def process(self, tool_calls, assistant_content="", assistant_reasoning=""):
         """
         process tool calls from an API response..
-        initial_content is the "normal" non-toolcall content, the text that the AI wants to say that's not toolcalls
+        assistant_content is the "normal" non-toolcall content, the text that the AI wants to say that's not toolcalls
         """
 
         # this is, once again, a very badly documented thing in openAI's chat completions docs
@@ -90,8 +90,10 @@ class ToolcallManager:
             "role": "assistant",
             "tool_calls": repaired_tool_calls
         }
-        if initial_content:
-            assistant_message["content"] = initial_content
+        if assistant_content:
+            assistant_message["content"] = assistant_content
+        if assistant_reasoning:
+            assistant_message["reasoning_content"] = assistant_reasoning
 
         # add it to context
         await self.channel.context.chat.add(assistant_message)
@@ -133,7 +135,7 @@ class ToolcallManager:
                     func_response = await func_callable(**tool_args)
 
                     # then build the openai toolcall response object
-                    func_response_str = json.dumps(str(func_response))
+                    func_response_str = json.dumps(func_response)
                     tool_response = {
                         "role": "tool",
                         "tool_call_id": tool_call_dict['id'],
@@ -141,7 +143,7 @@ class ToolcallManager:
                     }
 
                     # yield it so it can be displayed immediately
-                    yield {"type": "tool_response", "content": func_response_str}
+                    yield {"type": "tool", "tool_call_id": tool_call_dict['id'], "content": func_response_str}
 
                 except Exception as e:
                     core.log_error("error", e)
@@ -154,7 +156,7 @@ class ToolcallManager:
                     }
 
                     # yield it so it can be displayed immediately
-                    yield {"type": "tool_response", "content": f"error: {str(e)}"}
+                    yield {"type": "tool", "tool_call_id": tool_call_dict['id'], "content": f"error: {str(e)}"}
 
                 # add the tool response to the context window
                 await self.channel.context.chat.add(tool_response)
@@ -189,6 +191,7 @@ class ToolcallManager:
         final_content = []
         final_reasoning = []
         had_recursive_call = False
+        total_tool_usage = 0
 
         try:
             async for token in self.channel.manager.API.send_stream(
@@ -196,15 +199,14 @@ class ToolcallManager:
                 tools=self.channel.manager.tools
             ):
                 token_type = token.get("type")
+
                 if token_type == "content":
                     final_content.append(token.get("content"))
                     yield token
                 elif token_type == "reasoning":
-                    # only collect reasoning, in case there was no normal message content. but dont yield.
-                    # actually, do yield. we wanna see it!
-                    yield token
                     final_reasoning.append(token.get("content"))
-                elif token_type in ["tool_call_delta", "tool_response", "tool_calls"]:
+                    yield token
+                elif token_type in ["tool_call_delta", "tool", "tool_calls"]:
                     yield token
 
                 if token_type == "tool_calls":
@@ -222,26 +224,33 @@ class ToolcallManager:
                     # the AI has decided to call more tools, so we make a recursive call
                     async for sub_token in self.process(
                         repaired_tool_calls if tool_calls else [],
-                        initial_content=None
+                        assistant_content="".join(final_content),
+                        assistant_reasoning="".join(final_reasoning)
                     ):
                         yield sub_token
-                elif token_type == "usage":
-                    pass
 
-            if not final_content:
-                if final_reasoning:
-                    # replace content with reasoning if there was no content
-                    final_content = f"The AI made a tool call, but returned no message.\nReasoning: {''.join(final_reasoning)}"
-                else:
-                    final_content = "Made a tool call"
+                if token_type == "token_usage":
+                    usage = token.get("content")
+                    if usage is not None:
+                        total_tool_usage += usage
+                        # Yield it to the frontend so the token bar updates in real-time
+                        yield token
 
             # only add final message if we didn't make a recursive call
             # (the innermost call handles adding the final message)
-            if final_content and not had_recursive_call:
-                await self.channel.context.chat.add({
-                    "role": "assistant",
-                    "content": "".join(final_content)
-                })
+            if not had_recursive_call:
+                final_content_str = "".join(final_content)
+                final_reasoning_str = "".join(final_reasoning)
+
+                if final_content_str or final_reasoning_str:
+                    final_msg = {
+                        "role": "assistant",
+                        "content": final_content_str
+                    }
+                    if final_reasoning_str:
+                        final_msg["reasoning_content"] = final_reasoning_str
+
+                    await self.channel.context.chat.add(final_msg)
 
         except Exception as e:
             core.log("error", f"Error while handling tool calls: {e}")
@@ -249,3 +258,6 @@ class ToolcallManager:
                 f"Error while handling tool calls: {e}",
                 "error"
             )
+
+        if total_tool_usage > 0:
+            self.channel.context.chat.token_usage = total_tool_usage

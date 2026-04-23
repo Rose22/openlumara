@@ -217,6 +217,32 @@ function createCategoryElement(key, name, icon) {
     <span class="category-item-icon">${icon}</span>
     <span class="category-item-name">${escapeHtml(name)}</span>
     `;
+
+    // Allow dropping chats onto this category
+    btn.addEventListener('dragover', (e) => {
+        console.log('Drag over category', key, 'classList:', btn.classList);
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        btn.classList.add('drag-over');
+        console.log('After add class:', btn.classList);
+        e.stopPropagation();
+    });
+
+    btn.addEventListener('dragleave', () => {
+        console.log('Drag leave category', key);
+        btn.classList.remove('drag-over');
+    });
+
+    btn.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        btn.classList.remove('drag-over');
+        const chatId = e.dataTransfer.getData('text/plain');
+        if (chatId) {
+            await moveChatToCategory(chatId, key);
+        }
+    });
+
     btn.onclick = () => selectCategory(key);
     return btn;
 }
@@ -433,10 +459,25 @@ function createGroupContainer() {
 function createChatElement(chat) {
     const item = document.createElement('div');
     item.className = 'chat-item' + (chat.id === currentChatId ? ' active' : '');
-
+    item.setAttribute('draggable', 'true');
     item.dataset.chatId = chat.id;
-    // PERFORMANCE FIX: Removed JSON.stringify.
-    // Data is retrieved from chatDataMap using the ID when needed.
+
+    console.log('Created chat element', chat.id, 'draggable:', item.draggable);
+
+    // Drag start event
+    item.addEventListener('dragstart', (e) => {
+        console.log('Drag start', chat.id);
+        e.dataTransfer.setData('text/plain', chat.id);
+        e.dataTransfer.effectAllowed = 'move';
+        // Add a class for styling while dragging
+        setTimeout(() => item.classList.add('dragging'), 0);
+    });
+
+    item.addEventListener('dragend', () => {
+        item.classList.remove('dragging');
+        // Remove any drop target highlights
+        document.querySelectorAll('.category-item').forEach(el => el.classList.remove('drag-over'));
+    });
 
     item.onclick = (e) => {
         if (e.target.closest('.chat-item-actions') || e.target.closest('.inline-rename-container')) {
@@ -502,15 +543,52 @@ function createChatElement(chat) {
  * Creates a lightweight placeholder for a chat item.
  * This prevents the initial DOM overhead of creating hundreds of complex elements.
  */
+/**
+ * Creates a lightweight placeholder for a chat item.
+ * This prevents the initial DOM overhead of creating hundreds of complex elements.
+ */
 function createChatItemShell(chat) {
     const item = document.createElement('div');
     item.className = 'chat-item chat-item-shell' + (chat.id === currentChatId ? ' active' : '');
+    item.setAttribute('draggable', 'true');
     item.dataset.chatId = chat.id;
 
     // Crucial: Set a min-height so the scrollbar behaves correctly
     // before the item is fully rendered.
     item.style.minHeight = '55px';
 
+    // Only enable drag-and-drop on desktop (not mobile)
+    const isMobile = window.matchMedia('(max-width: 768px)').matches || 'ontouchstart' in window;
+
+    if (!isMobile) {
+        // Drag start event
+        item.addEventListener('dragstart', (e) => {
+            console.log('Drag start', chat.id);
+            e.dataTransfer.setData('text/plain', chat.id);
+            e.dataTransfer.effectAllowed = 'move';
+            // Add a class for styling while dragging
+            setTimeout(() => item.classList.add('dragging'), 0);
+            // Set flag to prevent file upload overlay
+            window.isDraggingChat = true;
+            // Prevent the drag from bubbling up to the main content area
+            e.stopPropagation();
+        });
+
+        // Prevent dragover events from bubbling up to the document body
+        item.addEventListener('dragover', (e) => {
+            e.stopPropagation();
+        }, true); // Use capture phase to catch events before they bubble
+
+        item.addEventListener('dragend', () => {
+            item.classList.remove('dragging');
+            // Remove any drop target highlights
+            document.querySelectorAll('.category-item').forEach(el => el.classList.remove('drag-over'));
+            // Clear flag when drag ends
+            window.isDraggingChat = false;
+        });
+    }
+
+    // Always attach click handler for both mobile and desktop
     item.onclick = (e) => {
         if (e.target.closest('.chat-item-actions') || e.target.closest('.inline-rename-container')) {
             return;
@@ -581,37 +659,68 @@ function populateChatItem(item, chat) {
 }
 
 function renderChatList(chats) {
-    const list = document.getElementById('chat-list');
-    const searchInput = document.getElementById('chat-search');
-    const currentSearchQuery = searchInput ? searchInput.value : '';
+    try {
+        const list = document.getElementById('chat-list');
+        if (!list) {
+            console.warn('Chat list container not found');
+            return;
+        }
+        const searchInput = document.getElementById('chat-search');
+        const currentSearchQuery = searchInput ? searchInput.value : '';
 
-    const fragment = document.createDocumentFragment();
+        const fragment = document.createDocumentFragment();
 
-    if (chats.length === 0) {
-        const emptyMsg = document.createElement('div');
-        emptyMsg.className = 'chat-empty';
-        emptyMsg.textContent = 'No chats in this category';
-        emptyMsg.style.cssText = 'padding: 20px; text-align: center; color: var(--text-muted); font-size: 0.85rem;';
-        fragment.appendChild(emptyMsg);
-    } else {
-        chats.sort((a, b) => (b.updated || 0) - (a.updated || 0));
-        chats.forEach(chat => {
-            // Create the shell instead of the full element
-            const shell = createChatItemShell(chat);
-            fragment.appendChild(shell);
-        });
+        if (chats.length === 0) {
+            const emptyMsg = document.createElement('div');
+            emptyMsg.className = 'chat-empty';
+            emptyMsg.textContent = 'No chats in this category';
+            emptyMsg.style.cssText = 'padding: 20px; text-align: center; color: var(--text-muted); font-size: 0.85rem;';
+            fragment.appendChild(emptyMsg);
+        } else {
+            chats.sort((a, b) => (b.updated || 0) - (a.updated || 0));
+            chats.forEach(chat => {
+                // Create the shell instead of the full element
+                const shell = createChatItemShell(chat);
+                fragment.appendChild(shell);
+            });
+        }
+
+        list.innerHTML = '';
+        list.appendChild(fragment);
+
+        // Initialize observer on the new shells
+        const shells = list.querySelectorAll('.chat-item-shell');
+        shells.forEach(shell => chatListObserver.observe(shell));
+
+        // Re-apply filters if active
+        if (activeTagFilter) filterChatsByTag();
+        if (currentSearchQuery) filterChats(currentSearchQuery);
+    } catch (err) {
+        console.error('Failed to render chat list:', err);
     }
+}
 
-    list.innerHTML = '';
-    list.appendChild(fragment);
+async function moveChatToCategory(chatId, newCategory) {
+    if (!chatId || !newCategory) return;
 
-    // Initialize observer on the new shells
-    const shells = list.querySelectorAll('.chat-item-shell');
-    shells.forEach(shell => chatListObserver.observe(shell));
+    try {
+        const response = await fetch('/chat/update_category', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: chatId, category: newCategory })
+        });
 
-    // Re-apply filters if active
-    if (activeTagFilter) filterChatsByTag();
-    if (currentSearchQuery) filterChats(currentSearchQuery);
+        const data = await response.json();
+
+        if (data.success) {
+            // Refresh the chat list to reflect the change
+            await loadChats();
+        } else {
+            console.error('Failed to move chat:', data.error);
+        }
+    } catch (e) {
+        console.error('Error moving chat:', e);
+    }
 }
 
 async function newChat() {
@@ -1207,47 +1316,7 @@ async function clearChat() {
     }
 }
 
-function extractSnippet(content, query, maxLength) {
-    if (!content) return '';
 
-    const lowerContent = content.toLowerCase();
-    const queryLower = query.toLowerCase();
-    const matchIndex = lowerContent.indexOf(queryLower);
-
-    if (matchIndex === -1) return '';
-
-    // Calculate snippet boundaries
-    const contextChars = Math.floor((maxLength - query.length) / 2);
-    let start = Math.max(0, matchIndex - contextChars);
-    let end = Math.min(content.length, matchIndex + query.length + contextChars);
-
-    // Adjust to not cut words
-    if (start > 0) {
-        const spaceIndex = content.lastIndexOf(' ', start);
-        if (spaceIndex > matchIndex - contextChars - 10) {
-            start = spaceIndex + 1;
-        }
-    }
-    if (end < content.length) {
-        const spaceIndex = content.indexOf(' ', end);
-        if (spaceIndex !== -1 && spaceIndex < end + 10) {
-            end = spaceIndex;
-        }
-    }
-
-    let snippet = content.substring(start, end);
-
-    // Add ellipsis
-    if (start > 0) snippet = '...' + snippet;
-    if (end < content.length) snippet = snippet + '...';
-
-    // Escape HTML and highlight match
-    snippet = escapeHtml(snippet);
-    const regex = new RegExp(`(${escapeRegex(query)})`, 'gi');
-    snippet = snippet.replace(regex, '<mark>$1</mark>');
-
-    return snippet;
-}
 
 
 function escapeRegex(string) {

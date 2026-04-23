@@ -34,27 +34,6 @@ async def main(args):
     # run main loop
     return await manager.run()
 
-def do_restart(argv=None):
-    """cross-platform restart with TTY/console inheritance"""
-    print("----------------")
-
-    script = os.path.abspath(__file__)
-    restart_argv = list(argv) if argv is not None else sys.argv[1:]
-    args = [sys.executable, script] + restart_argv
-
-    if sys.platform == "win32":
-        # windows: spawn new process, inherit same console
-        subprocess.Popen(
-            args,
-            stdin=sys.stdin,
-            stdout=sys.stdout,
-            stderr=sys.stderr,
-        )
-        sys.exit(0)
-    else:
-        # unix: replace process, inherits TTY automatically
-        os.execv(sys.executable, args)
-
 def add_arguments_recursive(parser, config, prefix=""):
     """
     Recursively traverses the config dict and adds arguments to the parser.
@@ -135,6 +114,7 @@ def build_arg_parser():
     args_main.add_argument("--coder", help="enable only the coder module (coding agent mode)", action="store_true")
     args_main.add_argument("--quiet", help="surpress logs", action="store_true")
     args_main.add_argument("--insecure_tls", help="Disable verification for SSL/TLS certs. Use when your API uses self-signed or unvalid certificates.", action="store_true")
+    args_main.add_argument("--debug", help="Enable debug mode (display all warnings and errors)", action="store_true")
 
     return arg_parser
 
@@ -148,6 +128,9 @@ def run_from_argv(argv=None):
     if args.tmp:
         core.storage.TEMPORARY = True
 
+    if args.debug:
+        core.debug = True
+
     while True:
         result = None
         try:
@@ -155,10 +138,12 @@ def run_from_argv(argv=None):
         except KeyboardInterrupt:
             pass
 
-        if result == "restart":
-            do_restart(run_argv)
-        else:
-            exit()
+    if result == "restart":
+        # run the loop again
+        core.config.config = None # unload config
+        pass
+    else:
+        exit()
 
 
 if __name__ == "__main__":

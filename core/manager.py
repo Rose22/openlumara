@@ -61,9 +61,8 @@ class Manager:
             enabled_user_modules = []
             enabled_user_modules = []
         elif self.coding_mode:
-            enabled_modules = ["coder"]
+            enabled_modules = ["coder", "openlumara_prompt"]
             enabled_user_modules = []
-            enabled_channels = ["cli"]
 
         if not enabled_channels:
             print("ERROR: At least one channel must be enabled in the config! Try the `cli` channel for a basic terminal UI.")
@@ -136,9 +135,14 @@ class Manager:
             print(f"Please open the WebUI at http://{host}:{port}")
 
         try:
-            await asyncio.gather(*self._async_tasks, return_exceptions=True)
+            should_swallow_exceptions = (not core.debug)
+            await asyncio.gather(*self._async_tasks, return_exceptions=should_swallow_exceptions)
         except KeyboardInterrupt:
             pass
+        except Exception as e:
+            if core.debug:
+                import traceback
+                traceback.print_exc()
         finally:
             if self._restart_requested:
                 return "restart"
@@ -182,6 +186,13 @@ class Manager:
         # Cancel all running tasks so gather() returns
         for task in list(self._async_tasks):
             task.cancel()
+
+        # unload everything from memory
+        self.modules = None
+        self.channels = None
+        self.tools = None
+        self.savedata = None
+        self.API = None
 
         core.log("core", "Shutdown complete")
 
@@ -439,6 +450,9 @@ class Manager:
 
             if func_name == "result" or func_name.startswith("on_"):
                 # builtin function
+                continue
+
+            if func_name in loaded_module.disabled_tools:
                 continue
 
             try:

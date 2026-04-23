@@ -39,17 +39,17 @@ if ('serviceWorker' in navigator) {
 // Don't set initial connection status - let it be determined by checkConnection()
 
 async function init() {
-    requestNotificationPermission();
-
-    // The first time the user clicks anywhere,
-    // we attempt to request notification permission.
-    document.addEventListener('click', () => {
-        if (typeof notificationPermission !== 'undefined' && notificationPermission === 'default') {
-            requestNotificationPermission();
-        }
-    }, { once: true });
-
     try {
+        requestNotificationPermission();
+
+        // The first time the user clicks anywhere,
+        // we attempt to request notification permission.
+        document.addEventListener('click', () => {
+            if (typeof notificationPermission !== 'undefined' && notificationPermission === 'default') {
+                requestNotificationPermission();
+            }
+        }, { once: true });
+
         await checkConnection();
 
         // Load current chat from backend if available
@@ -57,36 +57,41 @@ async function init() {
             await restoreCurrentChat();
         }
     } catch (err) {
+        console.error('Failed to initialize connection:', err);
         isConnected = false;
         updateConnectionStatus('disconnected');
         scheduleReconnect();
     }
 
-    // Apply saved font size on load
-    const savedFontSize = localStorage.getItem('fontSize');
-    if (savedFontSize) {
-        document.documentElement.style.setProperty('--font-size-base', `${savedFontSize}px`);
+    try {
+        // Apply saved font size on load
+        const savedFontSize = localStorage.getItem('fontSize');
+        if (savedFontSize) {
+            document.documentElement.style.setProperty('--font-size-base', `${savedFontSize}px`);
+        }
+
+        loadTheme();
+        loadChats();
+        initTagFilterState();
+
+        window.addEventListener('resize', handleTitleBarResize);
+
+        // Message polling
+        pollIntervalId = setInterval(() => {
+            if (isConnected) {
+                pollMessages();
+            }
+        }, CONFIG.POLL_INTERVAL);
+
+        // Periodic API status check
+        apiStatusIntervalId = setInterval(() => {
+            if (isConnected) {
+                checkApiStatus();
+            }
+        }, CONFIG.API_STATUS_INTERVAL);
+    } catch (err) {
+        console.error('Failed to initialize UI and polling:', err);
     }
-
-    loadTheme();
-    loadChats();
-    initTagFilterState();
-
-    window.addEventListener('resize', handleTitleBarResize);
-
-    // Message polling
-    pollIntervalId = setInterval(() => {
-        if (isConnected) {
-            pollMessages();
-        }
-    }, CONFIG.POLL_INTERVAL);
-
-    // Periodic API status check
-    apiStatusIntervalId = setInterval(() => {
-        if (isConnected) {
-            checkApiStatus();
-        }
-    }, CONFIG.API_STATUS_INTERVAL);
 }
 
 init();

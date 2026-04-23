@@ -61,6 +61,13 @@ class Channel:
         # fallback
         return ""
 
+    async def get_token_usage(self):
+        if not self.token_usage:
+            # fall back to manual counting
+            return self.context.get_token_usage()
+
+        return self.token_usage
+
     async def send(self, message: dict):
         """sends a message to the AI from within the current channel"""
 
@@ -144,10 +151,12 @@ class Channel:
         # as soon as user sends a message in this channel, set current channel (tracked in the manager) to this one
         await self._set_as_active_channel()
 
+        user_message = message #alias for readability
+
         cmd_response = None
         if message.get("role", "user") == "user":
             try:
-                cmd_response = await self.commands.process_input(message)
+                cmd_response = await self.commands.process_input(user_message)
             except Exception as e:
                 core.log_error("error while executing command", e)
 
@@ -164,8 +173,8 @@ class Channel:
                 yield {"type": "content", "content": self._get_disconnection_message()}
                 return
 
-        # add to context
-        await self.context.chat.add(message)
+        # add user's message to context
+        await self.context.chat.add(user_message)
 
         # get the new context window with the added message
         context = await self.context.get(system_prompt=True, end_prompt=True)
@@ -200,28 +209,31 @@ class Channel:
                 yield token
                 tool_calls_occurred = True
 
-                # we add the accumulated content tokens so far to the initial_content argument
+                # we add the accumulated content tokens so far to the assistant_content argument
                 async for sub_token in self.tc_manager.process(
                     token.get("content"),
-                    initial_content="".join(final_content)
+                    assistant_content="".join(final_content),
+                    assistant_reasoning="".join(final_reasoning)
                 ):
                     yield sub_token
                 # tc_manager.process() will loop until the AI no longer deems tool calls necessary
-            elif token_type == "usage":
+            elif token_type == "tool":
+                # this is a toolcall response
+                yield token
+            elif token_type == "token_usage":
                 # this is the final token usage count, usually emitted at the end of the stream
-                pass
+                self.context.chat.token_usage = int(token.get("content"))
 
-        # add AI's response to context as well
         if not tool_calls_occurred:
-            new_message = {
+            assistant_message = {
                 "role": "assistant",
                 "content": "".join(final_content)
             }
 
             if final_reasoning:
-                new_message["reasoning_content"] = "".join(final_reasoning)
+                assistant_message["reasoning_content"] = "".join(final_reasoning)
 
-            await self.context.chat.add(new_message)
+            await self.context.chat.add(assistant_message)
 
     async def announce(self, message: str, type=None):
         """called externally to announce things in this channel, such as a reminder sent by the AI"""

@@ -9,52 +9,6 @@ class Client(discord.Client):
         super(Client, self).__init__(**kwargs)
         self.ai_channel = channel
 
-    def _format_tool_call(self, tool_data):
-        """
-        Parses raw tool call data into a friendly string.
-        Example: 🔧 scheduler_add_job(action="Remind user...", seconds=5)
-        """
-        try:
-            # Handle OpenAI style pydantic objects
-            if hasattr(tool_data, 'function'):
-                func_name = getattr(tool_data.function, 'name', 'unknown')
-                raw_args = getattr(tool_data.function, 'arguments', '{}')
-            # Handle dictionary style
-            elif isinstance(tool_data, dict) and 'function' in tool_data:
-                func_name = tool_data['function'].get('name', 'unknown')
-                raw_args = tool_data['function'].get('arguments', '{}')
-            else:
-                return "🔧 Calling tool..."
-
-            # Parse arguments safely using json_repair
-            if isinstance(raw_args, str):
-                try:
-                    args_dict = json_repair.loads(raw_args)
-                except Exception:
-                    args_dict = {}
-            elif isinstance(raw_args, dict):
-                args_dict = raw_args
-            else:
-                args_dict = {}
-
-            # Build arg string: key="value", key2="value2"
-            arg_strs = []
-            for k, v in args_dict.items():
-                v_str = str(v)
-                # Truncate long values
-                if len(v_str) > 30:
-                    v_str = v_str[:30] + ".."
-                # Escape quotes for display
-                v_str = v_str.replace('"', "'")
-                arg_strs.append(f'{k}="{v_str}"')
-
-            args_display = ", ".join(arg_strs)
-            return f"🔧 {func_name}({args_display})"
-
-        except Exception as e:
-            core.log("discord", f"Error formatting tool call: {e}")
-            return "🔧 Calling tool..."
-
     async def _stream_to_discord(self, token_stream, discord_channel):
         """streams a message to discord in steps"""
         message_obj = await discord_channel.send("...")
@@ -89,9 +43,12 @@ class Client(discord.Client):
                     if content:
                         if isinstance(content, list):
                             for tool in content:
-                                current_tool_buffer.append(self._format_tool_call(tool))
+                                current_tool_buffer.append(self.ai_channel.tc_manager.display_call(tool))
                         else:
-                            current_tool_buffer.append(self._format_tool_call(content))
+                            current_tool_buffer.append(self.ai_channel.tc_manager.display_call(content))
+                    continue
+
+                if t_type != "content":
                     continue
 
                 # Handle Content/Errors
@@ -235,3 +192,4 @@ class Discord(core.channel.Channel):
     async def on_shutdown(self):
         if self.config.get("announce_shutdown"):
             await self.announce("i'm shutting down!")
+        await self._client.close()

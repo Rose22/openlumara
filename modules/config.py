@@ -5,6 +5,7 @@ import copy
 class Config(core.module.Module):
     """Lets the AI manage the OpenLumara configuration/settings for you"""
 
+    unsafe = True
     _header = "OpenLumara config"
 
     def _redact_sensitive_info(self, data):

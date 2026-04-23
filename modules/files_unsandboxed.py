@@ -8,9 +8,8 @@ from pathlib import Path
 class FileManager(core.module.Module):
     """Gives your AI full access to your filesystem. CAUTION: Unsafe! Use at your own risk."""
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._header = "System info"
+    unsafe = True
+    _header = "System info"
 
     async def on_end_prompt(self):
         details = {

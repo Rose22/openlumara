@@ -2114,6 +2114,35 @@
     }
 }
 
+/* Unsafe Module Warning Styling */
+.module-unsafe {
+    border: 1px solid rgba(255, 99, 99, 0.4) !important;
+    background: linear-gradient(135deg, rgba(255, 99, 99, 0.05) 0%, rgba(255, 99, 99, 0.02) 100%) !important;
+    transition: all 0.2s ease;
+}
+
+.module-unsafe-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    font-size: 0.7em;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: #ff6363;
+    background: rgba(255, 99, 99, 0.15);
+    border: 1px solid rgba(255, 99, 99, 0.3);
+    border-radius: 4px;
+    text-transform: uppercase;
+    vertical-align: middle;
+    line-height: 1.2;
+}
+
+/* Slightly dim disabled unsafe modules for visual hierarchy */
+.module-unsafe:not(.enabled) {
+    opacity: 0.75;
+    filter: grayscale(0.2);
+}
+
+
 /* ==========================================================================
  *  Utilities & Accessibility
  *  ========================================================================== */

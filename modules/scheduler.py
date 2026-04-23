@@ -6,10 +6,9 @@ import ulid
 class Scheduler(core.module.Module):
     """Lets your AI send you scheduled reminders and do things at specified times"""
 
-    async def on_ready(self) -> None:
+    async def on_ready(self, *args, **kwargs):
         """Initialize storage, manager, and schedule existing jobs."""
         self.schedule = core.storage.StorageList("schedule", type="json")
-        self.tc_manager = core.toolcalls.ToolcallManager(self.channel)
 
         # Map of job_id -> asyncio.TimerHandle
         self.scheduled_handles = {}
@@ -109,6 +108,14 @@ class Scheduler(core.module.Module):
 
     async def _execute_job(self, job: dict) -> None:
         """Performs the actual action of the job."""
+        job_id = job.get("id")
+
+        # Determine the target channel for this job
+        channel_name = (job.get("channel") or "").lower().strip()
+        job_channel = self.manager.channels.get(channel_name)
+        if not job_channel and self.channel:
+            job_channel = self.channel
+
         tools = [
             t for t in self.manager.tools
             if t.get("function", {}).get("name") != "scheduler_add_job"
@@ -118,18 +125,25 @@ class Scheduler(core.module.Module):
 
         event_message = {
             "role": "user",
-            "content": (
-                f"Please follow these instructions:\n"
-                f"{action}\n"
-                f"Use tools if needed. For simple reminders, do not use tools."
-            )
+            "content": f"""
+[AUTOMATED SYSTEM INSTRUCTION]
+Please follow these instructions:
+
+{action}
+Use tools if needed. For simple reminders, do not use tools.
+""".strip()
         }
 
+        await self.channel.context.chat.add(event_message)
+
         response = await self.manager.API.send(
-            [event_message],
+            await self.channel.context.get(end_prompt=False),
             use_tools=True,
             tools=tools
         )
+
+        # erase the automated instruction from history
+        await self.channel.context.chat.pop(-1)
 
         if not response:
             return
@@ -138,24 +152,28 @@ class Scheduler(core.module.Module):
         tool_calls = response.get("tool_calls")
 
         if tool_calls:
+            if not job_channel:
+                core.log("scheduler", f"error executing job {job_id}: no channel available for tool calls")
+                return
+
+            # Use a local manager to avoid race conditions and ensure the correct channel is used
+            tc_manager = core.toolcalls.ToolcallManager(job_channel)
+
             final_content_list = []
-            async for token in self.tc_manager.process(
-                tool_calls,
-                initial_content=response.get("content", "")
+            async for token in tc_manager.process(
+                tool_calls
             ):
-                if token.get("type") in ("content", "reasoning"):
+                if token.get("type") == "content":
                     final_content_list.append(token.get("content", ""))
             final_content = "".join(final_content_list)
         else:
             final_content = response.get("content", "")
 
         if final_content:
-            channel = self.manager.channels.get(job.get("channel").lower().strip())
-            if not channel and self.channel:
-                channel = self.channel
-
-            if channel:
-                await channel.announce(final_content, "schedule")
+            if job_channel:
+                await job_channel.announce(final_content, "schedule")
+            elif self.channel:
+                await self.channel.announce(final_content, "schedule")
 
     # ---------------------------------------------------------
     # Time Calculations
