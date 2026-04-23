@@ -222,7 +222,9 @@ class Channel:
                 yield token
             elif token_type == "token_usage":
                 # this is the final token usage count, usually emitted at the end of the stream
-                self.context.chat.token_usage = int(token.get("content"))
+                token_usage = token.get("content")
+                if isinstance(token_usage, int):
+                    self.context.chat.token_usage = token_usage
 
         if not tool_calls_occurred:
             assistant_message = {
