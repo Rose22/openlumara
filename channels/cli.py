@@ -84,6 +84,7 @@ class Cli(core.channel.Channel):
             "toolcall-response-label": "ansiblue bold",
             "error": "ansired bold",
             "status": "ansiblue",
+            "separator": "ansigray",
         })
 
     def _setup_history(self):
@@ -103,6 +104,13 @@ class Cli(core.channel.Channel):
             prompt_toolkit.shortcuts.print_formatted_text(formatted, style=self.style)
         else:
             print(text, end="", flush=True)
+
+    def _print_header(self, label: str, style_class: str = None):
+        width = 40
+        separator = "─" * width
+        self._print_formatted(f"{separator}", "separator")
+        self._print_formatted(f"  {label}", style_class)
+        self._print_formatted(f"{separator}", "separator")
 
     async def run(self):
         if not sys.stdin.isatty():
@@ -145,15 +153,12 @@ class Cli(core.channel.Channel):
 
             # print headers
             if token_type == "reasoning" and not currently_reasoning:
-                self._print_formatted("\n---\nReasoning:", "reasoning-label")
+                self._print_header("Reasoning", "reasoning-label")
                 currently_reasoning = True
-                switched_state = True
             elif token_type == "tool":
-                self._print_formatted("\n---\n(processing results..)", "toolcall-response-label")
-                switched_state = True
+                self._print_formatted("\n(processing results..)", "toolcall-response-label")
             elif token_type == "content" and currently_reasoning:
-                self._print_formatted("\n---\nConclusion:", "conclusion-label")
-                switched_state = True
+                self._print_header("Conclusion", "conclusion-label")
 
             if token_type in ["content", "tool_calls", "tool"] and currently_reasoning:
                 # we can have multiple reasoning blocks
