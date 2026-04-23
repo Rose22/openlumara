@@ -1451,7 +1451,7 @@ function handleToolResponse(data, aiMsgDiv) {
             responseContent.innerHTML = renderToolResponseContent(content);
         }
 
-        // Add "processing result..." indicator after the card
+        // Ensure the processing result indicator is always at the bottom
         addProcessingIndicator(cardEl);
 
         scrollToBottom();
@@ -1465,9 +1465,11 @@ function handleToolResponse(data, aiMsgDiv) {
  * Add a "processing result..." indicator below a tool call card.
  */
 function addProcessingIndicator(cardEl) {
-    // Remove any existing processing indicator first
-    const existing = cardEl.parentElement.querySelector('.tool-processing-indicator');
-    if (existing) existing.remove();
+    // Remove any existing processing indicator from the container first
+    if (toolCallsContainer) {
+        const existing = toolCallsContainer.querySelector('.tool-processing-indicator');
+        if (existing) existing.remove();
+    }
 
     const indicator = document.createElement('div');
     indicator.className = 'tool-processing-indicator';
@@ -1480,8 +1482,10 @@ function addProcessingIndicator(cardEl) {
     </div>
     `;
 
-    // Insert after the card
-    cardEl.parentElement.insertBefore(indicator, cardEl.nextSibling);
+    // Always append to the very end of the tool calls container
+    if (toolCallsContainer) {
+        toolCallsContainer.appendChild(indicator);
+    }
 }
 
 /**
