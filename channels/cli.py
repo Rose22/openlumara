@@ -149,7 +149,7 @@ class Cli(core.channel.Channel):
                 currently_reasoning = True
                 switched_state = True
             elif token_type == "tool":
-                self._print_formatted("\n---\nToolcall response:", "toolcall-response-label")
+                self._print_formatted("\n---\n(processing results..)", "toolcall-response-label")
                 switched_state = True
             elif token_type == "content" and currently_reasoning:
                 self._print_formatted("\n---\nConclusion:", "conclusion-label")
@@ -159,11 +159,11 @@ class Cli(core.channel.Channel):
                 # we can have multiple reasoning blocks
                 currently_reasoning = False
 
-            if token_type == "tool":
-                # print toolcall response
-                result = json.loads(content)
-                subcontent = result.get("content")
-                print(str(subcontent).strip(), flush=True)
+            # if token_type == "tool":
+            #     # print toolcall response
+            #     result = json.loads(content)
+            #     subcontent = result.get("content")
+            #     print(str(subcontent).strip(), flush=True)
 
             elif token_type == "tool_call_delta":
                 # Extract the accumulated tool call from the delta
