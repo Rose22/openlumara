@@ -1050,6 +1050,113 @@ class YourClassName(core.module.Module):
             return False
 
 
+    async def add_symbol_after(self, project_name: str, file_path: list, target_symbol_name: str, name: str, content_body: str, language: str = None) -> bool:
+        """
+        Inserts a new symbol (function or method) after the target symbol.
+
+        Args:
+            project_name: Name of the project.
+            file_path: List representing the path to the file.
+            target_symbol_name: The name of the symbol to insert after.
+            name: The name of the new symbol.
+            content_body: The content of the new symbol. If it doesn't contain a definition, one will be constructed.
+            language: Optional language identifier.
+        """
+        file_path_str = self._get_file_path(project_name, file_path)
+        if not os.path.exists(file_path_str):
+            return False
+
+        if not language:
+            language = self._get_language_from_ext(file_path_str)
+
+        # 1. Find the line number of the target symbol
+        line_number = self._find_symbol_line(file_path_str, target_symbol_name, language)
+        if not line_number:
+            return False
+
+        try:
+            with open(file_path_str, 'r') as f:
+                lines = f.readlines()
+
+            # 2. Determine the end line of the target symbol
+            config = self.LANGUAGE_CONFIG.get(language)
+            body_type = config.get('body_type', 'brace') if config else 'brace'
+
+            start_idx = line_number - 1
+            end_idx = -1
+
+            if body_type == 'indentation':
+                def get_indent(l): return len(l) - len(l.lstrip())
+                base_indent = get_indent(lines[start_idx])
+                end_idx = start_idx + 1
+                for i in range(start_idx + 1, len(lines)):
+                    line = lines[i]
+                    if not line.strip() or line.strip().startswith('#'):
+                        continue
+                    if get_indent(line) <= base_indent:
+                        break
+                    end_idx = i + 1
+            else:
+                # Brace-based logic
+                brace_found = False
+                start_brace_idx = -1
+                for i in range(start_idx, len(lines)):
+                    if '{' in lines[i]:
+                        start_brace_idx = i
+                        brace_found = True
+                        break
+
+                if not brace_found:
+                    end_idx = start_idx + 1
+                else:
+                    brace_count = 0
+                    end_idx = len(lines)
+                    for i in range(start_brace_idx, len(lines)):
+                        line = lines[i]
+                        brace_count += line.count('{')
+                        brace_count -= line.count('}')
+                        if brace_count <= 0:
+                            end_idx = i + 1
+                            break
+
+            if end_idx == -1:
+                end_idx = start_idx + 1
+
+            # 3. Determine indentation of the target symbol to match it
+            target_line = lines[line_number - 1]
+            indent_len = len(target_line) - len(target_line.lstrip())
+            indent_str = " " * indent_len
+
+            # 4. Construct the new symbol content
+            stripped_body = content_body.strip()
+            is_method = "." in target_symbol_name
+
+            if is_method:
+                body_lines = content_body.splitlines(keepends=True)
+                new_symbol = "".join([f"{indent_str}{line}" for line in body_lines])
+            else:
+                new_symbol = content_body
+
+            # Ensure the new symbol ends with a newline for clean insertion
+            if not new_symbol.endswith('\n'):
+                new_symbol += '\n'
+            new_symbol += '\n' # and an extra one for better separation
+
+            # 5. Insert the new symbol into the lines list after the target symbol
+            lines.insert(end_idx, new_symbol)
+
+            with open(file_path_str, 'w') as f:
+                f.writelines(lines)
+            return True
+
+        except Exception as e:
+            try:
+                import core
+                core.log("coder", f"Error in add_symbol_after: {e}")
+            except:
+                print(f"Error in add_symbol_after: {e}")
+            return False
+
     async def delete_symbol(self, project_name: str, file_path: list, symbol_name: str, language: str = None) -> bool:
         """
         Deletes a symbol from a file.
