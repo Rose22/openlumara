@@ -781,7 +781,7 @@
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    background: conic-gradient(from var(--angle), var(--tool-border), var(--accent), var(--tool-border), var(--accent));
+    background: conic-gradient(from var(--angle), var(--tool-border), var(--accent));
     z-index: -1;
     animation: rotate 2s linear infinite;
 
@@ -1155,6 +1155,8 @@
     margin: 8px 0;
     overflow-x: auto;
     position: relative;
+    max-width: 100%;
+    white-space: pre-wrap !important;
 }
 
 .message pre code {
