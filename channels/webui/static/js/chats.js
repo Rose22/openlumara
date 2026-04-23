@@ -543,6 +543,10 @@ function createChatElement(chat) {
  * Creates a lightweight placeholder for a chat item.
  * This prevents the initial DOM overhead of creating hundreds of complex elements.
  */
+/**
+ * Creates a lightweight placeholder for a chat item.
+ * This prevents the initial DOM overhead of creating hundreds of complex elements.
+ */
 function createChatItemShell(chat) {
     const item = document.createElement('div');
     item.className = 'chat-item chat-item-shell' + (chat.id === currentChatId ? ' active' : '');
@@ -555,36 +559,36 @@ function createChatItemShell(chat) {
 
     // Only enable drag-and-drop on desktop (not mobile)
     const isMobile = window.matchMedia('(max-width: 768px)').matches || 'ontouchstart' in window;
-    if (isMobile) {
-        return item;
+
+    if (!isMobile) {
+        // Drag start event
+        item.addEventListener('dragstart', (e) => {
+            console.log('Drag start', chat.id);
+            e.dataTransfer.setData('text/plain', chat.id);
+            e.dataTransfer.effectAllowed = 'move';
+            // Add a class for styling while dragging
+            setTimeout(() => item.classList.add('dragging'), 0);
+            // Set flag to prevent file upload overlay
+            window.isDraggingChat = true;
+            // Prevent the drag from bubbling up to the main content area
+            e.stopPropagation();
+        });
+
+        // Prevent dragover events from bubbling up to the document body
+        item.addEventListener('dragover', (e) => {
+            e.stopPropagation();
+        }, true); // Use capture phase to catch events before they bubble
+
+        item.addEventListener('dragend', () => {
+            item.classList.remove('dragging');
+            // Remove any drop target highlights
+            document.querySelectorAll('.category-item').forEach(el => el.classList.remove('drag-over'));
+            // Clear flag when drag ends
+            window.isDraggingChat = false;
+        });
     }
 
-    // Drag start event
-    item.addEventListener('dragstart', (e) => {
-        console.log('Drag start', chat.id);
-        e.dataTransfer.setData('text/plain', chat.id);
-        e.dataTransfer.effectAllowed = 'move';
-        // Add a class for styling while dragging
-        setTimeout(() => item.classList.add('dragging'), 0);
-        // Set flag to prevent file upload overlay
-        window.isDraggingChat = true;
-        // Prevent the drag from bubbling up to the main content area
-        e.stopPropagation();
-    });
-
-    // Prevent dragover events from bubbling up to the document body
-    item.addEventListener('dragover', (e) => {
-        e.stopPropagation();
-    }, true); // Use capture phase to catch events before they bubble
-
-    item.addEventListener('dragend', () => {
-        item.classList.remove('dragging');
-        // Remove any drop target highlights
-        document.querySelectorAll('.category-item').forEach(el => el.classList.remove('drag-over'));
-        // Clear flag when drag ends
-        window.isDraggingChat = false;
-    });
-
+    // Always attach click handler for both mobile and desktop
     item.onclick = (e) => {
         if (e.target.closest('.chat-item-actions') || e.target.closest('.inline-rename-container')) {
             return;
