@@ -33,38 +33,6 @@ function appendStreamText(type, text, typewriterEnabled = true) {
             typewriterQueue = [];
         }
 
-        // Finalize previous reasoning segment when transitioning away
-        if (last && last.type === 'reasoning') {
-            if (last.el) {
-                const label = last.el.querySelector('.reasoning-label');
-                if (label) label.textContent = 'Thoughts';
-                last.el.classList.remove('is-reasoning-active');
-
-                // Collapse if not expanded by default and user didn't manually expand
-                const reasoningId = last.el.dataset.reasoningId;
-                if (!manuallyCollapsedReasoning.has(reasoningId)) {
-                    const expandByDefault = localStorage.getItem('reasoningExpandedByDefault') === 'true';
-                    if (!expandByDefault) {
-                        last.el.classList.add('collapsed');
-                    }
-                }
-            }
-        }
-
-        // Finalize tool_calls segments when transitioning away
-        if (last && last.type === 'tool_calls' && toolCallsContainer) {
-            const cards = toolCallsContainer.querySelectorAll('.tool-call-card');
-            cards.forEach(card => {
-                card.classList.remove('streaming');
-                const status = card.querySelector('.tool-call-status');
-                if (status) {
-                    status.classList.remove('streaming');
-                    status.classList.add('pending');
-                    status.textContent = 'calling...';
-                }
-            });
-        }
-
         // Update token usage on every segment type transition (reasoning/content/tool_calls finished)
         updateTokenUsage();
 
@@ -88,34 +56,12 @@ function ensureToolCallsSegment() {
     const last = streamSegments[streamSegments.length - 1];
     if (last && last.type === 'tool_calls') return last;
 
-    // Finalize content if transitioning from it
     if (last && last.type === 'content') {
         last.displayed = last.text;
         if (last.el) last.el.innerHTML = renderMarkdown(last.text);
         typewriterQueue = [];
     }
 
-    // Also finalize reasoning segments when transitioning away
-    if (last && last.type === 'reasoning') {
-        if (last.el) {
-            const label = last.el.querySelector('.reasoning-label');
-            if (label) label.textContent = 'Thoughts';
-            last.el.classList.remove('is-reasoning-active');
-
-            // Collapse if not expanded by default and user didn't manually expand
-            const reasoningId = last.el.dataset.reasoningId;
-            if (!manuallyCollapsedReasoning.has(reasoningId)) {
-                const expandByDefault = localStorage.getItem('reasoningExpandedByDefault') === 'true';
-                if (!expandByDefault) {
-                    last.el.classList.add('collapsed');
-                }
-            }
-        }
-    }
-
-    // Finalize tool_calls segments when transitioning away from them (e.g., if new content arrives)
-    // This is handled by the check above returning early, but we need to handle transitions FROM tool_calls
-    
     const seg = { type: 'tool_calls', text: '', id: segCounter++, el: null };
     streamSegments.push(seg);
     return seg;
@@ -220,23 +166,6 @@ function updateSegmentContent(seg, index) {
     if (seg.type === 'content') {
         const textToDisplay = seg.displayed !== undefined ? seg.displayed : seg.text;
         seg.el.innerHTML = renderMarkdown(textToDisplay);
-    }
-
-    // NEW: Finalize tool_calls segments that are not the active one being rendered
-    if (seg.type === 'tool_calls' && toolCallsContainer) {
-        const isLast = index === streamSegments.length - 1;
-        if (!isLast) {
-            const cards = toolCallsContainer.querySelectorAll('.tool-call-card');
-            cards.forEach(card => {
-                card.classList.remove('streaming');
-                const status = card.querySelector('.tool-call-status');
-                if (status) {
-                    status.classList.remove('streaming');
-                    status.classList.add('pending');
-                    status.textContent = 'calling...';
-                }
-            });
-        }
     }
 }
 
@@ -932,18 +861,6 @@ function handleToolCallDelta(data, aiMsgDiv, aiWrapper) {
     }
 
     toolCallsContainer = tcSeg.el;
-
-    // Finalize any previously streaming cards before rendering new ones
-    const existingCards = toolCallsContainer.querySelectorAll('.tool-call-card.streaming');
-    existingCards.forEach(card => {
-        card.classList.remove('streaming');
-        const status = card.querySelector('.tool-call-status');
-        if (status) {
-            status.classList.remove('streaming');
-            status.classList.add('pending');
-            status.textContent = 'calling...';
-        }
-    });
 
     // Stop reasoning pulsing when tool calls start streaming
     const activeReasoning = aiMsgDiv.querySelectorAll('.reasoning-wrapper.is-reasoning-active');
