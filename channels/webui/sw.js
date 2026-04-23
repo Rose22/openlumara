@@ -1,4 +1,4 @@
-const CACHE_NAME = 'openlumara-v2.8.5';
+const CACHE_NAME = 'openlumara-v2.8.7';
 const ASSETS = ['/', '/manifest.json'];
 
 self.addEventListener('install', (e) => {
