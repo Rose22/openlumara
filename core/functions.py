@@ -11,8 +11,11 @@ def log(category: str, msg: str):
 
 def log_error(msg: str, e: Exception):
     """console log but with extra spice for errors"""
-    log("error", f"{msg}: {e} | {e.__traceback__.tb_frame.f_code.co_filename}, {e.__traceback__.tb_frame.f_code.co_name}, ln:{e.__traceback__.tb_lineno}")
-    traceback.print_exception(e, limit=5, file=sys.stdout)
+    if core.debug:
+        log("error", f"{msg}: {e} | {e.__traceback__.tb_frame.f_code.co_filename}, {e.__traceback__.tb_frame.f_code.co_name}, ln:{e.__traceback__.tb_lineno}")
+        traceback.print_exception(e, file=sys.stdout)
+    else:
+        log("error", f"{msg}: {e}")
 
 async def restart(channel = None):
     if channel:
