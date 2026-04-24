@@ -116,6 +116,10 @@ class Scheduler(core.module.Module):
         if not job_channel and self.channel:
             job_channel = self.channel
 
+        if not job_channel:
+                core.log("scheduler", f"error executing job {job_id}: no channel available for tool calls")
+                return
+
         tools = [
             t for t in self.manager.tools
             if t.get("function", {}).get("name") != "scheduler_add_job"
@@ -152,10 +156,6 @@ Use tools if needed. For simple reminders, do not use tools.
         tool_calls = response.get("tool_calls")
 
         if tool_calls:
-            if not job_channel:
-                core.log("scheduler", f"error executing job {job_id}: no channel available for tool calls")
-                return
-
             # Use a local manager to avoid race conditions and ensure the correct channel is used
             tc_manager = core.toolcalls.ToolcallManager(job_channel)
 
