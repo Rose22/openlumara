@@ -202,14 +202,16 @@ def load(file_path=None):
     global config
     config = core.storage.StorageDict(filename, "yaml", path=dirname, autoreload=False)
 
+    if core.storage.TEMPORARY:
+        # force a load even in temporary mode
+        config.load()
+
     schema = get_schema()
     registry = _get_registry_data()
 
     created_new_config = False
     if not config:
         target = copy.deepcopy(schema)
-        if not core.storage.TEMPORARY:
-            created_new_config = True
     else:
         target = sync_config(dict(config), schema)
 
