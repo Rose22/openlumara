@@ -130,6 +130,10 @@ class Client(discord.Client):
                 if member.id == self.user.id:
                     mentioned = True
 
+            # or if we dont want to require mentions
+            if not self.ai_channel.config.get("require_mentions"):
+                mentioned = True
+
             if mentioned:
                 core.log("discord", f"<{message.author.name}> {message.clean_content}")
 
@@ -141,6 +145,10 @@ class Client(discord.Client):
                            content = content.replace(str(mention), "")
                            content = content.replace("<@>", "")
                            content = content.strip()
+
+                        # if group chat is enabled, make the AI aware of who is speaking
+                        if self.ai_channel.config.get("enable_group_chat") and not content.startswith(core.config.get("cmd_prefix", "/")):
+                            content = f"{message.author.display_name} said: {content}"
 
                         response_obj = self.ai_channel.send_stream({"role": "user", "content": content})
                     except Exception as e:
@@ -155,6 +163,8 @@ class Client(discord.Client):
 class Discord(core.channel.Channel):
     settings =  {
         "token": "TOKEN_HERE",
+        "require_mentions": False,
+        "enable_group_chat": False,
         "announce_startup": False,
         "announce_shutdown": False
     }
