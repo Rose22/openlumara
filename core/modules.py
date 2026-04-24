@@ -22,6 +22,10 @@ def load(package, base_class = None, filter: list = None):
         return ()
 
     for importer, modname, ispkg in pkgutil.iter_modules(package.__path__):
+        if filter and modname not in filter:
+            # dont even import unloaded modules
+            continue
+
         try:
             # Import the module relative to the package
             module = importlib.import_module(f"{package.__name__}.{modname}")
