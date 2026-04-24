@@ -119,6 +119,7 @@ args = arg_parser.parse_args(sys.argv[1:])
 
 if args.tmp:
     core.storage.TEMPORARY = True
+    core.log("core", "Temporary mode activated. Loading/saving of data disabled, anything you store will not persist!")
 
 if args.debug:
     core.debug = True
