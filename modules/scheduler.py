@@ -138,16 +138,16 @@ Use tools if needed. For simple reminders, do not use tools.
 """.strip()
         }
 
-        await self.channel.context.chat.add(event_message)
+        await job_channel.context.chat.add(event_message)
 
         response = await self.manager.API.send(
-            await self.channel.context.get(end_prompt=False),
+            await job_channel.context.get(end_prompt=False),
             use_tools=True,
             tools=tools
         )
 
         # erase the automated instruction from history
-        await self.channel.context.chat.pop(-1)
+        await job_channel.context.chat.pop(-1)
 
         if not response:
             return
