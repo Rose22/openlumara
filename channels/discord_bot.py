@@ -159,13 +159,6 @@ class Discord(core.channel.Channel):
         "announce_shutdown": False
     }
 
-    def __init__(self, manager):
-        super().__init__(manager)
-
-        intents = discord.Intents.default()
-        intents.message_content = True
-        self._client = Client(self, intents=intents)
-
     async def _announce(self, msg: str, type: str = None):
         if not msg:
             return None
@@ -182,10 +175,17 @@ class Discord(core.channel.Channel):
             core.log("error", "discord token not set! set it in config.yaml as discord_token")
             return False
 
+        intents = discord.Intents.default()
+        intents.message_content = True
+        self._client = Client(self, intents=intents)
+
         core.log("discord", "logging in..")
 
         try:
             await self._client.start(token)
+        except asyncio.CancelledError:
+            # shut up no one cares about this stupid error
+            pass
         except Exception as e:
             core.log("error", f"error connecting to discord: {e}")
 

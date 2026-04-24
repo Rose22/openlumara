@@ -127,6 +127,7 @@ def run_from_argv(argv=None):
 
     if args.tmp:
         core.storage.TEMPORARY = True
+        core.log("core", "Temporary mode activated. Loading/saving of data disabled, anything you store will not persist!")
 
     if args.debug:
         core.debug = True

@@ -24,8 +24,7 @@ class Telegram(core.channel.Channel):
         "announce_shutdown": False
     }
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    async def run(self):
         self.token = os.getenv("TELEGRAM_BOT_TOKEN")
         if not self.token:
             try:
@@ -54,7 +53,6 @@ class Telegram(core.channel.Channel):
         self.message_queue = asyncio.Queue()
         self.queue_task = None
 
-    async def run(self):
         if not self.token:
             await self._announce("Telegram channel failed: No API token provided.", "error")
             return False

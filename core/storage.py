@@ -47,7 +47,7 @@ class StorageList(list):
             self.manager = manager
 
         if os.path.exists(self.path):
-            if autoload:
+            if autoload and not TEMPORARY:
                 self.load()
         else:
             self.save()
@@ -97,9 +97,6 @@ class StorageList(list):
             self.extend(data)
             return self
 
-        if TEMPORARY:
-            return self
-
         data = self._read()
         if not data:
             return None
@@ -115,7 +112,7 @@ class StorageList(list):
                 self.extend(data.split("\n"))
 
     def get(self, *args, **kwargs):
-        if self.autoreload:
+        if self.autoreload and not TEMPORARY:
             self.load()
 
         return super().get(*args, **kwargs)
@@ -165,7 +162,7 @@ class StorageDict(dict):
             self.manager = manager
 
         if os.path.exists(self.path):
-            if autoload:
+            if autoload and not TEMPORARY:
                 self.load()
         else:
             self.save()
@@ -271,9 +268,6 @@ class StorageDict(dict):
             self.update(data)
             return True
 
-        if TEMPORARY:
-            return True
-
         if self.type not in ["markdown"]:
             data = self._read()
             if not data:
@@ -308,7 +302,7 @@ class StorageDict(dict):
         return True
 
     def get(self, *args, **kwargs):
-        if self.autoreload:
+        if self.autoreload and not TEMPORARY:
             self.load()
 
         return super().get(*args, **kwargs)
@@ -328,7 +322,7 @@ class StorageText:
         self.autoreload = autoreload
 
         if os.path.exists(self.path):
-            if autoload:
+            if autoload and not TEMPORARY:
                 self.load()
         else:
             self.save()
@@ -340,14 +334,11 @@ class StorageText:
         self._data = str(new_data)
         self.save()
     def get(self):
-        if self.autoreload:
+        if self.autoreload and not TEMPORARY:
             self.load()
         return str(self._data)
 
     def load(self):
-        if TEMPORARY:
-            return self
-
         try:
             with open(self.path, "r") as f:
                 self._data = f.read()
