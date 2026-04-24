@@ -112,7 +112,7 @@ class StorageList(list):
                 self.extend(data.split("\n"))
 
     def get(self, *args, **kwargs):
-        if self.autoreload:
+        if self.autoreload and not TEMPORARY:
             self.load()
 
         return super().get(*args, **kwargs)
@@ -302,7 +302,7 @@ class StorageDict(dict):
         return True
 
     def get(self, *args, **kwargs):
-        if self.autoreload:
+        if self.autoreload and not TEMPORARY:
             self.load()
 
         return super().get(*args, **kwargs)
@@ -334,7 +334,7 @@ class StorageText:
         self._data = str(new_data)
         self.save()
     def get(self):
-        if self.autoreload:
+        if self.autoreload and not TEMPORARY:
             self.load()
         return str(self._data)
 
