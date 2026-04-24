@@ -102,8 +102,8 @@ class Cli(core.channel.Channel):
 
     def _print_header(self, label: str, style_class: str = None):
         width = 40
-        separator = "─" * width
-        self._print_formatted(f"{separator}", "separator")
+        separator = "\u2500" * width
+        self._print_formatted(f"\n{separator}", "separator")
         self._print_formatted(f"  {label}", style_class)
         self._print_formatted(f"{separator}", "separator")
 
