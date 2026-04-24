@@ -8,7 +8,7 @@ import shutil
 import itertools
 import asyncio
 import importlib
-import modules.files_sandboxed
+import modules.sandboxed_files
 from typing import List, Dict, Any, Optional, Union
 
 # --- Improved Tree-sitter Setup ---
@@ -59,7 +59,7 @@ except Exception as e:
     HAS_TREE_SITTER = False
     disabled_reason = f"Setup encountered an unexpected error: {e}"
 
-class Coder(modules.files_sandboxed.SandboxedFiles):
+class Coder(modules.sandboxed_files.SandboxedFiles):
     """Allows your AI to write, edit and test code for you."""
 
     settings = {
