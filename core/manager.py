@@ -137,11 +137,11 @@ class Manager:
                 import traceback
                 traceback.print_exc()
         finally:
-            if self._restart_requested:
-                return "restart"
-
             # gracefully shut down
             await self.shutdown()
+
+        if self._restart_requested:
+            return "restart"
 
         return None
 
