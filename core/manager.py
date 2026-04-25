@@ -192,14 +192,14 @@ class Manager:
         # wait so that everything's properly gone
         await asyncio.sleep(0.1)
 
+        core.log("core", "Shutdown complete")
+
         # unload everything from memory
         self.modules = None
         self.channels = None
         self.tools = None
         self.savedata = None
         self.API = None
-
-        core.log("core", "Shutdown complete")
 
     async def _initialize_api_connection(self):
         """Initialize API connection with user-friendly error handling."""

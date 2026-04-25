@@ -135,6 +135,7 @@ while True:
     if result == "restart":
         # run the loop again
         core.config.config = None # unload config
+        print("-" * 40)
         pass
     else:
         exit()
