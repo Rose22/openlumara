@@ -420,18 +420,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
     async def create_project(self, project_name: str):
         """
-        Creates an entire project structure in one go!
-
-        for the structure, use a dict like:
-        {
-            "root": ["main.py", "test.py"],
-            "src": {
-                "libs": [
-                    "mylib.py",
-                    "core.py"
-                ]
-            }
-        }
+        Creates a project
         """
         # Define the base path for the project using the sandboxed path method
         base_path = self._get_project_path(project_name)
@@ -444,7 +433,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
     async def create_file(self, project_name: str, file_path: list, content: str):
         """
-        Creates a new file within a project. Fails if the file already exists.
+        Creates a new file within a project. File path will be created recursively if non existent. Fails if the file already exists.
         """
         file_path_str = self._get_file_path(project_name, file_path)
 
