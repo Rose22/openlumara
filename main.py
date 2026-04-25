@@ -18,11 +18,11 @@ import core
 import subprocess
 import argparse
 
-async def main():
+async def main(args):
     # the manager class connects everything together
     manager = core.manager.Manager(cmdline_args=args)
     # run main loop
-    return await manager.run()
+    return await manager.run(args)
 
 def add_arguments_recursive(parser, config, prefix=""):
     """
@@ -139,7 +139,7 @@ if args.debug:
 while True:
     result = None
     try:
-        result = asyncio.run(main())
+        result = asyncio.run(main(args))
     except KeyboardInterrupt:
         pass
 
