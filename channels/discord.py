@@ -190,7 +190,7 @@ class Discord(core.channel.Channel):
         self._client = Client(self, intents=intents)
 
         # discordpy really likes to throw useless exceptions. shut up already.
-        discord.utils.setup_logging(handler=None)
+        discord.utils.setup_logging(level=50, root=False)
 
         core.log("discord", "logging in..")
 
