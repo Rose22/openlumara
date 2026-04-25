@@ -54,12 +54,12 @@ class ModuleMaker(modules.sandboxed_files.SandboxedFiles):
                 await self.channel.announce("This message pops up every minute. Very annoying!")
                 await asyncio.sleep(60)
 
-            async def on_user_message(self, message: dict):
-                \"\"\"This will be called by the framework when user sends a message. The dict is an openAI message object with the user's message. (structure: {'role': 'user', 'content': 'users message'})\"\"\"
+            async def on_user_message(self, content: str):
+                \"\"\"This will be called by the framework when user sends a message"\"\"
                 pass
 
-            async def on_assistant_message(self, message: dict):
-                \"\"\"This will be called by the framework when the AI assistant sends a message. The dict is an openAI message object with the assistant's message. (structure: {'role': 'assistant', 'content': 'ai message'})\"\"\"
+            async def on_assistant_message(self, content: str):
+                \"\"\"This will be called by the framework when the AI assistant sends a message\"\"\"
                 pass
 
             async def my_function(self, name: str):
