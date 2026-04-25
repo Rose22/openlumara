@@ -155,6 +155,12 @@ class Lists(core.module.Module):
 
         return self.result(output)
 
+    def _find_item(self, items: list, starts_with: str):
+        for index, item in enumerate(items):
+            if item.strip().lower().startswith(starts_with.strip().lower()):
+                return index
+        return None
+
     async def add_item(self, category: str, list_name: str, item_content: str):
         """
         Adds an item to a list. List items are 1-indexed.
@@ -167,36 +173,38 @@ class Lists(core.module.Module):
 
         return self.result("list item added!")
 
-    async def edit_item(self, category: str, list_name: str, index: int, item_content: str):
+    async def edit_item(self, category: str, list_name: str, item_starts_with: str, item_content: str):
         """
-        Edits an item in a list. List items are 1-indexed.
+        Edits an item in a list. You can target a list item using a string the item starts with (uses python's .startswith())
         """
         if not self._verify_target(category, list_name):
             return self.result("that list doesn't exist")
 
         target_list = self.data[category][list_name]
-        target_index = index-1 # the system prompt shows list items as 1-indexed
-        if target_index < 0 or target_index >= len(target_list["items"]):
-            return self.result("invalid list index", False)
 
-        target_list["items"][target_index] = item_content
+        found_index = self._find_item(target_list["items"], item_starts_with)
+        if not found_index:
+            return self.result("could not find that list item", False)
+
+        target_list["items"][found_index] = item_content
         self.data.save()
 
         return self.result("list item edited!")
 
-    async def delete_item(self, category: str, list_name: str, index: int):
+    async def delete_item(self, category: str, list_name: str, item_starts_with: str):
         """
-        Deletes an item in a list. List items are 1-indexed.
+        Deletes an item in a list. You can target a list item using a string the item starts with (uses python's .startswith())
         """
         if not self._verify_target(category, list_name):
             return self.result("that list doesn't exist")
 
         target_list = self.data[category][list_name]
-        target_index = index-1 # the system prompt shows list items as 1-indexed
-        if target_index < 0 or target_index >= len(target_list["items"]):
-            return self.result("invalid list index", False)
 
-        target_list["items"].pop(target_index)
+        found_index = self._find_item(target_list["items"], item_starts_with)
+        if not found_index:
+            return self.result("could not find that list item", False)
+
+        target_list["items"].pop(found_index)
         self.data.save()
 
         return self.result("list item deleted!")

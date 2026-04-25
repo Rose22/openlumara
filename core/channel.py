@@ -98,6 +98,11 @@ class Channel:
         # add sent message to context
         await self.context.chat.add(message)
 
+        # run module event hooks
+        for module_name, module in self.manager.modules.items():
+            if hasattr(module, "on_user_message"):
+                await module.on_user_message(message)
+
         # then get the full context window
         context = await self.context.get(system_prompt=True, end_prompt=True)
 
@@ -176,6 +181,14 @@ class Channel:
         # add user's message to context
         await self.context.chat.add(user_message)
 
+        # run module event hooks
+        for module_name, module in self.manager.modules.items():
+            if hasattr(module, "on_user_message"):
+                if asyncio.iscoroutinefunction(module.on_user_message):
+                    await module.on_user_message(message)
+                else:
+                    module.on_user_message(message)
+
         # get the new context window with the added message
         context = await self.context.get(system_prompt=True, end_prompt=True)
 
@@ -236,6 +249,14 @@ class Channel:
                 assistant_message["reasoning_content"] = "".join(final_reasoning)
 
             await self.context.chat.add(assistant_message)
+
+            # run module event hooks
+            for module_name, module in self.manager.modules.items():
+                if hasattr(module, "on_assistant_message"):
+                    if asyncio.iscoroutinefunction(module.on_assistant_message):
+                        await module.on_assistant_message(message)
+                    else:
+                        module.on_assistant_message(message)
 
     async def announce(self, message: str, type=None):
         """called externally to announce things in this channel, such as a reminder sent by the AI"""

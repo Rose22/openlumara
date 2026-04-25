@@ -368,7 +368,7 @@ Use tools if needed. For simple reminders, do not use tools.
             self.schedule.save()
             self._schedule_job(job)
 
-            return self.result("job successfully added!")
+            return self.result(f"job added. ID: {job_id}")
 
         except Exception as e:
             return self.result(f"error: {e}", False)

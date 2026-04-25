@@ -69,6 +69,14 @@ class Module:
         """This method will be added as a background task that will run contineously in the background. Use it for things like schedulers, cronjobs, etc!"""
         pass
 
+    async def on_user_message(self, message: dict):
+        """Triggers when the user sends a message)"""
+        pass
+
+    async def on_assistant_message(self, message: dict):
+        """Triggers when the assistant sends a message"""
+        pass
+
 # --------------
 # command decorator (@core.module.command)
 # Registry format: {"command_name": [(class_type, method), ...]}
