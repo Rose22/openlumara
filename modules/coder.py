@@ -65,11 +65,12 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
     settings = {
         "coding_style": "Write clean, well-commented code. Do not include your reasoning inside final code.",
         "sandbox_folder": "~/coder",
-        "read-only": True,
+        "read-only": False,
         "folder_blacklist": ["venv"],
         "allow_function_adding": True,
         "allow_function_editing": True,
         "allow_function_deleting": True,
+        "allow_project_creation": True,
         "allow_file_creation": True,
         "allow_full_file_reads": False,
         "allow_full_file_overwrites": False,
@@ -417,7 +418,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         except Exception as e:
             return self.result(f"error: {e}", False)
 
-    async def create_project(self, project_name: str, file_structure: dict):
+    async def create_project(self, project_name: str):
         """
         Creates an entire project structure in one go!
 
@@ -432,51 +433,27 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             }
         }
         """
-        async def _build_structure(current_path: str, structure: dict):
-            for name, content in structure.items():
-                # Determine the target path. If the key is 'root', we treat it
-                # as the current directory itself, not a new subdirectory.
-                if name == "root":
-                    target_path = current_path
-                else:
-                    target_path = os.path.join(current_path, name)
-
-                if isinstance(content, dict):
-                    # If content is a dict, it represents a directory.
-                    os.makedirs(target_path, exist_ok=True)
-                    await _build_structure(target_path, content)
-                elif isinstance(content, list):
-                    # If content is a list, it represents files in a directory.
-                    # Ensure the directory exists (vital for the 'root' case).
-                    os.makedirs(target_path, exist_ok=True)
-                    for filename in content:
-                        file_path = os.path.join(target_path, filename)
-                        # Create an empty file (or overwrite existing).
-                        with open(file_path, "w") as f:
-                            pass
-
         # Define the base path for the project using the sandboxed path method
         base_path = self._get_project_path(project_name)
 
         try:
             os.makedirs(base_path, exist_ok=True)
-            await _build_structure(base_path, file_structure)
-            return self.result("Project structure creation complete.")
+            return self.result("Project created.")
         except OSError as e:
-            return self.result(f"Error creating project structure: {e}")
+            return self.result(f"Error creating project: {e}")
 
     async def create_file(self, project_name: str, file_path: list, content: str):
         """
         Creates a new file within a project. Fails if the file already exists.
         """
-        if self.config.get("read-only_mode"):
-            return self.result("User has disabled file modification. Provide the code directly to user.", False)
-
         file_path_str = self._get_file_path(project_name, file_path)
 
-        import os
         if os.path.exists(file_path_str):
             return self.result(f"error: file already exists at {file_path_str}", False)
+
+        target_dir = os.path.dirname(os.path.join(self.sandbox_path, *file_path))
+        if not os.path.exists(target_dir):
+            os.makedirs(target_dir, exist_ok=True)
 
         try:
             with open(file_path_str, "w") as f:
