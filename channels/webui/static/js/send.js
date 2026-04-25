@@ -1399,20 +1399,21 @@ function finalizeStreamingToolCalls(finalToolCalls, aiMsgDiv) {
 
     const cards = toolCallsContainer.querySelectorAll('.tool-call-card');
     cards.forEach(card => {
-        card.classList.remove('streaming');
-        const status = card.querySelector('.tool-call-status');
-        if (status) {
-            status.classList.remove('streaming');
-            status.classList.add('pending');
-            status.textContent = 'calling...';
+        // FIX: Only reset cards that are currently in the 'streaming' state.
+        // If the card is already 'completed', leave it alone!
+        if (card.classList.contains('streaming')) {
+            card.classList.remove('streaming');
+            const status = card.querySelector('.tool-call-status');
+            if (status) {
+                status.classList.remove('streaming');
+                status.classList.add('pending');
+                status.textContent = 'calling...';
+            }
         }
     });
 
     finalToolCalls.forEach((tc) => {
         const finalId = tc.id || `tool-unknown`;
-
-        // 1. Try to find by the specific stream ID used during delta phase
-        // If no ID was present, the streaming phase used `tc-stream-${tc.index}`
         const streamId = tc.id || (tc.index !== undefined ? `tc-stream-${tc.index}` : null);
 
         let card = null;
@@ -1420,7 +1421,6 @@ function finalizeStreamingToolCalls(finalToolCalls, aiMsgDiv) {
             card = toolCallsContainer.querySelector(`[data-stream-tc-id="${streamId}"]`);
         }
 
-        // 2. Fallback: Match by the index attribute on the card
         if (!card && tc.index !== undefined) {
             card = toolCallsContainer.querySelector(`[data-index="${tc.index}"]`);
         }
@@ -1432,6 +1432,7 @@ function finalizeStreamingToolCalls(finalToolCalls, aiMsgDiv) {
 
     updateTokenUsage();
 }
+
 
 /**
  * Handle tool response during streaming.
