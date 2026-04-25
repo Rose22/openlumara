@@ -189,6 +189,9 @@ class Discord(core.channel.Channel):
         intents.message_content = True
         self._client = Client(self, intents=intents)
 
+        # discordpy really likes to throw useless exceptions. shut up already.
+        discord.utils.setup_logging(handler=None)
+
         core.log("discord", "logging in..")
 
         try:

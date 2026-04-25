@@ -28,6 +28,7 @@ class Manager:
         self.coding_mode = False
 
         self._restart_requested = False
+        self._prevent_double_shutdown = False
 
     def _remove_async_task(self, task):
         self._async_tasks.discard(task)
@@ -151,6 +152,11 @@ class Manager:
         await self.shutdown()
 
     async def shutdown(self):
+        if self._prevent_double_shutdown:
+            return False
+
+        self._prevent_double_shutdown = True
+
         core.log("core", "Shutting down..")
 
         # shutdown modules
@@ -180,7 +186,8 @@ class Manager:
         for task in list(self._async_tasks):
             task.cancel()
 
-        await asyncio.sleep(0.1)
+        # wait so that everything's properly gone
+        await asyncio.sleep(0.5)
 
         # unload everything from memory
         self.modules = None
@@ -188,6 +195,8 @@ class Manager:
         self.tools = None
         self.savedata = None
         self.API = None
+
+        self._prevent_double_shutdown = False
 
         core.log("core", "Shutdown complete")
 
