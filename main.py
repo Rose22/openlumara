@@ -18,17 +18,43 @@ import core
 import subprocess
 import argparse
 
-async def main(args):
+async def main():
+    # parse arguments
+    arg_parser = argparse.ArgumentParser()
+
+    # custom arguments
+    args_main = arg_parser.add_argument_group("main")
+    args_main.add_argument("--config", help="specify a specific config file to load", metavar="<path>")
+    args_main.add_argument("--pure", help="disables all non-essential modules so that system prompt is blank and you're talking to the bare model", action="store_true")
+    args_main.add_argument("--tmp", help="temporary session, discards all data after shutdown", action="store_true")
+    args_main.add_argument("--cli", help="CLI-only mode", action="store_true")
+    args_main.add_argument("--coder", help="enable only the coder module (coding agent mode)", action="store_true")
+    args_main.add_argument("--quiet", help="surpress logs", action="store_true")
+    args_main.add_argument("--insecure_tls", help="Disable verification for SSL/TLS certs. Use when your API uses self-signed or unvalid certificates.", action="store_true")
+    args_main.add_argument("--debug", help="Enable debug mode (display all warnings and errors)", action="store_true")
+
+    args_settings = arg_parser.add_argument_group("settings")
+    add_arguments_recursive(args_settings, core.config.get_schema(
+        enabled_channels=core.config.get("channels").get("enabled"),
+        enabled_modules=core.config.get("modules").get("enabled"),
+        enabled_user_modules=core.config.get("user_modules").get("enabled")
+    ))
+
+    # do the arg parsing
+    args = arg_parser.parse_args(sys.argv[1:])
+
+    override_config_with_args(core.config.config, args)
+
     if args.quiet:
         core.quiet = True
 
-    # load config file, allowing the path to be overridden
-    config_display_str = "config.yaml" if not args.config else args.config
-    if not core.quiet:
-        core.log("core", f"Loading settings from config {config_display_str}")
-    core.config.load(args.config)
+    if args.tmp:
+        core.storage.TEMPORARY = True
+        if not args.quiet:
+            core.log("core", "Temporary mode activated. Loading/saving of data disabled. Anything you store will not persist!")
 
-    override_config_with_args(core.config.config, args)
+    if args.debug:
+        core.debug = True
 
     # the manager class connects everything together
     manager = core.manager.Manager(cmdline_args=args)
@@ -98,37 +124,21 @@ def override_config_with_args(live_config, args_namespace):
             continue
 
 
-# parse arguments
-arg_parser = argparse.ArgumentParser()
-args_settings = arg_parser.add_argument_group("settings")
-add_arguments_recursive(args_settings, core.config.get_schema())
+# parse the --config arg
+arg_pre_parser = argparse.ArgumentParser(add_help=False)
+arg_pre_parser.add_argument("--config")
+pre_args, _ = arg_pre_parser.parse_known_args(sys.argv[1:])
 
-# custom arguments
-args_main = arg_parser.add_argument_group("main")
-args_main.add_argument("--config", help="specify a specific config file to load", metavar="<path>")
-args_main.add_argument("--pure", help="disables all non-essential modules so that system prompt is blank and you're talking to the bare model", action="store_true")
-args_main.add_argument("--tmp", help="temporary session, discards all data after shutdown", action="store_true")
-args_main.add_argument("--cli", help="CLI-only mode", action="store_true")
-args_main.add_argument("--coder", help="enable only the coder module (coding agent mode)", action="store_true")
-args_main.add_argument("--quiet", help="surpress logs", action="store_true")
-args_main.add_argument("--insecure_tls", help="Disable verification for SSL/TLS certs. Use when your API uses self-signed or unvalid certificates.", action="store_true")
-args_main.add_argument("--debug", help="Enable debug mode (display all warnings and errors)", action="store_true")
-
-# do the arg parsing
-args = arg_parser.parse_args(sys.argv[1:])
-
-if args.tmp:
-    core.storage.TEMPORARY = True
-    if not args.quiet:
-        core.log("core", "Temporary mode activated. Loading/saving of data disabled. Anything you store will not persist!")
-
-if args.debug:
-    core.debug = True
+# load config file, allowing the path to be overridden
+config_display_str = "config.yaml" if not pre_args.config else pre_args.config
+if not core.quiet:
+    core.log("core", f"Loading settings from config {config_display_str}")
+core.config.load(pre_args.config)
 
 while True:
     result = None
     try:
-        result = asyncio.run(main(args))
+        result = asyncio.run(main())
     except KeyboardInterrupt:
         pass
 
