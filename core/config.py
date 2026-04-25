@@ -235,6 +235,8 @@ def load(file_path=None):
         filename = "config"
         dirname = core.get_path()
 
+    new_config = False
+
     global config
     global _registry_cache
     # unload config if it's present
@@ -243,24 +245,31 @@ def load(file_path=None):
 
     # load config from disk
     config = core.storage.StorageDict(filename, "yaml", path=dirname, autoreload=False)
+    if not config:
+        new_config = True
 
-    if core.storage.TEMPORARY:
+    if not new_config and core.storage.TEMPORARY:
         config.load()
 
     # Read raw config to extract enabled lists BEFORE importing modules
     raw_config = dict(config) if config else {}
+
     enabled_channels = raw_config.get("channels", {}).get("enabled", [])
+    if not enabled_channels and new_config:
+        enabled_channels = DEFAULT_CHANNELS
+
     enabled_modules = raw_config.get("modules", {}).get("enabled", [])
+    if not enabled_modules and new_config:
+        enabled_modules = DEFAULT_MODULES
+
     enabled_user_modules = raw_config.get("user_modules", {}).get("enabled", [])
 
     # Now build schema using ONLY enabled modules
     schema = get_schema(enabled_channels, enabled_modules, enabled_user_modules)
     registry = _get_registry_data(enabled_channels, enabled_modules, enabled_user_modules)
 
-    created_new_config = False
-    if not config:
+    if new_config:
         target = copy.deepcopy(schema)
-        created_new_config = True
     else:
         target = sync_config(raw_config, schema)
 
@@ -279,7 +288,7 @@ def load(file_path=None):
     config.load(target)
     config.save()
 
-    if created_new_config:
+    if new_config:
         print(f"A new configuration file has been created at {config.path}.")
 
 def get(*args, **kwargs):
