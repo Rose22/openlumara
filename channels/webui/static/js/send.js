@@ -1408,9 +1408,23 @@ function finalizeStreamingToolCalls(finalToolCalls, aiMsgDiv) {
         }
     });
 
-    finalToolCalls.forEach((tc, idx) => {
-        const finalId = tc.id || `tool-${idx}`;
-        const card = toolCallsContainer.querySelector(`[data-stream-tc-id]`);
+    finalToolCalls.forEach((tc) => {
+        const finalId = tc.id || `tool-unknown`;
+
+        // 1. Try to find by the specific stream ID used during delta phase
+        // If no ID was present, the streaming phase used `tc-stream-${tc.index}`
+        const streamId = tc.id || (tc.index !== undefined ? `tc-stream-${tc.index}` : null);
+
+        let card = null;
+        if (streamId) {
+            card = toolCallsContainer.querySelector(`[data-stream-tc-id="${streamId}"]`);
+        }
+
+        // 2. Fallback: Match by the index attribute on the card
+        if (!card && tc.index !== undefined) {
+            card = toolCallsContainer.querySelector(`[data-index="${tc.index}"]`);
+        }
+
         if (card) {
             card.dataset.toolCallId = finalId;
         }
