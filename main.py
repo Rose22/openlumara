@@ -22,7 +22,7 @@ async def main(args):
     # the manager class connects everything together
     manager = core.manager.Manager(cmdline_args=args)
     # run main loop
-    return await manager.run(args)
+    return await manager.run()
 
 def add_arguments_recursive(parser, config, prefix=""):
     """
