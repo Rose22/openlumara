@@ -96,22 +96,28 @@ class Manager:
             # load modules
             import modules
             for module in core.modules.load(modules, core.module.Module, filter=enabled_modules):
-                loaded_module = await self.add_module_class(module)
-                await loaded_module._start()
+                try:
+                    loaded_module = await self.add_module_class(module)
+                    await loaded_module._start()
 
-                self.modules[loaded_module.name] = loaded_module
-                loaded_module_names.append(loaded_module.name)
+                    self.modules[loaded_module.name] = loaded_module
+                    loaded_module_names.append(loaded_module.name)
+                except Exception as e:
+                    core.log_error(f"could not load module {module.__name__}", e)
 
         if enabled_user_modules:
             # load user modules
             import user_modules
             core.log("core", "Loading user modules")
             for module in core.modules.load(user_modules, core.module.Module, filter=enabled_user_modules):
-                loaded_module = await self.add_module_class(module, is_user_module=True)
-                await loaded_module._start()
+                try:
+                    loaded_module = await self.add_module_class(module, is_user_module=True)
+                    await loaded_module._start()
 
-                self.modules[loaded_module.name] = loaded_module
-                loaded_module_names.append(loaded_module.name)
+                    self.modules[loaded_module.name] = loaded_module
+                    loaded_module_names.append(loaded_module.name)
+                except Exception as e:
+                    core.log_error(f"could not load user module {module.__name__}", e)
 
         if enabled_modules or enabled_user_modules:
             core.log("core", f"Modules loaded: {', '.join(loaded_module_names)}")
