@@ -69,11 +69,11 @@ class Module:
         """This method will be added as a background task that will run contineously in the background. Use it for things like schedulers, cronjobs, etc!"""
         pass
 
-    async def on_user_message(self, message: dict):
+    async def on_user_message(self, content: str):
         """Triggers when the user sends a message)"""
         pass
 
-    async def on_assistant_message(self, message: dict):
+    async def on_assistant_message(self, content: str):
         """Triggers when the assistant sends a message"""
         pass
 

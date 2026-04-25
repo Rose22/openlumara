@@ -101,7 +101,13 @@ class Channel:
         # run module event hooks
         for module_name, module in self.manager.modules.items():
             if hasattr(module, "on_user_message"):
-                await module.on_user_message(message)
+                try:
+                    if asyncio.iscoroutinefunction(module.on_user_message):
+                        await module.on_user_message(message.get("content", ""))
+                    else:
+                        module.on_user_message(message.get("content", ""))
+                except Exception as e:
+                    core.log(module.name, f"could not run user message hook: {e}")
 
         # then get the full context window
         context = await self.context.get(system_prompt=True, end_prompt=True)
@@ -148,6 +154,16 @@ class Channel:
 
         await self.context.chat.add({"role": "assistant", "content": response.get("content")})
 
+        # run module event hooks
+        for module_name, module in self.manager.modules.items():
+            if hasattr(module, "on_assistant_message"):
+                try:
+                    if asyncio.iscoroutinefunction(module.on_assistant_message):
+                        await module.on_assistant_message(response.get("content", ""))
+                    else:
+                        module.on_assistant_message(response.get("content", ""))
+                except Exception as e:
+                    core.log(module.name, f"could not run assistant message hook: {e}")
         return response
 
     async def send_stream(self, message: dict):
@@ -184,10 +200,13 @@ class Channel:
         # run module event hooks
         for module_name, module in self.manager.modules.items():
             if hasattr(module, "on_user_message"):
-                if asyncio.iscoroutinefunction(module.on_user_message):
-                    await module.on_user_message(message)
-                else:
-                    module.on_user_message(message)
+                try:
+                    if asyncio.iscoroutinefunction(module.on_user_message):
+                        await module.on_user_message(message.get("content", ""))
+                    else:
+                        module.on_user_message(message.get("content", ""))
+                except Exception as e:
+                    core.log(module.name, f"could not run user message hook: {e}")
 
         # get the new context window with the added message
         context = await self.context.get(system_prompt=True, end_prompt=True)
@@ -253,10 +272,13 @@ class Channel:
             # run module event hooks
             for module_name, module in self.manager.modules.items():
                 if hasattr(module, "on_assistant_message"):
-                    if asyncio.iscoroutinefunction(module.on_assistant_message):
-                        await module.on_assistant_message(message)
-                    else:
-                        module.on_assistant_message(message)
+                    try:
+                        if asyncio.iscoroutinefunction(module.on_assistant_message):
+                            await module.on_assistant_message(assistant_message.get("content", ""))
+                        else:
+                            module.on_assistant_message(assistant_message.get("content", ""))
+                    except Exception as e:
+                        core.log(module.name, f"could not run assistant message hook: {e}")
 
     async def announce(self, message: str, type=None):
         """called externally to announce things in this channel, such as a reminder sent by the AI"""

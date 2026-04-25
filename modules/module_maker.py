@@ -22,9 +22,12 @@ class ModuleMaker(modules.sandboxed_files.SandboxedFiles):
         To create modules for OpenLumara, follow this spec:
 
         ```python
+        # ALWAYS import core at the start
         import core
 
-        class YourClassName(core.module.Module):
+        # ALWAYS ensure you subclass from core.module.Module
+        # ALWAYS use an identical class name to the file name (e.g. filename: my_module, class name: MyModule)
+        class MyModule(core.module.Module):
             \"\"\"You can put a description of your module here\"\"\"
 
             # contains settings definitions. these will show up in settings panels and can be changed by the user
