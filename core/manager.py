@@ -38,6 +38,7 @@ class Manager:
         """main loop"""
 
         should_swallow_exceptions = (not core.debug)
+        self._prevent_double_shutdown = False
 
         if self.args.pure:
             self.pure_mode = True
@@ -155,6 +156,8 @@ class Manager:
         if self._prevent_double_shutdown:
             return False
 
+        # if we call manager.shutdown() somewhere in the framework,
+        # stop the automatic shutdown at the end of run() from running
         self._prevent_double_shutdown = True
 
         core.log("core", "Shutting down..")
@@ -187,7 +190,7 @@ class Manager:
             task.cancel()
 
         # wait so that everything's properly gone
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(0.1)
 
         # unload everything from memory
         self.modules = None
@@ -195,8 +198,6 @@ class Manager:
         self.tools = None
         self.savedata = None
         self.API = None
-
-        self._prevent_double_shutdown = False
 
         core.log("core", "Shutdown complete")
 
