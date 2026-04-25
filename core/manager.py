@@ -196,7 +196,7 @@ class Manager:
             task.cancel()
 
         # wait so that everything's properly gone
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(1)
 
         core.log("core", "Shutdown complete")
 
