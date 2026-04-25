@@ -11,12 +11,11 @@ class ModuleMaker(modules.sandboxed_files.SandboxedFiles):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.sandbox_path = os.path.abspath(core.config.get("user_modules").get("path"))
-        print(self.sandbox_path)
 
     def _get_module_path(self, name):
         return self._get_sandbox_path(f"{name}.py")
 
-    async def create_module(self, name: str, python_code: str):
+    async def create(self, name: str, python_code: str):
         """
         Create a new module. This can grant you, the AI, new tools for use in the future!
 
@@ -51,10 +50,6 @@ class ModuleMaker(modules.sandboxed_files.SandboxedFiles):
                 \"\"\"This will be automatically ran as an asyncio background task by the openlumara framework\"\"\"
                 await self.channel.announce("This message pops up every minute. Very annoying!")
                 await asyncio.sleep(60)
-
-            async def on_tick(self):
-                \"\"\"Runs every tick (tick is defined in user config, defaults to 1 second)\"\"\"
-                pass
 
             async def on_user_message(self, message: dict):
                 \"\"\"This will be called by the framework when user sends a message. The dict is an openAI message object with the user's message. (structure: {'role': 'user', 'content': 'users message'})\"\"\"
@@ -115,7 +110,7 @@ class ModuleMaker(modules.sandboxed_files.SandboxedFiles):
             f.write(python_code)
         return self.result("Code written! Remind user to enable the module and restart the server (using `/restart` or the restart button in the webUI settings panel)")
 
-    async def read_module(self, name: str):
+    async def read(self, name: str):
         """read an already-created module"""
 
         if not os.path.exists(self._get_module_path(name)):
@@ -126,7 +121,7 @@ class ModuleMaker(modules.sandboxed_files.SandboxedFiles):
             content = f.read()
         return self.result(content)
 
-    async def edit_module(self, name: str, python_code: str):
+    async def edit(self, name: str, python_code: str):
         """edits an existing module. ALWAYS call read_module() first before editing a module!"""
         if not os.path.exists(self._get_module_path(name)):
             return self.result("Module does not exist!", success=False)
