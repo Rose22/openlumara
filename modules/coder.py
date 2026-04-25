@@ -440,7 +440,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         if os.path.exists(file_path_str):
             return self.result(f"error: file already exists at {file_path_str}", False)
 
-        target_dir = os.path.dirname(os.path.join(self.sandbox_path, *file_path))
+        target_dir = os.path.dirname(file_path_str)
         if not os.path.exists(target_dir):
             os.makedirs(target_dir, exist_ok=True)
 
@@ -468,9 +468,15 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
     async def overwrite_file(self, project_name: str, file_path: list, content: str):
         """
-        Writes to a file within a project.
+        Writes to an existing file within a project.
         """
         file_path_str = self._get_file_path(project_name, file_path)
+
+        target_dir = os.path.dirname(file_path_str)
+        if not os.path.exists(target_dir):
+            os.makedirs(target_dir, exist_ok=True)
+
+        print(target_dir)
 
         try:
             with open(file_path_str, "w") as f:
