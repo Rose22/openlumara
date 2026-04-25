@@ -43,8 +43,8 @@ class SandboxedFiles(core.module.Module):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.sandbox_path = os.path.realpath(os.path.expanduser(self.config.get("sandbox_folder")))
-        self.trash_path = os.path.realpath(os.path.join(core.get_data_path(), "trash"))
+        self.sandbox_path = os.path.realpath(os.path.expanduser(self.config.get("sandbox_folder", "")))
+        self.trash_path = os.path.realpath(os.path.join(core.get_data_path(), "trash", ""))
 
         if not os.path.exists(self.sandbox_path):
             os.makedirs(self.sandbox_path, exist_ok=True)

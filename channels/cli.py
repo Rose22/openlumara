@@ -126,11 +126,14 @@ class Cli(core.channel.Channel):
 
         with prompt_toolkit.patch_stdout.patch_stdout():
             while self.running:
-                msg = await prompt_session.prompt_async(
-                    self._get_prompt(),
-                    refresh_interval=0.5,
-                    set_exception_handler=False
-                )
+                try:
+                    msg = await prompt_session.prompt_async(
+                        self._get_prompt(),
+                        refresh_interval=0.5,
+                        set_exception_handler=False
+                    )
+                except KeyboardInterrupt:
+                    await self.manager.shutdown()
 
                 if not msg.strip():
                     continue

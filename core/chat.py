@@ -51,7 +51,7 @@ class Chat:
         if not messages:
             return False
         
-        cmd_prefix = core.config.get("cmd_prefix", "/")
+        cmd_prefix = core.config.get("core").get("cmd_prefix", "/")
         
         for msg in messages:
             role = msg.get("role")

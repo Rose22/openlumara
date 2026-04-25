@@ -7,7 +7,7 @@ def get_commands_help(modules_dict):
     Builds a help string grouped by module instance.
     """
     output = []
-    cmd_prefix = core.config.get("cmd_prefix", "/")
+    cmd_prefix = core.config.get("core").get("cmd_prefix", "/")
 
     for module_name, instance in modules_dict.items():
         module_cmds = []
@@ -212,7 +212,7 @@ core:
 
     async def _extract_cmd(self, message_text):
         message_content = message_text.strip()
-        cmd_prefix = core.config.get("cmd_prefix", "/")
+        cmd_prefix = core.config.get("core").get("cmd_prefix", "/")
         cmd_prefix_index = message_content.lower().find(cmd_prefix.lower())+len(cmd_prefix)
 
         cmd = message_content[cmd_prefix_index:].split()

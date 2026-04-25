@@ -127,7 +127,8 @@ def run_from_argv(argv=None):
 
     if args.tmp:
         core.storage.TEMPORARY = True
-        core.log("core", "Temporary mode activated. Loading/saving of data disabled, anything you store will not persist!")
+        if not args.quiet:
+            core.log("core", "Temporary mode activated. Loading/saving of data disabled. Anything you store will not persist!")
 
     if args.debug:
         core.debug = True
@@ -142,6 +143,7 @@ def run_from_argv(argv=None):
     if result == "restart":
         # run the loop again
         core.config.config = None # unload config
+        print("-" * 40)
         pass
     else:
         exit()

@@ -180,7 +180,7 @@ class Webui(core.channel.Channel):
             while not self._shutdown_requested:
                 await asyncio.sleep(1)
         except asyncio.CancelledError:
-            raise
+            pass
 
     def _run_flask(self):
         """Run Flask in a separate thread."""

@@ -8,7 +8,7 @@ import shutil
 import itertools
 import asyncio
 import importlib
-import modules.files_sandboxed
+import modules.sandboxed_files
 from typing import List, Dict, Any, Optional, Union
 
 # --- Improved Tree-sitter Setup ---
@@ -59,7 +59,7 @@ except Exception as e:
     HAS_TREE_SITTER = False
     disabled_reason = f"Setup encountered an unexpected error: {e}"
 
-class Coder(modules.files_sandboxed.SandboxedFiles):
+class Coder(modules.sandboxed_files.SandboxedFiles):
     """Allows your AI to write, edit and test code for you."""
 
     settings = {
@@ -73,8 +73,7 @@ class Coder(modules.files_sandboxed.SandboxedFiles):
         "allow_file_creation": True,
         "allow_full_file_reads": False,
         "allow_full_file_overwrites": False,
-        "allow_code_execution": False,
-        "openlumara_module_creation_mode": False,
+        "allow_code_execution": False
     }
 
     # Language heuristics for symbol searching and outline generation
@@ -254,88 +253,6 @@ class Coder(modules.files_sandboxed.SandboxedFiles):
         }
     }
 
-
-    OPENLUMARA_MODULE_PROMPT = """
-To create modules for OpenLumara, follow this spec:
-
-```python
-import core
-
-class YourClassName(core.module.Module):
-    \"\"\"You can put a description of your module here\"\"\"
-
-    # contains settings definitions. these will show up in settings panels and can be changed by the user
-    settings = {
-        "key": "default_value",
-        "save_data_path": "fancymoduledata"
-    }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # dict that gets saved to persistent storage
-        self.saved_dict = core.storage.StorageDict(self.config.get("save_data_path"), type="json") # available types: json, yaml, msgpack, markdown, text
-
-        # list that gets saved to persistent storage
-        self.saved_list = core.storage.StorageList(self.config.get("save_data_path"), type="json") # available types: json, yaml, msgpack, text
-
-        self.whatever_variables_you_want = "whatever value you want"
-
-    async def on_system_prompt(self):
-        return "Return a string here, and it'll appear in your system prompt!"
-
-    async def on_background(self):
-        \"\"\"This will be automatically ran as an asyncio background task by the openlumara framework\"\"\"
-        await self.channel.announce("This message pops up every minute. Very annoying!")
-        await asyncio.sleep(60)
-
-    async def my_function(self, name: str):
-        \"\"\"A tool that can be called by AI. The docstring will show up in your tool description!\"\"\"
-        # any code you want here
-        name = name.lower()
-        # use self.channel.announce to display notifications to the user! this can be during processing, or even in a background loop. this allows you to display messages without being prompted into it
-        await self.channel.announce("wow! this message popped up all on its own!")
-
-        try:
-            ohnoididsomethingnaughty()
-        except Exception as e:
-            return self.result(f"error while trying to run my tool: {e}", success=False) # use success=False upon errors
-
-        # you can even send a prompt to yourself and return the response!
-        response_from_ai = self.channel.send_stream({"role": "user", "content": "how do you do, me?"})
-        collected_tokens = []
-        async for token in response_from_ai:
-            # do whatever you want with the token. collect it, display it, whatever you want
-            # tokens follow openAI's spec. they are a dict with two keys: type, and content.
-            if token.get("type") == "content":
-                collected_tokens.append(token.get("content"))
-            elif token.get("type") == "reasoning":
-                # do whatever with reasoning
-                pass
-
-        msg_from_ai = " ".join(collected_tokens)
-
-        return self.result(f"this is my tool, {name}! also, {msg_from_ai}", success=True) # using self.result is VITAL to ensure the output of a tool gets properly returned and parsed
-
-    @core.module.command("my_command", temporary=False, help={
-        "": "show list of profiles", # this is shown for the command by itself without arguments
-        "<name>": "show profile for <name>",
-        "<name> <profile>": "set <name>'s profile to <profile>"
-    })
-    async def my_command(self, args: list):
-        # arguments is 0-indexed. args[0] is not the name of the command, but the first argument
-        match len(args):
-            case 0:
-                return self.saved_dict.keys()
-            case 1:
-                return self.saved_dict.get(args[0], "profile not found")
-            case 2:
-                self.saved_dict[args[0]] = str(args[1])
-                self.saved_dict.save()
-                return "Profile stored!" # we don't use self.result() for user facing commands, only for AI-facing tools
-            case _:
-                return "invalid arguments"
-"""
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.path = self.sandbox_path
@@ -351,24 +268,36 @@ class YourClassName(core.module.Module):
 
         # disable any tools that were disabled via config
         if self.config.get("read-only"):
-            self.disabled_tools.append("create_project")
+            self.disabled_tools.extend([
+                "add_symbol_before",
+                "add_symbol_after",
+                "edit_symbol",
+                "delete_symbol",
+                "create_project",
+                "create_file",
+                "overwrite_file",
+                "execute"
+            ])
 
-        if not self.config.get("allow_function_adding") or self.config.get("read-only"):
+        if not self.config.get("allow_function_adding"):
             self.disabled_tools.append("add_symbol_before")
 
-        if not self.config.get("allow_function_editing") or self.config.get("read-only"):
-            self.disabled_tools.append("edit_symbol_content")
+        if not self.config.get("allow_function_editing"):
+            self.disabled_tools.append("edit_symbol")
 
-        if not self.config.get("allow_function_deleting") or self.config.get("read-only"):
+        if not self.config.get("allow_function_deleting"):
             self.disabled_tools.append("delete_symbol")
 
-        if not self.config.get("allow_file_creation") or self.config.get("read-only"):
+        if not self.config.get("allow_project_creation"):
+            self.disabled_tools.append("create_project")
+
+        if not self.config.get("allow_file_creation"):
             self.disabled_tools.append("create_file")
 
-        if not self.config.get("allow_full_file_reads") or self.config.get("read-only"):
+        if not self.config.get("allow_full_file_reads"):
             self.disabled_tools.append("read_file")
 
-        if not self.config.get("allow_full_file_overwrites") or self.config.get("read-only"):
+        if not self.config.get("allow_full_file_overwrites"):
             self.disabled_tools.append("overwrite_file")
 
         if not self.config.get("allow_code_execution"):
@@ -392,25 +321,22 @@ class YourClassName(core.module.Module):
         if coding_style:
             output += f"## Your coding style\nWhen coding, keep this coding style guide in mind:\n{coding_style}\n\n"
 
-        if self.config.get("openlumara_module_creation_mode"):
-            output += self.OPENLUMARA_MODULE_PROMPT.strip()
-        else:
-            file_list = os.listdir(self.sandbox_path)
-            project_list = []
-            for filename in file_list:
-                if not os.path.isdir(os.path.join(self.sandbox_path, filename)):
-                    continue
+        file_list = os.listdir(self.sandbox_path)
+        project_list = []
+        for filename in file_list:
+            if not os.path.isdir(os.path.join(self.sandbox_path, filename)):
+                continue
 
-                project_list.append(filename)
+            project_list.append(filename)
 
-            output += "## Current projects in sandbox\n"
-            if not project_list:
-                output += "No projects yet."
+        output += "## Current projects in sandbox\n"
+        if not project_list:
+            output += "No projects yet."
 
-            try:
-                output += "\n".join(project_list)
-            except Exception as e:
-                return f"error: {e}", False
+        try:
+            output += "\n".join(project_list)
+        except Exception as e:
+            return f"error: {e}", False
 
         return output
 

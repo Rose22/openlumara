@@ -132,7 +132,7 @@ class Telegram(core.channel.Channel):
             self.auth_storage.set(str(chat_id))
 
         text = update.message.text.strip()
-        cmd_prefix = core.config.get("cmd_prefix", "/")
+        cmd_prefix = core.config.get("core").get("cmd_prefix", "/")
 
         # Check if it is a command
         if text.startswith(cmd_prefix):

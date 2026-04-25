@@ -68,7 +68,7 @@ class Memory(core.module.Module):
         }
         self._mem.append(mem)
         self._mem.save()
-        return self.result(True)
+        return self.result("memory added. ID: {mem['id']}")
 
     async def edit(self, id: str, content: str = None, tags: list = None):
         """

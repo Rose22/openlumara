@@ -116,6 +116,10 @@ class Scheduler(core.module.Module):
         if not job_channel and self.channel:
             job_channel = self.channel
 
+        if not job_channel:
+                core.log("scheduler", f"error executing job {job_id}: no channel available for tool calls")
+                return
+
         tools = [
             t for t in self.manager.tools
             if t.get("function", {}).get("name") != "scheduler_add_job"
@@ -134,16 +138,16 @@ Use tools if needed. For simple reminders, do not use tools.
 """.strip()
         }
 
-        await self.channel.context.chat.add(event_message)
+        await job_channel.context.chat.add(event_message)
 
         response = await self.manager.API.send(
-            await self.channel.context.get(end_prompt=False),
+            await job_channel.context.get(end_prompt=False),
             use_tools=True,
             tools=tools
         )
 
         # erase the automated instruction from history
-        await self.channel.context.chat.pop(-1)
+        await job_channel.context.chat.pop(-1)
 
         if not response:
             return
@@ -152,10 +156,6 @@ Use tools if needed. For simple reminders, do not use tools.
         tool_calls = response.get("tool_calls")
 
         if tool_calls:
-            if not job_channel:
-                core.log("scheduler", f"error executing job {job_id}: no channel available for tool calls")
-                return
-
             # Use a local manager to avoid race conditions and ensure the correct channel is used
             tc_manager = core.toolcalls.ToolcallManager(job_channel)
 
@@ -368,7 +368,7 @@ Use tools if needed. For simple reminders, do not use tools.
             self.schedule.save()
             self._schedule_job(job)
 
-            return self.result("job successfully added!")
+            return self.result(f"job added. ID: {job_id}")
 
         except Exception as e:
             return self.result(f"error: {e}", False)

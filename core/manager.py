@@ -28,6 +28,7 @@ class Manager:
         self.coding_mode = False
 
         self._restart_requested = False
+        self._prevent_double_shutdown = False
 
     def _remove_async_task(self, task):
         self._async_tasks.discard(task)
@@ -37,6 +38,7 @@ class Manager:
         """main loop"""
 
         should_swallow_exceptions = (not core.debug)
+        self._prevent_double_shutdown = False
 
         if self.args.pure:
             self.pure_mode = True
@@ -94,22 +96,28 @@ class Manager:
             # load modules
             import modules
             for module in core.modules.load(modules, core.module.Module, filter=enabled_modules):
-                loaded_module = await self.add_module_class(module)
-                await loaded_module._start()
+                try:
+                    loaded_module = await self.add_module_class(module)
+                    await loaded_module._start()
 
-                self.modules[loaded_module.name] = loaded_module
-                loaded_module_names.append(loaded_module.name)
+                    self.modules[loaded_module.name] = loaded_module
+                    loaded_module_names.append(loaded_module.name)
+                except Exception as e:
+                    core.log_error(f"could not load module {module.__name__}", e)
 
         if enabled_user_modules:
             # load user modules
             import user_modules
             core.log("core", "Loading user modules")
             for module in core.modules.load(user_modules, core.module.Module, filter=enabled_user_modules):
-                loaded_module = await self.add_module_class(module, is_user_module=True)
-                await loaded_module._start()
+                try:
+                    loaded_module = await self.add_module_class(module, is_user_module=True)
+                    await loaded_module._start()
 
-                self.modules[loaded_module.name] = loaded_module
-                loaded_module_names.append(loaded_module.name)
+                    self.modules[loaded_module.name] = loaded_module
+                    loaded_module_names.append(loaded_module.name)
+                except Exception as e:
+                    core.log_error(f"could not load user module {module.__name__}", e)
 
         if enabled_modules or enabled_user_modules:
             core.log("core", f"Modules loaded: {', '.join(loaded_module_names)}")
@@ -137,11 +145,11 @@ class Manager:
                 import traceback
                 traceback.print_exc()
         finally:
-            if self._restart_requested:
-                return "restart"
-
             # gracefully shut down
             await self.shutdown()
+
+        if self._restart_requested:
+            return "restart"
 
         return None
 
@@ -151,6 +159,13 @@ class Manager:
         await self.shutdown()
 
     async def shutdown(self):
+        if self._prevent_double_shutdown:
+            return False
+
+        # if we call manager.shutdown() somewhere in the framework,
+        # stop the automatic shutdown at the end of run() from running
+        self._prevent_double_shutdown = True
+
         core.log("core", "Shutting down..")
 
         # shutdown modules
@@ -180,7 +195,10 @@ class Manager:
         for task in list(self._async_tasks):
             task.cancel()
 
+        # wait so that everything's properly gone
         await asyncio.sleep(0.1)
+
+        core.log("core", "Shutdown complete")
 
         # unload everything from memory
         self.modules = None
@@ -188,8 +206,6 @@ class Manager:
         self.tools = None
         self.savedata = None
         self.API = None
-
-        core.log("core", "Shutdown complete")
 
     async def _initialize_api_connection(self):
         """Initialize API connection with user-friendly error handling."""
