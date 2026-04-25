@@ -351,24 +351,36 @@ class YourClassName(core.module.Module):
 
         # disable any tools that were disabled via config
         if self.config.get("read-only"):
-            self.disabled_tools.append("create_project")
+            self.disabled_tools.extend([
+                "add_symbol_before",
+                "add_symbol_after",
+                "edit_symbol",
+                "delete_symbol",
+                "create_project",
+                "create_file",
+                "overwrite_file",
+                "execute"
+            ])
 
-        if not self.config.get("allow_function_adding") or self.config.get("read-only"):
+        if not self.config.get("allow_function_adding"):
             self.disabled_tools.append("add_symbol_before")
 
-        if not self.config.get("allow_function_editing") or self.config.get("read-only"):
-            self.disabled_tools.append("edit_symbol_content")
+        if not self.config.get("allow_function_editing"):
+            self.disabled_tools.append("edit_symbol")
 
-        if not self.config.get("allow_function_deleting") or self.config.get("read-only"):
+        if not self.config.get("allow_function_deleting"):
             self.disabled_tools.append("delete_symbol")
 
-        if not self.config.get("allow_file_creation") or self.config.get("read-only"):
+        if not self.config.get("allow_project_creation"):
+            self.disabled_tools.append("create_project")
+
+        if not self.config.get("allow_file_creation"):
             self.disabled_tools.append("create_file")
 
-        if not self.config.get("allow_full_file_reads") or self.config.get("read-only"):
+        if not self.config.get("allow_full_file_reads"):
             self.disabled_tools.append("read_file")
 
-        if not self.config.get("allow_full_file_overwrites") or self.config.get("read-only"):
+        if not self.config.get("allow_full_file_overwrites"):
             self.disabled_tools.append("overwrite_file")
 
         if not self.config.get("allow_code_execution"):
