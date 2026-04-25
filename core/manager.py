@@ -168,6 +168,7 @@ class Manager:
                 try:
                     if asyncio.iscoroutinefunction(module.on_shutdown):
                         await module.on_shutdown()
+                        await module._stop_tick_loop()
                     else:
                         module.on_shutdown()
                 except Exception as e:

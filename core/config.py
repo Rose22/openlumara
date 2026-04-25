@@ -13,7 +13,9 @@ _registry_cache = None
 default_config = {
     "core": {
         "data_folder": "data",
-        "auto_resume_chats": True
+        "auto_resume_chats": True,
+        "cmd_prefix": "/",
+        "tick_interval": 1
     },
     "api": {
         "url": "http://localhost:5001/v1",
@@ -40,6 +42,7 @@ default_config = {
         "settings": {}
     },
     "user_modules": {
+        "path": "user_modules",
         "enabled": [],
         "disabled": [],
         "settings": {}
@@ -234,6 +237,12 @@ def load(file_path=None):
         dirname = core.get_path()
 
     global config
+    global _registry_cache
+    # unload config if it's present
+    config = None
+    _registry_cache = None
+
+    # load config from disk
     config = core.storage.StorageDict(filename, "yaml", path=dirname, autoreload=False)
 
     if core.storage.TEMPORARY:

@@ -22,6 +22,25 @@ class Module:
         config_target = "modules" if not is_user_module else "user_modules"
         self.config = core.config.get(config_target, {}).get("settings", {}).get(self.name, {})
 
+        # start the module's tick loop if it's present
+        self._tick_loop = None
+        if hasattr(self, "on_tick"):
+            if not is_empty_coroutine(self.on_tick):
+                self._tick_loop = asyncio.create_task(self._run_tick_loop())
+
+    async def _run_tick_loop(self):
+        """runs code every N seconds (N is defined in the config)"""
+
+        while True:
+            await self.on_tick()
+            await asyncio.sleep(core.config.get("core").get("tick_interval", 1))
+
+    async def _stop_tick_loop(self):
+        if not self._tick_loop:
+            return False
+
+        self._tick_loop.cancel()
+
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         # Scan the class for methods decorated with @command

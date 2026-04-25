@@ -147,7 +147,7 @@ class Client(discord.Client):
                            content = content.strip()
 
                         # if group chat is enabled, make the AI aware of who is speaking
-                        if self.ai_channel.config.get("enable_group_chat") and not content.startswith(core.config.get("cmd_prefix", "/")):
+                        if self.ai_channel.config.get("enable_group_chat") and not content.startswith(core.config.get("core").get("cmd_prefix", "/")):
                             content = f"{message.author.display_name} said: {content}"
 
                         response_obj = self.ai_channel.send_stream({"role": "user", "content": content})
