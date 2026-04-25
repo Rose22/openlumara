@@ -57,7 +57,10 @@ def run_from_args(arg_list: list = []):
     ))
 
     # do the arg parsing
-    args = arg_parser.parse_args(arg_list)
+    args, unknown = arg_parser.parse_known_args(arg_list)
+    for unknown_arg in unknown:
+        if unknown_arg.startswith("--"):
+            core.log("core", f"Warning: Unrecognized argument '{unknown_arg}' will be ignored. The module could be disabled or the syntax could be wrong.")
 
     # override any targeted config values
     override_config_with_args(core.config.config, args)
