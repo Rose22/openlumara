@@ -200,13 +200,6 @@ class Manager:
 
         core.log("core", "Shutdown complete")
 
-        # unload everything from memory
-        self.modules = None
-        self.channels = None
-        self.tools = None
-        self.savedata = None
-        self.API = None
-
     async def _initialize_api_connection(self):
         """Initialize API connection with user-friendly error handling."""
         core.log("API", "Connecting to AI..")

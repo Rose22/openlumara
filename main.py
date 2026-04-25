@@ -17,13 +17,7 @@ import core
 import subprocess
 import argparse
 
-async def main_loop(args):
-    # the manager class connects everything together
-    manager = core.manager.Manager(cmdline_args=args)
-    # run main loop
-    return await manager.run()
-
-def run_from_args(arg_list: list = []):
+async def main_loop(arg_list):
     # parse the --config arg
     arg_pre_parser = argparse.ArgumentParser(add_help=False)
     arg_pre_parser.add_argument("--config")
@@ -33,6 +27,7 @@ def run_from_args(arg_list: list = []):
     config_display_str = "config.yaml" if not pre_args.config else pre_args.config
     if not core.quiet:
         core.log("core", f"Loading settings from config {config_display_str}")
+
     core.config.load(pre_args.config)
 
     # parse arguments
@@ -76,10 +71,20 @@ def run_from_args(arg_list: list = []):
     if args.debug:
         core.debug = True
 
+    # the manager class connects everything together
+    manager = core.manager.Manager(cmdline_args=args)
+    # run main loop
+    return await manager.run()
+
+    # unload everything
+    manager = None
+    core.config.config = None
+
+def run_from_args(arg_list: list = []):
     while True:
         result = None
         try:
-            result = asyncio.run(main_loop(args))
+            result = asyncio.run(main_loop(arg_list))
         except KeyboardInterrupt:
             pass
 

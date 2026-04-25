@@ -239,8 +239,6 @@ def load(file_path=None):
 
     global config
     global _registry_cache
-    # unload config if it's present
-    config = None
     _registry_cache = None
 
     # load config from disk
@@ -276,6 +274,7 @@ def load(file_path=None):
     # Sync settings and reconcile lists
     for item in registry:
         sync_module_settings(target, item['instances'], item['section_key'])
+
         # Use available_names (filesystem discovered) instead of imported names
         state = reconcile_lists(
             item['available_names'],
