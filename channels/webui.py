@@ -224,7 +224,12 @@ def _run_async(coro):
     if not channel_instance or not channel_instance.main_loop:
         return None
     future = asyncio.run_coroutine_threadsafe(coro, channel_instance.main_loop)
-    return future.result()
+
+    try:
+        return future.result()
+    except Exception as e:
+        core.log("webui", f"Error running async task: {e}")
+        return None
 
 # =============================================================================
 # Flask Routes
