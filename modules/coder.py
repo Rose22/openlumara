@@ -476,8 +476,6 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         if not os.path.exists(target_dir):
             os.makedirs(target_dir, exist_ok=True)
 
-        print(target_dir)
-
         try:
             with open(file_path_str, "w") as f:
                 f.write(content)
