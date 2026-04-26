@@ -1674,10 +1674,10 @@ function applyCustomFont(fontId) {
 
     if (!fontId || fontId === 'default') {
         // Reset to system defaults
-        root.style.setProperty('--font-family', "sans-serif");
+        root.style.setProperty('--font-family', "Arial, sans-serif");
         root.style.removeProperty('--code-font'); // This allows it to fall back to :root
     } else {
-        const fontFamily = `'${fontId}', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`;
+        const fontFamily = `'${fontId}', Arial, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`;
 
         // Update UI font
         root.style.setProperty('--font-family', fontFamily);
@@ -1718,7 +1718,7 @@ function createFontFamilyDropdown(fontOptions, selectedFont, onChange) {
     trigger.setAttribute('aria-haspopup', 'listbox');
 
     const selectedOption = fontOptions.find(f => f.value === currentSelection) || fontOptions[0];
-    const triggerFontFamily = currentSelection === 'default' ? 'inherit' : `'${currentSelection}', sans-serif`;
+    const triggerFontFamily = currentSelection === 'default' ? 'inherit' : `'${currentSelection}', Arial, sans-serif`;
 
     // Structure: Value text + Arrow
     trigger.innerHTML = `

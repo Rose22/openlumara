@@ -42,9 +42,9 @@
     --sidebar-width: 420px;
 
     /* === TYPOGRAPHY === */
-    --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-    --font-display: 'Inter', sans-serif; /* Used for headers/Names */
-    --font-family: 'sans-serif';
+    --font-primary: 'Arial', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-display: 'Arial', sans-serif; /* Used for headers/Names */
+    --font-family: 'Arial', 'sans-serif';
     --code-font: 'Consolas', 'Monaco', 'Menlo', monospace;
 
     /* === SHAPES & FEEL === */

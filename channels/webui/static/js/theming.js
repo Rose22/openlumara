@@ -104,7 +104,7 @@ function applyTheme(family, mode) {
         // OVERRIDE the code font with the user's selected font
         root.style.setProperty('--code-font', `'${savedFont}', monospace`);
     } else if (savedFont === 'default') {
-        root.style.setProperty('--font-family', "sans-serif");
+        root.style.setProperty('--font-family', "Arial, sans-serif");
     }
 
     currentThemeFamily = family;
