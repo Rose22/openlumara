@@ -200,6 +200,7 @@ class Manager:
                 pass
             except Exception as e:
                 core.log("warning", f"Error waiting for task {task.get_name()} to finish: {e}")
+
         # wait so that everything's properly gone
         await asyncio.sleep(1)
 
