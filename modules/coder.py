@@ -266,38 +266,70 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
                 return lang
         return 'generic'
 
-    def _validate_content(self, content: str, context: str = "content") -> tuple:
-        """
-        Validates that content is not double-escaped or malformed.
-        Returns (is_valid, cleaned_content, error_message).
-        """
-        if not isinstance(content, str):
-            return False, content, f"{context} must be a string"
+def _validate_content(self, content: str, context: str = "content") -> tuple:
+    """
+    Validates that content is not double-escaped or malformed.
+    Returns (is_valid, cleaned_content, error_message).
+    """
+    if not isinstance(content, str):
+        return False, content, f"{context} must be a string"
 
-        # Check for signs of double-escaping
-        if content.startswith('"') and content.endswith('"'):
-            # Likely a JSON string literal that wasn't properly decoded
-            # Check if it contains escaped quotes that shouldn't be there
-            if '\\"' in content and '\\n' in content:
-                # This looks like a double-escaped string
-                core.log("coder", f"WARNING: {context} appears to be double-escaped. Attempting to fix.")
-                try:
-                    # Try to decode it
-                    import json
-                    decoded = json.loads(content)
-                    return True, decoded, None
-                except:
-                    return False, content, f"{context} appears to be a JSON-encoded string. Pass raw code, not a JSON string literal."
+    # Check for escaped characters that indicate double-encoding
+    has_escaped_quotes = '\\"' in content or "\\\"\"" in content or "\\'''" in content
+    has_literal_newlines = r'\n' in content  # The literal backslash-n sequence
 
-        # Check for excessive backslash escaping
-        backslash_count = content.count('\\')
-        quote_count = content.count('"') + content.count("'")
-        if backslash_count > quote_count * 2 and len(content) > 50:
-            # Suspicious ratio of backslashes
-            if '\\n' in content[:100] and '\n' not in content[:100]:
-                return False, content, f"{context} contains escaped newlines (\\n instead of actual newlines). Pass raw code with actual line breaks."
+    # Also check if it looks like it was JSON-encoded
+    looks_like_json_string = (
+        (content.startswith('"') and content.endswith('"')) or
+        (content.startswith("'") and content.endswith("'"))
+    ) and (has_escaped_quotes or has_literal_newlines)
 
-        return True, content, None
+    if has_escaped_quotes or (has_literal_newlines and '\n' not in content[:500]):
+        core.log("coder", f"WARNING: {context} contains escaped characters. Attempting to decode.")
+
+        try:
+            import codecs
+            # Try to decode escape sequences
+            decoded = codecs.decode(content, 'unicode_escape')
+            # If the decoded version has actual newlines where there were \n, use it
+            if '\n' in decoded and r'\n' in content[:200]:
+                core.log("coder", f"Successfully decoded escaped content for {context}")
+                return True, decoded, None
+        except Exception as e:
+            core.log("coder", f"Failed to decode escaped content: {e}")
+
+        # If decoding failed, give a clear error
+        if has_escaped_quotes and has_literal_newlines:
+            return False, content, (
+                f"{context} appears to be double-escaped with both escaped quotes (\\\") "
+                f"and escaped newlines (\\n). You must pass raw code with actual quotes "
+                f"and actual line breaks, NOT escaped sequences."
+            )
+        elif has_escaped_quotes:
+            return False, content, (
+                f"{context} contains escaped quotes (\\"). "
+                f"Pass raw code with actual quote characters."
+            )
+        elif has_literal_newlines:
+            return False, content, (
+                f"{context} contains escaped newlines (\\n as text, not actual newlines). "
+                f"Pass raw code with actual line breaks."
+            )
+
+    if looks_like_json_string:
+        core.log("coder", f"WARNING: {context} appears to be a JSON string literal. Attempting to decode.")
+        try:
+            import json
+            decoded = json.loads(content)
+            if isinstance(decoded, str):
+                return True, decoded, None
+        except:
+            return False, content, (
+                f"{context} appears to be a JSON-encoded string. "
+                f"Pass raw source code directly, not a JSON string literal."
+            )
+
+    return True, content, None
 
     async def on_system_prompt(self):
         """Generates the system prompt with tool usage guidelines."""
@@ -308,36 +340,53 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
 When working with code files, you MUST use tools in this order:
 
-1. **get_outline** - Call this first to see all symbols (classes, functions, variables) in a file. This is cheap and fast.
+1. **get_outline** - Call this first to see all symbols (classes, functions) in a file.
+2. **get_symbols** - Use this to retrieve specific code by symbol name. PRIMARY reading method.
+3. **edit_symbol / add_symbol_before / add_symbol_after / delete_symbol** - Modify code precisely.
+4. **read_file** - LAST RESORT only. Do not use for normal code reading.
+5. **overwrite_file** - Only for complete file restructuring.
 
-2. **get_symbols** - Use this to retrieve the actual code for specific symbols by name. This is the PRIMARY way you should read code. It returns only what you need.
+### CRITICAL: Content Format
 
-3. **edit_symbol / add_symbol_before / add_symbol_after / delete_symbol** - Use these to modify code precisely at the symbol level.
+When passing code to `content`, `new_content`, or `content_body` parameters:
 
-4. **read_file** - DO NOT use this unless you have a specific reason why get_symbols cannot work (e.g., the file format doesn't have parseable symbols, or you need to see the exact file layout). This tool wastes context.
+**YOU MUST PASS RAW SOURCE CODE WITH:**
+- Actual newline characters
+- Actual quote characters (" and ')
+- Actual triple quotes (\"\"\" for docstrings)
 
-5. **overwrite_file** - Only use when you must completely restructure a file. Prefer symbol-level edits.
+**DO NOT PASS:**
+- Escaped newlines like `\\n` as text
+- Escaped quotes like `\\"` as text
+- JSON string literals
+
+**WRONG - This is what causes corrupted files:**
+```
+"def hello():\n print(\"hi\")"
+```
+
+The above is a JSON string with escaped characters. It will corrupt your file!
+
+**RIGHT - Pass raw code with actual formatting:**
+
+```
+def hello():
+    print("hi")
+```
+
+The tool framework handles encoding. You just provide the actual code.
 
 ### Workflow Example
 
-**CORRECT workflow:**
-1. Call `get_outline(project_name=["myproject"], file_path=["utils.py"])` to see symbols
-2. Receive: `[{"name": "helper_func", "type": "function"}, {"name": "DataParser", "type": "class"}]`
-3. Call `get_symbols(project_name=["myproject"], file_path=["utils.py"], symbols=["DataParser"])` to read the class
-4. Call `edit_symbol(project_name=["myproject"], file_path=["utils.py"], symbol_name="DataParser", new_content="class DataParser: ...")` to modify it
+1. `get_outline(project_name="myproj", file_path=["utils.py"])`
+   Returns: `[{"name": "parse_data", "type": "function"}]`
 
-**WRONG workflow:**
-1. Call `read_file` on the entire file just to find one function
-2. This floods context with irrelevant code
+2. `get_symbols(project_name="myproj", file_path=["utils.py"], symbols=["parse_data"])`
+   Returns the function code.
 
-### Content Parameter Format
-
-When passing code content to tools (`content`, `new_content`, `content_body`):
-
-- Use **actual line breaks**, not the string `\\n`
-- Use **actual quotes**, not escaped quotes like `\\"`
-
-The content parameter should look like real source code, not a JSON string representation of it.
+3. `edit_symbol(project_name="myproj", file_path=["utils.py"], symbol_name="parse_data", new_content=def parse_data(input):
+    # Your raw code with actual newlines
+    return input.strip())`
 """.strip()
 
         coding_style = self.config.get("coding_style")
