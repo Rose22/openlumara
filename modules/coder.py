@@ -439,6 +439,9 @@ When working with code files, you MUST use tools in this order:
         """
         Creates a new project directory in the sandbox.
         """
+        if not self.config.get("allow_project_creation"):
+            return self.result("Project creation is disabled.", False)
+
         base_path = self._get_project_path(project_name)
         try:
             os.makedirs(base_path, exist_ok=True)
@@ -458,6 +461,9 @@ When working with code files, you MUST use tools in this order:
             file_path: List of path components (e.g., ["src", "main.py"]).
             content: Raw source code content.
         """
+        if not self.config.get("allow_file_creation"):
+            return self.result("File creation is disabled", False)
+
         # Validate content
         is_valid, cleaned_content, error = self._validate_content(content, "content")
         if not is_valid and error:
@@ -488,6 +494,9 @@ When working with code files, you MUST use tools in this order:
         Prefer using get_outline() + get_symbols() to read specific code blocks.
         Reading entire files wastes tokens and floods your context.
         """
+        if not self.config.get("allow_full_file_reads"):
+            return self.result("Full file reading is disabled. Use get_symbol!", False)
+
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
             return self.result("file does not exist!", False)
@@ -506,6 +515,9 @@ When working with code files, you MUST use tools in this order:
         IMPORTANT: The `content` parameter should be raw source code with actual newlines
         and quotes, NOT a JSON-encoded string literal.
         """
+        if not self.config.get("allow_full_file_overwrites"):
+            return self.result("File overwriting is disabled. Use edit_symbol!", False)
+
         # Validate content
         is_valid, cleaned_content, error = self._validate_content(content, "content")
         if not is_valid and error:
@@ -529,6 +541,9 @@ When working with code files, you MUST use tools in this order:
         """
         Executes a file within a project.
         """
+        if not self.config.get("allow_code_execution"):
+            return self.result("Code execution is disabled for security.", False)
+
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
             return self.result("file does not exist!", False)
@@ -831,6 +846,9 @@ When working with code files, you MUST use tools in this order:
             symbol_name: Name of the symbol to edit (e.g., "MyClass.my_method")
             new_content: The new source code for the symbol
         """
+        if not self.config.get("allow_function_editing"):
+            return self.result("Symbol editing is disabled.", False)
+
         # Validate content
         is_valid, cleaned_content, error = self._validate_content(new_content, "new_content")
         if not is_valid and error:
@@ -954,6 +972,9 @@ When working with code files, you MUST use tools in this order:
             name: The name of the new symbol (for reference, may not be used if content_body contains definition).
             content_body: The complete source code for the new symbol.
         """
+        if not self.config.get("allow_function_adding"):
+            return self.result("Symbol adding is disabled.", False)
+
         # Validate content
         is_valid, cleaned_content, error = self._validate_content(content_body, "content_body")
         if not is_valid and error:
@@ -1015,6 +1036,9 @@ When working with code files, you MUST use tools in this order:
             name: The name of the new symbol (for reference).
             content_body: The complete source code for the new symbol.
         """
+        if not self.config.get("allow_function_adding"):
+            return self.result("Symbol adding is disabled.", False)
+
         # Validate content
         is_valid, cleaned_content, error = self._validate_content(content_body, "content_body")
         if not is_valid and error:
@@ -1075,6 +1099,9 @@ When working with code files, you MUST use tools in this order:
         Args:
             symbol_name: Name of the symbol to delete (e.g., "MyClass.old_method")
         """
+        if not self.config.get("allow_function_deleting"):
+            return self.result("Symbol deletion is disabled.", False)
+
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
             return self.result("file does not exist", False)
