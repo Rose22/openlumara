@@ -265,6 +265,63 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
                 return lang
         return 'generic'
 
+    def _verify_syntax(self, file_path: str) -> tuple:
+        """
+        Verify that a written code file has no syntax errors using tree-sitter.
+        Parses the source without executing any code — language-agnostic.
+        Supports all languages in LANGUAGES: python, javascript, typescript,
+        html, css, cpp, c-sharp, rust, ruby, go, java.
+
+        Returns (is_valid, error_message).
+        If tree-sitter is unavailable or the language isn't recognized,
+        falls back to a simple structural check; never blocks on failure.
+        """
+        if not HAS_TREE_SITTER:
+            return True, None  # can't verify without tree-sitter, trust the model
+
+        lang = self._get_language_from_ext(file_path)
+        if lang not in LANGUAGE_MAP:
+            return True, None  # no parser for this language, trust the model
+
+        try:
+            with open(file_path, 'rb') as f:
+                source_bytes = f.read()
+
+            parser = Parser(LANGUAGE_MAP[lang])
+            tree = parser.parse(source_bytes)
+
+            # If the tree has errors, it contains "ERROR" nodes
+            if tree.root_node.has_error:
+                # Find the first error node for a useful message
+                error_msg = self._first_error_message(tree.root_node, source_bytes)
+                return False, f"Syntax error in {os.path.basename(file_path)}: {error_msg}"
+
+            return True, None
+        except Exception as e:
+            # Don't block on verification errors — trust the model
+            core.log("coder", f"Syntax verification skipped: {e}")
+            return True, None
+
+    def _first_error_message(self, node, source_bytes: bytes) -> str:
+        """
+        Walk the tree to find the first ERROR/MISSING node and produce a readable message.
+        """
+        if node.type in ('ERROR', 'MISSING'):
+            start = node.start_point[0] + 1  # 1-indexed line
+            end = node.end_point[0] + 1
+            snippet = source_bytes[node.start_byte:node.end_byte].decode('utf-8', errors='replace').strip()
+            if len(snippet) > 60:
+                snippet = snippet[:60] + "..."
+            if not snippet:
+                return f"line {start}: missing syntax (expected token here)"
+            return f"line {start}-{end}: unexpected syntax: {snippet!r}"
+
+        for child in node.children:
+            msg = self._first_error_message(child, source_bytes)
+            if msg:
+                return msg
+        return "syntax error detected (tree contains ERROR nodes)"
+
     async def on_system_prompt(self):
         """Generates the system prompt with tool usage guidelines."""
         output = """
@@ -432,6 +489,12 @@ When modifying code, choose your tool based on the change:
         try:
             with open(file_path_str, "w", encoding='utf-8') as f:
                 f.write(content)
+
+            # Verify syntax without executing the code
+            is_valid, error = self._verify_syntax(file_path_str)
+            if not is_valid:
+                return self.result(f"{error}\nThe file was created but could not be written due to syntax errors.", False)
+
             return self.result(True)
         except Exception as e:
             return self.result(f"error: {e}", False)
@@ -524,6 +587,12 @@ When modifying code, choose your tool based on the change:
         try:
             with open(file_path_str, "w", encoding='utf-8') as f:
                 f.write(content)
+
+            # Verify syntax without executing the code
+            is_valid, error = self._verify_syntax(file_path_str)
+            if not is_valid:
+                return self.result(f"{error}\nThe file was written but contains syntax errors.", False)
+
             return self.result(True)
         except Exception as e:
             return self.result(f"error: {e}", False)
@@ -879,6 +948,12 @@ When modifying code, choose your tool based on the change:
 
                     with open(file_path_str, 'wb') as f:
                         f.write(updated_bytes)
+
+                    # Verify syntax without executing the code
+                    is_valid, error = self._verify_syntax(file_path_str)
+                    if not is_valid:
+                        return self.result(f"{error}\nThe edit was applied but the file contains syntax errors.", False)
+
                     return self.result(True)
             except Exception as e:
                 core.log("coder", f"Tree-sitter edit failed: {e}")
@@ -905,6 +980,12 @@ When modifying code, choose your tool based on the change:
 
             with open(file_path_str, 'w', encoding='utf-8') as f:
                 f.writelines(lines)
+
+            # Verify syntax without executing the code
+            is_valid, error = self._verify_syntax(file_path_str)
+            if not is_valid:
+                return self.result(f"{error}\nThe edit was applied but the file contains syntax errors.", False)
+
             return self.result(True)
 
         except Exception as e:
@@ -992,6 +1073,12 @@ When modifying code, choose your tool based on the change:
 
             with open(file_path_str, 'w', encoding='utf-8') as f:
                 f.writelines(lines)
+
+            # Verify syntax without executing the code
+            is_valid, error = self._verify_syntax(file_path_str)
+            if not is_valid:
+                return self.result(f"{error}\nThe symbol was added but the file contains syntax errors.", False)
+
             return self.result(True)
 
         except Exception as e:
@@ -1051,6 +1138,12 @@ When modifying code, choose your tool based on the change:
 
             with open(file_path_str, 'w', encoding='utf-8') as f:
                 f.writelines(lines)
+
+            # Verify syntax without executing the code
+            is_valid, error = self._verify_syntax(file_path_str)
+            if not is_valid:
+                return self.result(f"{error}\nThe symbol was added but the file contains syntax errors.", False)
+
             return self.result(True)
 
         except Exception as e:
@@ -1105,6 +1198,12 @@ When modifying code, choose your tool based on the change:
 
                     with open(file_path_str, 'wb') as f:
                         f.write(updated_bytes)
+
+                    # Verify syntax without executing the code
+                    is_valid, error = self._verify_syntax(file_path_str)
+                    if not is_valid:
+                        return self.result(f"{error}\nThe symbol was deleted but the file contains syntax errors.", False)
+
                     return self.result(True)
             except Exception as e:
                 core.log("coder", f"Tree-sitter delete failed: {e}")
@@ -1127,6 +1226,12 @@ When modifying code, choose your tool based on the change:
 
             with open(file_path_str, 'w', encoding='utf-8') as f:
                 f.writelines(lines)
+
+            # Verify syntax without executing the code
+            is_valid, error = self._verify_syntax(file_path_str)
+            if not is_valid:
+                return self.result(f"{error}\nThe symbol was deleted but the file contains syntax errors.", False)
+
             return self.result(True)
 
         except Exception as e:
@@ -1265,6 +1370,11 @@ When modifying code, choose your tool based on the change:
             with open(file_path_str, 'w', encoding='utf-8') as f:
                 f.write(content)
 
+            # Verify syntax without executing the code
+            is_valid, error = self._verify_syntax(file_path_str)
+            if not is_valid:
+                return self.result(f"{error}\nThe edits were applied but the file contains syntax errors.", False)
+
             return self.result(f"Successfully applied {len(edits)} edit(s) to {os.path.join(project_name, *file_path)}")
 
         except Exception as e:
@@ -1303,6 +1413,12 @@ When modifying code, choose your tool based on the change:
                 f.write(content)
                 if not content.endswith('\n'):
                     f.write('\n')
+
+            # Verify syntax without executing the code
+            is_valid, error = self._verify_syntax(file_path_str)
+            if not is_valid:
+                return self.result(f"{error}\nThe content was appended but the file contains syntax errors.", False)
+
             return self.result(True)
         except Exception as e:
             return self.result(f"error: {e}", False)
