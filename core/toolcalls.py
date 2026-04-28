@@ -141,7 +141,6 @@ class ToolcallManager:
                         func_response_str = json.dumps(func_response)
 
                     # then build the openai toolcall response object
-                    func_response_str = json.dumps(func_response)
                     tool_response = {
                         "role": "tool",
                         "tool_call_id": tool_call_dict['id'],
