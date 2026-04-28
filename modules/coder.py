@@ -5,9 +5,9 @@ import re
 import subprocess
 import stat
 import shutil
-import itertools
 import asyncio
 import importlib
+import glob as glob_module
 import modules.sandboxed_files
 from typing import List, Dict, Any, Optional, Union
 
@@ -62,16 +62,15 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
     settings = {
         "coding_style": "Write clean, well-commented code. Do not include your reasoning inside final code.",
         "sandbox_folder": "~/coder",
-        "read-only": False,
-        "folder_blacklist": ["venv"],
-        "allow_function_adding": True,
-        "allow_function_editing": True,
-        "allow_function_deleting": True,
         "allow_project_creation": True,
+        "allow_editing": True,
+        "allow_function_adding": True,
+        "allow_function_deleting": True,
         "allow_file_creation": True,
         "allow_full_file_reads": False,
         "allow_full_file_overwrites": False,
-        "allow_code_execution": False
+        "allow_code_execution": False,
+        "folder_blacklist": ["venv"]
     }
 
     # Consolidated language configuration with all metadata in one place
@@ -235,14 +234,14 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             self.disabled_tools.extend([
                 "add_symbol_before", "add_symbol_after", "edit_symbol",
                 "delete_symbol", "create_project", "create_file",
-                "overwrite_file", "execute"
+                "overwrite_file", "execute", "edit", "append_to_file"
             ])
 
         if not self.config.get("allow_function_adding"):
             self.disabled_tools.extend(["add_symbol_before", "add_symbol_after"])
 
-        if not self.config.get("allow_function_editing"):
-            self.disabled_tools.append("edit_symbol")
+        if not self.config.get("allow_editing"):
+            self.disabled_tools.extend(["edit_symbol", "edit"])
 
         if not self.config.get("allow_function_deleting"):
             self.disabled_tools.append("delete_symbol")
@@ -251,7 +250,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             self.disabled_tools.append("create_project")
 
         if not self.config.get("allow_file_creation"):
-            self.disabled_tools.append("create_file")
+            self.disabled_tools.extend(["create_file", "append_to_file"])
 
         if not self.config.get("allow_full_file_overwrites"):
             self.disabled_tools.append("overwrite_file")
@@ -266,85 +265,45 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
                 return lang
         return 'generic'
 
-    def _validate_content(self, content: str, context: str = "content") -> tuple:
-        """
-        Validates that content is not double-escaped or malformed.
-        Returns (is_valid, cleaned_content, error_message).
-        """
-        if not isinstance(content, str):
-            return False, content, f"{context} must be a string"
-
-        # Check for escaped characters that indicate double-encoding
-        has_escaped_quotes = '\\"' in content or "\\\"\"" in content or "\\'''" in content
-        has_literal_newlines = r'\n' in content  # The literal backslash-n sequence
-
-        # Also check if it looks like it was JSON-encoded
-        looks_like_json_string = (
-            (content.startswith('"') and content.endswith('"')) or
-            (content.startswith("'") and content.endswith("'"))
-        ) and (has_escaped_quotes or has_literal_newlines)
-
-        if has_escaped_quotes or (has_literal_newlines and '\n' not in content[:500]):
-            core.log("coder", f"WARNING: {context} contains escaped characters. Attempting to decode.")
-
-            try:
-                import codecs
-                # Try to decode escape sequences
-                decoded = codecs.decode(content, 'unicode_escape')
-                # If the decoded version has actual newlines where there were \n, use it
-                if '\n' in decoded and r'\n' in content[:200]:
-                    core.log("coder", f"Successfully decoded escaped content for {context}")
-                    return True, decoded, None
-            except Exception as e:
-                core.log("coder", f"Failed to decode escaped content: {e}")
-
-            # If decoding failed, give a clear error
-            if has_escaped_quotes and has_literal_newlines:
-                return False, content, (
-                    f"{context} appears to be double-escaped with both escaped quotes (\\\") "
-                    f"and escaped newlines (\\n). You must pass raw code with actual quotes "
-                    f"and actual line breaks, NOT escaped sequences."
-                )
-            elif has_escaped_quotes:
-                return False, content, (
-                    f"{context} contains escaped quotes (\\\"). "
-                    f"Pass raw code with actual quote characters."
-                )
-            elif has_literal_newlines:
-                return False, content, (
-                    f"{context} contains escaped newlines (\\n as text, not actual newlines). "
-                    f"Pass raw code with actual line breaks."
-                )
-
-        if looks_like_json_string:
-            core.log("coder", f"WARNING: {context} appears to be a JSON string literal. Attempting to decode.")
-            try:
-                import json
-                decoded = json.loads(content)
-                if isinstance(decoded, str):
-                    return True, decoded, None
-            except:
-                return False, content, (
-                    f"{context} appears to be a JSON-encoded string. "
-                    f"Pass raw source code directly, not a JSON string literal."
-                )
-
-        return True, content, None
-
     async def on_system_prompt(self):
         """Generates the system prompt with tool usage guidelines."""
         output = """
 ## Code Editing Tool Usage
 
-### Tool Selection Priority
+### Reading Code (Token-Efficient)
 
-When working with code files, you MUST use tools in this order:
+When working with code files, read them in this order:
 
-1. **get_outline** - Call this first to see all symbols (classes, functions) in a file.
-2. **get_symbol** - Use this to retrieve specific code by symbol name. PRIMARY reading method.
-3. **edit_symbol / add_symbol_before / add_symbol_after / delete_symbol** - Modify code precisely.
-4. **read_file** - LAST RESORT only. Do not use for normal code reading.
-5. **overwrite_file** - Only for complete file restructuring.
+1. **get_outline** - Call FIRST to see all symbols (classes, functions) in a file.
+2. **get_symbol** - Retrieve specific code by symbol name. PRIMARY reading method.
+   Use dot notation for nested symbols: "MyClass.my_method".
+3. **read_file** with offset/limit - For files without clear symbols or when you need raw context.
+4. **read_file** (no args) - LAST RESORT only. Reading entire files wastes tokens.
+
+### Editing Code
+
+When modifying code, choose your tool based on the change:
+
+1. **edit** - PREFERRED for most changes. Performs exact text replacement.
+   Accepts a list of {oldText, newText} pairs. Each oldText must match exactly.
+   Multiple edits can be batched in one call (they process sequentially).
+2. **append_to_file** - Add content to end of file (functions, classes, imports).
+3. **edit_symbol / add_symbol_before / add_symbol_after** - For symbol-aware edits
+   (e.g., inserting methods inside a class body, or replacing entire functions).
+4. **overwrite_file** - ONLY for complete file restructuring.
+
+### Searching
+
+1. **grep** - Search across all files in a project (text or regex patterns).
+2. **find_files** - Find files matching glob patterns (*.py, test_*.js, etc.).
+3. **search** - Search within a single file for text/regex with context lines.
+4. **list_full_project_tree** - Understand overall project layout first.
+
+### Content Format
+
+- All content parameters (new_content, content_body, content in create_file) must be RAW source code.
+- Use actual newlines and quotes. Do NOT escape them as \\n or \\\".
+- The framework handles serialization automatically - just pass the raw text.
 """.strip()
 
         coding_style = self.config.get("coding_style")
@@ -453,22 +412,13 @@ When working with code files, you MUST use tools in this order:
         """
         Creates a new file within a project.
 
-        IMPORTANT: The `content` parameter should be raw source code with actual newlines
-        and quotes, NOT a JSON-encoded string literal.
-
         Args:
             project_name: Name of the project.
             file_path: List of path components (e.g., ["src", "main.py"]).
-            content: Raw source code content.
+            content: The raw source code content for the file. Use actual newlines and quotes - do NOT escape them.
         """
         if not self.config.get("allow_file_creation"):
             return self.result("File creation is disabled", False)
-
-        # Validate content
-        is_valid, cleaned_content, error = self._validate_content(content, "content")
-        if not is_valid and error:
-            return self.result(f"Content validation error: {error}", False)
-        content = cleaned_content
 
         file_path_str = self._get_file_path(project_name, file_path)
 
@@ -486,13 +436,20 @@ When working with code files, you MUST use tools in this order:
         except Exception as e:
             return self.result(f"error: {e}", False)
 
-    async def read_file(self, project_name: str, file_path: list):
+    async def read_file(self, project_name: str, file_path: list, offset: int = None, limit: int = None):
         """
-        Reads an entire file.
+        Reads a file with optional line offset and limit (like pi's `read` tool).
 
-        WARNING: This tool should be used as a LAST RESORT only!
-        Prefer using get_outline() + get_symbols() to read specific code blocks.
-        Reading entire files wastes tokens and floods your context.
+        Args:
+            project_name: Name of the project.
+            file_path: List of path components (e.g., ["src", "main.py"]).
+            offset: Line number to start reading from (1-indexed, optional). Reads entire file if not specified.
+            limit: Maximum number of lines to read (optional). Max 2000 lines. Use for large files.
+
+        WARNING: This tool reads entire files by default. Prefer using get_outline() + get_symbol()
+        to read only the specific code blocks you need. Reading entire files wastes tokens and floods context.
+
+        Truncation: Output is truncated to 2000 lines or 50KB (whichever hits first) for large files.
         """
         if not self.config.get("allow_full_file_reads"):
             return self.result("Full file reading is disabled. Use get_symbol!", False)
@@ -503,26 +460,60 @@ When working with code files, you MUST use tools in this order:
 
         try:
             with open(file_path_str, "r", encoding='utf-8') as f:
-                result = f.read()
-            return result # return raw string to avoid escaping content
+                lines = f.readlines()
+
+            total_lines = len(lines)
+
+            # Apply offset (1-indexed)
+            start_idx = 0
+            if offset is not None:
+                start_idx = max(0, min(offset - 1, total_lines))
+
+            # Apply limit
+            end_idx = total_lines
+            if limit is not None:
+                end_idx = min(start_idx + limit, total_lines)
+
+            selected_lines = lines[start_idx:end_idx]
+            result = "".join(selected_lines)
+
+            # Truncate if too large (2000 lines or 50KB)
+            max_lines = 2000
+            max_bytes = 50 * 1024  # 50KB
+
+            truncated = False
+            if len(selected_lines) > max_lines:
+                selected_lines = selected_lines[:max_lines]
+                result = "".join(selected_lines)
+                truncated = True
+            elif len(result.encode('utf-8')) > max_bytes:
+                # Truncate at byte boundary
+                while len(result.encode('utf-8')) > max_bytes and result:
+                    result = result[:-1]
+                truncated = True
+
+            response = result
+            if truncated:
+                response += "\n\n[Output truncated - file has more content]"
+
+            return response
         except Exception as e:
             return self.result(f"error reading file: {e}", False)
 
     async def overwrite_file(self, project_name: str, file_path: list, content: str):
         """
-        Completely overwrites an existing file with new content.
+        Completely overwrites an existing file with new content. For large restructuring.
 
-        IMPORTANT: The `content` parameter should be raw source code with actual newlines
-        and quotes, NOT a JSON-encoded string literal.
+        Args:
+            project_name: Name of the project.
+            file_path: List of path components.
+            content: The raw source code content. Use actual newlines and quotes.
         """
         if not self.config.get("allow_full_file_overwrites"):
             return self.result("File overwriting is disabled. Use edit_symbol!", False)
 
-        # Validate content
-        is_valid, cleaned_content, error = self._validate_content(content, "content")
-        if not is_valid and error:
-            return self.result(f"Content validation error: {error}", False)
-        content = cleaned_content
+        # Create backup before overwriting
+        await self._backup_file(self._get_file_path(project_name, file_path))
 
         file_path_str = self._get_file_path(project_name, file_path)
 
@@ -839,25 +830,19 @@ When working with code files, you MUST use tools in this order:
         """
         Replaces the content of a symbol with new content.
 
-        IMPORTANT: The `new_content` parameter should be raw source code with actual
-        newlines and quotes, NOT a JSON-encoded string literal.
-
         Args:
             symbol_name: Name of the symbol to edit (e.g., "MyClass.my_method")
-            new_content: The new source code for the symbol
+            new_content: The new source code. Use actual newlines, do not escape them.
         """
-        if not self.config.get("allow_function_editing"):
+        if not self.config.get("allow_editing"):
             return self.result("Symbol editing is disabled.", False)
-
-        # Validate content
-        is_valid, cleaned_content, error = self._validate_content(new_content, "new_content")
-        if not is_valid and error:
-            return self.result(f"Content validation error: {error}", False)
-        new_content = cleaned_content.strip()
 
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
             return self.result("file does not exist", False)
+
+        # Backup before editing
+        await self._backup_file(file_path_str)
 
         if not language:
             language = self._get_language_from_ext(file_path_str)
@@ -964,26 +949,15 @@ When working with code files, you MUST use tools in this order:
         """
         Inserts a new symbol before the target symbol.
 
-        IMPORTANT: The `content_body` parameter should be raw source code with actual
-        newlines and quotes, NOT a JSON-encoded string literal.
-
         Args:
             target_symbol_name: The name of the symbol to insert before.
             name: The name of the new symbol (for reference, may not be used if content_body contains definition).
-            content_body: The complete source code for the new symbol.
+            content_body: The complete source code. Use actual newlines, do not escape them.
         """
         if not self.config.get("allow_function_adding"):
             return self.result("Symbol adding is disabled.", False)
 
-        # Validate content
-        is_valid, cleaned_content, error = self._validate_content(content_body, "content_body")
-        if not is_valid and error:
-            return self.result(f"Content validation error: {error}", False)
-        content_body = cleaned_content
-
         file_path_str = self._get_file_path(project_name, file_path)
-        if not os.path.exists(file_path_str):
-            return self.result("file does not exist", False)
 
         if not language:
             language = self._get_language_from_ext(file_path_str)
@@ -1028,22 +1002,13 @@ When working with code files, you MUST use tools in this order:
         """
         Inserts a new symbol after the target symbol.
 
-        IMPORTANT: The `content_body` parameter should be raw source code with actual
-        newlines and quotes, NOT a JSON-encoded string literal.
-
         Args:
             target_symbol_name: The name of the symbol to insert after.
             name: The name of the new symbol (for reference).
-            content_body: The complete source code for the new symbol.
+            content_body: The complete source code for the new symbol. Use actual newlines, do not escape them.
         """
         if not self.config.get("allow_function_adding"):
             return self.result("Symbol adding is disabled.", False)
-
-        # Validate content
-        is_valid, cleaned_content, error = self._validate_content(content_body, "content_body")
-        if not is_valid and error:
-            return self.result(f"Content validation error: {error}", False)
-        content_body = cleaned_content
 
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
@@ -1233,6 +1198,242 @@ When working with code files, you MUST use tools in this order:
 
             result_str = "\n\n".join(matches)
             return self.result(result_str)
+
+        except Exception as e:
+            return self.result(f"error: {e}", False)
+
+    async def edit(self, project_name: str, file_path: list, edits: list):
+        """
+        Performs multiple exact text replacements in a file.
+        Each edit has oldText (must match unique, non-overlapping region) and newText (replacement).
+
+        This is the PREFERRED way to make targeted changes to existing code,
+        instead of full-file overwrites or symbol-level edits.
+
+        Args:
+            project_name: Name of the project.
+            file_path: List of path components (e.g., ["src", "utils.py"]).
+            edits: A list of edit objects, each with:
+                - oldText: Exact text to find and replace (must be unique in the file)
+                - newText: The replacement text
+                Multiple edits are processed in order.
+
+        Example edits payload:
+        [
+            {"oldText": "def foo():", "newText": "def foo(x):"},
+            {"oldText": "    return 0", "newText": "    return x * 2"}
+        ]
+        """
+        if not self.config.get("allow_editing"):
+            return self.result("Editing is disabled.", False)
+
+        file_path_str = self._get_file_path(project_name, file_path)
+        if not os.path.exists(file_path_str):
+            return self.result("file does not exist", False)
+
+        if not isinstance(edits, list) or len(edits) == 0:
+            return self.result("edits must be a non-empty list of {oldText, newText} objects", False)
+
+        # Backup the file
+        await self._backup_file(file_path_str)
+
+        try:
+            with open(file_path_str, 'r', encoding='utf-8') as f:
+                content = f.read()
+
+            for i, edit_obj in enumerate(edits):
+                if not isinstance(edit_obj, dict):
+                    return self.result(f"edit #{i+1} must be an object with 'oldText' and 'newText'", False)
+
+                old_text = edit_obj.get('oldText', '')
+                new_text = edit_obj.get('newText', '')
+
+                if not old_text:
+                    return self.result(f"edit #{i+1} has empty 'oldText' - must specify exact text to replace", False)
+
+                if old_text not in content:
+                    # Provide helpful hint about what was found
+                    return self.result(
+                        f"error: oldText for edit #{i+1} not found in file. "
+                        f'The exact text "{old_text[:80]}{"..." if len(old_text) > 80 else ""}" '
+                        f'was not found. Make sure oldText matches exactly including whitespace.',
+                        False
+                    )
+
+                content = content.replace(old_text, new_text, 1)
+
+            with open(file_path_str, 'w', encoding='utf-8') as f:
+                f.write(content)
+
+            return self.result(f"Successfully applied {len(edits)} edit(s) to {os.path.join(project_name, *file_path)}")
+
+        except Exception as e:
+            core.log("coder", f"Error in edit: {e}")
+            return self.result(f"error: {e}", False)
+
+    async def append_to_file(self, project_name: str, file_path: list, content: str):
+        """
+        Appends content to the end of a file. Creates the file if it doesn't exist.
+        Safe alternative to read-file-then-write for adding to existing files.
+
+        Args:
+            project_name: Name of the project.
+            file_path: List of path components (e.g., ["src", "utils.py"]).
+            content: The raw text to append. Use actual newlines, do not escape them.
+        """
+        if not self.config.get("allow_file_creation"):
+            return self.result("File creation/editing is disabled", False)
+
+        file_path_str = self._get_file_path(project_name, file_path)
+
+        target_dir = os.path.dirname(file_path_str)
+        if not os.path.exists(target_dir):
+            os.makedirs(target_dir, exist_ok=True)
+
+        # Create file if it doesn't exist (no backup needed for new files)
+        mode = 'a'
+        if not os.path.exists(file_path_str):
+            mode = 'w'
+
+        try:
+            with open(file_path_str, mode, encoding='utf-8') as f:
+                if mode == 'a' and os.path.getsize(file_path_str) > 0:
+                    # Add newline before appending if file is non-empty
+                    f.write('\n')
+                f.write(content)
+                if not content.endswith('\n'):
+                    f.write('\n')
+            return self.result(True)
+        except Exception as e:
+            return self.result(f"error: {e}", False)
+
+    async def grep(self, project_name: str, path: list = None, pattern: str = "", use_regex: bool = False,
+                   case_sensitive: bool = False, max_results: int = 50):
+        """
+        Search for a pattern across files in a project (like pi's `grep` tool).
+        Searches recursively through all files in the specified directory.
+
+        Args:
+            project_name: Name of the project.
+            path: Optional sub-path within the project to search. Defaults to project root.
+            pattern: Text or regex pattern to search for.
+            use_regex: If True, treat pattern as a regex.
+            case_sensitive: If True, case-sensitive matching.
+            max_results: Maximum results to return (default 50).
+        """
+        search_dir = self._get_project_path(project_name)
+        if path:
+            search_dir = os.path.join(search_dir, *path)
+
+        if not os.path.isdir(search_dir):
+            return self.result("search directory does not exist", False)
+
+        try:
+            # Build regex or text match
+            if use_regex:
+                flags = 0 if case_sensitive else re.IGNORECASE
+                try:
+                    compiled_pattern = re.compile(pattern, flags)
+                except re.error as e:
+                    return self.result(f"Invalid regex pattern: {e}", False)
+            else:
+                search_text = pattern if case_sensitive else pattern.lower()
+
+            results = []
+            file_count = 0
+            total_matches = 0
+
+            for root, dirs, files in os.walk(search_dir):
+                # Skip hidden directories and common non-source dirs
+                dirs[:] = [d for d in dirs if not d.startswith('.') and d != 'venv' and d != '__pycache__' and d != '.git']
+
+                for filename in sorted(files):
+                    filepath = os.path.join(root, filename)
+                    rel_path = os.path.relpath(filepath, search_dir)
+
+                    # Skip binary files and common non-source extensions
+                    ext = os.path.splitext(filename)[1].lower()
+                    if ext in ('.pyc', '.pyo', '.so', '.dll', '.exe', '.bin', '.db', '.sqlite', '.png', '.jpg', '.gif'):
+                        continue
+
+                    try:
+                        with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
+                            for line_num, line in enumerate(f, 1):
+                                found = False
+                                if use_regex:
+                                    if compiled_pattern.search(line):
+                                        found = True
+                                else:
+                                    line_search = line.lower() if not case_sensitive else line
+                                    if search_text in line_search:
+                                        found = True
+
+                                if found:
+                                    # Show the matching line with context (truncated)
+                                    snippet = line.rstrip('\n')[:200]
+                                    results.append(f"{rel_path}:{line_num}: {snippet}")
+                                    total_matches += 1
+                                    if total_matches >= max_results:
+                                        break
+                            if total_matches >= max_results:
+                                break
+                    except (IOError, OSError):
+                        continue
+
+                    file_count += 1
+                if total_matches >= max_results:
+                    break
+
+            if not results:
+                return self.result({"pattern": pattern, "matches": 0, "files_searched": file_count})
+
+            result_data = {
+                "pattern": pattern,
+                "matches": min(total_matches, max_results),
+                "files_searched": file_count,
+                "truncated": total_matches > max_results,
+                "results": results[:max_results]
+            }
+            return self.result(result_data)
+
+        except Exception as e:
+            return self.result(f"error: {e}", False)
+
+    async def find_files(self, project_name: str, path: list = None, pattern: str = "*", file_type: str = "any"):
+        """
+        Find files matching a glob pattern in a project (like pi's `find` tool).
+
+        Args:
+            project_name: Name of the project.
+            path: Optional sub-path within the project. Defaults to project root.
+            pattern: Glob pattern (e.g., '*.py', 'test_*.ts', '**/*.md').
+            file_type: Filter by type - "any", "file", or "directory".
+        """
+        search_dir = self._get_project_path(project_name)
+        if path:
+            search_dir = os.path.join(search_dir, *path)
+
+        if not os.path.exists(search_dir):
+            return self.result("search directory does not exist", False)
+
+        try:
+            full_pattern = os.path.join(search_dir, pattern)
+            matches = glob_module.glob(full_pattern, recursive=True)
+
+            results = []
+            for match in matches:
+                rel_path = os.path.relpath(match, search_dir)
+                if file_type == "directory" and not os.path.isdir(match):
+                    continue
+                if file_type == "file" and not os.path.isfile(match):
+                    continue
+                results.append(rel_path)
+
+            return self.result({
+                "pattern": pattern,
+                "count": len(results),
+                "files": sorted(results)
+            })
 
         except Exception as e:
             return self.result(f"error: {e}", False)
