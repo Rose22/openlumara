@@ -266,70 +266,70 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
                 return lang
         return 'generic'
 
-def _validate_content(self, content: str, context: str = "content") -> tuple:
-    """
-    Validates that content is not double-escaped or malformed.
-    Returns (is_valid, cleaned_content, error_message).
-    """
-    if not isinstance(content, str):
-        return False, content, f"{context} must be a string"
+    def _validate_content(self, content: str, context: str = "content") -> tuple:
+        """
+        Validates that content is not double-escaped or malformed.
+        Returns (is_valid, cleaned_content, error_message).
+        """
+        if not isinstance(content, str):
+            return False, content, f"{context} must be a string"
 
-    # Check for escaped characters that indicate double-encoding
-    has_escaped_quotes = '\\"' in content or "\\\"\"" in content or "\\'''" in content
-    has_literal_newlines = r'\n' in content  # The literal backslash-n sequence
+        # Check for escaped characters that indicate double-encoding
+        has_escaped_quotes = '\\"' in content or "\\\"\"" in content or "\\'''" in content
+        has_literal_newlines = r'\n' in content  # The literal backslash-n sequence
 
-    # Also check if it looks like it was JSON-encoded
-    looks_like_json_string = (
-        (content.startswith('"') and content.endswith('"')) or
-        (content.startswith("'") and content.endswith("'"))
-    ) and (has_escaped_quotes or has_literal_newlines)
+        # Also check if it looks like it was JSON-encoded
+        looks_like_json_string = (
+            (content.startswith('"') and content.endswith('"')) or
+            (content.startswith("'") and content.endswith("'"))
+        ) and (has_escaped_quotes or has_literal_newlines)
 
-    if has_escaped_quotes or (has_literal_newlines and '\n' not in content[:500]):
-        core.log("coder", f"WARNING: {context} contains escaped characters. Attempting to decode.")
+        if has_escaped_quotes or (has_literal_newlines and '\n' not in content[:500]):
+            core.log("coder", f"WARNING: {context} contains escaped characters. Attempting to decode.")
 
-        try:
-            import codecs
-            # Try to decode escape sequences
-            decoded = codecs.decode(content, 'unicode_escape')
-            # If the decoded version has actual newlines where there were \n, use it
-            if '\n' in decoded and r'\n' in content[:200]:
-                core.log("coder", f"Successfully decoded escaped content for {context}")
-                return True, decoded, None
-        except Exception as e:
-            core.log("coder", f"Failed to decode escaped content: {e}")
+            try:
+                import codecs
+                # Try to decode escape sequences
+                decoded = codecs.decode(content, 'unicode_escape')
+                # If the decoded version has actual newlines where there were \n, use it
+                if '\n' in decoded and r'\n' in content[:200]:
+                    core.log("coder", f"Successfully decoded escaped content for {context}")
+                    return True, decoded, None
+            except Exception as e:
+                core.log("coder", f"Failed to decode escaped content: {e}")
 
-        # If decoding failed, give a clear error
-        if has_escaped_quotes and has_literal_newlines:
-            return False, content, (
-                f"{context} appears to be double-escaped with both escaped quotes (\\\") "
-                f"and escaped newlines (\\n). You must pass raw code with actual quotes "
-                f"and actual line breaks, NOT escaped sequences."
-            )
-        elif has_escaped_quotes:
-            return False, content, (
-                f"{context} contains escaped quotes (\\\"). "
-                f"Pass raw code with actual quote characters."
-            )
-        elif has_literal_newlines:
-            return False, content, (
-                f"{context} contains escaped newlines (\\n as text, not actual newlines). "
-                f"Pass raw code with actual line breaks."
-            )
+            # If decoding failed, give a clear error
+            if has_escaped_quotes and has_literal_newlines:
+                return False, content, (
+                    f"{context} appears to be double-escaped with both escaped quotes (\\\") "
+                    f"and escaped newlines (\\n). You must pass raw code with actual quotes "
+                    f"and actual line breaks, NOT escaped sequences."
+                )
+            elif has_escaped_quotes:
+                return False, content, (
+                    f"{context} contains escaped quotes (\\\"). "
+                    f"Pass raw code with actual quote characters."
+                )
+            elif has_literal_newlines:
+                return False, content, (
+                    f"{context} contains escaped newlines (\\n as text, not actual newlines). "
+                    f"Pass raw code with actual line breaks."
+                )
 
-    if looks_like_json_string:
-        core.log("coder", f"WARNING: {context} appears to be a JSON string literal. Attempting to decode.")
-        try:
-            import json
-            decoded = json.loads(content)
-            if isinstance(decoded, str):
-                return True, decoded, None
-        except:
-            return False, content, (
-                f"{context} appears to be a JSON-encoded string. "
-                f"Pass raw source code directly, not a JSON string literal."
-            )
+        if looks_like_json_string:
+            core.log("coder", f"WARNING: {context} appears to be a JSON string literal. Attempting to decode.")
+            try:
+                import json
+                decoded = json.loads(content)
+                if isinstance(decoded, str):
+                    return True, decoded, None
+            except:
+                return False, content, (
+                    f"{context} appears to be a JSON-encoded string. "
+                    f"Pass raw source code directly, not a JSON string literal."
+                )
 
-    return True, content, None
+        return True, content, None
 
     async def on_system_prompt(self):
         """Generates the system prompt with tool usage guidelines."""
