@@ -341,52 +341,10 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 When working with code files, you MUST use tools in this order:
 
 1. **get_outline** - Call this first to see all symbols (classes, functions) in a file.
-2. **get_symbols** - Use this to retrieve specific code by symbol name. PRIMARY reading method.
+2. **get_symbol** - Use this to retrieve specific code by symbol name. PRIMARY reading method.
 3. **edit_symbol / add_symbol_before / add_symbol_after / delete_symbol** - Modify code precisely.
 4. **read_file** - LAST RESORT only. Do not use for normal code reading.
 5. **overwrite_file** - Only for complete file restructuring.
-
-### CRITICAL: Content Format
-
-When passing code to `content`, `new_content`, or `content_body` parameters:
-
-**YOU MUST PASS RAW SOURCE CODE WITH:**
-- Actual newline characters
-- Actual quote characters (" and ')
-- Actual triple quotes (\"\"\" for docstrings)
-
-**DO NOT PASS:**
-- Escaped newlines like `\\n` as text
-- Escaped quotes like `\\"` as text
-- JSON string literals
-
-**WRONG - This is what causes corrupted files:**
-```
-"def hello():\n print(\"hi\")"
-```
-
-The above is a JSON string with escaped characters. It will corrupt your file!
-
-**RIGHT - Pass raw code with actual formatting:**
-
-```
-def hello():
-    print("hi")
-```
-
-The tool framework handles encoding. You just provide the actual code.
-
-### Workflow Example
-
-1. `get_outline(project_name="myproj", file_path=["utils.py"])`
-   Returns: `[{"name": "parse_data", "type": "function"}]`
-
-2. `get_symbols(project_name="myproj", file_path=["utils.py"], symbols=["parse_data"])`
-   Returns the function code.
-
-3. `edit_symbol(project_name="myproj", file_path=["utils.py"], symbol_name="parse_data", new_content=def parse_data(input):
-    # Your raw code with actual newlines
-    return input.strip())`
 """.strip()
 
         coding_style = self.config.get("coding_style")
@@ -537,7 +495,7 @@ The tool framework handles encoding. You just provide the actual code.
         try:
             with open(file_path_str, "r", encoding='utf-8') as f:
                 result = f.read()
-            return self.result(result)
+            return result # return raw string to avoid escaping content
         except Exception as e:
             return self.result(f"error reading file: {e}", False)
 
@@ -754,19 +712,18 @@ The tool framework handles encoding. You just provide the actual code.
 
         return None
 
-    async def get_symbols(self, project_name: str, file_path: list, symbols: list, language: str = None):
+    async def get_symbol(self, project_name: str, file_path: list, symbol_name: str, language: str = None):
         """
-        Returns the code blocks for multiple symbols by name.
+        Returns the code block for a symbol by name.
 
         THIS IS THE PREFERRED WAY TO READ CODE.
         Use this instead of read_file() to get only the code you need.
 
         Args:
-            symbols: list of symbol names (e.g., ["MyClass", "my_function", "MyClass.my_method"])
+            symbol: a symbol name (e.g. "MyClass", "my_function", "MyClass.my_method")
 
         Returns:
-            A dict mapping symbol names to their source code bodies.
-            Example: {"my_function": "def my_function():\\n    pass"}
+            The code of the symbol as a string
         """
         results = {}
         file_path_str = self._get_file_path(project_name, file_path)
@@ -777,95 +734,91 @@ The tool framework handles encoding. You just provide the actual code.
         if not language:
             language = self._get_language_from_ext(file_path_str)
 
-        for name in symbols:
-            line_number = self._find_symbol_line(file_path_str, name, language)
-            if not line_number:
-                results[name] = f"symbol '{name}' not found"
-                continue
+        name = symbol_name
 
-            # 1. Try Tree-sitter
-            if HAS_TREE_SITTER and language in LANGUAGE_MAP:
-                try:
-                    parser = Parser(LANGUAGE_MAP[language])
-                    with open(file_path_str, 'rb') as f:
-                        source_bytes = f.read()
+        line_number = self._find_symbol_line(file_path_str, name, language)
+        if not line_number:
+            return self.result(f"symbol '{name}' not found", False)
 
-                    tree = parser.parse(source_bytes)
-                    target_row = line_number - 1
-
-                    candidate_nodes = []
-                    def find_nodes(node):
-                        if node.start_point[0] <= target_row <= node.end_point[0]:
-                            lang_config = self.LANGUAGES.get(language, {})
-                            if node.type in lang_config.get('symbol_types', {}):
-                                candidate_nodes.append(node)
-                        for child in node.children:
-                            find_nodes(child)
-
-                    find_nodes(tree.root_node)
-
-                    if candidate_nodes:
-                        best_node = min(candidate_nodes, key=lambda n: n.end_byte - n.start_byte)
-                        results[name] = source_bytes[best_node.start_byte:best_node.end_byte].decode('utf-8')
-                        continue
-                except Exception as e:
-                    core.log("coder", f"Tree-sitter failed for get_symbols: {e}")
-
-            # 2. Fallback to indentation/brace logic
-            lang_config = self.LANGUAGES.get(language, {})
-            body_type = lang_config.get('body_type', 'brace')
-
+        # 1. Try Tree-sitter
+        if HAS_TREE_SITTER and language in LANGUAGE_MAP:
             try:
-                with open(file_path_str, 'r', encoding='utf-8') as f:
-                    lines = f.readlines()
+                parser = Parser(LANGUAGE_MAP[language])
+                with open(file_path_str, 'rb') as f:
+                    source_bytes = f.read()
 
-                if not (1 <= line_number <= len(lines)):
-                    results[name] = "line number out of range"
-                    continue
+                tree = parser.parse(source_bytes)
+                target_row = line_number - 1
 
-                start_idx = line_number - 1
+                candidate_nodes = []
+                def find_nodes(node):
+                    if node.start_point[0] <= target_row <= node.end_point[0]:
+                        lang_config = self.LANGUAGES.get(language, {})
+                        if node.type in lang_config.get('symbol_types', {}):
+                            candidate_nodes.append(node)
+                    for child in node.children:
+                        find_nodes(child)
 
-                if body_type == 'indentation':
-                    def get_indent(l): return len(l) - len(l.lstrip())
-                    base_indent = get_indent(lines[start_idx])
-                    end_idx = start_idx + 1
-                    for i in range(start_idx + 1, len(lines)):
-                        line = lines[i]
-                        if not line.strip() or line.strip().startswith('#'):
-                            continue
-                        if get_indent(line) <= base_indent:
-                            break
-                        end_idx = i + 1
-                    body_lines = lines[start_idx:end_idx]
-                else:
-                    brace_found = False
-                    start_brace_idx = -1
-                    for i in range(start_idx, len(lines)):
-                        if '{' in lines[i]:
-                            start_brace_idx = i
-                            brace_found = True
-                            break
+                find_nodes(tree.root_node)
 
-                    if not brace_found:
-                        results[name] = "".join(lines[start_idx:start_idx + 1])
-                        continue
-
-                    brace_count = 0
-                    end_idx = len(lines)
-                    for i in range(start_brace_idx, len(lines)):
-                        line = lines[i]
-                        brace_count += line.count('{')
-                        brace_count -= line.count('}')
-                        if brace_count <= 0:
-                            end_idx = i + 1
-                            break
-                    body_lines = lines[start_idx:end_idx]
-
-                results[name] = "".join(body_lines)
+                if candidate_nodes:
+                    best_node = min(candidate_nodes, key=lambda n: n.end_byte - n.start_byte)
+                    found_code = source_bytes[best_node.start_byte:best_node.end_byte].decode('utf-8')
+                    return found_code
             except Exception as e:
-                results[name] = f"error: {e}"
+                core.log("coder", f"Tree-sitter failed for get_symbol: {e}")
 
-        return self.result(results)
+        # 2. Fallback to indentation/brace logic
+        lang_config = self.LANGUAGES.get(language, {})
+        body_type = lang_config.get('body_type', 'brace')
+
+        try:
+            with open(file_path_str, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+
+            if not (1 <= line_number <= len(lines)):
+                return self.result("line number out of range", False)
+
+            start_idx = line_number - 1
+
+            if body_type == 'indentation':
+                def get_indent(l): return len(l) - len(l.lstrip())
+                base_indent = get_indent(lines[start_idx])
+                end_idx = start_idx + 1
+                for i in range(start_idx + 1, len(lines)):
+                    line = lines[i]
+                    if not line.strip() or line.strip().startswith('#'):
+                        continue
+                    if get_indent(line) <= base_indent:
+                        break
+                    end_idx = i + 1
+                body_lines = lines[start_idx:end_idx]
+            else:
+                brace_found = False
+                start_brace_idx = -1
+                for i in range(start_idx, len(lines)):
+                    if '{' in lines[i]:
+                        start_brace_idx = i
+                        brace_found = True
+                        break
+
+                if not brace_found:
+                    return "".join(lines[start_idx:start_idx + 1])
+
+                brace_count = 0
+                end_idx = len(lines)
+                for i in range(start_brace_idx, len(lines)):
+                    line = lines[i]
+                    brace_count += line.count('{')
+                    brace_count -= line.count('}')
+                    if brace_count <= 0:
+                        end_idx = i + 1
+                        break
+                body_lines = lines[start_idx:end_idx]
+
+            return "".join(body_lines)
+        except Exception as e:
+            return self.result(f"error: {e}", False)
 
     async def edit_symbol(self, project_name: str, file_path: list, symbol_name: str, new_content: str, language: str = None):
         """
