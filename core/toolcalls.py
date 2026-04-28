@@ -134,6 +134,12 @@ class ToolcallManager:
                     # do the function call and get it's result
                     func_response = await func_callable(**tool_args)
 
+                    # don't double-escape strings
+                    if isinstance(func_response, str):
+                        func_response_str = func_response
+                    else:
+                        func_response_str = json.dumps(func_response)
+
                     # then build the openai toolcall response object
                     func_response_str = json.dumps(func_response)
                     tool_response = {
