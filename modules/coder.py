@@ -307,7 +307,7 @@ def _validate_content(self, content: str, context: str = "content") -> tuple:
             )
         elif has_escaped_quotes:
             return False, content, (
-                f"{context} contains escaped quotes (\\"). "
+                f"{context} contains escaped quotes (\\\"). "
                 f"Pass raw code with actual quote characters."
             )
         elif has_literal_newlines:
