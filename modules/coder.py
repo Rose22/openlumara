@@ -301,53 +301,66 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
     async def on_system_prompt(self):
         """Generates the system prompt with tool usage guidelines."""
-        output = """## Code Editing Guidelines
+        output = """
+## Code Editing Tool Usage
 
-### CRITICAL: Tool Usage Priority
+### Tool Selection Priority
 
-When working with code, you MUST follow this order of preference:
+When working with code files, you MUST use tools in this order:
 
-1. **get_outline** - ALWAYS use this first to see what symbols exist in a file
-2. **get_symbols** - Use this to read specific functions/classes by name (PREFERRED for reading code)
-3. **list_full_project_tree** - Use this to understand project structure
-4. **read_file** - ONLY use as an absolute last resort for files you cannot parse otherwise
+1. **get_outline** - Call this first to see all symbols (classes, functions, variables) in a file. This is cheap and fast.
 
-### Content Format for Write Operations
+2. **get_symbols** - Use this to retrieve the actual code for specific symbols by name. This is the PRIMARY way you should read code. It returns only what you need.
 
-When passing `content`, `new_content`, or `content_body` parameters:
-- Pass **raw source code**, NOT JSON-encoded strings
-- Use actual newlines, not escaped `\\n`
-- Use actual quotes, not escaped `\\"`
+3. **edit_symbol / add_symbol_before / add_symbol_after / delete_symbol** - Use these to modify code precisely at the symbol level.
 
-**CORRECT:**
-1. Call `get_outline` to see available symbols
-2. Call `get_symbols` with the symbol names you need to read
-3. Make your changes using `edit_symbol`, `add_symbol_before/after`, or `delete_symbol`
-4. NEVER read entire files unless absolutely necessary
-"""
+4. **read_file** - DO NOT use this unless you have a specific reason why get_symbols cannot work (e.g., the file format doesn't have parseable symbols, or you need to see the exact file layout). This tool wastes context.
+
+5. **overwrite_file** - Only use when you must completely restructure a file. Prefer symbol-level edits.
+
+### Workflow Example
+
+**CORRECT workflow:**
+1. Call `get_outline(project_name=["myproject"], file_path=["utils.py"])` to see symbols
+2. Receive: `[{"name": "helper_func", "type": "function"}, {"name": "DataParser", "type": "class"}]`
+3. Call `get_symbols(project_name=["myproject"], file_path=["utils.py"], symbols=["DataParser"])` to read the class
+4. Call `edit_symbol(project_name=["myproject"], file_path=["utils.py"], symbol_name="DataParser", new_content="class DataParser: ...")` to modify it
+
+**WRONG workflow:**
+1. Call `read_file` on the entire file just to find one function
+2. This floods context with irrelevant code
+
+### Content Parameter Format
+
+When passing code content to tools (`content`, `new_content`, `content_body`):
+
+- Use **actual line breaks**, not the string `\\n`
+- Use **actual quotes**, not escaped quotes like `\\"`
+
+The content parameter should look like real source code, not a JSON string representation of it.
+""".strip()
 
         coding_style = self.config.get("coding_style")
         if coding_style:
-            output += f"## Coding Style\n{coding_style}\n\n"
+            output += f"\n## Coding Style\n{coding_style}\n\n"
 
-        # List projects
         try:
             file_list = os.listdir(self.sandbox_path)
             project_list = [f for f in file_list if os.path.isdir(os.path.join(self.sandbox_path, f))]
 
-            output += "## Current Projects in Sandbox\n"
+            output += "## Projects in Sandbox\n"
             if not project_list:
-                output += "No projects yet. Use `create_project` to start.\n"
+                output += "No projects exist. Use `create_project` to create one.\n"
             else:
-                output += "\n".join(f"- {name}" for name in project_list)
-                output += "\n"
+                for name in project_list:
+                    output += f"- {name}\n"
         except Exception as e:
-            output += f"Error listing projects: {e}\n"
+            output += f"Could not list projects: {e}\n"
 
         if HAS_TREE_SITTER:
-            output += f"\n## Tree-sitter Status\nTree-sitter is ENABLED with support for: {', '.join(loaded_languages)}\n"
+            output += f"\n## Parser Support\nTree-sitter parsing enabled for: {', '.join(loaded_languages)}\n"
         else:
-            output += f"\n## Tree-sitter Status\nTree-sitter is DISABLED ({disabled_reason})\n"
+            output += f"\n## Parser Support\nTree-sitter disabled: {disabled_reason}\n"
 
         return output
 
