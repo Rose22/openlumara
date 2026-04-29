@@ -303,6 +303,9 @@ function flattenSettingsObject(obj, prefix, callback) {
 
 // Detect field type from value
 function detectType(value, key = '') {
+    if (key.endsWith('reasoning_effort')) {
+        return 'reasoning_effort_slider';
+    }
     if (value === null || value === undefined) return 'text';
     if (typeof value === 'boolean') return 'boolean';
     if (typeof value === 'number') return 'number';
@@ -624,6 +627,9 @@ function createSettingItem(item) {
     let inputEl;
 
     switch (item.type) {
+        case 'reasoning_effort_slider':
+            inputEl = createReasoningEffortSlider(item.key, item.value);
+            break;
         case 'model':
             inputEl = createModelInput(item.key, item.value);
             break;
@@ -2751,3 +2757,74 @@ toggleModal = function(modalName) {
     // Add this line to ensure the body class is correct on page load
     document.body.classList.toggle('token-bar-hidden', !isVisible);
 })();
+
+
+// Create reasoning effort slider
+function createReasoningEffortSlider(key, value) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'setting-item';
+    wrapper.dataset.key = key;
+
+    const label = document.createElement('label');
+    label.className = 'setting-label';
+    label.textContent = formatLabel(key);
+    wrapper.appendChild(label);
+
+    const container = document.createElement('div');
+    container.className = 'setting-slider-container';
+
+    const slider = document.createElement('input');
+    slider.type = 'range';
+    slider.className = 'setting-slider';
+    slider.min = '0';
+    slider.max = '4';
+    slider.step = '1';
+
+    const mapping = {
+        '0': null,
+        '1': 'low',
+        '2': 'medium',
+        '3': 'high',
+        '4': 'xhigh'
+    };
+
+    const labelMap = {
+        '0': 'OFF',
+        '1': 'low',
+        '2': 'medium',
+        '3': 'high',
+        '4': 'extra high'
+    };
+
+    // Find current index from value
+    let currentIndex = 0;
+    if (value === 'low') currentIndex = 1;
+    else if (value === 'medium') currentIndex = 2;
+    else if (value === 'high') currentIndex = 3;
+    else if (value === 'xhigh') currentIndex = 4;
+    else currentIndex = 0;
+
+    slider.value = currentIndex;
+
+    const valueDisplay = document.createElement('span');
+    valueDisplay.className = 'setting-slider-value';
+    valueDisplay.textContent = labelMap[currentIndex];
+
+    slider.oninput = () => {
+        const idx = slider.value;
+        valueDisplay.textContent = labelMap[idx];
+        handleSettingChange(key, mapping[idx]);
+    };
+
+    container.appendChild(slider);
+    container.appendChild(valueDisplay);
+
+    wrapper.appendChild(container);
+
+    const desc = document.createElement('p');
+    desc.className = 'setting-description';
+    desc.textContent = 'Set the reasoning effort for the model';
+    wrapper.appendChild(desc);
+
+    return wrapper;
+}
