@@ -313,7 +313,12 @@ async function send(providedContent = null) {
                         const { type: metaType } = data._meta;
 
                         if (metaType === 'commit') {
-                            // Backend has finalized - preserve our UI, just sync indices
+                            // Signal that data streaming is complete so the typewriter can finish
+                            isDataStreaming = false;
+                            // Wait for typewriter to finish before finalizing
+                            if (isTypewriterRunning) {
+                                await waitForTypewriter();
+                            }
                             finalizeAllContent();
                             collapseFinishedReasoning(aiMsgDiv);
                             await finalizeStreamingUI(aiWrapper, aiMsgDiv);
