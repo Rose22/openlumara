@@ -308,7 +308,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
     # ==================== Tree-sitter Helpers ====================
 
-    def _get_parser(self, language: str) -> Optional[Parser]:
+    def _get_parser(self, language: str):
         """Get or create a cached parser for the given language."""
         if language not in self._parser_cache:
             if language in LANGUAGE_MAP:
