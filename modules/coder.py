@@ -359,31 +359,282 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             tree, source_bytes = result
 
             if tree.root_node.has_error:
-                error_msg = self._first_error_message(tree.root_node, source_bytes)
-                return False, f"Syntax error in {os.path.basename(file_path)}: {error_msg}"
+                error_msg = self._first_error_message(tree.root_node, source_bytes, os.path.basename(file_path))
+                if error_msg:
+                    return False, error_msg
+                else:
+                    # Fallback: provide line/column info from the error node
+                    error_node = None
+                    def find_error(n):
+                        nonlocal error_node
+                        if n.type in ('ERROR', 'MISSING'):
+                            error_node = n
+                            return
+                        if not error_node:
+                            for child in n.children:
+                                find_error(child)
+                    find_error(tree.root_node)
+                    if error_node:
+                        line = error_node.start_point[0] + 1
+                        col = error_node.start_point[1] + 1
+                        return False, f"Syntax error in {os.path.basename(file_path)}: line {line}, column {col}: {error_node.type} node detected"
+                    return False, f"Syntax error in {os.path.basename(file_path)}: syntax error detected"
 
             return True, None
         except Exception as e:
             core.log("coder", f"Syntax verification skipped: {e}")
             return True, None
 
-    def _first_error_message(self, node, source_bytes: bytes) -> str:
-        """Walk the tree to find the first ERROR/MISSING node and produce a readable message."""
-        if node.type in ('ERROR', 'MISSING'):
-            start = node.start_point[0] + 1
-            end = node.end_point[0] + 1
-            snippet = source_bytes[node.start_byte:node.end_byte].decode('utf-8', errors='replace').strip()
-            if len(snippet) > 60:
-                snippet = snippet[:60] + "..."
-            if not snippet:
-                return f"line {start}: missing syntax (expected token here)"
-            return f"line {start}-{end}: unexpected syntax: {snippet!r}"
-
+    def _first_error_message(self, node, source_bytes: bytes, file_name: str = "file") -> Optional[str]:
+        """Walk the tree to find the first ERROR/MISSING node and produce a detailed, informative message."""
+        snippet = ""
+        start_line = 0
+        end_line = 0
+        
+        # First, recursively check children for errors (depth-first)
         for child in node.children:
-            msg = self._first_error_message(child, source_bytes)
+            msg = self._first_error_message(child, source_bytes, file_name)
             if msg:
                 return msg
-        return "syntax error detected (tree contains ERROR nodes)"
+        
+        # If this node is an error, report it
+        if node.type in ('ERROR', 'MISSING'):
+            start_line = node.start_point[0] + 1
+            start_col = node.start_point[1] + 1
+            end_line = node.end_point[0] + 1
+            end_col = node.end_point[1] + 1
+
+            # Extract the source snippet around the error
+            snippet = source_bytes[node.start_byte:node.end_byte].decode('utf-8', errors='replace').strip()
+
+            # Get surrounding context lines
+            lines = source_bytes.decode('utf-8', errors='replace').split('\n')
+            max_context = 3
+
+            # Build context lines with nice formatting
+            context_lines = []
+            for i in range(max(0, start_line - 1 - max_context), start_line - 1):
+                context_lines.append(f"    {i+1:4d}: {lines[i]}")
+            err_line_str = f"  >> {start_line:4d}: {lines[start_line - 1]}"
+            for i in range(start_line, min(len(lines), start_line + max_context)):
+                context_lines.append(f"    {i+1:4d}: {lines[i]}")
+
+            # Analyze the error node type and children for specific diagnostics
+            error_details = self._analyze_error_node(node, snippet, lines, start_line)
+
+            # Build a compact but informative message
+            message_lines = [f"Syntax error in {file_name}:"]
+            message_lines.append(f"  {error_details}")
+            message_lines.append(f"  At line {start_line}, column {start_col}")
+
+            if snippet:
+                snippet_display = snippet[:50] + "..." if len(snippet) > 50 else snippet
+                message_lines.append(f"  Snippet: {snippet_display!r}")
+
+            if context_lines:
+                message_lines.append(f"  Context:")
+                message_lines.extend(context_lines)
+                message_lines.append(err_line_str)
+
+            if node.children and len(node.children) <= 8:
+                child_types = [c.type for c in node.children]
+                message_lines.append(f"  Children: {child_types}")
+
+            return "\n".join(message_lines)
+
+        return None
+
+    def _analyze_error_node(self, node, snippet: str, lines: list, line_num: int) -> str:
+        """Analyze an error node to provide a specific, human-readable error description."""
+        children = list(node.children)
+
+        # Check for common patterns based on language
+        if node.type == 'MISSING':
+            # MISSING node means parser expected something but didn't find it
+            desc = self._describe_missing_token(node, lines, line_num)
+            # Add context about what might be expected
+            if "Missing expected token" in desc:
+                expected = self._get_expected_from_children(children)
+                if expected:
+                    return f"Missing {expected} (expected: {desc})"
+            return desc
+
+        if node.type == 'ERROR':
+            return self._describe_error_token(node, snippet, children, lines, line_num)
+
+        # Fallback with more detail
+        return f"Syntax error at line {line_num} (node type: {node.type})"
+
+    def _describe_missing_token(self, node, lines: list, line_num: int) -> str:
+        """Describe what token or structure is missing (language-agnostic)."""
+        prev_line = lines[line_num - 2] if line_num > 1 else ""
+        curr_line = lines[line_num - 1] if line_num <= len(lines) else ""
+        next_line = lines[line_num] if line_num < len(lines) else ""
+
+        # Check for unclosed delimiters (common across most languages)
+        open_close_pairs = [('(', ')'), ('[', ']'), ('{', '}')]
+        for open_char, close_char in open_close_pairs:
+            if curr_line.rstrip().endswith(open_char) and not next_line.strip().endswith(close_char):
+                return f"Missing closing '{close_char}' after '{open_char}'"
+
+        # Check for unterminated string (common pattern)
+        stripped = curr_line.rstrip()
+        for quote in ("'", '"'):
+            if stripped.count(quote) % 2 == 1:
+                return f"Unterminated {quote} string literal (missing closing {quote})"
+
+        # Check for unclosed multi-line construct (colon followed by empty next line)
+        if prev_line.rstrip().endswith(':') and not next_line.strip():
+            return "Missing indented block or content after ':'"
+
+        # Check for missing comma in list/array/dict
+        if next_line.strip() and not curr_line.rstrip().endswith((',', ']', '}', ')')):
+            if next_line.strip().startswith((',', ']')):
+                return "Missing comma before next item"
+
+        # Check for end of file issues
+        if not next_line.strip() and line_num == len(lines):
+            return "Unexpected end of file (missing closing delimiters or statements)"
+
+        # Check for missing colon after def/class/if/else/for/while
+        colon_keywords = ('def', 'class', 'if', 'else', 'for', 'while', 'try', 'except', 'finally', 'with', 'elif')
+        for keyword in colon_keywords:
+            if curr_line.strip().startswith(keyword) and not curr_line.rstrip().endswith(':'):
+                return f"Missing ':' after '{keyword}' statement"
+
+        # Check for missing statement after return/raise/break/continue
+        statement_keywords = ('return', 'raise', 'break', 'continue', 'yield')
+        for keyword in statement_keywords:
+            if curr_line.strip().startswith(keyword) and not curr_line.strip().endswith(('(', ':', ']', ')')):
+                return f"Missing expression after '{keyword}'"
+
+        # Generic missing token description with more context
+        return f"Missing expected token or structure (at line {line_num})"
+
+    def _describe_error_token(self, node, snippet: str, children: list, lines: list, line_num: int) -> str:
+        """Describe what unexpected syntax was found (language-agnostic)."""
+        if not snippet:
+            expected = self._get_expected_from_children(children)
+            if expected:
+                return f"Unexpected empty syntax at line {line_num} (expected: {expected})"
+            return f"Unexpected syntax at line {line_num} (empty error node)"
+
+        stripped = snippet.strip()
+
+        # Check for mismatched delimiters
+        if stripped in ('(', ')', '[', ']', '{', '}'):
+            # Find the matching open/close
+            matching = {'(': ')', ')': '(', '[': ']', ']': '[', '{': '}', '}': '{'}
+            expected_char = matching.get(stripped, '')
+            return f"Unexpected '{stripped}' delimiter (expected '{expected_char}' or mismatched pair)"
+
+        # Check for unterminated strings
+        if (stripped.startswith("'") and not stripped.endswith("'")) or \
+           (stripped.startswith('"') and not stripped.endswith('"')):
+            quote = stripped[0]
+            return f"Unterminated {quote} string literal (missing closing {quote})"
+
+        # Check for unexpected colon (common issue in many languages)
+        if stripped == ':':
+            # Check if it's in a weird place
+            if line_num <= len(lines):
+                prev = lines[line_num - 2].rstrip() if line_num > 1 else ""
+                if prev.strip().endswith(('(', '[', '{', ',', '=')):
+                    return "Unexpected ':' (may be misplaced in expression)"
+            return "Unexpected ':' (may be in wrong context)"
+
+        # Check for unexpected comma
+        if stripped == ',' and line_num <= len(lines):
+            prev = lines[line_num - 2].rstrip() if line_num > 1 else ""
+            if prev.endswith('(') or prev.endswith('['):
+                return "Unexpected trailing comma"
+            # Check if comma is at start of line after opening delimiter
+            if prev.strip().endswith(('(', '[', '{')):
+                return "Unexpected leading comma (may be missing previous item)"
+
+        # Check for unexpected semicolon
+        if stripped == ';' and line_num <= len(lines):
+            prev = lines[line_num - 2].rstrip() if line_num > 1 else ""
+            if not prev.endswith((';', '{', '}', ')', ']')):
+                return "Unexpected ';' (may be in wrong context or unnecessary)"
+
+        # Check for unexpected comparison operator at statement level
+        if stripped in ('==', '!=', '<=', '>=') and line_num <= len(lines):
+            prev = lines[line_num - 2].rstrip() if line_num > 1 else ""
+            if not prev.endswith(('(', '[', ',', '=', ':')):
+                return f"Unexpected '{stripped}' (may be misplaced comparison - use '=' for assignment)"
+
+        # Check for unexpected assignment-like syntax
+        if stripped == '=' and line_num <= len(lines):
+            prev = lines[line_num - 2].rstrip() if line_num > 1 else ""
+            if prev.endswith(('(', '[', ',', ':')):
+                return "Unexpected '=' (may be a comparison instead of assignment)"
+
+        # Check for unexpected keywords
+        unexpected_keywords = ('def', 'class', 'if', 'else', 'for', 'while', 'return', 'import')
+        if stripped in unexpected_keywords:
+            return f"Unexpected keyword '{stripped}' (may be misplaced or missing context)"
+
+        # If we have children, they might tell us what was expected
+        if children:
+            expected = self._get_expected_from_children(children)
+            if expected:
+                snippet_display = stripped[:30] + "..." if len(stripped) > 30 else stripped
+                return f"Unexpected '{snippet_display}' (expected: {expected})"
+
+        # Default message with more context
+        snippet_display = stripped[:40] + "..." if len(stripped) > 40 else stripped
+        return f"Unexpected syntax: '{snippet_display}' (at line {line_num})"
+
+    def _get_expected_from_children(self, children: list) -> Optional[str]:
+        """Try to determine what token type was expected based on children."""
+        if not children:
+            return None
+
+        # If children are all terminal/error types, the parser couldn't recover
+        non_error = [c for c in children if c.type not in ('ERROR', 'MISSING', '<eof>')]
+        if not non_error:
+            return "valid syntax"
+
+        # Map common tree-sitter node types to human-readable names
+        type_map = {
+            'identifier': 'identifier/name',
+            'string': 'string',
+            'number': 'number',
+            'comment': 'comment',
+            'expression': 'expression',
+            'statement': 'statement',
+            'expression_statement': 'expression',
+            'binary_expression': 'binary expression',
+            'call_expression': 'function call',
+            'member_expression': 'member access',
+            'property_identifier': 'property name',
+            'parameter': 'parameter',
+            'return_statement': 'return statement',
+            'if_statement': 'if statement',
+            'for_statement': 'for statement',
+            'while_statement': 'while statement',
+            'function_declaration': 'function',
+            'class_declaration': 'class',
+            'import_statement': 'import statement',
+            'import_specifier': 'import specifier',
+            'keyword': 'keyword',
+            'operator': 'operator',
+            'punctuation': 'punctuation',
+            'colon': ':',
+            'semicolon': ';',
+            'comma': ',',
+            'left_parenthesis': '(',
+            'right_parenthesis': ')',
+            'left_bracket': '[',
+            'right_bracket': ']',
+            'left_curly_brace': '{',
+            'right_curly_brace': '}',
+        }
+
+        # Return the human-readable type of the first non-error child
+        child_type = non_error[0].type
+        return type_map.get(child_type, child_type)
 
     # ==================== Language Detection ====================
 
@@ -453,7 +704,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
         try:
             backup_dir = self._get_backup_dir()
-            timestamp = time.strftime("%Y%m%d_%H%M%S_%f")
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
             basename = os.path.basename(file_path)
             backup_name = f"{basename}.{timestamp}.bak"
             backup_path = os.path.join(backup_dir, backup_name)
@@ -483,29 +734,30 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         except Exception as e:
             core.log("coder", f"Backup cleanup failed: {e}")
 
-    async def restore_backup(self, file_path: str, backup_path: str = None) -> dict:
+    async def restore_backup(self, project_name: str, file_path: list) -> dict:
         """
         Restore a file from backup.
         If backup_path is None, restores from the most recent backup.
         """
-        if not os.path.exists(file_path):
+        file_path_str = self._get_file_path(project_name, file_path)
+
+        if not os.path.exists(file_path_str):
             return {"success": False, "error": "File does not exist"}
 
         try:
-            if backup_path is None:
-                backup_dir = self._get_backup_dir()
-                basename = os.path.basename(file_path)
-                backups = []
-                for f in os.listdir(backup_dir):
-                    if f.startswith(basename + ".") and f.endswith(".bak"):
-                        full_path = os.path.join(backup_dir, f)
-                        backups.append((os.path.getmtime(full_path), full_path))
-                if not backups:
-                    return {"success": False, "error": "No backups found"}
-                backups.sort(reverse=True)
-                backup_path = backups[0][1]
+            backup_dir = self._get_backup_dir()
+            basename = os.path.basename(file_path_str)
+            backups = []
+            for f in os.listdir(backup_dir):
+                if f.startswith(basename + ".") and f.endswith(".bak"):
+                    full_path = os.path.join(backup_dir, f)
+                    backups.append((os.path.getmtime(full_path), full_path))
+            if not backups:
+                return {"success": False, "error": "No backups found"}
+            backups.sort(reverse=True)
+            backup_path = backups[0][1]
 
-            shutil.copy2(backup_path, file_path)
+            shutil.copy2(backup_path, file_path_str)
             return {
                 "success": True,
                 "message": f"Restored from {os.path.basename(backup_path)}"
@@ -827,7 +1079,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         file_path_str = self._get_file_path(project_name, file_path)
 
         if os.path.exists(file_path_str):
-            return self.result({"success": False, "error": f"file already exists at {file_path_str}"})
+            return self.result({"success": False, "error": f"File already exists."})
 
         target_dir = os.path.dirname(file_path_str)
         if not os.path.exists(target_dir):
@@ -846,7 +1098,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
                     "message": "The file was created but contains syntax errors."
                 })
 
-            return self.result({"success": True, "message": f"File created at {file_path_str}"})
+            return self.result({"success": True, "message": f"File created."})
         except Exception as e:
             return self.result({"success": False, "error": str(e)})
 
@@ -903,12 +1155,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             if truncated:
                 response += "\n\n[Output truncated - file has more content]"
 
-            return self.result({
-                "success": True,
-                "content": response,
-                "total_lines": total_lines,
-                "truncated": truncated
-            })
+            return response
         except Exception as e:
             return self.result({"success": False, "error": f"error reading file: {e}"})
 
@@ -1096,11 +1343,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             if nodes:
                 node, source_bytes = nodes[0]
                 found_code = source_bytes[node.start_byte:node.end_byte].decode('utf-8')
-                return self.result({
-                    "success": True,
-                    "symbol": found_code,
-                    "language": language
-                })
+                return found_code
 
         # 2. Fallback to line-based extraction
         line_number = self._find_symbol_line(file_path_str, symbol_name, language)
@@ -1135,12 +1378,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
                 end_idx = self._find_symbol_end_line(lines, start_idx, body_type)
                 body_lines = lines[start_idx:end_idx]
 
-            return self.result({
-                "success": True,
-                "symbol": "".join(body_lines),
-                "language": language,
-                "line_range": [line_number, end_idx]
-            })
+            return "".join(body_lines)
         except Exception as e:
             return self.result({"success": False, "error": str(e)})
 
@@ -1273,7 +1511,13 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
                 new_symbol += '\n'
             new_symbol += '\n'
 
-            lines.insert(line_number - 1, new_symbol)
+            # Ensure there's a newline before the insertion point
+            insert_pos = line_number - 1
+            if insert_pos > 0 and not lines[insert_pos - 1].endswith('\n'):
+                lines.insert(insert_pos, '\n')
+                insert_pos += 1
+
+            lines.insert(insert_pos, new_symbol)
 
             with open(file_path_str, 'w', encoding='utf-8') as f:
                 f.writelines(lines)
@@ -1349,6 +1593,11 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             if not new_symbol.endswith('\n'):
                 new_symbol += '\n'
             new_symbol += '\n'
+
+            # Ensure there's a newline before the insertion point
+            if end_idx > 0 and not lines[end_idx - 1].endswith('\n'):
+                lines.insert(end_idx, '\n')
+                end_idx += 1
 
             lines.insert(end_idx, new_symbol)
 
@@ -1520,7 +1769,20 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         except Exception as e:
             return self.result({"success": False, "error": str(e)})
 
-    async def edit(self, project_name: str, file_path: list, edits: list):
+    def _generate_diff(self, orig_content: str, new_content: str):
+        # Generate unified diff
+        orig_lines = orig_content.splitlines(keepends=True)
+        mod_lines = content.splitlines(keepends=True)
+        diff = difflib.unified_diff(
+            orig_lines,
+            mod_lines,
+            fromfile=f"{project_name}/{os.path.join(*file_path)}",
+            tofile=f"{project_name}/{os.path.join(*file_path)} (modified)",
+            lineterm=''
+        )
+        diff_str = "\n".join(diff)
+
+    async def edit(self, project_name: str, file_path: list, old_text: str, new_text: str):
         """
         Performs multiple exact text replacements in a file.
         Each edit has oldText (must match unique, non-overlapping region) and newText (replacement).
@@ -1532,37 +1794,21 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         if not os.path.exists(file_path_str):
             return self.result({"success": False, "error": "file does not exist"})
 
-        if not isinstance(edits, list) or len(edits) == 0:
-            return self.result({"success": False, "error": "edits must be a non-empty list of {oldText, newText} objects"})
-
         await self._backup_file(file_path_str)
 
         try:
             with open(file_path_str, 'r', encoding='utf-8') as f:
                 content = f.read()
 
-            applied = 0
-            for i, edit_obj in enumerate(edits):
-                if not isinstance(edit_obj, dict):
-                    return self.result({"success": False, "error": f"edit #{i+1} must be an object with 'oldText' and 'newText'"})
+            if old_text not in content:
+                return self.result({
+                    "success": False,
+                    "error": f"old_text for edit not found in file. "
+                    f'The exact text "{old_text[:80]}{"..." if len(old_text) > 80 else ""}" '
+                    f'was not found. Make sure old_text matches exactly including whitespace.'
+                })
 
-                old_text = edit_obj.get('oldText', '')
-                new_text = edit_obj.get('newText', '')
-
-                if not old_text:
-                    return self.result({"success": False, "error": f"edit #{i+1} has empty 'oldText'"})
-
-                if old_text not in content:
-                    return self.result({
-                        "success": False,
-                        "error": f"oldText for edit #{i+1} not found in file. "
-                        f'The exact text "{old_text[:80]}{"..." if len(old_text) > 80 else ""}" '
-                        f'was not found. Make sure oldText matches exactly including whitespace.',
-                        "applied": applied
-                    })
-
-                content = content.replace(old_text, new_text, 1)
-                applied += 1
+            content = content.replace(old_text, new_text, 1)
 
             with open(file_path_str, 'w', encoding='utf-8') as f:
                 f.write(content)
@@ -1572,59 +1818,14 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
                 return self.result({
                     "success": False,
                     "error": error,
-                    "message": "The edits were applied but the file contains syntax errors.",
-                    "applied": applied
+                    "message": "The edit was applied but the file contains syntax errors."
                 })
 
             return self.result({
                 "success": True,
-                "message": f"Successfully applied {applied} edit(s) to {os.path.join(project_name, *file_path)}",
-                "applied": applied
+                "message": f"Successfully applied edit to {os.path.join(project_name, *file_path)}"
             })
 
-        except Exception as e:
-            return self.result({"success": False, "error": str(e)})
-
-    async def preview_edits(self, project_name: str, file_path: list, edits: list) -> dict:
-        """
-        Preview what changes would be made without applying them.
-        Returns a unified diff of the proposed changes.
-        """
-        file_path_str = self._get_file_path(project_name, file_path)
-        if not os.path.exists(file_path_str):
-            return self.result({"success": False, "error": "file does not exist"})
-
-        if not isinstance(edits, list) or len(edits) == 0:
-            return self.result({"success": False, "error": "edits must be a non-empty list"})
-
-        try:
-            with open(file_path_str, 'r', encoding='utf-8') as f:
-                original = f.read()
-
-            modified = original
-            for edit_obj in edits:
-                old_text = edit_obj.get('oldText', '')
-                new_text = edit_obj.get('newText', '')
-                if old_text and old_text in modified:
-                    modified = modified.replace(old_text, new_text, 1)
-
-            # Generate unified diff
-            orig_lines = original.splitlines(keepends=True)
-            mod_lines = modified.splitlines(keepends=True)
-            diff = difflib.unified_diff(
-                orig_lines,
-                mod_lines,
-                fromfile=f"{project_name}/{os.path.join(*file_path)}",
-                tofile=f"{project_name}/{os.path.join(*file_path)} (modified)",
-                lineterm=''
-            )
-            diff_str = "\n".join(diff)
-
-            return self.result({
-                "success": True,
-                "diff": diff_str,
-                "changes_count": len(edits)
-            })
         except Exception as e:
             return self.result({"success": False, "error": str(e)})
 
@@ -1758,23 +1959,63 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             lang = self._get_language_from_ext(file_path_str)
             formatters = self.FORMATTERS.get(lang, [])
 
+            async def run_formatter(fmt_name, args):
+                """Run a formatter with given args, handling CLI differences."""
+                proc = await asyncio.create_subprocess_exec(
+                    fmt_name, *args,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                try:
+                    stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
+                    return proc.returncode, stdout, stderr
+                except asyncio.TimeoutError:
+                    try:
+                        proc.kill()
+                        await proc.wait()
+                    except:
+                        pass
+                    return -1, b"", b"Timeout"
+
+            def try_format_with_inplace(fmt_name):
+                """Try formatting with -i flag, fallback to read/write if it fails."""
+                import subprocess as sp
+                try:
+                    # Try with -i first
+                    result = sp.run([fmt_name, "-i", file_path_str], 
+                                   capture_output=True, text=True, timeout=30)
+                    if result.returncode == 0:
+                        return True, fmt_name
+                except (FileNotFoundError, sp.TimeoutExpired):
+                    pass
+                
+                # Fallback: read, format, write
+                try:
+                    with open(file_path_str, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    
+                    # Try running without -i (pipe mode)
+                    result = sp.run([fmt_name, '-'], 
+                                   input=content, capture_output=True, text=True, timeout=30)
+                    if result.returncode == 0:
+                        with open(file_path_str, 'w', encoding='utf-8') as f:
+                            f.write(result.stdout)
+                        return True, fmt_name
+                except (FileNotFoundError, sp.TimeoutExpired):
+                    pass
+                
+                return False, None
+
             if formatter == "auto":
                 # Try each formatter until one succeeds
                 for fmt in formatters:
-                    try:
-                        proc = await asyncio.create_subprocess_exec(
-                            fmt, "-i", file_path_str,
-                            stdout=asyncio.subprocess.PIPE,
-                            stderr=asyncio.subprocess.PIPE
-                        )
-                        await asyncio.wait_for(proc.communicate(), timeout=30)
+                    success, used_fmt = try_format_with_inplace(fmt)
+                    if success:
                         return self.result({
                             "success": True,
-                            "message": f"File formatted with {fmt}",
-                            "formatter": fmt
+                            "message": f"File formatted with {used_fmt}",
+                            "formatter": used_fmt
                         })
-                    except (FileNotFoundError, asyncio.TimeoutError):
-                        continue
                 return self.result({
                     "success": False,
                     "error": f"No formatter found for {lang}. Tried: {formatters}"
@@ -1787,25 +2028,17 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
                         "error": f"Formatter '{formatter}' not supported for {lang}. Supported: {formatters}"
                     })
 
-                proc = await asyncio.create_subprocess_exec(
-                    formatter, "-i", file_path_str,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE
-                )
-                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
-
-                if proc.returncode != 0:
-                    stderr_str = stderr.decode('utf-8', errors='replace').strip()
+                success, used_fmt = try_format_with_inplace(formatter)
+                if success:
                     return self.result({
-                        "success": False,
-                        "error": f"Formatting failed: {stderr_str}",
-                        "formatter": formatter
+                        "success": True,
+                        "message": f"File formatted with {used_fmt}",
+                        "formatter": used_fmt
                     })
-
+                
                 return self.result({
-                    "success": True,
-                    "message": f"File formatted with {formatter}",
-                    "formatter": formatter
+                    "success": False,
+                    "error": f"Formatter '{formatter}' failed for {lang}."
                 })
         except Exception as e:
             return self.result({"success": False, "error": str(e)})
@@ -1834,30 +2067,66 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             with open(file_path_str, 'r', encoding='utf-8') as f:
                 lines = f.readlines()
 
-            imports_start = 0
-            imports_end = 0
-            in_imports = False
-
+            # Find import block - more robust detection
+            imports_start = None
+            imports_end = None
+            import_pattern = re.compile(r'^(?:import\s+|from\s+\S+\s+import\s+)')
+            
             for i, line in enumerate(lines):
-                stripped = line.strip()
-                if stripped.startswith('import ') or stripped.startswith('from '):
-                    if not in_imports:
+                if import_pattern.match(line):
+                    if imports_start is None:
                         imports_start = i
-                        in_imports = True
                     imports_end = i + 1
-                elif in_imports and stripped and not stripped.startswith('#'):
-                    in_imports = False
+                elif imports_start is not None and line.strip() and not line.strip().startswith('#'):
+                    # Stop at first non-import, non-blank, non-comment line
+                    break
 
-            if not in_imports:
-                # No imports found, nothing to update
-                return self.result({
-                    "success": True,
-                    "message": "No imports found in file",
-                    "changes_made": 0
-                })
+            if imports_start is None:
+                # No imports found
+                if not added_symbols:
+                    return self.result({
+                        "success": True,
+                        "message": "No imports found in file",
+                        "changes_made": 0
+                    })
+                # If adding symbols, we need to create import block
+                imports_start = 0
+                imports_end = 0
+                # Find first non-import line to insert before
+                for i, line in enumerate(lines):
+                    if not line.strip().startswith('#') and not line.strip().startswith('import') and not line.strip().startswith('from'):
+                        imports_start = i
+                        imports_end = i
+                        break
+                else:
+                    # File is empty or only comments
+                    imports_start = 0
+                    imports_end = 0
 
-            import_lines = lines[imports_start:imports_end]
+            import_lines = lines[imports_start:imports_end] if imports_start is not None else []
             changes_made = 0
+
+            # Parse existing imports to build a set of (module, name) tuples
+            existing_imports = set()  # (module, name) where name is None for module imports
+            for line in import_lines:
+                # Handle 'from X import Y, Z'
+                match = re.search(r'^from\s+(\S+)\s+import\s+(.+)', line)
+                if match:
+                    module = match.group(1)
+                    names = [n.strip().split(' as ')[0].strip() for n in match.group(2).split(',')]
+                    for name in names:
+                        if name:
+                            existing_imports.add((module, name))
+                    # Also add the module itself if it's a relative import
+                    if module.startswith('.'):
+                        existing_imports.add((module, None))
+                # Handle 'import X, Y'
+                match = re.search(r'^import\s+(.+)', line)
+                if match:
+                    modules = [m.strip().split(' as ')[0].strip() for m in match.group(1).split(',')]
+                    for mod in modules:
+                        if mod:
+                            existing_imports.add((mod, None))
 
             # Remove imports for deleted symbols
             if removed_symbols:
@@ -1865,7 +2134,8 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
                 for line in import_lines:
                     should_remove = False
                     for sym in removed_symbols:
-                        if f" {sym}" in line or f".{sym}" in line or f"import {sym}" in line:
+                        # Check for exact symbol match in import
+                        if re.search(rf'\b{re.escape(sym)}\b', line):
                             should_remove = True
                             break
                     if not should_remove:
@@ -1874,27 +2144,54 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
                         changes_made += 1
                 import_lines = new_import_lines
 
+            # Re-parse existing imports after removal
+            existing_imports = set()
+            for line in import_lines:
+                match = re.search(r'^from\s+(\S+)\s+import\s+(.+)', line)
+                if match:
+                    module = match.group(1)
+                    names = [n.strip().split(' as ')[0].strip() for n in match.group(2).split(',')]
+                    for name in names:
+                        if name:
+                            existing_imports.add((module, name))
+                    if module.startswith('.'):
+                        existing_imports.add((module, None))
+                match = re.search(r'^import\s+(.+)', line)
+                if match:
+                    modules = [m.strip().split(' as ')[0].strip() for m in match.group(1).split(',')]
+                    for mod in modules:
+                        if mod:
+                            existing_imports.add((mod, None))
+
             # Add imports for new symbols
             if added_symbols:
-                existing_names = set()
-                for line in import_lines:
-                    # Extract imported names
-                    match = re.search(r'from\s+(\S+)\s+import\s+(.+)', line)
-                    if match:
-                        module = match.group(1)
-                        names = [n.strip().split(' as ')[0].strip() for n in match.group(2).split(',')]
-                        for name in names:
-                            if name:
-                                existing_names.add((module, name))
-
-                    match = re.search(r'import\s+(\S+)', line)
-                    if match:
-                        existing_names.add((match.group(1), None))
-
+                # Group symbols by module for cleaner imports
+                symbols_by_module = {}
                 for sym in added_symbols:
-                    if sym not in existing_names:
-                        import_lines.append(f"from . import {sym}\n")
-                        changes_made += 1
+                    # Check if already imported
+                    already_imported = False
+                    for (module, name) in existing_imports:
+                        if name == sym or module == sym:
+                            already_imported = True
+                            break
+                    
+                    if not already_imported:
+                        # Try to find which module it belongs to
+                        # Default to current module (.)
+                        symbols_by_module.setdefault('.', []).append(sym)
+
+                for module, syms in symbols_by_module.items():
+                    if len(syms) == 1:
+                        import_lines.append(f"from {module} import {syms[0]}\n")
+                    else:
+                        import_lines.append(f"from {module} import {', '.join(syms)}\n")
+                    changes_made += 1
+
+            # Clean up empty lines in import block
+            while import_lines and not import_lines[-1].strip():
+                import_lines.pop()
+            if import_lines and not import_lines[-1].endswith('\n'):
+                import_lines[-1] += '\n'
 
             lines[imports_start:imports_end] = import_lines
 
