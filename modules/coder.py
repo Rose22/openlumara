@@ -2214,46 +2214,31 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
     async def on_system_prompt(self):
         """Generates the system prompt with tool usage guidelines."""
-        output = """
-## Code Editing Tool Usage
+        output = """## Code Editing Tool Usage
 
-### Reading Code (Token-Efficient)
+### Reading
+Use in this order:
+1. **get_outline** (first) - lists all symbols in a file.
+2. **get_symbol** (primary) - reads a symbol by name (e.g., "MyClass.my_method").
+3. **read_file** (offset/limit) - only if outline/symbol aren't enough.
+4. **read_file** (full) - LAST RESORT ONLY.
 
-When working with code files, read them in this order:
-
-1. **get_outline** - Call FIRST to see all symbols (classes, functions) in a file.
-2. **get_symbol** - Retrieve specific code by symbol name. PRIMARY reading method.
-   Use dot notation for nested symbols: "MyClass.my_method".
-
-Then, ONLY if get_outline and get_symbol did not provide enough information:
-3. **read_file** with offset/limit - For files without clear symbols or when you need raw context.
-4. **read_file** (no args) - LAST RESORT only. Reading entire files wastes tokens.
-
-### Editing Code
-
-When modifying code, choose your tool based on the change:
-
-1. **edit** - PREFERRED for most changes. Performs exact text replacement.
-   Accepts a list of {oldText, newText} pairs. Each oldText must match exactly.
-   Multiple edits can be batched in one call (they process sequentially).
-2. **preview_edits** - Preview changes before applying them (returns unified diff).
-3. **append_to_file** - Add content to end of file (functions, classes, imports).
-4. **edit_symbol / add_symbol_before / add_symbol_after** - For symbol-aware edits
-   (e.g., inserting methods inside a class body, or replacing entire functions).
-5. **overwrite_file** - ONLY for complete file restructuring.
+### Editing
+Use in this order:
+1. **edit** (preferred) - exact text replacement. Accepts list of {oldText, newText} pairs. Batches allowed.
+2. **append_to_file** - adds content to end of file.
+3. **edit_symbol / add_symbol_before / add_symbol_after** - for inserting/replacing specific symbols.
 
 ### Searching
-
-1. **grep** - Search across all files in a project (text or regex patterns).
-2. **find_files** - Find files matching glob patterns (*.py, test_*.js, etc.).
-3. **search** - Search within a single file for text/regex with context lines.
-4. **list_full_project_tree** - Understand overall project layout first.
+Use in this order:
+1. **grep** - regex/text across project files.
+2. **find_files** - glob patterns.
+3. **search** - text/regex within a single file.
+4. **list_full_project_tree** - overall project layout.
 
 ### Content Format
-
-- All content parameters (new_content, content_body, content in create_file) must be RAW source code.
-- Use actual newlines and quotes. Do NOT escape them as \\n or \\\".
-- The framework handles serialization automatically - just pass the raw text.
+- All content params must be RAW source code.
+- Use actual newlines/quotes. Do NOT escape as `\\n` or `\\\"`.
 """.strip()
 
         coding_style = self.config.get("coding_style")
