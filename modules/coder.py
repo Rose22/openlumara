@@ -1095,7 +1095,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             return self.result(f"error: {e}", False)
 
     async def read_file(self, project_name: str, file_path: list, offset: int = None, limit: int = None):
-        """Reads a file. **USE ONLY AS A LAST RESORT WHEN GET_OUTLINE AND GET_SYMBOL DID NOT PROVIDE ADEQUATE RESULTS**"
+        """Reads a file. **USE ONLY AS A LAST RESORT WHEN GET_OUTLINE AND GET_SYMBOL DID NOT PROVIDE ADEQUATE RESULTS**"""
         if not self.config.get("permissions").get("read_files"):
             return self.result("error: Full file reading is disabled. Use get_symbol!", success=False)
 
