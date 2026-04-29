@@ -2765,11 +2765,6 @@ function createReasoningEffortSlider(key, value) {
     wrapper.className = 'setting-item';
     wrapper.dataset.key = key;
 
-    const label = document.createElement('label');
-    label.className = 'setting-label';
-    label.textContent = formatLabel(key);
-    wrapper.appendChild(label);
-
     const container = document.createElement('div');
     container.className = 'setting-slider-container';
 
