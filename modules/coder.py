@@ -2224,6 +2224,8 @@ When working with code files, read them in this order:
 1. **get_outline** - Call FIRST to see all symbols (classes, functions) in a file.
 2. **get_symbol** - Retrieve specific code by symbol name. PRIMARY reading method.
    Use dot notation for nested symbols: "MyClass.my_method".
+
+Then, ONLY if get_outline and get_symbol did not provide enough information:
 3. **read_file** with offset/limit - For files without clear symbols or when you need raw context.
 4. **read_file** (no args) - LAST RESORT only. Reading entire files wastes tokens.
 
