@@ -141,6 +141,7 @@ class Lists(core.module.Module):
         return None
 
     async def add_item(self, category: str, list_name: str, item_content: str):
+        """adds item to list. creates list if nonexistent."""
         self._create_if_non_existent(category, list_name)
 
         target_list = self.data[category][list_name]
