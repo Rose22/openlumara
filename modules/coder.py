@@ -80,7 +80,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         "limits": {
             "folder_blacklist": ["venv"],
             "max_file_size_mb": 10,
-            "max_read_lines": 5000,
+            "max_read_lines": 1000,
             "max_grep_results": 50,
             "backup_retention_count": 5,
         }
@@ -1604,7 +1604,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
     # ==================== Search Operations ====================
 
-    async def search(self, project_name: str, file_path: list, query: str, context_lines: int = 5, max_matches: int = 10, use_regex: bool = False):
+    async def search(self, project_name: str, file_path: list, query: str, context_lines: int = 5, max_matches: int = 10, use_regex: bool = True):
         """Searches for text or regex pattern within a file. Returns snippets with line numbers and surrounding context."""
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
@@ -1709,7 +1709,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         except Exception as e:
             return self.result(f"error: {e}", success=False)
 
-    async def grep(self, project_name: str, path: list = None, pattern: str = "", use_regex: bool = False,
+    async def grep(self, project_name: str, path: list = None, pattern: str = "", use_regex: bool = True,
                    case_sensitive: bool = False, max_results: int = None):
         """Searches within a directory using a pattern. Pattern can be normal string or regex."""
 
