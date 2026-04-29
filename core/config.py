@@ -27,7 +27,7 @@ default_config = {
     "model": {
         "name": "",
         "temperature": 0.7,
-        "reasoning_effort": "medium",
+        "reasoning_effort": None,
         "use_tools": True
     },
     "channels": {
