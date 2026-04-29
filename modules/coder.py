@@ -1019,7 +1019,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
                         if entry.name.startswith('.'):
                             continue
                         if current_depth < depth_limit:
-                            folders[entry.name] = _build1tree(entry.path, current_depth + 1)
+                            folders[entry.name] = _build_tree(entry.path, current_depth + 1)
                         else:
                             folders[entry.name] = {"files": [], "folders": {}}
             except Exception:
