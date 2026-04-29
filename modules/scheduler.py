@@ -6,6 +6,10 @@ import ulid
 class Scheduler(core.module.Module):
     """Lets your AI send you scheduled reminders and do things at specified times"""
 
+    settings = {
+        "put_scheduled_jobs_in_system_prompt": True
+    }
+
     async def on_ready(self, *args, **kwargs):
         """Initialize storage, manager, and schedule existing jobs."""
         self.schedule = core.storage.StorageList("schedule", type="json")
@@ -308,6 +312,9 @@ Use tools if needed. For simple reminders, do not use tools.
         return days[weekday] if 0 <= weekday < 7 else "Unknown"
 
     async def on_system_prompt(self) -> str:
+        if not self.config.get("put_scheduled_jobs_in_system_prompt"):
+            return None
+
         if self.schedule:
             return f"Your scheduler system will trigger these events at the specified times:\n{self}"
         return None

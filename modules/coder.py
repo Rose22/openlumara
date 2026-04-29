@@ -65,6 +65,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
     settings = {
         "coding_style": "Write clean, well-commented code. Do not include your reasoning inside final code.",
         "sandbox_folder": "~/coder",
+        "add_project_list_to_system_prompt": True,
         "permissions": {
             "create_project": True,
             "add_functions": True,
@@ -2055,11 +2056,14 @@ RAW source code only. Use actual newlines/quotes. Do NOT escape as `\\n` or `\\\
 """.strip()
         coding_style = self.config.get("coding_style")
         if coding_style: output += f"\n## Coding Style\n{coding_style}\n"
-        try:
-            projects = [f for f in os.listdir(self.sandbox_path) if os.path.isdir(os.path.join(self.sandbox_path, f))]
-            output += "## Projects in Sandbox\n" + ("\n".join(f"- {p}" for p in projects) if projects else "- No projects exist. Use `create_project` to create one.\n")
-        except Exception as e:
-            output += f"Could not list projects: {e}\n"
+
+        if self.config.get("add_project_list_to_system_prompt"):
+            try:
+                projects = [f for f in os.listdir(self.sandbox_path) if os.path.isdir(os.path.join(self.sandbox_path, f))]
+                output += "## Projects in Sandbox\n" + ("\n".join(f"- {p}" for p in projects) if projects else "- No projects exist. Use `create_project` to create one.\n")
+            except Exception as e:
+                output += f"Could not list projects: {e}\n"
+
         if HAS_TREE_SITTER:
             output += f"\n## Parser Support\nTree-sitter enabled for: {', '.join(loaded_languages)}"
         else:

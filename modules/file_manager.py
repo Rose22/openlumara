@@ -11,7 +11,14 @@ class FileManager(core.module.Module):
     unsafe = True
     _header = "System info"
 
+    settings = {
+        "put_system_info_in_prompt": False
+    }
+
     async def on_end_prompt(self):
+        if not self.config.get("put_system_info_in_prompt"):
+            return None
+
         details = {
             "OS": sys.platform,
             "OS release": platform.release(),

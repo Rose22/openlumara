@@ -4,7 +4,7 @@ class Models(core.module.Module):
     """Lets you or the AI switch between AI models"""
 
     settings = {
-        "add_model_list_to_system_prompt": True
+        "put_model_list_in_system_prompt": True
     }
 
     def __init__(self, *args, **kwargs):
@@ -13,7 +13,7 @@ class Models(core.module.Module):
 
     async def on_system_prompt(self):
         """Returns a list of AI/LLM models available to switch to"""
-        if not self.config.get("add_model_list_to_system_prompt"):
+        if not self.config.get("put_model_list_in_system_prompt"):
             return None
 
         if not self.models:

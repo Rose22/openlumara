@@ -4,7 +4,7 @@ class Characters(core.module.Module):
     """Lets your AI embody different characters! inspired by characterAI, janitorAI, sillytavern, etc."""
 
     settings = {
-        "add_character_list_to_system_prompt": True,
+        "put_character_list_in_system_prompt": True,
         "disable_agent_prompts_when_character_active": True
     }
 
@@ -74,7 +74,7 @@ class Characters(core.module.Module):
         return f"character switched to {character}"
 
     async def on_system_prompt(self):
-        if not self.config.get("add_character_list_to_system_prompt"):
+        if not self.config.get("put_character_list_in_system_prompt"):
             return None
 
         curr_char = self.characters.get(await self.channel.context.chat.get_data("character"))
