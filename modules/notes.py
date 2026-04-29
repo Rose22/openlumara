@@ -14,7 +14,6 @@ class Notes(core.module.Module):
         return f"current categories containing notes: {categories}"
 
     async def create(self, name: str, category: str, content: str):
-        """create a new note and store it within the notebook"""
         if category not in self.data.keys():
             self.data[category] = {}
 
@@ -26,7 +25,6 @@ class Notes(core.module.Module):
         return self.result("note created")
 
     async def read(self, category: str, name: str):
-        """reads a note using its name"""
         if category not in self.data.keys():
             return self.result("category doesn't exist", False)
 
@@ -36,7 +34,7 @@ class Notes(core.module.Module):
         return self.result(self.data[category].get(name, "EMPTY"))
 
     async def edit(self, category: str, name: str, content: str):
-        """edits an existing note. ALWAYS read the note first before editing."""
+        """Edits an existing note. ALWAYS read the note first before editing."""
         if category not in self.data.keys():
             return self.result("category doesn't exist", False)
 
@@ -57,14 +55,12 @@ class Notes(core.module.Module):
                 yield current_key, value
 
     async def list(self, category: str):
-        """gets all notes in a specific category"""
         if category not in self.data.keys():
             return self.result("category doesn't exist", False)
 
         return self.result(list(self.data.get(category, {}).keys()))
 
     async def search(self, query: str):
-        """searches within the stored notes"""
         found = []
         for key, content in self._recursive_items(dict(self.data)):
             if query.lower() in key.lower() or query.lower() in content.lower():
@@ -72,7 +68,6 @@ class Notes(core.module.Module):
         return self.result(found)
 
     async def delete(self, category: str, name: str):
-        """deletes a note using its name"""
         if category not in self.data.keys():
             return self.result("category doesn't exist", False)
 

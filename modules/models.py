@@ -27,7 +27,11 @@ class Models(core.module.Module):
 
     @core.module.command("model")
     async def model(self, args: list):
-         """switch to model <name>"""
+         """Switches to model <name>.
+         
+         Args:
+             args: the model name or empty to show current model
+         """
          if not args:
             return f"Current model: {self.manager.API.get_model()}"
 
@@ -35,7 +39,7 @@ class Models(core.module.Module):
 
     @core.module.command("models")
     async def models(self, args: list):
-        """list models"""
+        """Lists available models."""
         if not self.models:
             models = await self.manager.API.list_models()
             if not models:

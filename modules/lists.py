@@ -11,40 +11,21 @@ class Lists(core.module.Module):
         self.data = core.storage.StorageDict("lists", "yaml")
 
     async def on_system_prompt(self):
-        # display all pinned lists all fancy in the prompt
         output = ""
-        #output += "Pinned lists (you can see their full contents):\n"
-        unpinned_lists = {}
-        for category_name, lists in self.data.items():
-            category_header_displayed = False
-
-            for list_name, list in lists.items():
-                if not list.get("pinned"):
-                    if category_name not in unpinned_lists.keys():
-                        unpinned_lists[category_name] = []
-
-                    unpinned_lists[category_name].append(list_name)
-                    continue
-
-                if not list.get("items"):
-                    continue
-
-                if not category_header_displayed:
-                    output += f"## {category_name}\n"
-                    category_header_displayed = True
-
-                output += f"### {list_name}\n"
-                for index, list_item in enumerate(list.get("items")):
-                    output += f"{index+1}. {list_item}\n"
-                output += "\n"
-
-        # display unpinned lists as just their names
-        if unpinned_lists:
+        pinned_by_cat, unpinned_by_cat = {}, {}
+        for cat, lists in self.data.items():
+            for name, lst in lists.items():
+                if not lst.get("items"): continue
+                if lst.get("pinned"): pinned_by_cat.setdefault(cat, []).append((name, lst["items"]))
+                else: unpinned_by_cat.setdefault(cat, []).append(name)
+        for cat, items in pinned_by_cat.items():
+            output += f"## {cat}\n"
+            for name, lst_items in items:
+                output += f"### {name}\n" + "\n".join(f"{i+1}. {it}" for i, it in enumerate(lst_items)) + "\n"
+        if unpinned_by_cat:
             output += "---\nlists that aren't pinned:\n"
-            for category_name, items in unpinned_lists.items():
-                items_str = ", ".join(items)
-                output += f"{category_name}: {items_str}\n"
-
+            for cat, names in unpinned_by_cat.items():
+                output += f"{cat}: {', '.join(names)}\n"
         return output
 
     def _verify_target(self, category, list_name):
@@ -93,8 +74,7 @@ class Lists(core.module.Module):
 #         return self.result("list deleted!")
 
     async def delete(self, category: str, list_name: str):
-        """Deletes a list. ONLY use this if user explicitely asks for it!"""
-
+        """Deletes a list. ONLY use if user explicitly asks."""
         if not self._verify_target(category, list_name):
             return self.result("that list doesn't exist")
 
@@ -108,6 +88,7 @@ class Lists(core.module.Module):
         return self.result("list deleted!")
 
     async def pin(self, category: str, list_name: str):
+        """Pins a list to the top of your context."""
         if not self._verify_target(category, list_name):
             return self.result("that list doesn't exist")
 
@@ -144,8 +125,6 @@ class Lists(core.module.Module):
     #     return self.result(output)
 
     async def get(self, category: str, list_name: str):
-        """retrieves the contents of a list"""
-
         if not self._verify_target(category, list_name):
             return self.result("that list doesn't exist")
 
@@ -162,9 +141,6 @@ class Lists(core.module.Module):
         return None
 
     async def add_item(self, category: str, list_name: str, item_content: str):
-        """
-        Adds an item to a list. List items are 1-indexed.
-        """
         self._create_if_non_existent(category, list_name)
 
         target_list = self.data[category][list_name]
@@ -174,9 +150,6 @@ class Lists(core.module.Module):
         return self.result("list item added!")
 
     async def edit_item(self, category: str, list_name: str, item_starts_with: str, item_content: str):
-        """
-        Edits an item in a list. You can target a list item using a string the item starts with (uses python's .startswith())
-        """
         if not self._verify_target(category, list_name):
             return self.result("that list doesn't exist")
 
@@ -192,9 +165,6 @@ class Lists(core.module.Module):
         return self.result("list item edited!")
 
     async def delete_item(self, category: str, list_name: str, item_starts_with: str):
-        """
-        Deletes an item in a list. You can target a list item using a string the item starts with (uses python's .startswith())
-        """
         if not self._verify_target(category, list_name):
             return self.result("that list doesn't exist")
 

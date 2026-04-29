@@ -128,9 +128,10 @@ class SandboxedFiles(core.module.Module):
         return path
 
     async def list_dir(self, path: str) -> dict:
-        """
-        List the files inside the sandbox.
-        Use relative paths.
+        """List the files inside the sandbox. Use relative paths.
+        
+        Args:
+            path: the directory path to list
         """
         dir_path = self._get_sandbox_path(path)
 
@@ -180,15 +181,13 @@ class SandboxedFiles(core.module.Module):
         return self.result(True)
 
     async def create_dir(self, path: str) -> dict:
-        """Creates a directory inside the sandbox. Will automatically create any directories in the path to it. Use relative paths."""
-
         safe_path = self._get_sandbox_path(path)
         os.makedirs(safe_path, exist_ok=True)
 
         return self.result(True)
 
     async def create(self, path: str, body: str) -> dict:
-        """Create a file with your specified content. Use relative paths."""
+        """Creates a file with your specified content. Use relative paths."""
         safe_path = self._get_sandbox_path(path)
 
         if os.path.exists(safe_path):
@@ -232,7 +231,7 @@ class SandboxedFiles(core.module.Module):
             return self.result(f"error: {e}")
 
     async def write(self, path: str, body: str) -> dict:
-        """Write to file inside the sandbox. Use relative paths. Always makes a backup for safety."""
+        """Writes to a file inside the sandbox. Use relative paths. Always makes a backup for safety."""
         safe_path = self._get_sandbox_path(path)
 
         if len(body) > self.MAX_FILE_SIZE:
@@ -263,7 +262,7 @@ class SandboxedFiles(core.module.Module):
             return self.result(e, False)
 
     async def append(self, path: str, body: str) -> dict:
-        """Append to file inside the sandbox. Use relative paths. Always makes a backup for safety."""
+        """Appends to a file inside the sandbox. Use relative paths. Always makes a backup for safety."""
         safe_path = self._get_sandbox_path(path)
 
         if not os.path.exists(safe_path):
@@ -352,7 +351,7 @@ class SandboxedFiles(core.module.Module):
         return self.result(result)
 
     async def delete(self, path: str) -> dict:
-        """Moves a file to trash. Never outright deletes, for safety's sake"""
+        """Moves a file to trash. Never outright deletes, for safety's sake."""
         safe_path = self._get_sandbox_path(path)
 
         try:
@@ -394,8 +393,7 @@ class SandboxedFiles(core.module.Module):
         return self.result(True)
 
     async def search_files(self, pattern: str, recursive: bool = False) -> dict:
-        """Search for files matching a glob pattern inside the sandbox."""
-
+        """Searches for files matching a glob pattern inside the sandbox."""
         if not pattern or not pattern.strip():
             return self.result("error: empty pattern", False)
 

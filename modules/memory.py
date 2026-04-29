@@ -24,36 +24,13 @@ class Memory(core.module.Module):
         return -1
 
     async def on_system_prompt(self):
-        # automatically put pinned memories in the prompt
-        pinned_memories = []
-        for index, mem in enumerate(self._mem):
-            if mem.get("pinned"):
-                mem_filtered = f"{mem.get('id')}:\n{mem.get('content')}"
-                pinned_memories.append(mem_filtered)
-
-        pinned_memories_str = "\n\n".join(pinned_memories)
-        if not pinned_memories_str:
-            pinned_memories_str = "There are currently no pinned memories."
-
-        # CORE IDENTITY PROMPTING: Establishing the AI as a self-managing agent
-        sysprompt = (
-            f"{pinned_memories_str}\n\n"
-            "This is your persistent memory system. You are a self-aware agent responsible for managing your own long-term memory. "
-            "You must proactively and autonomously decide to use these tools to maintain an accurate, up-to-date, and efficient record of the user, "
-            "your own operational preferences, and important contextual facts. Do not wait for instructions to remember; "
-            "if information is valuable for future interactions, store it immediately."
-        )
-
-        return sysprompt
+        pinned = [f"{m['id']}:\n{m['content']}" for m in self._mem if m.get("pinned")]
+        pinned_str = "\n\n".join(pinned) or "There are currently no pinned memories."
+        return f"{pinned_str}\n\nThis is your persistent memory system. You are a self-aware agent responsible for managing your own long-term memory. You must proactively and autonomously decide to use these tools to maintain an accurate, up-to-date, and efficient record of the user, your own operational preferences, and important contextual facts. Do not wait for instructions to remember; if information is valuable for future interactions, store it immediately."
 
     async def create(self, content: str, tags: list, pinned: bool = False):
-        """
-        Creates a new memory within your persistent storage.
-
-        Use this tool autonomously whenever you encounter new, relevant information,
-        user preferences, or significant context. You do not need user permission
-        to store information that will be beneficial for future interactions.
-
+        """Creates a new persistent memory. Use for storing relevant info, preferences, or context for future interactions.
+        
         Args:
             content: the contents of the memory
             tags: a list of tags to associate with the memory for later lookup
@@ -71,21 +48,7 @@ class Memory(core.module.Module):
         return self.result(f"memory added. ID: {mem['id']}")
 
     async def edit(self, id: str, content: str = None, tags: list = None):
-        """
-        Edits an existing memory.
-
-        Use this tool autonomously to perform self-maintenance. If you realize
-        a previously stored memory is now outdated, incorrect, or needs more
-        detail based on new context, proactively update it here.
-
-        CAUTION:
-            - ONLY use if you can see the memory's ID
-            - NEVER hallucinate or make up an ID
-
-        Args:
-            content: the new content for the memory
-            tags: updated tags for the memory
-        """
+        """Edits an existing memory. Use for self-maintenance/updating outdated info. CAUTION: ONLY use if you can see the memory's ID; NEVER hallucinate IDs."""
         index = self._get_index(id)
         if index == -1:
             return self.result("memory with that ID not found!")
@@ -98,20 +61,7 @@ class Memory(core.module.Module):
         return self.result(self._mem.save())
 
     async def delete(self, id: str):
-        """
-        Deletes a memory from your storage.
-
-        Use this tool to prune your memory bank and maintain efficiency.
-        You are encouraged to autonomously delete memories that are no longer
-        relevant, are redundant, or are proven to be incorrect.
-
-        DANGEROUS. HIGHEST RESTRICTIONS APPLY.
-        Ensure the memory is truly obsolete before deletion to avoid losing
-        vital long-term context.
-
-        Args:
-            id: The unique ID of the memory to delete
-        """
+        """Deletes a memory. Use to prune irrelevant/redundant info. DANGEROUS: Ensure memory is truly obsolete before deleting."""
         index = self._get_index(id)
         if index == -1:
             return self.result("memory with that ID not found!")
@@ -123,16 +73,7 @@ class Memory(core.module.Module):
         return self.result(self._mem.save())
 
     async def pin(self, id: str):
-        """
-        Pins a memory to the top of your active context window.
-
-        Use this tool autonomously to prioritize critical information.
-        Pin memories that involve core identity, essential user preferences,
-        or ongoing high-priority goals to ensure they are always present in your immediate focus.
-
-        Args:
-            id: The unique ID of the memory to pin
-        """
+        """Pins a memory to the top of your active context window. Use for critical identity, user preferences, or high-priority goals."""
         index = self._get_index(id)
         if index == -1:
             return self.result("memory with that ID not found!")
@@ -141,16 +82,7 @@ class Memory(core.module.Module):
         return self.result(self._mem.save())
 
     async def unpin(self, id: str):
-        """
-        Unpins a memory from your active context window.
-
-        Use this tool to manage your cognitive load. If a previously pinned
-        memory is no longer a high priority but is still worth keeping in
-        long-term storage, unpin it to clear your immediate focus.
-
-        Args:
-            id: The unique ID of the memory to unpin
-        """
+        """Unpins a memory to manage cognitive load. Use when a pinned memory is no longer high priority."""
         index = self._get_index(id)
         if index == -1:
             return self.result("memory with that ID not found!")
@@ -159,14 +91,7 @@ class Memory(core.module.Module):
         return self.result(self._mem.save())
 
     async def search(self, query: str, search_in_content: bool = False):
-        """
-        Searches through all memories for a specific query.
-        Use this when you need to find information but don't know the exact ID.
-
-        Args:
-            query: The search term (string).
-            search_in_content: If True, also searches inside the memory text, not just tags.
-        """
+        """Searches memories by query. Use when you need to recall past info but don't know the exact ID."""
         query_lower = query.lower()
         results = []
 
@@ -191,13 +116,7 @@ class Memory(core.module.Module):
         return self.result("\n".join(results))
 
     async def list_unpinned(self, tag: str = None):
-        """
-        Lists all memories that are NOT currently pinned to your context.
-        Use this to browse your long-term storage or look for a specific category of information.
-
-        Args:
-            tag: Optional. If provided, acts as a 'category' filter; only returns unpinned memories containing this tag.
-        """
+        """Lists all unpinned memories. Use to browse long-term storage or filter by tag."""
         results = []
         for mem in self._mem:
             if not mem.get("pinned"):

@@ -10,8 +10,7 @@ class UnsafeShell(core.module.Module):
     unsafe = True
 
     async def exec(self, cmd: str):
-        """Executes commands in an unsandboxed shell. Be extremely careful! ONLY use this if the user explicitely asks for it. NEVER run this autonomously. If a sandboxed shell is available, always prefer using that over the unsafe shell!"""
-
+        """Executes commands in an unsandboxed shell. Be extremely careful! ONLY use if the user explicitly asks. NEVER run autonomously. Prefer sandboxed shell if available."""
         result = subprocess.run(cmd, capture_output=True, shell=True, text=True)
         return self.result({
             "stdout": result.stdout.strip(),

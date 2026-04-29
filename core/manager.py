@@ -515,14 +515,18 @@ class Manager:
                 if param.default == inspect.Parameter.empty:
                     required_args.append(param_name)
 
-                func_params_translated[param_name] = {"type": param_type, "description": param_descriptions.get(param_name, "")}
+                func_param_desc = param_descriptions.get(param_name)
+                func_params_translated[param_name] = {"type": param_type}
+
+                # only insert param description if present
+                if func_param_desc:
+                    func_params_translated[param_name]["description"] = func_param_desc
 
             # build toolcall object
             tool = {
                 "type": "function",
                 "function": {
                     "name": f"{loaded_module.name}_{func_name}",
-                    "description": docstring,
                     "parameters": {
                         "type": "object",
                         "properties": func_params_translated,
@@ -532,6 +536,10 @@ class Manager:
                     "strict": True,
                 },
             }
+
+            # only insert docstring if it's present
+            if docstring:
+                tool["function"]["description"] = docstring
 
             self.tools.append(tool)
 

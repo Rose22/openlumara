@@ -325,20 +325,7 @@ Use tools if needed. For simple reminders, do not use tools.
         target_weekday: int = None, weekdays_only: bool = False,
         recurring: bool = False,
     ):
-        """
-        Adds a scheduled job.
-
-        MODE 1 - RELATIVE TIME (from now):
-            Use weeks, days, hours, minutes, seconds.
-            Example: "every 5 minutes" -> minutes=5, recurring=True
-
-        MODE 2 - SPECIFIC CLOCK TIME:
-            Use target_hour (0-23) and target_minute (0-59).
-            Optionally set target_weekday (0=Monday) or weekdays_only=True.
-            Example: "every weekday at 9am" -> target_hour=9, weekdays_only=True, recurring=True
-
-        Action is what action should be performed at the scheduled time. This is an instruction/prompt for the AI to follow, so write this in second person form.
-        """
+        """Adds a scheduled job. MODE 1 - RELATIVE TIME (from now): Use weeks, days, hours, minutes, seconds. MODE 2 - SPECIFIC CLOCK TIME: Use target_hour (0-23) and target_minute (0-59). Optionally set target_weekday (0=Monday) or weekdays_only=True. Action is what action should be performed at the scheduled time. This is an instruction/prompt for the AI to follow, so write this in second person form."""
         try:
             recur = {
                 "weeks": weeks, "days": days, "hours": hours, "minutes": minutes, "seconds": seconds,
@@ -383,7 +370,6 @@ Use tools if needed. For simple reminders, do not use tools.
         target_weekday: int = None, weekdays_only: bool = False,
         recurring: bool = False
     ):
-        """Edits an existing job by ID."""
         index = self._get_index(id)
         if index == -1:
             return self.result("id does not exist", False)
@@ -420,7 +406,6 @@ Use tools if needed. For simple reminders, do not use tools.
             return self.result(f"error: {e}", False)
 
     async def remove_job(self, id: str):
-        """Removes a job by ID."""
         index = self._get_index(id)
         if index == -1:
             return self.result("id does not exist", False)

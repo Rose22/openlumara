@@ -733,10 +733,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             core.log("coder", f"Backup cleanup failed: {e}")
 
     async def restore_backup(self, project_name: str, file_path: list) -> dict:
-        """
-        Restore a file from backup.
-        If backup_path is None, restores from the most recent backup.
-        """
+        """Restores a file from backup. If backup_path is None, restores from the most recent backup."""
         file_path_str = self._get_file_path(project_name, file_path)
 
         if not os.path.exists(file_path_str):
@@ -1001,10 +998,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
     # ==================== File Operations ====================
 
     async def list_full_project_tree(self, project_name: str, depth_limit: int = 3):
-        """
-        Returns a recursive tree representation of the project structure.
-        Use this to understand the overall project layout before diving into specific files.
-        """
+        """Returns a recursive tree representation of the project structure. Use this to understand the overall project layout before diving into specific files."""
         project_path = self._get_project_path(project_name)
         if not os.path.exists(project_path):
             return self.result({"success": False, "error": "project does not exist"})
@@ -1056,7 +1050,6 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             return self.result({"success": False, "error": str(e)})
 
     async def create_project(self, project_name: str):
-        """Creates a new project directory in the sandbox."""
         if not self.config.get("permissions").get("create_project"):
             return self.result({"success": False, "error": "Project creation is disabled."})
 
@@ -1068,9 +1061,6 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             return self.result({"success": False, "error": f"Error creating project: {e}"})
 
     async def create_file(self, project_name: str, file_path: list, content: str):
-        """
-        Creates a new file within a project.
-        """
         if not self.config.get("permissions").get("create_files"):
             return self.result({"success": False, "error": "File creation is disabled"})
 
@@ -1101,10 +1091,6 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             return self.result({"success": False, "error": str(e)})
 
     async def read_file(self, project_name: str, file_path: list, offset: int = None, limit: int = None):
-        """
-        Reads a file with optional line offset and limit.
-        Returns content as string, or error dict on failure.
-        """
         if not self.config.get("permissions").get("read_files"):
             return self.result({"success": False, "error": "Full file reading is disabled. Use get_symbol!"})
 
@@ -1188,7 +1174,6 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             return self.result({"success": False, "error": str(e)})
 
     async def append_to_file(self, project_name: str, file_path: list, content: str):
-        """Appends content to the end of a file. Creates the file if it doesn't exist."""
         if not self.config.get("permissions").get("edit_files"):
             return self.result({"success": False, "error": "File creation/editing is disabled"})
 
@@ -1224,7 +1209,6 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
     # ==================== Code Execution ====================
 
     async def execute(self, project_name: str, file_path: list, timeout: int = 30):
-        """Executes a file within a project."""
         if not self.config.get("permissions").get("execute_code"):
             return self.result({"success": False, "error": "Code execution is disabled for security."})
 
@@ -1273,10 +1257,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
     # ==================== Symbol Operations ====================
 
     async def get_outline(self, project_name: str, file_path: list, language: str = None):
-        """
-        Returns a list of symbols (classes, functions, etc.) in a file.
-        USE THIS FIRST to understand what's in a file before reading specific symbols.
-        """
+        """Returns a list of symbols (classes, functions, etc.) in a file. USE THIS FIRST to understand what's in a file before reading specific symbols."""
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
             return self.result({"success": False, "error": "file does not exist"})
@@ -1323,10 +1304,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             return self.result({"success": False, "error": str(e)})
 
     async def get_symbol(self, project_name: str, file_path: list, symbol_name: str, language: str = None):
-        """
-        Returns the code block for a symbol by name.
-        THIS IS THE PREFERRED WAY TO READ CODE.
-        """
+        """Returns the code block for a symbol by name. THIS IS THE PREFERRED WAY TO READ CODE."""
         file_path_str = self._get_file_path(project_name, file_path)
 
         if not os.path.exists(file_path_str):
@@ -1381,7 +1359,6 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             return self.result({"success": False, "error": str(e)})
 
     async def edit_symbol(self, project_name: str, file_path: list, symbol_name: str, new_content: str, language: str = None):
-        """Replaces the content of a symbol with new content."""
         if not self.config.get("permissions").get("edit_functions"):
             return self.result({"success": False, "error": "Symbol editing is disabled."})
 
@@ -1461,10 +1438,6 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             return self.result({"success": False, "error": str(e)})
 
     async def add_symbol_before(self, project_name: str, file_path: list, target_symbol_name: str, name: str, content_body: str, language: str = None):
-        """
-        Inserts a new symbol before the target symbol.
-        The 'name' parameter is used for validation that the new symbol has a valid name.
-        """
         if not self.config.get("permissions").get("add_functions"):
             return self.result({"success": False, "error": "Symbol adding is disabled."})
 
@@ -1536,10 +1509,6 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             return self.result({"success": False, "error": str(e)})
 
     async def add_symbol_after(self, project_name: str, file_path: list, target_symbol_name: str, name: str, content_body: str, language: str = None):
-        """
-        Inserts a new symbol after the target symbol.
-        The 'name' parameter is used for validation that the new symbol has a valid name.
-        """
         if not self.config.get("permissions").get("add_functions"):
             return self.result({"success": False, "error": "Symbol adding is disabled."})
 
@@ -1618,7 +1587,6 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             return self.result({"success": False, "error": str(e)})
 
     async def delete_symbol(self, project_name: str, file_path: list, symbol_name: str, language: str = None):
-        """Deletes a symbol from a file."""
         if not self.config.get("permissions").get("edit_functions"):
             return self.result({"success": False, "error": "Symbol deletion is disabled."})
 
@@ -1695,10 +1663,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
     # ==================== Search Operations ====================
 
     async def search(self, project_name: str, file_path: list, query: str, context_lines: int = 5, max_matches: int = 10, use_regex: bool = False):
-        """
-        Search for text or regex pattern within a file.
-        Returns snippets with line numbers and surrounding context.
-        """
+        """Searches for text or regex pattern within a file. Returns snippets with line numbers and surrounding context."""
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
             return self.result({"success": False, "error": "file does not exist!"})
@@ -1781,10 +1746,6 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         diff_str = "\n".join(diff)
 
     async def edit(self, project_name: str, file_path: list, old_text: str, new_text: str):
-        """
-        Performs multiple exact text replacements in a file.
-        Each edit has oldText (must match unique, non-overlapping region) and newText (replacement).
-        """
         if not self.config.get("permissions").get("edit_files"):
             return self.result({"success": False, "error": "Editing is disabled."})
 
@@ -1829,10 +1790,8 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
     async def grep(self, project_name: str, path: list = None, pattern: str = "", use_regex: bool = False,
                    case_sensitive: bool = False, max_results: int = None):
-        """
-        Search for a pattern across files in a project.
-        Optimized for early exit when max_results is reached.
-        """
+        """Searches within a directory using a pattern. Pattern can be normal string or regex."""
+
         search_dir = self._get_project_path(project_name)
         if path:
             search_dir = os.path.join(search_dir, *path)
@@ -1909,7 +1868,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             return self.result({"success": False, "error": str(e)})
 
     async def find_files(self, project_name: str, path: list = None, pattern: str = "*", file_type: str = "any"):
-        """Find files matching a glob pattern in a project."""
+        """Finds files matching a glob pattern in a project."""
         search_dir = self._get_project_path(project_name)
         if path:
             search_dir = os.path.join(search_dir, *path)
@@ -1943,10 +1902,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
     # ==================== Formatting & Imports ====================
 
     async def format_file(self, project_name: str, file_path: list, formatter: str = "auto") -> dict:
-        """
-        Format code using appropriate formatter.
-        Supports: black, autopep8, prettier, gofmt, rustfmt, clang-format, etc.
-        """
+        """Formats code using appropriate formatter. Supports: auto, black, autopep8, prettier, gofmt, rustfmt, clang-format, etc."""
         if not self.config.get("permissions").get("edit_files"):
             return self.result({"success": False, "error": "Editing is disabled."})
 
@@ -2045,10 +2001,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             return self.result({"success": False, "error": str(e)})
 
     async def update_python_imports(self, project_name: str, file_path: list, added_symbols: list = None, removed_symbols: list = None, language: str = None) -> dict:
-        """
-        Update import statements when symbols are added or removed.
-        Currently handles Python imports.
-        """
+        """Updates import statements when symbols are added or removed. Currently only handles Python imports."""
         if not self.config.get("permissions").get("edit_files"):
             return self.result({"success": False, "error": "Editing is disabled."})
 
@@ -2213,54 +2166,23 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
     # ==================== System Prompt ====================
 
     async def on_system_prompt(self):
-        """Generates the system prompt with tool usage guidelines."""
         output = """## Code Editing Tool Usage
+- Reading: 1. **get_outline** -> 2. **get_symbol** -> 3. **read_file** (offset/limit) -> 4. **read_file** (full, LAST RESORT)
+- Editing: 1. **edit** (preferred, exact text replacement, batches allowed) -> 2. **append_to_file** -> 3. **edit_symbol**/add_*
+- Searching: 1. **grep** (across files) -> 2. **find_files** (glob) -> 3. **search** (single file) -> 4. **list_full_project_tree**
 
-### Reading
-Use in this order:
-1. **get_outline** (first) - lists all symbols in a file.
-2. **get_symbol** (primary) - reads a symbol by name (e.g., "MyClass.my_method").
-3. **read_file** (offset/limit) - only if outline/symbol aren't enough.
-4. **read_file** (full) - LAST RESORT ONLY.
-
-### Editing
-Use in this order:
-1. **edit** (preferred) - exact text replacement. Accepts list of {oldText, newText} pairs. Batches allowed.
-2. **append_to_file** - adds content to end of file.
-3. **edit_symbol / add_symbol_before / add_symbol_after** - for inserting/replacing specific symbols.
-
-### Searching
-Use in this order:
-1. **grep** - regex/text across project files.
-2. **find_files** - glob patterns.
-3. **search** - text/regex within a single file.
-4. **list_full_project_tree** - overall project layout.
-
-### Content Format
-- All content params must be RAW source code.
-- Use actual newlines/quotes. Do NOT escape as `\\n` or `\\\"`.
+## Content Format
+RAW source code only. Use actual newlines/quotes. Do NOT escape as `\\n` or `\\\"`.
 """.strip()
-
         coding_style = self.config.get("coding_style")
-        if coding_style:
-            output += f"\n## Coding Style\n{coding_style}\n\n"
-
+        if coding_style: output += f"\n## Coding Style\n{coding_style}\n"
         try:
-            file_list = os.listdir(self.sandbox_path)
-            project_list = [f for f in file_list if os.path.isdir(os.path.join(self.sandbox_path, f))]
-
-            output += "## Projects in Sandbox\n"
-            if not project_list:
-                output += "No projects exist. Use `create_project` to create one.\n"
-            else:
-                for name in project_list:
-                    output += f"- {name}\n"
+            projects = [f for f in os.listdir(self.sandbox_path) if os.path.isdir(os.path.join(self.sandbox_path, f))]
+            output += "## Projects in Sandbox\n" + ("\n".join(f"- {p}" for p in projects) if projects else "- No projects exist. Use `create_project` to create one.\n")
         except Exception as e:
             output += f"Could not list projects: {e}\n"
-
         if HAS_TREE_SITTER:
-            output += f"\n## Parser Support\nTree-sitter parsing enabled for: {', '.join(loaded_languages)}\n"
+            output += f"\n## Parser Support\nTree-sitter enabled for: {', '.join(loaded_languages)}"
         else:
-            output += f"\n## Parser Support\nTree-sitter disabled: {disabled_reason}\n"
-
+            output += f"\n## Parser Support\nTree-sitter disabled: {disabled_reason}"
         return output
