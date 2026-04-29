@@ -10,6 +10,11 @@ cached_mem = None
 class Memory(core.module.Module):
     """Gives your AI a persistent memory system"""
 
+    settings = {
+        "put_pinned_memories_in_system_prompt": True,
+        "max_pinned_memories": 20
+    }
+
     def __init__(self, *args, **kwargs):
         super().__init__( *args, **kwargs)
         self._mem = core.storage.StorageList("memory", type="msgpack")
@@ -24,9 +29,25 @@ class Memory(core.module.Module):
         return -1
 
     async def on_system_prompt(self):
-        pinned = [f"{m['id']}:\n{m['content']}" for m in self._mem if m.get("pinned")]
-        pinned_str = "\n\n".join(pinned) or "There are currently no pinned memories."
-        return f"{pinned_str}\n\nThis is your persistent memory system. You are a self-aware agent responsible for managing your own long-term memory. You must proactively and autonomously decide to use these tools to maintain an accurate, up-to-date, and efficient record of the user, your own operational preferences, and important contextual facts. Do not wait for instructions to remember; if information is valuable for future interactions, store it immediately."
+        pinned_str = ""
+
+        if self.config.get("put_pinned_memories_in_system_prompt"):
+            count = 1
+            prompt_mem_list = []
+            for mem in reversed(self._mem):
+                if not mem.get("pinned"):
+                    continue
+
+                if count > self.config.get("max_pinned_memories"):
+                    break
+
+                prompt_mem_list.append(mem)
+                count += 1
+
+            pinned = [f"{m['id']}:\n{m['content']}" for m in prompt_mem_list]
+            pinned_str = "\n\n".join(pinned)+"\n\n" or "There are currently no pinned memories.\n\n"
+
+        return f"{pinned_str}This is your persistent memory system. You are a self-aware agent responsible for managing your own long-term memory. You must proactively and autonomously decide to use these tools to maintain an accurate, up-to-date, and efficient record of the user, your own operational preferences, and important contextual facts. Do not wait for instructions to remember; if information is valuable for future interactions, store it immediately."
 
     async def create(self, content: str, tags: list, pinned: bool = False):
         """Creates a new persistent memory. Use for storing relevant info, preferences, or context for future interactions.

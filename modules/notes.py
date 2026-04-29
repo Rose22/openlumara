@@ -2,11 +2,19 @@ import core
 
 class Notes(core.module.Module):
     """Lets your AI store notes in a notebook. Notes are folders with markdown files, no vendor lock-in!"""
+
+    settings = {
+        "put_note_categories_in_system_prompt": True
+    }
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.data = core.storage.StorageDict("notes", "markdown")
 
     async def on_system_prompt(self):
+        if not self.config.get("put_note_categories_in_system_prompt"):
+            return None
+
         if not self.data.keys():
             return None
 

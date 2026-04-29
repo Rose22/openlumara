@@ -5,19 +5,35 @@ class Lists(core.module.Module):
     """
     Lets the AI manage lists for you, such as shopping lists, simple todo lists, and so on.
     """
+
+    settings = {
+        "put_pinned_lists_in_system_prompt": True,
+        "max_pinned_lists": 10
+    }
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.data = core.storage.StorageDict("lists", "yaml")
 
     async def on_system_prompt(self):
+        if not self.config.get("put_pinned_lists_in_system_prompt"):
+            return None
+
         output = ""
         pinned_by_cat, unpinned_by_cat = {}, {}
-        for cat, lists in self.data.items():
+        count = 1
+
+        for cat, lists in reversed(self.data.items()):
             for name, lst in lists.items():
+                if count > self.config.get("max_pinned_lists"):
+                    break
+
+                count += 1
                 if not lst.get("items"): continue
                 if lst.get("pinned"): pinned_by_cat.setdefault(cat, []).append((name, lst["items"]))
                 else: unpinned_by_cat.setdefault(cat, []).append(name)
+
         for cat, items in pinned_by_cat.items():
             output += f"## {cat}\n"
             for name, lst_items in items:
@@ -26,6 +42,7 @@ class Lists(core.module.Module):
             output += "---\nlists that aren't pinned:\n"
             for cat, names in unpinned_by_cat.items():
                 output += f"{cat}: {', '.join(names)}\n"
+
         return output
 
     def _verify_target(self, category, list_name):

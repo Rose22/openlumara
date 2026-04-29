@@ -6,6 +6,10 @@ import ulid
 class Scheduler(core.module.Module):
     """Lets your AI send you scheduled reminders and do things at specified times"""
 
+    settings = {
+        "put_scheduled_jobs_in_system_prompt": True
+    }
+
     async def on_ready(self, *args, **kwargs):
         """Initialize storage, manager, and schedule existing jobs."""
         self.schedule = core.storage.StorageList("schedule", type="json")
@@ -308,6 +312,9 @@ Use tools if needed. For simple reminders, do not use tools.
         return days[weekday] if 0 <= weekday < 7 else "Unknown"
 
     async def on_system_prompt(self) -> str:
+        if not self.config.get("put_scheduled_jobs_in_system_prompt"):
+            return None
+
         if self.schedule:
             return f"Your scheduler system will trigger these events at the specified times:\n{self}"
         return None
@@ -320,12 +327,39 @@ Use tools if needed. For simple reminders, do not use tools.
         self,
         action: str,
         channel: str = None,
-        weeks: int = 0, days: int = 0, hours: int = 0, minutes: int = 0, seconds: int = 0,
-        target_hour: int = None, target_minute: int = 0, target_second: int = 0,
-        target_weekday: int = None, weekdays_only: bool = False,
+        relative_duration: str = None,
+        target_time: str = None,
+        target_weekday: int = None,
+        weekdays_only: bool = False,
         recurring: bool = False,
     ):
-        """Adds a scheduled job. MODE 1 - RELATIVE TIME (from now): Use weeks, days, hours, minutes, seconds. MODE 2 - SPECIFIC CLOCK TIME: Use target_hour (0-23) and target_minute (0-59). Optionally set target_weekday (0=Monday) or weekdays_only=True. Action is what action should be performed at the scheduled time. This is an instruction/prompt for the AI to follow, so write this in second person form."""
+        """Adds a scheduled job. MODE 1 - RELATIVE TIME: Use relative_duration (e.g., '2d 4h 30m'). MODE 2 - SPECIFIC CLOCK TIME: Use target_time (e.g., '14:30'). Optionally set target_weekday (0=Monday) or weekdays_only=True. Action is what action should be performed at the scheduled time. Action is an instruction/prompt for the AI to follow, so write it in second person form."""
+        import re
+        
+        weeks = days = hours = minutes = seconds = 0
+        target_hour = target_minute = target_second = None
+        
+        # Parse relative_duration (e.g., "2d 4h")
+        if relative_duration:
+            pattern = r'(\d+)\s*([wdhms])'
+            matches = re.findall(pattern, relative_duration)
+            for val, unit in matches:
+                val = int(val)
+                if unit == 'w': weeks = val
+                elif unit == 'd': days = val
+                elif unit == 'h': hours = val
+                elif unit == 'm': minutes = val
+                elif unit == 's': seconds = val
+
+        # Parse target_time (e.g., "14:30:00")
+        if target_time:
+            parts = target_time.split(':')
+            if len(parts) >= 2:
+                target_hour = int(parts[0])
+                target_minute = int(parts[1])
+                if len(parts) == 3:
+                    target_second = int(parts[2])
+
         try:
             recur = {
                 "weeks": weeks, "days": days, "hours": hours, "minutes": minutes, "seconds": seconds,
@@ -365,9 +399,10 @@ Use tools if needed. For simple reminders, do not use tools.
         id: str,
         action: str = None,
         channel: str = None,
-        weeks: int = 0, days: int = 0, hours: int = 0, minutes: int = 0, seconds: int = 0,
-        target_hour: int = None, target_minute: int = 0, target_second: int = 0,
-        target_weekday: int = None, weekdays_only: bool = False,
+        relative_duration: str = None,
+        target_time: str = None,
+        target_weekday: int = None,
+        weekdays_only: bool = False,
         recurring: bool = False
     ):
         index = self._get_index(id)
@@ -377,7 +412,33 @@ Use tools if needed. For simple reminders, do not use tools.
         existing = self.schedule[index]
 
         try:
+            import re
             existing_recur = existing.get("recurs_in", {})
+            
+            weeks = days = hours = minutes = seconds = 0
+            target_hour = target_minute = target_second = None
+            
+            # Parse relative_duration
+            if relative_duration:
+                pattern = r'(\d+)\s*([wdhms])'
+                matches = re.findall(pattern, relative_duration)
+                for val, unit in matches:
+                    val = int(val)
+                    if unit == 'w': weeks = val
+                    elif unit == 'd': days = val
+                    elif unit == 'h': hours = val
+                    elif unit == 'm': minutes = val
+                    elif unit == 's': seconds = val
+
+            # Parse target_time
+            if target_time:
+                parts = target_time.split(':')
+                if len(parts) >= 2:
+                    target_hour = int(parts[0])
+                    target_minute = int(parts[1])
+                    if len(parts) == 3:
+                        target_second = int(parts[2])
+
             recur = {
                 "weeks": weeks or existing_recur.get("weeks", 0), "days": days or existing_recur.get("days", 0), "hours": hours or existing_recur.get("hours", 0), "minutes": minutes or existing_recur.get("minutes", 0), "seconds": seconds or existing_recur.get("seconds", 0),
                 "target_hour": target_hour or existing_recur.get("target_hour"), "target_minute": target_minute or existing_recur.get("target_minute", 0), "target_second": target_second or existing_recur.get("target_second", 0),

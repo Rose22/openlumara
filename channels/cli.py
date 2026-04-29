@@ -134,6 +134,7 @@ class Cli(core.channel.Channel):
                     )
                 except KeyboardInterrupt:
                     await self.manager.shutdown()
+                    break
 
                 if not msg.strip():
                     continue

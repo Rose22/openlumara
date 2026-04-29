@@ -3,7 +3,14 @@ import core
 class Chats(core.module.Module):
     """Lets you or the AI manage your chats"""
 
+    settings = {
+        "put_chat_categories_in_system_prompt": True
+    }
+
     async def on_system_prompt(self):
+        if not self.config.get("put_chat_categories_in_system_prompt"):
+            return None
+
         cats = [c for c in await self.channel.context.chat.get_categories() if len(c.split(":")) == 1 and c]
         return f"Available categories to categorise chat into: {', '.join(cats)}" if len(cats) > 1 else None
 
