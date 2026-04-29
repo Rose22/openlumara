@@ -1095,6 +1095,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             return self.result(f"error: {e}", False)
 
     async def read_file(self, project_name: str, file_path: list, offset: int = None, limit: int = None):
+        """Reads a file. **USE ONLY AS A LAST RESORT WHEN GET_OUTLINE AND GET_SYMBOL DID NOT PROVIDE ADEQUATE RESULTS**"
         if not self.config.get("permissions").get("read_files"):
             return self.result("error: Full file reading is disabled. Use get_symbol!", success=False)
 
@@ -2047,12 +2048,30 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
     async def on_system_prompt(self):
         output = """## Code Editing Tool Usage
-- Reading: 1. **get_outline** -> 2. **get_symbol** -> 3. **read_file** (offset/limit) -> 4. **read_file** (full, LAST RESORT)
-- Editing: 1. **edit** (preferred, exact text replacement, batches allowed) -> 2. **append_to_file** -> 3. **edit_symbol**/add_*
-- Searching: 1. **grep** (across files) -> 2. **find_files** (glob) -> 3. **search** (single file) -> 4. **list_full_project_tree**
 
-## Content Format
-RAW source code only. Use actual newlines/quotes. Do NOT escape as `\\n` or `\\\"`.
+### Reading
+Use in this order:
+1. **get_outline** (first) - lists all symbols in a file.
+2. **get_symbol** (primary) - reads a symbol by name (e.g., "MyClass.my_method").
+3. **read_file** (offset/limit) - only if outline/symbol aren't enough.
+4. **read_file** (full) - LAST RESORT ONLY.
+
+### Editing
+Use in this order:
+1. **edit** (preferred) - exact text replacement. Accepts list of {oldText, newText} pairs. Batches allowed.
+2. **append_to_file** - adds content to end of file.
+3. **edit_symbol / add_symbol_before / add_symbol_after** - for inserting/replacing specific symbols.
+
+### Searching
+Use in this order:
+1. **grep** - regex/text across project files.
+2. **find_files** - glob patterns.
+3. **search** - text/regex within a single file.
+4. **list_full_project_tree** - overall project layout.
+
+### Content Format
+- All content params must be RAW source code.
+- Use actual newlines/quotes. Do NOT escape as `\\n` or `\\\"
 """.strip()
         coding_style = self.config.get("coding_style")
         if coding_style: output += f"\n## Coding Style\n{coding_style}\n"
