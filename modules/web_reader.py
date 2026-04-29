@@ -89,9 +89,7 @@ class WebReader(modules.http.Http):
     # ---------------------------------------------------------
 
     async def read(self, path: str):
-        """
-        Processes a URL and scrapes its content.
-        """
+        """Processes a URL and scrapes its content."""
         try:
             url_parser = urllib.parse.urlparse(path)
             if url_parser.scheme not in ["http", "https"]:

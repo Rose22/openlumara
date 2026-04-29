@@ -85,6 +85,7 @@ class SandboxedShell(core.module.Module):
             core.log("sandbox_shell", "Container started")
 
     async def run(self, command: str):
+        """Runs a command in the sandboxed Docker/Podman environment."""
         if not self.runtime:
             return self.result(f"Docker or podman are not installed or available.", False)
 

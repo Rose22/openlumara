@@ -69,7 +69,7 @@ class Manager:
             enabled_user_modules = []
 
         if not enabled_channels:
-            print("ERROR: At least one channel must be enabled in the config! Try the `cli` channel for a basic terminal UI.")
+            print("ERROR: At least one channel must be enabled in the config! Try the `cli` channel for a basic terminal UI.", flush=True)
             exit(1)
 
         core.log("core", "Loading channels")
@@ -133,8 +133,8 @@ class Manager:
         if "webui" in enabled_channels:
             host = core.config.get("channels").get("settings").get("webui").get("host")
             port = core.config.get("channels").get("settings").get("webui").get("port")
-            print()
-            print(f"Please open the WebUI at http://{host}:{port}")
+            print(flush=True)
+            print(f"Please open the WebUI at http://{host}:{port}", flush=True)
 
         try:
             await asyncio.gather(*self._async_tasks, return_exceptions=should_swallow_exceptions)
@@ -515,14 +515,18 @@ class Manager:
                 if param.default == inspect.Parameter.empty:
                     required_args.append(param_name)
 
-                func_params_translated[param_name] = {"type": param_type, "description": param_descriptions.get(param_name, "")}
+                func_param_desc = param_descriptions.get(param_name)
+                func_params_translated[param_name] = {"type": param_type}
+
+                # only insert param description if present
+                if func_param_desc:
+                    func_params_translated[param_name]["description"] = func_param_desc
 
             # build toolcall object
             tool = {
                 "type": "function",
                 "function": {
                     "name": f"{loaded_module.name}_{func_name}",
-                    "description": docstring,
                     "parameters": {
                         "type": "object",
                         "properties": func_params_translated,
@@ -532,6 +536,10 @@ class Manager:
                     "strict": True,
                 },
             }
+
+            # only insert docstring if it's present
+            if docstring:
+                tool["function"]["description"] = docstring
 
             self.tools.append(tool)
 

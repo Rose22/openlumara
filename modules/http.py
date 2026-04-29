@@ -458,17 +458,6 @@ class Http(core.module.Module):
     # ==================== HTTP Methods ====================
 
     async def get(self, url: str, headers: dict = None, params: dict =None):
-        """
-        Performs a HTTP GET request on url.
-
-        Args:
-            url: the URL to target
-            params: any parameters to add to the request
-            headers: HTTP headers
-
-        Returns:
-            Result dict with status, headers, cookies, and content
-        """
         return await self._make_request(
             requests.get,
             url,
@@ -478,18 +467,6 @@ class Http(core.module.Module):
         )
 
     async def post(self, url: str, headers: dict = None, data: dict = None, json: dict = None):
-        """
-        Performs a HTTP POST on url.
-
-        Args:
-            url: the URL to target
-            data: the data to post to the url (form-encoded)
-            json: JSON data to post (cannot be used with data)
-            headers: HTTP headers
-
-        Returns:
-            Result dict with status, headers, cookies, and content
-        """
         if data is not None and json is not None:
             return self.result("Cannot use both 'data' and 'json' parameters", False)
 
@@ -503,17 +480,6 @@ class Http(core.module.Module):
         )
 
     async def head(self, url: str, params: dict = None, headers: dict = None):
-        """
-        Performs a HTTP HEAD on url.
-
-        Args:
-            url: the URL to target
-            params: any parameters to add to the request
-            headers: HTTP headers
-
-        Returns:
-            Result dict with status, headers, cookies, and status
-        """
         return await self._make_request(
             requests.head,
             url,
@@ -523,17 +489,6 @@ class Http(core.module.Module):
         )
 
     async def options(self, url, params: dict = None, headers: dict = None):
-        """
-        Performs a HTTP OPTIONS on url.
-
-        Args:
-            url: the URL to target
-            params: any parameters to add to the request
-            headers: HTTP headers
-
-        Returns:
-            Result dict with status, headers, cookies, and status
-        """
         return await self._make_request(
             requests.options,
             url,
@@ -543,17 +498,6 @@ class Http(core.module.Module):
         )
 
     async def put(self, url, data: dict = None, headers: dict = None):
-        """
-        Performs a HTTP PUT on url.
-
-        Args:
-            url: the URL to target
-            data: the data to put to the url
-            headers: HTTP headers
-
-        Returns:
-            Result dict with status, headers, cookies, and content
-        """
         return await self._make_request(
             requests.put,
             url,
@@ -563,17 +507,6 @@ class Http(core.module.Module):
         )
 
     async def patch(self, url, data: dict = None, headers: dict = None):
-        """
-        Performs a HTTP PATCH on url.
-
-        Args:
-            url: the URL to target
-            data: the data to patch
-            headers: HTTP headers
-
-        Returns:
-            Result dict with status, headers, cookies, and content
-        """
         return await self._make_request(
             requests.patch,
             url,
@@ -583,17 +516,6 @@ class Http(core.module.Module):
         )
 
     async def delete(self, url, params: dict = None, headers: dict = None):
-        """
-        Performs a HTTP DELETE on url.
-
-        Args:
-            url: the URL to target
-            params: any parameters to add to the request
-            headers: HTTP headers
-
-        Returns:
-            Result dict with status, headers, cookies, and content
-        """
         return await self._make_request(
             requests.delete,
             url,

@@ -27,7 +27,11 @@ class Models(core.module.Module):
 
     @core.module.command("model")
     async def model(self, args: list):
-         """switch to model <name>"""
+         """Switches to model <name>.
+         
+         Args:
+             args: the model name or empty to show current model
+         """
          if not args:
             return f"Current model: {self.manager.API.get_model()}"
 
@@ -35,7 +39,7 @@ class Models(core.module.Module):
 
     @core.module.command("models")
     async def models(self, args: list):
-        """list models"""
+        """Lists available models."""
         if not self.models:
             models = await self.manager.API.list_models()
             if not models:
@@ -51,7 +55,7 @@ class Models(core.module.Module):
         found = False
         found_id = None
         for model_id in self.models:
-            if model_id == name.strip().lower():
+            if model_id.strip().lower() == name.strip().lower():
                 found = True
                 found_id = model_id
 

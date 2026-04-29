@@ -4,33 +4,12 @@ class Chats(core.module.Module):
     """Lets you or the AI manage your chats"""
 
     async def on_system_prompt(self):
-        categories = await self.channel.context.chat.get_categories()
-        if len(categories) <= 1:
-            return None
-
-        filtered_categories = []
-        for index, category in enumerate(categories):
-            # get rid of special categories
-            if len(category.split(":")) > 1:
-                continue
-
-            if not category:
-                # if we somehow end up with a blank category.. filter it out
-                continue
-
-            filtered_categories.append(category)
-
-        return f"Available categories to categorise chat into: {', '.join(filtered_categories)}"
+        cats = [c for c in await self.channel.context.chat.get_categories() if len(c.split(":")) == 1 and c]
+        return f"Available categories to categorise chat into: {', '.join(cats)}" if len(cats) > 1 else None
 
     # AI tool version
     async def organize(self, new_name: str, category: str, tags: list = []):
-        """
-        Lets you rename, categorize, and tag the current chat.
-
-        If the chat fits within an existing category (defined in your system prompt), use that one.
-        If a fitting category does not exist, create a new one.
-        """
-
+        """Lets you rename, categorize, and tag the current chat. If the chat fits within an existing category (defined in your system prompt), use that one. If a fitting category does not exist, create a new one."""
         if not new_name:
             return self.result("name must not be blank", False)
 
@@ -93,10 +72,7 @@ class Chats(core.module.Module):
 
     # AI tool version
     async def search(self, query: str):
-        """
-        Searches within all previous chats the user ever had with you. very useful for recalling information from the past!
-        Use only if user explicitely requests it, or if you can't find a past event the user is referring to within your current context!
-        """
+        """Searches within all previous chats the user ever had with you. Very useful for recalling information from the past! Use only if user explicitly requests it, or if you can't find a past event the user is referring to within your current context!"""
         found = await self._search(query)
         if not found:
             return self.result("no results found")

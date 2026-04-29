@@ -47,7 +47,6 @@ class FileManager(core.module.Module):
         return {"success": success, "reason": reason}
 
     async def list(self, path: str):
-        """Lists the contents of a directory."""
         verify = self._verify_path(path, should_be_dir=True)
         if not verify.get("success"):
             return self.result(verify.get("reason"), False)
@@ -55,7 +54,6 @@ class FileManager(core.module.Module):
         return os.listdir(path)
 
     async def read(self, path: str):
-        """Reads a file as text (UTF-8)."""
         verify = self._verify_path(path, should_be_file=True)
         if not verify.get("success"):
             return self.result(verify.get("reason"), False)
@@ -99,17 +97,13 @@ class FileManager(core.module.Module):
             return self.result(str(e), False)
 
     async def write(self, path: str, content: str):
-        """
-        Writes content to a file.
-        Automatically creates parent directories if they don't exist.
-        """
+        """Writes content to a file. Automatically creates parent directories."""
         try:
             return await self._write(path, content, mode='w')
         except Exception as e:
             return self.result(str(e), False)
 
     async def append(self, path: str, content: str):
-        """Appends text to the end of a file."""
         return await self._write(path, content, mode='a')
 
     async def mkdir(self, path: str):
@@ -121,7 +115,6 @@ class FileManager(core.module.Module):
             return self.result(str(e), False)
 
     async def remove(self, path: str):
-        """Removes a file or a directory (and all its contents)."""
         p = Path(path)
         if not p.exists():
             return self.result("path does not exist", False)
@@ -138,7 +131,6 @@ class FileManager(core.module.Module):
             return self.result(str(e), False)
 
     async def move(self, src: str, dst: str):
-        """Moves or renames a file or directory."""
         try:
             # Ensure destination directory exists
             Path(dst).parent.mkdir(parents=True, exist_ok=True)
@@ -148,7 +140,6 @@ class FileManager(core.module.Module):
             return self.result(str(e), False)
 
     async def copy(self, src: str, dst: str):
-        """Copies a file or an entire directory tree."""
         try:
             Path(dst).parent.mkdir(parents=True, exist_ok=True)
             if Path(src).is_dir():
@@ -160,7 +151,6 @@ class FileManager(core.module.Module):
             return self.result(str(e), False)
 
     async def get_info(self, path: str):
-        """Returns metadata (size, creation time, type) for a file or directory."""
         verify = self._verify_path(path)
         if not verify.get("success"):
             return self.result(verify.get("reason"), False)

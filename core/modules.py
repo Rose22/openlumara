@@ -29,6 +29,10 @@ def load(package, base_class = None, filter: list = None):
         try:
             # Import the module relative to the package
             module = importlib.import_module(f"{package.__name__}.{modname}")
+            
+            # Force reload to ensure we get the latest version of the module
+            # This is crucial for restarts where code might have been modified
+            importlib.reload(module)
 
             for attr_name in dir(module):
                 target_class = getattr(module, attr_name)

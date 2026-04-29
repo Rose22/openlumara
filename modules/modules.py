@@ -13,8 +13,6 @@ class Modules(core.module.Module):
         return str(module_list)
 
     async def toggle(self, name: str):
-        """Toggle a module by name."""
-
         if name.lower().strip() == "modules":
             return "module manager can only be manually turned off by editing the config file. you need to know what you're doing!"
 

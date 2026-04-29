@@ -39,13 +39,6 @@ class Config(core.module.Module):
             return None
 
     async def set(self, path: list, value: str):
-        """
-        Sets a configuration value at a nested path.
-
-        Args:
-            path: A list of keys representing the nested path (e.g., ["api", "url"]).
-            value: The value to set (as a string, will be type-converted).
-        """
         if not path:
             return self.result("Path cannot be empty", False)
 

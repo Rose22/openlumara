@@ -90,7 +90,7 @@ def run_from_args(arg_list: list = []):
 
         if result == "restart":
             # run the loop again
-            print("-" * 40)
+            print("-" * 40, flush=True)
             pass
         else:
             exit()

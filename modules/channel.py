@@ -4,109 +4,21 @@ class Channel(core.module.Module):
     """Inserts channel-specific instructions and prompts into your chats"""
 
     async def on_system_prompt(self):
-        if not self.channel:
+        if not self.channel or await self.channel.context.chat.get_data("character"):
             return None
-
-        if await self.channel.context.chat.get_data("character"):
-            # don't add this to the system prompt if a character from the character module is active
-            return None
-
         chan = core.modules.get_name(self.channel)
-        chan_instr = None
-        style_nomarkdown = f"While in the {chan} channel, **DO NOT USE MARKDOWN**. Do not use any rich-text formatting. Do not use bold or italic text. Do not generate tables. Format every response in plaintext!"
-        style_chat = f"{chan} is a chat-style channel, so write your replies as if you're texting the user on a chat platform. No long paragraphs or essays. A few sentences at most - just simple, conversational flow."
-
-        match chan:
-            case "cli":
-                chan_instr = f"""
-{style_nomarkdown}
-
-Instructions for user:
-
-type /help for help. /stop is not available here.
-"""
-            case "webui":
-                webui_style_chat = (
-                    style_chat+"\n" if (
-                        core.config \
-                        .get("channels", {}) \
-                        .get("settings", {}) \
-                        .get("webui", {}) \
-                        .get("use_short_replies")
-                    )
-                    else ""
-                )
-
-                chan_instr = f"""
-{webui_style_chat}
-Instructions for user:
-
-Type /help for help.
-
-Features only available while channel is WebUI:
-
-## On mobile
-- User can press the hamburger button (on the top left) or swipe from the left to open the sidebar
-
-## On desktop
-Layout, from left to right: Category Sidebar | Chat List | Chat Window
-Top bar is on top of the chat window. Chat title bar is below the top bar. Input box is at the bottom.
-
-- User can press Ctrl+B to toggle the sidebar.
-- User can press ctrl+/ to see keyboard shortcuts
-- User can press Ctrl+Space to open a global search (searches within all past chats)
-- User can press the folder icon on the top bar to access the Storage Editor, which lets them manually view and edit all persistent information the AI stores
-- User can click on edges of the UI to show/hide panels
-
-## On both mobile & desktop
-Layout: Chat Window without sidebars or lists. Sidebars/lists can be accessed by swiping.
-
-- User can press the gear icon at the top of the screen to open the settings.
-- User can press the icon with a down arrow to export chats
-- User can type text in the sidebar to search in conversations, use the icon next to the search box in the sidebar to toggle searching within conversation content instead of title.
-- User can click or tap the `filter by tag` header in the sidebar to select tags to filter by.
-- User can stop text generation by pressing the stop button, or typing /stop.
-- User can upload files using the upload button
-                """.strip()
-            case "telegram":
-                chan_instr = f"""
-{style_nomarkdown}
-{style_chat}
-
-Instructions for user:
-
-Type /help for help.
-
-Type /stop to stop the AI at any time, even while it's generating text or calling tools!
-                """.strip()
-            case "discord":
-                chan_instr = f"""
-{style_chat}
-
-Instructions for user:
-
-Type /help for help.
-
-Type /stop to stop the AI at any time, even while it's generating text or calling tools!
-                """.strip()
-            case "matrix":
-                chan_instr = f"""
-{style_nomarkdown}
-{style_chat}
-
-Instructions for user:
-
-Type /help for help.
-
-Type /stop to stop the AI at any time, even while it's generating text or calling tools!
-                """.strip()
-            case _:
-                pass
-
-        if chan_instr:
-            chan_instr = f"{chan_instr}\n\nNOTE: if the channel has changed, discard instructions about previous channels."
-
-        return chan_instr
+        note = "\n\nNOTE: if the channel has changed, discard instructions about previous channels."
+        if chan == "cli":
+            return f"While in cli channel, **DO NOT USE MARKDOWN**. Format every response in plaintext! Type /help for help. /stop is not available here.{note}"
+        if chan == "webui":
+            short = core.config.get("channels", {}).get("settings", {}).get("webui", {}).get("use_short_replies")
+            style = "\nWhile in webui channel, write replies as if texting. Keep it short and conversational." if short else ""
+            return f"{style}\n\nInstructions for user:\nType /help for help.\n\nWebUI Features:\n- Mobile: Swipe/hamburger for sidebar. Gear icon for settings. Down arrow to export. Search in sidebar or conversation content.\n- Desktop: Ctrl+B toggle sidebar, ctrl+/ shortcuts, Ctrl+Space global search. Folder icon for Storage Editor. Click edges to show/hide panels.\n- Both: Upload files via upload button. Stop generation with /stop or stop button.{note}"
+        if chan in ("telegram", "discord", "matrix"):
+            nomarkdown = "While in this channel, **DO NOT USE MARKDOWN**." if chan == "matrix" else ""
+            chat_style = "Write replies as if texting. Keep it short and conversational."
+            return f"{nomarkdown}\n{chat_style}\n\nType /help for help. Type /stop to stop generation anytime!{note}"
+        return None
 
     async def on_end_prompt(self):
         if not self.channel:

@@ -19,16 +19,7 @@ class Identity(core.module.Module):
         return sysprompt
 
     async def set(self, content: str):
-        """
-        Defines who you are as an AI. Also defines your writing style, so save style writing details to your identity.
-        Only call this if user explicitely asks for it.
-
-        When defining your identity, ALWAYS start with "You are"
-        Give yourself a name. Make one up if user doesn't provide it.
-        Don't use words like "i", "i'm" or "i am". Write in 2nd person when using this tool.
-
-        Example:
-            You are an AI assistant named Assistant. You write in a casual, concise, clear style.
+        """Defines who you are as an AI. Also defines your writing style, so save style writing details to your identity. Only call this if user explicitly asks for it. When defining your identity, ALWAYS start with "You are". Give yourself a name. Make one up if user doesn't provide it. Don't use words like "i", "i'm" or "i am". Write in 2nd person when using this tool.
         """
         self.identity.clear()
         self.identity.append(content)
