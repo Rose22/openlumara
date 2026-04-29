@@ -1054,6 +1054,10 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             return self.result({"success": False, "error": "Project creation is disabled."})
 
         base_path = self._get_project_path(project_name)
+
+        if os.path.exists(base_path):
+            return self.result("Project already exists! Choose a different name.", False)
+
         try:
             os.makedirs(base_path, exist_ok=True)
             return self.result({"success": True, "message": f"Project '{project_name}' created."})
