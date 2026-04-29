@@ -108,12 +108,10 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             'outline_patterns': [
                 (r'^\s*class\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'class'),
                 (r'^\s*(?:async\s+)?def\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'function'),
-                (r'^\s*[a-zA-Z_][a-zA-Z0-9_]*\s*[:=]', 'variable'),
             ],
             'symbol_types': {
                 'class_definition': 'class',
                 'function_definition': 'function',
-                'assignment': 'variable',
             }
         },
         'javascript': {
@@ -122,7 +120,6 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             'outline_patterns': [
                 (r'^\s*class\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'class'),
                 (r'^\s*function\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'function'),
-                (r'^\s*(?:const|let|var)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=', 'variable'),
                 (r'^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*\([^)]*\)\s*=>', 'function'),
             ],
             'symbol_types': {
@@ -130,7 +127,6 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
                 'function_declaration': 'function',
                 'method_definition': 'method',
                 'arrow_function': 'function',
-                'variable_declarator': 'variable',
             }
         },
         'typescript': {
@@ -139,14 +135,12 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             'outline_patterns': [
                 (r'^\s*class\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'class'),
                 (r'^\s*function\s+([a-zA-Z_][a-zA-Z0-9_]*)', 'function'),
-                (r'^\s*(?:const|let|var)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=', 'variable'),
                 (r'^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*\([^)]*\)\s*=>', 'function'),
             ],
             'symbol_types': {
                 'class_declaration': 'class',
                 'function_declaration': 'function',
                 'method_definition': 'method',
-                'variable_declarator': 'variable',
             }
         },
         'html': {
