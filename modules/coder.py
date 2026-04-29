@@ -1001,7 +1001,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         """Returns a recursive tree representation of the project structure. Use this to understand the overall project layout before diving into specific files."""
         project_path = self._get_project_path(project_name)
         if not os.path.exists(project_path):
-            return self.result({"success": False, "error": "project does not exist"})
+            return self.result("error: project does not exist", success=False)
 
         def _build_tree(path, current_depth):
             if not os.path.isdir(path):
@@ -1019,7 +1019,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
                         if entry.name.startswith('.'):
                             continue
                         if current_depth < depth_limit:
-                            folders[entry.name] = _build_tree(entry.path, current_depth + 1)
+                            folders[entry.name] = _build1tree(entry.path, current_depth + 1)
                         else:
                             folders[entry.name] = {"files": [], "folders": {}}
             except Exception:
@@ -1029,9 +1029,9 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
         try:
             tree = _build_tree(project_path, 0)
-            return self.result({"success": True, "tree": {"root": tree}})
+            return self.result({"tree": {"root": tree}}, success=True)
         except Exception as e:
-            return self.result({"success": False, "error": str(e)})
+            return self.result(f"error: {e}", success=False)
 
     async def list_project_folder(self, project_name: str, sub_path: list = None):
         """Lists the immediate contents of a specific path within a project (non-recursive)."""
@@ -1041,18 +1041,18 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             target_path = os.path.join(target_path, *sub_path)
 
         if not os.path.exists(target_path):
-            return self.result({"success": False, "error": "path does not exist"})
+            return self.result("error: path does not exist", success=False)
         if not os.path.isdir(target_path):
-            return self.result({"success": False, "error": "path is not a directory"})
+            return self.result("error: path is not a directory", success=False)
 
         try:
-            return self.result({"success": True, "contents": os.listdir(target_path)})
+            return self.result({"contents": os.listdir(target_path)}, success=True)
         except Exception as e:
-            return self.result({"success": False, "error": str(e)})
+            return self.result(f"error: {e}", success=False)
 
     async def create_project(self, project_name: str):
         if not self.config.get("permissions").get("create_project"):
-            return self.result({"success": False, "error": "Project creation is disabled."})
+            return self.result("error: Project creation is disabled.", success=False)
 
         base_path = self._get_project_path(project_name)
 
@@ -1061,20 +1061,20 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
         try:
             os.makedirs(base_path, exist_ok=True)
-            return self.result({"success": True, "message": f"Project '{project_name}' created."})
+            return self.result(f"Project '{project_name}' created.", success=True)
         except OSError as e:
-            return self.result({"success": False, "error": f"Error creating project: {e}"})
+            return self.result(f"error: Error creating project: {e}", success=False)
 
     async def create_file(self, project_name: str, file_path: list, content: str):
-        """Creates a file at specified path. Path will be recursively created if nonexistent."""
+        """Creates a file at specified path. Cannot overwrite existing files. Path will be recursively created if nonexistent."""
 
         if not self.config.get("permissions").get("create_files"):
-            return self.result({"success": False, "error": "File creation is disabled"})
+            return self.result("error: File creation is disabled", success=False)
 
         file_path_str = self._get_file_path(project_name, file_path)
 
         if os.path.exists(file_path_str):
-            return self.result({"success": False, "error": f"File already exists."})
+            return self.result("error: File already exists.", success=False)
 
         target_dir = os.path.dirname(file_path_str)
         if not os.path.exists(target_dir):
@@ -1087,28 +1087,24 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             # Verify syntax
             is_valid, error = self._verify_syntax(file_path_str)
             if not is_valid:
-                return self.result({
-                    "success": False,
-                    "error": error,
-                    "message": "The file was created but contains syntax errors."
-                })
+                return self.result(f"error: {error}. The file was created but contains syntax errors.", success=False)
 
-            return self.result({"success": True, "message": f"File created."})
+            return self.result(f"File created.", success=True)
         except Exception as e:
-            return self.result({"success": False, "error": str(e)})
+            return self.result(f"error: {e}", False)
 
     async def read_file(self, project_name: str, file_path: list, offset: int = None, limit: int = None):
         if not self.config.get("permissions").get("read_files"):
-            return self.result({"success": False, "error": "Full file reading is disabled. Use get_symbol!"})
+            return self.result("error: Full file reading is disabled. Use get_symbol!", success=False)
 
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
-            return self.result({"success": False, "error": "file does not exist!"})
+            return self.result("error: file does not exist!", success=False)
 
         # Check file size
         size_ok, size_error = self._check_file_size(file_path_str)
         if not size_ok:
-            return self.result({"success": False, "error": size_error})
+            return self.result(f"error: {size_error}", success=False)
 
         try:
             with open(file_path_str, "r", encoding='utf-8') as f:
@@ -1148,12 +1144,12 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
             return response
         except Exception as e:
-            return self.result({"success": False, "error": f"error reading file: {e}"})
+            return self.result(f"error: error reading file: {e}", success=False)
 
     async def overwrite_file(self, project_name: str, file_path: list, content: str):
         """Completely overwrites an existing file with new content."""
         if not self.config.get("permissions").get("overwrite_files"):
-            return self.result({"success": False, "error": "File overwriting is disabled. Use edit_symbol!"})
+            return self.result("error: File overwriting is disabled. Use edit_symbol!", success=False)
 
         file_path_str = self._get_file_path(project_name, file_path)
 
@@ -1170,19 +1166,15 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
             is_valid, error = self._verify_syntax(file_path_str)
             if not is_valid:
-                return self.result({
-                    "success": False,
-                    "error": error,
-                    "message": "The file was written but contains syntax errors."
-                })
+                return self.result(f"error: {error}. The file was written but contains syntax errors.", success=False)
 
-            return self.result({"success": True, "message": f"File overwritten at {file_path_str}"})
+            return self.result(f"File overwritten at {file_path_str}", success=True)
         except Exception as e:
-            return self.result({"success": False, "error": str(e)})
+            return self.result(f"error: {e}", success=False)
 
     async def append_to_file(self, project_name: str, file_path: list, content: str):
         if not self.config.get("permissions").get("edit_files"):
-            return self.result({"success": False, "error": "File creation/editing is disabled"})
+            return self.result("error: File creation/editing is disabled", success=False)
 
         file_path_str = self._get_file_path(project_name, file_path)
         target_dir = os.path.dirname(file_path_str)
@@ -1203,25 +1195,21 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
             is_valid, error = self._verify_syntax(file_path_str)
             if not is_valid:
-                return self.result({
-                    "success": False,
-                    "error": error,
-                    "message": "The content was appended but the file contains syntax errors."
-                })
+                return self.result(f"error: {error}. The content was appended but the file contains syntax errors.", success=False)
 
-            return self.result({"success": True, "message": f"Content appended to {file_path_str}"})
+            return self.result(f"Content appended to {file_path_str}", success=True)
         except Exception as e:
-            return self.result({"success": False, "error": str(e)})
+            return self.result(f"error: {e}", success=False)
 
     # ==================== Code Execution ====================
 
     async def execute(self, project_name: str, file_path: list, timeout: int = 30):
         if not self.config.get("permissions").get("execute_code"):
-            return self.result({"success": False, "error": "Code execution is disabled for security."})
+            return self.result("error: Code execution is disabled for security.", success=False)
 
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
-            return self.result({"success": False, "error": "file does not exist!"})
+            return self.result("error: file does not exist!", success=False)
 
         os.chmod(file_path_str, os.stat(file_path_str).st_mode | stat.S_IEXEC)
         try:
@@ -1238,28 +1226,18 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
                 if proc.returncode != 0:
                     error_msg = stderr_str if stderr_str else f"Process exited with code {proc.returncode}"
-                    return self.result({
-                        "success": False,
-                        "error": f"Error (exit code {proc.returncode})",
-                        "stdout": stdout_str,
-                        "stderr": stderr_str
-                    })
+                    return self.result(f"error: Error (exit code {proc.returncode})", success=False)
 
-                return self.result({
-                    "success": True,
-                    "stdout": stdout_str,
-                    "stderr": stderr_str,
-                    "returncode": proc.returncode
-                })
+                return self.result({"stdout": stdout_str, "stderr": stderr_str, "returncode": proc.returncode}, success=True)
             except asyncio.TimeoutError:
                 try:
                     proc.kill()
                     await proc.wait()
                 except:
                     pass
-                return self.result({"success": False, "error": f"Execution timed out after {timeout} seconds"})
+                return self.result(f"error: Execution timed out after {timeout} seconds", success=False)
         except Exception as e:
-            return self.result({"success": False, "error": str(e)})
+            return self.result(f"error: {e}", success=False)
 
     # ==================== Symbol Operations ====================
 
@@ -1267,7 +1245,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         """Returns a list of symbols (classes, functions, etc.) in a file. USE THIS FIRST to understand what's in a file before reading specific symbols."""
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
-            return self.result({"success": False, "error": "file does not exist"})
+            return self.result("error: file does not exist", success=False)
 
         if not language:
             language = self._get_language_from_ext(file_path_str)
@@ -1281,10 +1259,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
                     symbols = []
                     self._walk_for_symbols(tree.root_node, language, symbols)
                     symbols.sort(key=lambda x: x['line'])
-                    return self.result({
-                        "success": True,
-                        "symbols": [{"name": s["name"], "type": s["type"]} for s in symbols]
-                    })
+                    return self.result({"symbols": [{"name": s["name"], "type": s["type"]} for s in symbols]}, success=True)
             except Exception as e:
                 core.log("coder", f"Tree-sitter failed, falling back to regex: {e}")
 
@@ -1306,16 +1281,16 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
                     if match:
                         outline.append({"name": match.group(1), "type": sym_type})
                         break
-            return self.result({"success": True, "symbols": outline})
+            return self.result({"symbols": outline}, success=True)
         except Exception as e:
-            return self.result({"success": False, "error": str(e)})
+            return self.result(f"error: {e}", success=False)
 
     async def get_symbol(self, project_name: str, file_path: list, symbol_name: str, language: str = None):
         """Returns the code block for a symbol by name. THIS IS THE PREFERRED WAY TO READ CODE."""
         file_path_str = self._get_file_path(project_name, file_path)
 
         if not os.path.exists(file_path_str):
-            return self.result({"success": False, "error": "file does not exist"})
+            return self.result("error: file does not exist", success=False)
 
         if not language:
             language = self._get_language_from_ext(file_path_str)
@@ -1331,7 +1306,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         # 2. Fallback to line-based extraction
         line_number = self._find_symbol_line(file_path_str, symbol_name, language)
         if not line_number:
-            return self.result({"success": False, "error": f"symbol '{symbol_name}' not found"})
+            return self.result(f"error: symbol '{symbol_name}' not found", success=False)
 
         lang_config = self.LANGUAGES.get(language, {})
         body_type = lang_config.get('body_type', 'brace')
@@ -1341,7 +1316,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
                 lines = f.readlines()
 
             if not (1 <= line_number <= len(lines)):
-                return self.result({"success": False, "error": "line number out of range"})
+                return self.result("error: line number out of range", success=False)
 
             start_idx = line_number - 1
 
@@ -1363,15 +1338,15 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
             return "".join(body_lines)
         except Exception as e:
-            return self.result({"success": False, "error": str(e)})
+            return self.result(f"error: {e}", success=False)
 
     async def edit_symbol(self, project_name: str, file_path: list, symbol_name: str, new_content: str, language: str = None):
         if not self.config.get("permissions").get("edit_functions"):
-            return self.result({"success": False, "error": "Symbol editing is disabled."})
+            return self.result("error: Symbol editing is disabled.", success=False)
 
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
-            return self.result({"success": False, "error": "file does not exist"})
+            return self.result("error: file does not exist", success=False)
 
         await self._backup_file(file_path_str)
 
@@ -1380,7 +1355,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
         line_number = self._find_symbol_line(file_path_str, symbol_name, language)
         if not line_number:
-            return self.result({"success": False, "error": f"symbol '{symbol_name}' not found"})
+            return self.result(f"error: symbol '{symbol_name}' not found", success=False)
 
         # 1. Try Tree-sitter for precise byte-level replacement
         if HAS_TREE_SITTER and language in LANGUAGE_MAP:
@@ -1395,16 +1370,9 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
                 is_valid, error = self._verify_syntax(file_path_str)
                 if not is_valid:
-                    return self.result({
-                        "success": False,
-                        "error": error,
-                        "message": "The edit was applied but the file contains syntax errors."
-                    })
+                    return self.result(f"error: {error}. The edit was applied but the file contains syntax errors.", success=False)
 
-                return self.result({
-                    "success": True,
-                    "message": f"Symbol '{symbol_name}' edited in {os.path.join(project_name, *file_path)}"
-                })
+                return self.result(f"Symbol '{symbol_name}' edited in {os.path.join(project_name, *file_path)}", success=True)
 
         # 2. Fallback to line-based replacement
         try:
@@ -1412,7 +1380,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
                 lines = f.readlines()
 
             if not (1 <= line_number <= len(lines)):
-                return self.result({"success": False, "error": "line number out of range"})
+                return self.result("error: line number out of range", success=False)
 
             lang_config = self.LANGUAGES.get(language, {})
             body_type = lang_config.get('body_type', 'brace')
@@ -1431,22 +1399,15 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
             is_valid, error = self._verify_syntax(file_path_str)
             if not is_valid:
-                return self.result({
-                    "success": False,
-                    "error": error,
-                    "message": "The edit was applied but the file contains syntax errors."
-                })
+                return self.result(f"error: {error}. The edit was applied but the file contains syntax errors.", success=False)
 
-            return self.result({
-                "success": True,
-                "message": f"Symbol '{symbol_name}' edited in {os.path.join(project_name, *file_path)}"
-            })
+            return self.result(f"Symbol '{symbol_name}' edited in {os.path.join(project_name, *file_path)}", success=True)
         except Exception as e:
-            return self.result({"success": False, "error": str(e)})
+            return self.result(f"error: {e}", success=False)
 
     async def add_symbol_before(self, project_name: str, file_path: list, target_symbol_name: str, name: str, content_body: str, language: str = None):
         if not self.config.get("permissions").get("add_functions"):
-            return self.result({"success": False, "error": "Symbol adding is disabled."})
+            return self.result("error: Symbol adding is disabled.", success=False)
 
         file_path_str = self._get_file_path(project_name, file_path)
 
@@ -1455,7 +1416,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
         line_number = self._find_symbol_line(file_path_str, target_symbol_name, language)
         if not line_number:
-            return self.result({"success": False, "error": f"symbol '{target_symbol_name}' not found"})
+            return self.result(f"error: symbol '{target_symbol_name}' not found", success=False)
 
         # Validate the new symbol name matches the content
         if name:
@@ -1502,33 +1463,26 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
             is_valid, error = self._verify_syntax(file_path_str)
             if not is_valid:
-                return self.result({
-                    "success": False,
-                    "error": error,
-                    "message": "The symbol was added but the file contains syntax errors."
-                })
+                return self.result(f"error: {error}. The symbol was added but the file contains syntax errors.", success=False)
 
-            return self.result({
-                "success": True,
-                "message": f"Symbol '{name}' added before '{target_symbol_name}'"
-            })
+            return self.result(f"Symbol '{name}' added before '{target_symbol_name}'", success=True)
         except Exception as e:
-            return self.result({"success": False, "error": str(e)})
+            return self.result(f"error: {e}", success=False)
 
     async def add_symbol_after(self, project_name: str, file_path: list, target_symbol_name: str, name: str, content_body: str, language: str = None):
         if not self.config.get("permissions").get("add_functions"):
-            return self.result({"success": False, "error": "Symbol adding is disabled."})
+            return self.result("error: Symbol adding is disabled.", success=False)
 
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
-            return self.result({"success": False, "error": "file does not exist"})
+            return self.result("error: file does not exist", success=False)
 
         if not language:
             language = self._get_language_from_ext(file_path_str)
 
         line_number = self._find_symbol_line(file_path_str, target_symbol_name, language)
         if not line_number:
-            return self.result({"success": False, "error": f"symbol '{target_symbol_name}' not found"})
+            return self.result(f"error: symbol '{target_symbol_name}' not found", success=False)
 
         # Validate the new symbol name
         if name:
@@ -1580,26 +1534,19 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
             is_valid, error = self._verify_syntax(file_path_str)
             if not is_valid:
-                return self.result({
-                    "success": False,
-                    "error": error,
-                    "message": "The symbol was added but the file contains syntax errors."
-                })
+                return self.result(f"error: {error}. The symbol was added but the file contains syntax errors.", success=False)
 
-            return self.result({
-                "success": True,
-                "message": f"Symbol '{name}' added after '{target_symbol_name}'"
-            })
+            return self.result(f"Symbol '{name}' added after '{target_symbol_name}'", success=True)
         except Exception as e:
-            return self.result({"success": False, "error": str(e)})
+            return self.result(f"error: {e}", success=False)
 
     async def delete_symbol(self, project_name: str, file_path: list, symbol_name: str, language: str = None):
         if not self.config.get("permissions").get("edit_functions"):
-            return self.result({"success": False, "error": "Symbol deletion is disabled."})
+            return self.result("error: Symbol deletion is disabled.", success=False)
 
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
-            return self.result({"success": False, "error": "file does not exist"})
+            return self.result("error: file does not exist", success=False)
 
         await self._backup_file(file_path_str)
 
@@ -1608,7 +1555,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
         line_number = self._find_symbol_line(file_path_str, symbol_name, language)
         if not line_number:
-            return self.result({"success": False, "error": f"symbol '{symbol_name}' not found"})
+            return self.result(f"error: symbol '{symbol_name}' not found", success=False)
 
         # 1. Try Tree-sitter for precise removal
         if HAS_TREE_SITTER and language in LANGUAGE_MAP:
@@ -1622,16 +1569,9 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
                 is_valid, error = self._verify_syntax(file_path_str)
                 if not is_valid:
-                    return self.result({
-                        "success": False,
-                        "error": error,
-                        "message": "The symbol was deleted but the file contains syntax errors."
-                    })
+                    return self.result(f"error: {error}. The symbol was deleted but the file contains syntax errors.", success=False)
 
-                return self.result({
-                    "success": True,
-                    "message": f"Symbol '{symbol_name}' deleted from {os.path.join(project_name, *file_path)}"
-                })
+                return self.result(f"Symbol '{symbol_name}' deleted from {os.path.join(project_name, *file_path)}", success=True)
 
         # 2. Fallback to line-based removal
         try:
@@ -1639,7 +1579,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
                 lines = f.readlines()
 
             if not (1 <= line_number <= len(lines)):
-                return self.result({"success": False, "error": "line number out of range"})
+                return self.result("error: line number out of range", success=False)
 
             lang_config = self.LANGUAGES.get(language, {})
             body_type = lang_config.get('body_type', 'brace')
@@ -1654,18 +1594,11 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
             is_valid, error = self._verify_syntax(file_path_str)
             if not is_valid:
-                return self.result({
-                    "success": False,
-                    "error": error,
-                    "message": "The symbol was deleted but the file contains syntax errors."
-                })
+                return self.result(f"error: {error}. The symbol was deleted but the file contains syntax errors.", success=False)
 
-            return self.result({
-                "success": True,
-                "message": f"Symbol '{symbol_name}' deleted from {os.path.join(project_name, *file_path)}"
-            })
+            return self.result(f"Symbol '{symbol_name}' deleted from {os.path.join(project_name, *file_path)}", success=True)
         except Exception as e:
-            return self.result({"success": False, "error": str(e)})
+            return self.result(f"error: {e}", success=False)
 
     # ==================== Search Operations ====================
 
@@ -1673,7 +1606,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         """Searches for text or regex pattern within a file. Returns snippets with line numbers and surrounding context."""
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
-            return self.result({"success": False, "error": "file does not exist!"})
+            return self.result("error: file does not exist!", success=False)
 
         try:
             with open(file_path_str, 'r', encoding='utf-8') as f:
@@ -1686,7 +1619,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
                 try:
                     pattern = re.compile(query, re.IGNORECASE)
                 except re.error as e:
-                    return self.result({"success": False, "error": f"Invalid regex pattern: {e}"})
+                    return self.result(f"error: Invalid regex pattern: {e}", success=False)
             else:
                 query_lower = query.lower()
 
@@ -1722,22 +1655,13 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
                     matches.append("\n".join(snippet))
 
             if not matches:
-                return self.result({
-                    "success": True,
-                    "matches": 0,
-                    "file": os.path.join(project_name, *file_path)
-                })
+                return self.result({"matches": 0, "file": os.path.join(project_name, *file_path)}, success=True)
 
             result_str = "\n\n".join(matches)
-            return self.result({
-                "success": True,
-                "matches": len(matches),
-                "file": os.path.join(project_name, *file_path),
-                "results": result_str
-            })
+            return self.result({"matches": len(matches), "file": os.path.join(project_name, *file_path), "results": result_str}, success=True)
 
         except Exception as e:
-            return self.result({"success": False, "error": str(e)})
+            return self.result(f"error: {e}", success=False)
 
     def _generate_diff(self, orig_content: str, new_content: str):
         # Generate unified diff
@@ -1754,11 +1678,11 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
     async def edit(self, project_name: str, file_path: list, old_text: str, new_text: str):
         if not self.config.get("permissions").get("edit_files"):
-            return self.result({"success": False, "error": "Editing is disabled."})
+            return self.result("error: Editing is disabled.", success=False)
 
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
-            return self.result({"success": False, "error": "file does not exist"})
+            return self.result("error: file does not exist", success=False)
 
         await self._backup_file(file_path_str)
 
@@ -1767,12 +1691,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
                 content = f.read()
 
             if old_text not in content:
-                return self.result({
-                    "success": False,
-                    "error": f"old_text for edit not found in file. "
-                    f'The exact text "{old_text[:80]}{"..." if len(old_text) > 80 else ""}" '
-                    f'was not found. Make sure old_text matches exactly including whitespace.'
-                })
+                return self.result("error: old_text for edit not found in file. The exact text was not found. Make sure old_text matches exactly including whitespace.", success=False)
 
             content = content.replace(old_text, new_text, 1)
 
@@ -1781,19 +1700,12 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
             is_valid, error = self._verify_syntax(file_path_str)
             if not is_valid:
-                return self.result({
-                    "success": False,
-                    "error": error,
-                    "message": "The edit was applied but the file contains syntax errors."
-                })
+                return self.result(f"error: {error}. The edit was applied but the file contains syntax errors.", success=False)
 
-            return self.result({
-                "success": True,
-                "message": f"Successfully applied edit to {os.path.join(project_name, *file_path)}"
-            })
+            return self.result(f"Successfully applied edit to {os.path.join(project_name, *file_path)}", success=True)
 
         except Exception as e:
-            return self.result({"success": False, "error": str(e)})
+            return self.result(f"error: {e}", success=False)
 
     async def grep(self, project_name: str, path: list = None, pattern: str = "", use_regex: bool = False,
                    case_sensitive: bool = False, max_results: int = None):
@@ -1804,7 +1716,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             search_dir = os.path.join(search_dir, *path)
 
         if not os.path.isdir(search_dir):
-            return self.result({"success": False, "error": "search directory does not exist"})
+            return self.result("error: search directory does not exist", success=False)
 
         max_results = max_results or self.config.get("max_grep_results", 50)
 
@@ -1814,7 +1726,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
                 try:
                     compiled_pattern = re.compile(pattern, flags)
                 except re.error as e:
-                    return self.result({"success": False, "error": f"Invalid regex pattern: {e}"})
+                    return self.result(f"error: Invalid regex pattern: {e}", success=False)
             else:
                 search_text = pattern if case_sensitive else pattern.lower()
 
@@ -1862,17 +1774,10 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
                 if total_matches >= max_results:
                     break
 
-            return self.result({
-                "success": True,
-                "pattern": pattern,
-                "matches": min(total_matches, max_results),
-                "files_searched": file_count,
-                "truncated": total_matches > max_results,
-                "results": results[:max_results]
-            })
+            return self.result({"pattern": pattern, "matches": min(total_matches, max_results), "files_searched": file_count, "truncated": total_matches > max_results, "results": results[:max_results]}, success=True)
 
         except Exception as e:
-            return self.result({"success": False, "error": str(e)})
+            return self.result(f"error: {e}", success=False)
 
     async def find_files(self, project_name: str, path: list = None, pattern: str = "*", file_type: str = "any"):
         """Finds files matching a glob pattern in a project."""
@@ -1881,7 +1786,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             search_dir = os.path.join(search_dir, *path)
 
         if not os.path.exists(search_dir):
-            return self.result({"success": False, "error": "search directory does not exist"})
+            return self.result("error: search directory does not exist", success=False)
 
         try:
             full_pattern = os.path.join(search_dir, pattern)
@@ -1896,26 +1801,21 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
                     continue
                 results.append(rel_path)
 
-            return self.result({
-                "success": True,
-                "pattern": pattern,
-                "count": len(results),
-                "files": sorted(results)
-            })
+            return self.result({"pattern": pattern, "count": len(results), "files": sorted(results)}, success=True)
 
         except Exception as e:
-            return self.result({"success": False, "error": str(e)})
+            return self.result(f"error: {e}", success=False)
 
     # ==================== Formatting & Imports ====================
 
     async def format_file(self, project_name: str, file_path: list, formatter: str = "auto") -> dict:
         """Formats code using appropriate formatter. Supports: auto, black, autopep8, prettier, gofmt, rustfmt, clang-format, etc."""
         if not self.config.get("permissions").get("edit_files"):
-            return self.result({"success": False, "error": "Editing is disabled."})
+            return self.result("error: Editing is disabled.", success=False)
 
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
-            return self.result({"success": False, "error": "file does not exist"})
+            return self.result("error: file does not exist", success=False)
 
         await self._backup_file(file_path_str)
 
@@ -1975,55 +1875,35 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
                 for fmt in formatters:
                     success, used_fmt = try_format_with_inplace(fmt)
                     if success:
-                        return self.result({
-                            "success": True,
-                            "message": f"File formatted with {used_fmt}",
-                            "formatter": used_fmt
-                        })
-                return self.result({
-                    "success": False,
-                    "error": f"No formatter found for {lang}. Tried: {formatters}"
-                })
+                        return self.result({"message": f"File formatted with {used_fmt}", "formatter": used_fmt}, success=True)
+                return self.result(f"error: No formatter found for {lang}. Tried: {formatters}", success=False)
             else:
                 # Use specified formatter
                 if formatter not in formatters:
-                    return self.result({
-                        "success": False,
-                        "error": f"Formatter '{formatter}' not supported for {lang}. Supported: {formatters}"
-                    })
+                    return self.result(f"error: Formatter '{formatter}' not supported for {lang}. Supported: {formatters}", success=False)
 
                 success, used_fmt = try_format_with_inplace(formatter)
                 if success:
-                    return self.result({
-                        "success": True,
-                        "message": f"File formatted with {used_fmt}",
-                        "formatter": used_fmt
-                    })
+                    return self.result({"message": f"File formatted with {used_fmt}", "formatter": used_fmt}, success=True)
                 
-                return self.result({
-                    "success": False,
-                    "error": f"Formatter '{formatter}' failed for {lang}."
-                })
+                return self.result(f"error: Formatter '{formatter}' failed for {lang}.", success=False)
         except Exception as e:
-            return self.result({"success": False, "error": str(e)})
+            return self.result(f"error: {e}", success=False)
 
     async def update_python_imports(self, project_name: str, file_path: list, added_symbols: list = None, removed_symbols: list = None, language: str = None) -> dict:
         """Updates import statements when symbols are added or removed. Currently only handles Python imports."""
         if not self.config.get("permissions").get("edit_files"):
-            return self.result({"success": False, "error": "Editing is disabled."})
+            return self.result("error: Editing is disabled.", success=False)
 
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
-            return self.result({"success": False, "error": "file does not exist"})
+            return self.result("error: file does not exist", success=False)
 
         if not language:
             language = self._get_language_from_ext(file_path_str)
 
         if language != 'python':
-            return self.result({
-                "success": False,
-                "error": f"Import management is only implemented for Python. Got: {language}"
-            })
+            return self.result(f"error: Import management is only implemented for Python. Got: {language}", success=False)
 
         await self._backup_file(file_path_str)
 
@@ -2048,11 +1928,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             if imports_start is None:
                 # No imports found
                 if not added_symbols:
-                    return self.result({
-                        "success": True,
-                        "message": "No imports found in file",
-                        "changes_made": 0
-                    })
+                    return self.result({"message": "No imports found in file", "changes_made": 0}, success=True)
                 # If adding symbols, we need to create import block
                 imports_start = 0
                 imports_end = 0
@@ -2162,13 +2038,9 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             with open(file_path_str, 'w', encoding='utf-8') as f:
                 f.writelines(lines)
 
-            return self.result({
-                "success": True,
-                "message": f"Updated {changes_made} import(s)",
-                "changes_made": changes_made
-            })
+            return self.result({"message": f"Updated {changes_made} import(s)", "changes_made": changes_made}, success=True)
         except Exception as e:
-            return self.result({"success": False, "error": str(e)})
+            return self.result(f"error: {e}", success=False)
 
     # ==================== System Prompt ====================
 
