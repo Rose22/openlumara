@@ -63,22 +63,28 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
     """Allows your AI to write, edit and test code for you."""
 
     settings = {
-        "coding_style": "Write clean, well-commented code. Do not include your reasoning inside final code.",
-        "sandbox_folder": "~/coder",
-        "allow_project_creation": True,
-        "allow_editing": True,
-        "allow_function_adding": True,
-        "allow_function_deleting": True,
-        "allow_file_creation": True,
-        "allow_full_file_reads": False,
-        "allow_full_file_overwrites": False,
-        "allow_code_execution": False,
-        "folder_blacklist": ["venv"],
-        # Security and size limits
-        "max_file_size_mb": 10,
-        "max_read_lines": 5000,
-        "max_grep_results": 50,
-        "backup_retention_count": 5,
+        "preferences": {
+            "coding_style": "Write clean, well-commented code. Do not include your reasoning inside final code.",
+            "sandbox_folder": "~/coder",
+        },
+        "permissions": {
+            "create_project": True,
+            "add_functions": True,
+            "edit_functions": True,
+            "delete_functions": True,
+            "create_files": True,
+            "read_files": True,
+            "edit_files": True,
+            "overwrite_files": False,
+            "execute_code": False,
+        },
+        "limits": {
+            "folder_blacklist": ["venv"],
+            "max_file_size_mb": 10,
+            "max_read_lines": 5000,
+            "max_grep_results": 50,
+            "backup_retention_count": 5,
+        }
     }
 
     # Language-specific formatting tools mapping
@@ -255,32 +261,32 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             core.log("coder", f"Tree-sitter DISABLED. Reason: {disabled_reason}")
 
         # Disable tools based on config
-        if self.config.get("read-only"):
+        if self.config.get("preferences", {}).get("read_only"):
             self.disabled_tools.extend([
                 "add_symbol_before", "add_symbol_after", "edit_symbol",
                 "delete_symbol", "create_project", "create_file",
                 "overwrite_file", "execute", "edit", "append_to_file"
             ])
 
-        if not self.config.get("allow_function_adding"):
+        if not self.config.get("permissions", {}).get("add_functions"):
             self.disabled_tools.extend(["add_symbol_before", "add_symbol_after"])
 
-        if not self.config.get("allow_editing"):
+        if not self.config.get("permissions", {}).get("edit_files"):
             self.disabled_tools.extend(["edit_symbol", "edit"])
 
-        if not self.config.get("allow_function_deleting"):
+        if not self.config.get("permissions", {}).get("delete_functions"):
             self.disabled_tools.append("delete_symbol")
 
-        if not self.config.get("allow_project_creation"):
+        if not self.config.get("permissions", {}).get("create_project"):
             self.disabled_tools.append("create_project")
 
-        if not self.config.get("allow_file_creation"):
+        if not self.config.get("permissions", {}).get("create_files"):
             self.disabled_tools.extend(["create_file", "append_to_file"])
 
-        if not self.config.get("allow_full_file_overwrites"):
+        if not self.config.get("permissions", {}).get("overwrite_files"):
             self.disabled_tools.append("overwrite_file")
 
-        if not self.config.get("allow_code_execution"):
+        if not self.config.get("permissions", {}).get("execute_code"):
             self.disabled_tools.append("execute")
 
     # ==================== Security & Path Helpers ====================
@@ -1059,7 +1065,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
     async def create_project(self, project_name: str):
         """Creates a new project directory in the sandbox."""
-        if not self.config.get("allow_project_creation"):
+        if not self.config.get("permissions").get("create_project"):
             return self.result({"success": False, "error": "Project creation is disabled."})
 
         base_path = self._get_project_path(project_name)
@@ -1073,7 +1079,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         """
         Creates a new file within a project.
         """
-        if not self.config.get("allow_file_creation"):
+        if not self.config.get("permissions").get("create_files"):
             return self.result({"success": False, "error": "File creation is disabled"})
 
         file_path_str = self._get_file_path(project_name, file_path)
@@ -1107,7 +1113,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         Reads a file with optional line offset and limit.
         Returns content as string, or error dict on failure.
         """
-        if not self.config.get("allow_full_file_reads"):
+        if not self.config.get("permissions").get("read_files"):
             return self.result({"success": False, "error": "Full file reading is disabled. Use get_symbol!"})
 
         file_path_str = self._get_file_path(project_name, file_path)
@@ -1161,7 +1167,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
     async def overwrite_file(self, project_name: str, file_path: list, content: str):
         """Completely overwrites an existing file with new content."""
-        if not self.config.get("allow_full_file_overwrites"):
+        if not self.config.get("permissions").get("overwrite_files"):
             return self.result({"success": False, "error": "File overwriting is disabled. Use edit_symbol!"})
 
         file_path_str = self._get_file_path(project_name, file_path)
@@ -1191,7 +1197,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
     async def append_to_file(self, project_name: str, file_path: list, content: str):
         """Appends content to the end of a file. Creates the file if it doesn't exist."""
-        if not self.config.get("allow_file_creation"):
+        if not self.config.get("permissions").get("edit_files"):
             return self.result({"success": False, "error": "File creation/editing is disabled"})
 
         file_path_str = self._get_file_path(project_name, file_path)
@@ -1227,7 +1233,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
     async def execute(self, project_name: str, file_path: list, timeout: int = 30):
         """Executes a file within a project."""
-        if not self.config.get("allow_code_execution"):
+        if not self.config.get("permissions").get("execute_code"):
             return self.result({"success": False, "error": "Code execution is disabled for security."})
 
         file_path_str = self._get_file_path(project_name, file_path)
@@ -1384,7 +1390,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
     async def edit_symbol(self, project_name: str, file_path: list, symbol_name: str, new_content: str, language: str = None):
         """Replaces the content of a symbol with new content."""
-        if not self.config.get("allow_editing"):
+        if not self.config.get("permissions").get("edit_functions"):
             return self.result({"success": False, "error": "Symbol editing is disabled."})
 
         file_path_str = self._get_file_path(project_name, file_path)
@@ -1467,7 +1473,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         Inserts a new symbol before the target symbol.
         The 'name' parameter is used for validation that the new symbol has a valid name.
         """
-        if not self.config.get("allow_function_adding"):
+        if not self.config.get("permissions").get("add_functions"):
             return self.result({"success": False, "error": "Symbol adding is disabled."})
 
         file_path_str = self._get_file_path(project_name, file_path)
@@ -1542,7 +1548,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         Inserts a new symbol after the target symbol.
         The 'name' parameter is used for validation that the new symbol has a valid name.
         """
-        if not self.config.get("allow_function_adding"):
+        if not self.config.get("permissions").get("add_functions"):
             return self.result({"success": False, "error": "Symbol adding is disabled."})
 
         file_path_str = self._get_file_path(project_name, file_path)
@@ -1621,7 +1627,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
     async def delete_symbol(self, project_name: str, file_path: list, symbol_name: str, language: str = None):
         """Deletes a symbol from a file."""
-        if not self.config.get("allow_function_deleting"):
+        if not self.config.get("permissions").get("edit_functions"):
             return self.result({"success": False, "error": "Symbol deletion is disabled."})
 
         file_path_str = self._get_file_path(project_name, file_path)
@@ -1787,7 +1793,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         Performs multiple exact text replacements in a file.
         Each edit has oldText (must match unique, non-overlapping region) and newText (replacement).
         """
-        if not self.config.get("allow_editing"):
+        if not self.config.get("permissions").get("edit_files"):
             return self.result({"success": False, "error": "Editing is disabled."})
 
         file_path_str = self._get_file_path(project_name, file_path)
@@ -1949,6 +1955,9 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         Format code using appropriate formatter.
         Supports: black, autopep8, prettier, gofmt, rustfmt, clang-format, etc.
         """
+        if not self.config.get("permissions").get("edit_files"):
+            return self.result({"success": False, "error": "Editing is disabled."})
+
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
             return self.result({"success": False, "error": "file does not exist"})
@@ -2043,11 +2052,14 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         except Exception as e:
             return self.result({"success": False, "error": str(e)})
 
-    async def update_imports(self, project_name: str, file_path: list, added_symbols: list = None, removed_symbols: list = None, language: str = None) -> dict:
+    async def update_python_imports(self, project_name: str, file_path: list, added_symbols: list = None, removed_symbols: list = None, language: str = None) -> dict:
         """
         Update import statements when symbols are added or removed.
         Currently handles Python imports.
         """
+        if not self.config.get("permissions").get("edit_files"):
+            return self.result({"success": False, "error": "Editing is disabled."})
+
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
             return self.result({"success": False, "error": "file does not exist"})
