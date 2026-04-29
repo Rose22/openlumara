@@ -1005,30 +1005,31 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
         def _build_tree(path, current_depth):
             if not os.path.isdir(path):
-                return os.path.basename(path)
+                return {"files": [], "folders": {}}
 
-            contents = []
+            files = []
+            folders = {}
             try:
                 for entry in os.scandir(path):
                     if entry.is_file():
-                        contents.append(entry.name)
+                        files.append(entry.name)
                     elif entry.is_dir():
                         if entry.name in self.config.get("folder_blacklist", []):
                             continue
                         if entry.name.startswith('.'):
                             continue
                         if current_depth < depth_limit:
-                            contents.append({entry.name: _build_tree(entry.path, current_depth + 1)})
+                            folders[entry.name] = _build_tree(entry.path, current_depth + 1)
                         else:
-                            contents.append(f"{entry.name}/")
+                            folders[entry.name] = {"files": [], "folders": {}}
             except Exception:
                 pass
 
-            return {"root": contents} if current_depth == 0 else contents
+            return {"files": files, "folders": folders}
 
         try:
             tree = _build_tree(project_path, 0)
-            return self.result({"success": True, "tree": tree})
+            return self.result({"success": True, "tree": {"root": tree}})
         except Exception as e:
             return self.result({"success": False, "error": str(e)})
 
