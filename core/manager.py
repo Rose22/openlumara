@@ -69,7 +69,7 @@ class Manager:
             enabled_user_modules = []
 
         if not enabled_channels:
-            print("ERROR: At least one channel must be enabled in the config! Try the `cli` channel for a basic terminal UI.")
+            print("ERROR: At least one channel must be enabled in the config! Try the `cli` channel for a basic terminal UI.", flush=True)
             exit(1)
 
         core.log("core", "Loading channels")
@@ -133,8 +133,8 @@ class Manager:
         if "webui" in enabled_channels:
             host = core.config.get("channels").get("settings").get("webui").get("host")
             port = core.config.get("channels").get("settings").get("webui").get("port")
-            print()
-            print(f"Please open the WebUI at http://{host}:{port}")
+            print(flush=True)
+            print(f"Please open the WebUI at http://{host}:{port}", flush=True)
 
         try:
             await asyncio.gather(*self._async_tasks, return_exceptions=should_swallow_exceptions)
