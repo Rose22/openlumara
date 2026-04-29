@@ -1061,6 +1061,8 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             return self.result({"success": False, "error": f"Error creating project: {e}"})
 
     async def create_file(self, project_name: str, file_path: list, content: str):
+        """Creates a file at specified path. Path will be recursively created if nonexistent."""
+
         if not self.config.get("permissions").get("create_files"):
             return self.result({"success": False, "error": "File creation is disabled"})
 
