@@ -63,10 +63,8 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
     """Allows your AI to write, edit and test code for you."""
 
     settings = {
-        "preferences": {
-            "coding_style": "Write clean, well-commented code. Do not include your reasoning inside final code.",
-            "sandbox_folder": "~/coder",
-        },
+        "coding_style": "Write clean, well-commented code. Do not include your reasoning inside final code.",
+        "sandbox_folder": "~/coder",
         "permissions": {
             "create_project": True,
             "add_functions": True,
