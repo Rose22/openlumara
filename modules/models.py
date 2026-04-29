@@ -55,7 +55,7 @@ class Models(core.module.Module):
         found = False
         found_id = None
         for model_id in self.models:
-            if model_id == name.strip().lower():
+            if model_id.strip().lower() == name.strip().lower():
                 found = True
                 found_id = model_id
 
