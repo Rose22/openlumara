@@ -254,32 +254,32 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             core.log("coder", f"Tree-sitter DISABLED. Reason: {disabled_reason}")
 
         # Disable tools based on config
-        if self.config.get("preferences", {}).get("read_only"):
+        if self.config.get("preferences", "read_only"):
             self.disabled_tools.extend([
                 "add_symbol_before", "add_symbol_after", "edit_symbol",
                 "delete_symbol", "create_project", "create_file",
                 "overwrite_file", "execute", "edit", "append_to_file"
             ])
 
-        if not self.config.get("permissions", {}).get("add_functions"):
+        if not self.config.get("permissions", "add_functions"):
             self.disabled_tools.extend(["add_symbol_before", "add_symbol_after"])
 
-        if not self.config.get("permissions", {}).get("edit_files"):
+        if not self.config.get("permissions", "edit_files"):
             self.disabled_tools.extend(["edit_symbol", "edit"])
 
-        if not self.config.get("permissions", {}).get("delete_functions"):
+        if not self.config.get("permissions", "delete_functions"):
             self.disabled_tools.append("delete_symbol")
 
-        if not self.config.get("permissions", {}).get("create_project"):
+        if not self.config.get("permissions", "create_project"):
             self.disabled_tools.append("create_project")
 
-        if not self.config.get("permissions", {}).get("create_files"):
+        if not self.config.get("permissions", "create_files"):
             self.disabled_tools.extend(["create_file", "append_to_file"])
 
-        if not self.config.get("permissions", {}).get("overwrite_files"):
+        if not self.config.get("permissions", "overwrite_files"):
             self.disabled_tools.append("overwrite_file")
 
-        if not self.config.get("permissions", {}).get("execute_code"):
+        if not self.config.get("permissions", "execute_code"):
             self.disabled_tools.append("execute")
 
     # ==================== Security & Path Helpers ====================
@@ -998,7 +998,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
     # ==================== File Operations ====================
 
-    async def list_full_project_tree(self, project_name: str, depth_limit: int = 3):
+    async def list_full_project_tree(self, project_name: str, depth_limit: int = 5, max_files_per_folder: int = 50):
         """Returns a recursive tree representation of the project structure. Use this to understand the overall project layout before diving into specific files."""
         project_path = self._get_project_path(project_name)
         if not os.path.exists(project_path):
@@ -1010,12 +1010,17 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
             files = []
             folders = {}
+            files_counter = 0
             try:
                 for entry in os.scandir(path):
                     if entry.is_file():
+                        if files_counter > max_files_per_folder:
+                            continue
+
                         files.append(entry.name)
+                        files_counter += 1
                     elif entry.is_dir():
-                        if entry.name in self.config.get("folder_blacklist", []):
+                        if entry.name in self.config.get("limits", "folder_blacklist", []):
                             continue
                         if entry.name.startswith('.'):
                             continue
@@ -1030,7 +1035,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
         try:
             tree = _build_tree(project_path, 0)
-            return self.result({"tree": {"root": tree}}, success=True)
+            return self.result(tree, success=True)
         except Exception as e:
             return self.result(f"error: {e}", success=False)
 
@@ -1067,7 +1072,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             return self.result(f"error: Error creating project: {e}", success=False)
 
     async def create_file(self, project_name: str, file_path: list, content: str):
-        """Creates a file at specified path. Cannot overwrite existing files. Path will be recursively created if nonexistent."""
+        """Creates a file at specified path. Cannot overwrite existing files. Path will be recursively created if nonexistent. Provide path as a list representing a relative path. Example: ['src', 'main.py']"""
 
         if not self.config.get("permissions").get("create_files"):
             return self.result("error: File creation is disabled", success=False)
@@ -1095,7 +1100,10 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             return self.result(f"error: {e}", False)
 
     async def read_file(self, project_name: str, file_path: list, offset: int = None, limit: int = None):
-        """Reads a file. **USE ONLY AS A LAST RESORT WHEN GET_OUTLINE AND GET_SYMBOL DID NOT PROVIDE ADEQUATE RESULTS**"""
+        """
+        Reads a file with optional line offset and limit.
+        Returns content as string, or error dict on failure.
+        """
         if not self.config.get("permissions").get("read_files"):
             return self.result("error: Full file reading is disabled. Use get_symbol!", success=False)
 
@@ -1175,6 +1183,8 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             return self.result(f"error: {e}", success=False)
 
     async def append_to_file(self, project_name: str, file_path: list, content: str):
+        """Appends content to the end of a file. Creates the file if it doesn't exist."""
+
         if not self.config.get("permissions").get("edit_files"):
             return self.result("error: File creation/editing is disabled", success=False)
 
@@ -1244,7 +1254,10 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
     # ==================== Symbol Operations ====================
 
     async def get_outline(self, project_name: str, file_path: list, language: str = None):
-        """Returns a list of symbols (classes, functions, etc.) in a file. USE THIS FIRST to understand what's in a file before reading specific symbols."""
+        """
+        Returns a list of symbols (classes, functions, etc.) in a file.
+        USE THIS FIRST to understand what's in a file before reading specific symbols.
+        """
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
             return self.result("error: file does not exist", success=False)
@@ -1288,7 +1301,10 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             return self.result(f"error: {e}", success=False)
 
     async def get_symbol(self, project_name: str, file_path: list, symbol_name: str, language: str = None):
-        """Returns the code block for a symbol by name. THIS IS THE PREFERRED WAY TO READ CODE."""
+        """
+        Returns the code block for a symbol by name.
+        THIS IS THE PREFERRED WAY TO READ CODE.
+        """
         file_path_str = self._get_file_path(project_name, file_path)
 
         if not os.path.exists(file_path_str):
@@ -1343,6 +1359,8 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             return self.result(f"error: {e}", success=False)
 
     async def edit_symbol(self, project_name: str, file_path: list, symbol_name: str, new_content: str, language: str = None):
+        """Replaces the content of a symbol with new content."""
+
         if not self.config.get("permissions").get("edit_functions"):
             return self.result("error: Symbol editing is disabled.", success=False)
 
@@ -1605,7 +1623,10 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
     # ==================== Search Operations ====================
 
     async def search(self, project_name: str, file_path: list, query: str, context_lines: int = 5, max_matches: int = 10, use_regex: bool = True):
-        """Searches for text or regex pattern within a file. Returns snippets with line numbers and surrounding context."""
+        """
+        Search for text or regex pattern within a file.
+        Returns snippets with line numbers and surrounding context.
+        """
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
             return self.result("error: file does not exist!", success=False)
@@ -1711,7 +1732,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
     async def grep(self, project_name: str, path: list = None, pattern: str = "", use_regex: bool = True,
                    case_sensitive: bool = False, max_results: int = None):
-        """Searches within a directory using a pattern. Pattern can be normal string or regex."""
+        """Search for a pattern across files in a project."""
 
         search_dir = self._get_project_path(project_name)
         if path:
@@ -1892,158 +1913,6 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         except Exception as e:
             return self.result(f"error: {e}", success=False)
 
-    async def update_python_imports(self, project_name: str, file_path: list, added_symbols: list = None, removed_symbols: list = None, language: str = None) -> dict:
-        """Updates import statements when symbols are added or removed. Currently only handles Python imports."""
-        if not self.config.get("permissions").get("edit_files"):
-            return self.result("error: Editing is disabled.", success=False)
-
-        file_path_str = self._get_file_path(project_name, file_path)
-        if not os.path.exists(file_path_str):
-            return self.result("error: file does not exist", success=False)
-
-        if not language:
-            language = self._get_language_from_ext(file_path_str)
-
-        if language != 'python':
-            return self.result(f"error: Import management is only implemented for Python. Got: {language}", success=False)
-
-        await self._backup_file(file_path_str)
-
-        try:
-            with open(file_path_str, 'r', encoding='utf-8') as f:
-                lines = f.readlines()
-
-            # Find import block - more robust detection
-            imports_start = None
-            imports_end = None
-            import_pattern = re.compile(r'^(?:import\s+|from\s+\S+\s+import\s+)')
-            
-            for i, line in enumerate(lines):
-                if import_pattern.match(line):
-                    if imports_start is None:
-                        imports_start = i
-                    imports_end = i + 1
-                elif imports_start is not None and line.strip() and not line.strip().startswith('#'):
-                    # Stop at first non-import, non-blank, non-comment line
-                    break
-
-            if imports_start is None:
-                # No imports found
-                if not added_symbols:
-                    return self.result({"message": "No imports found in file", "changes_made": 0}, success=True)
-                # If adding symbols, we need to create import block
-                imports_start = 0
-                imports_end = 0
-                # Find first non-import line to insert before
-                for i, line in enumerate(lines):
-                    if not line.strip().startswith('#') and not line.strip().startswith('import') and not line.strip().startswith('from'):
-                        imports_start = i
-                        imports_end = i
-                        break
-                else:
-                    # File is empty or only comments
-                    imports_start = 0
-                    imports_end = 0
-
-            import_lines = lines[imports_start:imports_end] if imports_start is not None else []
-            changes_made = 0
-
-            # Parse existing imports to build a set of (module, name) tuples
-            existing_imports = set()  # (module, name) where name is None for module imports
-            for line in import_lines:
-                # Handle 'from X import Y, Z'
-                match = re.search(r'^from\s+(\S+)\s+import\s+(.+)', line)
-                if match:
-                    module = match.group(1)
-                    names = [n.strip().split(' as ')[0].strip() for n in match.group(2).split(',')]
-                    for name in names:
-                        if name:
-                            existing_imports.add((module, name))
-                    # Also add the module itself if it's a relative import
-                    if module.startswith('.'):
-                        existing_imports.add((module, None))
-                # Handle 'import X, Y'
-                match = re.search(r'^import\s+(.+)', line)
-                if match:
-                    modules = [m.strip().split(' as ')[0].strip() for m in match.group(1).split(',')]
-                    for mod in modules:
-                        if mod:
-                            existing_imports.add((mod, None))
-
-            # Remove imports for deleted symbols
-            if removed_symbols:
-                new_import_lines = []
-                for line in import_lines:
-                    should_remove = False
-                    for sym in removed_symbols:
-                        # Check for exact symbol match in import
-                        if re.search(rf'\b{re.escape(sym)}\b', line):
-                            should_remove = True
-                            break
-                    if not should_remove:
-                        new_import_lines.append(line)
-                    else:
-                        changes_made += 1
-                import_lines = new_import_lines
-
-            # Re-parse existing imports after removal
-            existing_imports = set()
-            for line in import_lines:
-                match = re.search(r'^from\s+(\S+)\s+import\s+(.+)', line)
-                if match:
-                    module = match.group(1)
-                    names = [n.strip().split(' as ')[0].strip() for n in match.group(2).split(',')]
-                    for name in names:
-                        if name:
-                            existing_imports.add((module, name))
-                    if module.startswith('.'):
-                        existing_imports.add((module, None))
-                match = re.search(r'^import\s+(.+)', line)
-                if match:
-                    modules = [m.strip().split(' as ')[0].strip() for m in match.group(1).split(',')]
-                    for mod in modules:
-                        if mod:
-                            existing_imports.add((mod, None))
-
-            # Add imports for new symbols
-            if added_symbols:
-                # Group symbols by module for cleaner imports
-                symbols_by_module = {}
-                for sym in added_symbols:
-                    # Check if already imported
-                    already_imported = False
-                    for (module, name) in existing_imports:
-                        if name == sym or module == sym:
-                            already_imported = True
-                            break
-                    
-                    if not already_imported:
-                        # Try to find which module it belongs to
-                        # Default to current module (.)
-                        symbols_by_module.setdefault('.', []).append(sym)
-
-                for module, syms in symbols_by_module.items():
-                    if len(syms) == 1:
-                        import_lines.append(f"from {module} import {syms[0]}\n")
-                    else:
-                        import_lines.append(f"from {module} import {', '.join(syms)}\n")
-                    changes_made += 1
-
-            # Clean up empty lines in import block
-            while import_lines and not import_lines[-1].strip():
-                import_lines.pop()
-            if import_lines and not import_lines[-1].endswith('\n'):
-                import_lines[-1] += '\n'
-
-            lines[imports_start:imports_end] = import_lines
-
-            with open(file_path_str, 'w', encoding='utf-8') as f:
-                f.writelines(lines)
-
-            return self.result({"message": f"Updated {changes_made} import(s)", "changes_made": changes_made}, success=True)
-        except Exception as e:
-            return self.result(f"error: {e}", success=False)
-
     # ==================== System Prompt ====================
 
     async def on_system_prompt(self):
@@ -2058,9 +1927,9 @@ Use in this order:
 
 ### Editing
 Use in this order:
-1. **edit** (preferred) - exact text replacement. Accepts list of {oldText, newText} pairs. Batches allowed.
+1. **edit_symbol / add_symbol_before / add_symbol_after** (preferred) - for inserting/replacing specific symbols.
+2. **edit** - exact text replacement. Use to make granular edits that don't need entire symbol-level rewrites.
 2. **append_to_file** - adds content to end of file.
-3. **edit_symbol / add_symbol_before / add_symbol_after** - for inserting/replacing specific symbols.
 
 ### Searching
 Use in this order:
