@@ -7,8 +7,8 @@ class Modules(core.module.Module):
 
     async def on_system_prompt(self):
         module_list = {
-            "enabled": ", ".join(core.config.get("modules").get("enabled", [])),
-            "disabled": ", ".join(core.config.get("modules").get("disabled", []))
+            "enabled": ", ".join(core.config.get("modules", "enabled", [])),
+            "disabled": ", ".join(core.config.get("modules", "disabled", []))
         }
         return str(module_list)
 
@@ -18,8 +18,8 @@ class Modules(core.module.Module):
 
         module_name = name.lower().strip()
 
-        is_enabled = module_name in core.config.config.get("modules").get("enabled", [])
-        is_disabled = module_name in core.config.config.get("modules").get("disabled", [])
+        is_enabled = module_name in core.config.config.get("modules", "enabled", [])
+        is_disabled = module_name in core.config.config.get("modules", "disabled", [])
 
         if not is_enabled and not is_disabled:
             return "module not found"

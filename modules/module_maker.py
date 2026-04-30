@@ -10,7 +10,7 @@ class ModuleMaker(modules.sandboxed_files.SandboxedFiles):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.sandbox_path = os.path.abspath(core.config.get("user_modules").get("path"))
+        self.sandbox_path = os.path.abspath(core.config.get("user_modules", "path"))
 
     def _get_module_path(self, name):
         return self._get_sandbox_path(f"{name}.py")

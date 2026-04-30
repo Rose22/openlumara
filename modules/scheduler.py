@@ -126,7 +126,7 @@ class Scheduler(core.module.Module):
 
         tools = [
             t for t in self.manager.tools
-            if t.get("function", {}).get("name") != "scheduler_add_job"
+            if t.get("function", {}, "name") != "scheduler_add_job"
         ]
 
         action = job.get("action")
