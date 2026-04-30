@@ -1383,7 +1383,9 @@ async function saveSettings() {
     const saveBtn = document.getElementById('settings-save-btn');
     const btnText = saveBtn.querySelector('.btn-text');
     const btnLoading = saveBtn.querySelector('.btn-loading');
-    const hasNonThemeChanges = detectNonThemeChanges();
+    
+    const hasChannelOrModuleChanges = detectChannelOrModuleChanges();
+    const hasApiOrModelChanges = detectApiOrModelChanges();
 
     saveBtn.disabled = true;
     btnText.style.display = 'none';
@@ -1406,9 +1408,12 @@ async function saveSettings() {
         settingsOriginal = JSON.parse(JSON.stringify(settingsData));
         settingsHasChanges = false;
 
-        if (hasNonThemeChanges) {
+        if (hasChannelOrModuleChanges) {
             showSettingsSuccessWithRestart();
             await restartServer();
+        } else if (hasApiOrModelChanges) {
+            await reconnectApi();
+            toggleModal('settings');
         } else {
             showSettingsSuccess();
         }
@@ -1432,6 +1437,26 @@ async function saveSettings() {
 }
 
 // Detect if there are changes beyond just theme
+// Detect if there are changes in channel or module settings
+function detectChannelOrModuleChanges() {
+    for (const key of ['channels', 'modules', 'user_modules']) {
+        if (settingsData[key] && JSON.stringify(settingsData[key]) !== JSON.stringify(settingsOriginal[key])) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Detect if there are changes in API or model settings
+function detectApiOrModelChanges() {
+    for (const key of ['api', 'model']) {
+        if (settingsData[key] && JSON.stringify(settingsData[key]) !== JSON.stringify(settingsOriginal[key])) {
+            return true;
+        }
+    }
+    return false;
+}
+
 function detectNonThemeChanges() {
     const themeKeys = ['theme', 'theme_mode', 'themeFamily', 'themeMode'];
 
@@ -1488,6 +1513,7 @@ function showSettingsSuccessWithRestart() {
 
     form.insertBefore(success, form.firstChild);
 }
+
 
 // Show restart notification
 function showRestartNotification() {
