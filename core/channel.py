@@ -19,7 +19,7 @@ class Channel:
         self.tc_manager = core.toolcalls.ToolcallManager(self)
 
         # load channel config
-        self.config = core.config.ConfigManager(core.config.get("channels", "settings", self.name))
+        self.config = core.config.ConfigManager(core.config.config, ["channels", "settings", self.name])
 
     async def _set_as_active_channel(self):
         self.manager.channel = self

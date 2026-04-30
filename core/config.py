@@ -67,8 +67,9 @@ DEFAULT_MODULES = (
 DEFAULT_CHANNELS = ["cli", "webui"]
 
 class ConfigManager:
-    def __init__(self, config):
-        self.data = config
+    def __init__(self, config, base_path=None):
+        self.root_config = config
+        self.base_path = base_path or []
 
     def get(self, *args, **kwargs):
         """Shorthand for accessing nested config values.
@@ -83,13 +84,43 @@ class ConfigManager:
         if keys and not isinstance(keys[-1], str) or not keys[-1]:
             default = keys.pop()
 
-        current = self.data
+        # Start from the root config and traverse through the base path
+        current = self.root_config
+        for k in self.base_path:
+            if isinstance(current, dict) and k in current:
+                current = current[k]
+            else:
+                return default
+
+        # Then traverse through the provided keys
         for key in keys:
             if isinstance(current, dict) and key in current:
                 current = current[key]
             else:
                 return default
         return current
+
+    def __getitem__(self, key):
+        """Access items using bracket notation: config['key']"""
+        current = self.root_config
+        for k in self.base_path + [key]:
+            if isinstance(current, dict) and k in current:
+                current = current[k]
+            else:
+                raise KeyError(key)
+        return current
+
+    def __setitem__(self, key, value):
+        """Set items using bracket notation: config['key'] = value"""
+        current = self.root_config
+        for k in self.base_path:
+            if k not in current or not isinstance(current[k], dict):
+                current[k] = {}
+            current = current[k]
+        
+        current[key] = value
+        if hasattr(self.root_config, 'save'):
+            self.root_config.save()
 
 
 def _discover_available_names(package):

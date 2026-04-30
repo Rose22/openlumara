@@ -20,7 +20,7 @@ class Module:
 
         # load module config
         config_target = "modules" if not is_user_module else "user_modules"
-        self.config = core.config.ConfigManager(core.config.get(config_target, "settings", self.name))
+        self.config = core.config.ConfigManager(core.config.config, [config_target, "settings", self.name])
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
