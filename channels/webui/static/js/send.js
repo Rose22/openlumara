@@ -266,6 +266,8 @@ async function send(providedContent = null) {
     const typewriterSpeed = parseInt(localStorage.getItem("typewriterSpeed") ?? "30", 10);
     const useTypewriter = typewriterEnabled && typewriterSpeed > 0;
 
+    const soundEnabled = localStorage.getItem("streamingSoundEnabled") !== 'false';
+
     try {
         const response = await fetch('/stream', {
             method: 'POST',
@@ -318,7 +320,7 @@ async function send(providedContent = null) {
                             // Wait for typewriter to finish before finalizing
                             if (isTypewriterRunning) {
                                 await waitForTypewriter();
-                            } else if (!useTypewriter) {
+                            } else if (!useTypewriter && soundEnabled) {
                                 // Play completion sound if typewriter mode was off
                                 TypewriterAudioManager.play('completion');
                             }
@@ -356,8 +358,6 @@ async function send(providedContent = null) {
                             // Clear processing indicators when content starts
                             clearProcessingIndicators();
 
-                            const streamingSoundEnabled = localStorage.getItem('streamingSoundEnabled') !== 'false';
-
                             appendStreamText('content', token, useTypewriter);
                             if (useTypewriter) {
                                 const activeSeg = streamSegments.find(s => s.id === activeTypewriterSegId);
@@ -372,7 +372,7 @@ async function send(providedContent = null) {
                             }
 
                             // Play sound on every token if streaming sound is enabled AND typewriter mode is OFF
-                            if (!useTypewriter && streamingSoundEnabled && token.trim() !== '') {
+                            if (!useTypewriter && soundEnabled && token.trim() !== '') {
                                 TypewriterAudioManager.play('typewriter');
                             }
                         }
@@ -446,7 +446,7 @@ async function send(providedContent = null) {
 
         if (isTypewriterRunning) {
             await waitForTypewriter();
-        } else if (!useTypewriter) {
+        } else if (!useTypewriter && soundEnabled) {
             // Play completion sound if typewriter mode was off
             TypewriterAudioManager.play('completion');
         }
