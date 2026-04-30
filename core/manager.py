@@ -51,13 +51,13 @@ class Manager:
         self.savedata = core.storage.StorageDict("save", "msgpack")
 
         # retrieve enabled channels from config
-        enabled_channels = core.config.get("channels").get("enabled", [])
+        enabled_channels = core.config.get("channels", "enabled", [])
         if self.args.cli:
             enabled_channels = ["cli"]
 
         # retrieve enabled modules from config
-        enabled_modules = core.config.get("modules").get("enabled", [])
-        enabled_user_modules = core.config.get("user_modules", {}).get("enabled", [])
+        enabled_modules = core.config.get("modules", "enabled", [])
+        enabled_user_modules = core.config.get("user_modules", "enabled", [])
         loaded_module_names = []
 
         if self.pure_mode:

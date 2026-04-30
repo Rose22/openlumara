@@ -66,6 +66,32 @@ DEFAULT_MODULES = (
 
 DEFAULT_CHANNELS = ["cli", "webui"]
 
+class ConfigManager:
+    def __init__(self, config):
+        self.data = config
+
+    def get(self, *args, **kwargs):
+        """Shorthand for accessing nested config values.
+        Usage: config.get("api", "url") or config.get("api", "url", default_value)
+        """
+        default = kwargs.get("default", None)
+        if not args:
+            return default
+
+        keys = list(args)
+        # If the last argument is not a string, or is empty, treat it as an explicit default
+        if keys and not isinstance(keys[-1], str) or not keys[-1]:
+            default = keys.pop()
+
+        current = self.data
+        for key in keys:
+            if isinstance(current, dict) and key in current:
+                current = current[key]
+            else:
+                return default
+        return current
+
+
 def _discover_available_names(package):
     """
     Discover module names from filesystem WITHOUT importing them.
@@ -291,17 +317,31 @@ def load(file_path=None):
         print(f"A new configuration file has been created at {config.path}.")
 
 def get(*args, **kwargs):
-    """shorthand for accessing config values"""
-    global config
-    global default_config
+    """Shorthand for accessing nested config values.
+    Usage: config.get("api", "url") or config.get("api", "url", default_value)
+    """
+    global config, default_config
 
-    if config is None:
-        try:
-            val = default_config
-            for arg in args:
-                val = val[arg]
-            return val
-        except (KeyError, TypeError):
-            return None
+    default = kwargs.get("default", None)
+    if not args:
+        return default
 
-    return config.get(*args, **kwargs)
+    keys = list(args)
+    # If the last argument is not a string, or is empty, treat it as an explicit default
+    if keys and not isinstance(keys[-1], str) or not keys[-1]:
+        default = keys.pop()
+
+    # Safely resolve to a dictionary
+    try:
+        value = dict(config) if config else dict(default_config)
+    except (TypeError, ValueError):
+        value = dict(default_config)
+
+    for key in keys:
+        if isinstance(value, dict) and key in value:
+            value = value[key]
+        else:
+            return default
+    return value
+
+
