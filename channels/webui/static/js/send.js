@@ -267,6 +267,7 @@ async function send(providedContent = null) {
     const useTypewriter = typewriterEnabled && typewriterSpeed > 0;
 
     const soundEnabled = localStorage.getItem("streamingSoundEnabled") !== 'false';
+    let playedCompletionSound = false;
 
     try {
         const response = await fetch('/stream', {
@@ -323,6 +324,7 @@ async function send(providedContent = null) {
                             } else if (!useTypewriter && soundEnabled) {
                                 // Play completion sound if typewriter mode was off
                                 TypewriterAudioManager.play('completion');
+                                playedCompletionSound = true;
                             }
                             finalizeAllContent();
                             collapseFinishedReasoning(aiMsgDiv);
@@ -446,7 +448,7 @@ async function send(providedContent = null) {
 
         if (isTypewriterRunning) {
             await waitForTypewriter();
-        } else if (!useTypewriter && soundEnabled) {
+        } else if (!useTypewriter && !playedCompletionSound && soundEnabled) {
             // Play completion sound if typewriter mode was off
             TypewriterAudioManager.play('completion');
         }
