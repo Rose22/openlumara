@@ -1,13 +1,2 @@
-openai
-tiktoken
-prompt_toolkit
-msgpack
-pyyaml
-json-repair
-aiofiles
-python-ulid
-requests
-flask
-discord.py
-python-telegram-bot
 matrix-nio[e2e]
+simplematrixbotlib
