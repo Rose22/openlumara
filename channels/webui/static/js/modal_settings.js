@@ -2247,9 +2247,8 @@ function createThemeSection() {
     wrapper.appendChild(typographySection);
 
     // ==========================================================================
-    // TYPEWRITER / AUDIO SETTINGS SECTION
+    // AUDIO SETTINGS SECTION
     // ==========================================================================
-
     const audioSection = document.createElement('div');
     audioSection.className = 'audio-settings-section';
 
@@ -2264,111 +2263,43 @@ function createThemeSection() {
     </svg>
     </div>
     <div class="settings-section-title">
-    <h4>Typewriter Effect</h4>
-    <p>Configure text streaming animation and sounds</p>
+    <h4>Sound Effects</h4>
+    <p>Configure sound effects</p>
     </div>
     `;
     audioSection.appendChild(audioHeader);
 
-    // Enable/Disable Toggle
-    const savedTypewriterEnabled = localStorage.getItem('typewriterEnabled') !== 'false';
+    audioControls = document.createElement('div');
+    audioControls.className = 'settings-control-group';
 
-    const twToggleRow = document.createElement('div');
-    twToggleRow.className = 'toggle-row';
-    twToggleRow.innerHTML = `
+    // Streaming Sound Toggle
+    const savedStreamingSoundEnabled = localStorage.getItem('streamingSoundEnabled') !== 'false';
+
+    const streamingSoundToggleRow = document.createElement('div');
+    streamingSoundToggleRow.className = 'toggle-row';
+    streamingSoundToggleRow.innerHTML = `
     <div class="toggle-info">
-    <span class="toggle-label">Enable</span>
-    <span class="toggle-description">Simulate typing by showing one character at a time</span>
+    <span class="toggle-label">Enable Streaming Sound</span>
+    <span class="toggle-description">Play typing sound on every token during streaming, even without typewriter animation</span>
     </div>
     <label class="toggle-switch">
-    <input type="checkbox" id="typewriter-enabled-checkbox" ${savedTypewriterEnabled ? 'checked' : ''}>
+    <input type="checkbox" id="streaming-sound-enabled-checkbox" ${savedStreamingSoundEnabled ? 'checked' : ''}>
     <span class="toggle-slider"></span>
     </label>
     `;
 
-    const twCheckbox = twToggleRow.querySelector('#typewriter-enabled-checkbox');
-
-    // Controls Container (show/hide based on toggle)
-    const twControls = document.createElement('div');
-    twControls.className = 'audio-control-group';
-    twControls.style.display = savedTypewriterEnabled ? 'flex' : 'none';
-
-    // ==========================================================================
-    // SWEEP FADE TOGGLE
-    // ==========================================================================
-
-    const fadeEnabled = localStorage.getItem('typewriterFadeEnabled') === 'true';
-
-    const fadeToggleRow = document.createElement('div');
-    fadeToggleRow.className = 'toggle-row';
-    fadeToggleRow.innerHTML = `
-    <div class="toggle-info">
-    <span class="toggle-label">Fade</span>
-    <span class="toggle-description">Letters fade in smoothly as they appear</span>
-    </div>
-    <label class="toggle-switch">
-    <input type="checkbox" id="typewriter-fade-checkbox" ${fadeEnabled ? 'checked' : ''}>
-    <span class="toggle-slider"></span>
-    </label>
-    `;
-
-    const fadeCheckbox = fadeToggleRow.querySelector('#typewriter-fade-checkbox');
-    fadeCheckbox.addEventListener('change', function() {
-        localStorage.setItem('typewriterFadeEnabled', this.checked ? 'true' : 'false');
+    const streamingSoundCheckbox = streamingSoundToggleRow.querySelector('#streaming-sound-enabled-checkbox');
+    streamingSoundCheckbox.addEventListener('change', function() {
+        localStorage.setItem('streamingSoundEnabled', this.checked ? 'true' : 'false');
     });
 
-    twControls.appendChild(fadeToggleRow);
-
-    // Speed Slider
-    const currentSpeed = parseInt(localStorage.getItem("typewriterSpeed") ?? "30", 10);
-    const minSpeed = 1;
-    const maxSpeed = 200;
-    const speedPercentage = ((currentSpeed - minSpeed) / (maxSpeed - minSpeed)) * 100;
-
-    const speedRow = document.createElement('div');
-    speedRow.className = 'slider-row';
-    speedRow.innerHTML = `
-    <div class="slider-header">
-    <span class="slider-label">Speed</span>
-    <span class="slider-value" id="typewriter-speed-value">${currentSpeed}ms</span>
-    </div>
-    <div class="slider-track-wrapper">
-    <div class="slider-track">
-    <input type="range" class="slider-input" id="typewriter-speed-slider"
-    min="${minSpeed}" max="${maxSpeed}" value="${currentSpeed}">
-    <div class="slider-fill" id="speed-fill" style="width: ${speedPercentage}%"></div>
-    <div class="slider-handle" id="speed-handle" style="left: ${speedPercentage}%"></div>
-    </div>
-    <div class="slider-labels">
-    <span>Fast</span>
-    <span>Slow</span>
-    </div>
-    </div>
-    `;
-
-    const speedSlider = speedRow.querySelector('#typewriter-speed-slider');
-    const speedDisplay = speedRow.querySelector('#typewriter-speed-value');
-    const speedFill = speedRow.querySelector('#speed-fill');
-    const speedHandle = speedRow.querySelector('#speed-handle');
-
-    speedSlider.addEventListener('input', function() {
-        const val = parseInt(this.value);
-        const percentage = ((val - minSpeed) / (maxSpeed - minSpeed)) * 100;
-        speedDisplay.textContent = `${val}ms`;
-        speedFill.style.width = `${percentage}%`;
-        speedHandle.style.left = `${percentage}%`;
-        localStorage.setItem('typewriterSpeed', val);
-    });
-
-    twControls.appendChild(speedRow);
+    audioControls.appendChild(streamingSoundToggleRow);
 
     // Volume Control
     const currentVolume = Math.round((parseFloat(localStorage.getItem('typewriterVolume') || '1.0')) * 100);
 
     // Sync volume with manager on load
-    if (savedTypewriterEnabled) {
-        TypewriterAudioManager.setVolume(currentVolume / 100);
-    }
+    TypewriterAudioManager.setVolume(currentVolume / 100);
 
     const volumeRow = document.createElement('div');
     volumeRow.className = 'slider-row volume-row';
@@ -2429,7 +2360,7 @@ function createThemeSection() {
         localStorage.setItem('typewriterVolume', val / 100);
     });
 
-    twControls.appendChild(volumeRow);
+    audioControls.appendChild(volumeRow);
 
     // Sound File Inputs
     const soundContainer = document.createElement('div');
@@ -2571,13 +2502,134 @@ function createThemeSection() {
         'Completion Sound',
         completionIcon,
         localStorage.getItem("completionSoundName")
-    );
+    );1
+
     soundContainer.appendChild(compSoundInput);
 
-    twControls.appendChild(soundContainer);
-    audioSection.appendChild(twToggleRow);
-    audioSection.appendChild(twControls);
+    audioControls.appendChild(soundContainer);
+
+    audioSection.appendChild(audioControls);
+
     wrapper.appendChild(audioSection);
+
+    // ==========================================================================
+    // TYPEWRITER SETTINGS SECTION
+    // ==========================================================================
+
+    const twSection = document.createElement('div');
+    twSection.className = 'audio-settings-section';
+
+    const twHeader = document.createElement('div');
+    twHeader.className = 'settings-section-header';
+    twHeader.innerHTML = `
+    <div class="settings-section-icon audio-icon">
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+    <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+    <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+    </svg>
+    </div>
+    <div class="settings-section-title">
+    <h4>Typewriter Effect</h4>
+    <p>Configure text streaming animation and sounds</p>
+    </div>
+    `;
+    twSection.appendChild(twHeader);
+
+    // Enable/Disable Toggle
+    const savedTypewriterEnabled = localStorage.getItem('typewriterEnabled') !== 'false';
+
+    const twToggleRow = document.createElement('div');
+    twToggleRow.className = 'toggle-row';
+    twToggleRow.innerHTML = `
+    <div class="toggle-info">
+    <span class="toggle-label">Enable</span>
+    <span class="toggle-description">Simulate typing by showing one character at a time</span>
+    </div>
+    <label class="toggle-switch">
+    <input type="checkbox" id="typewriter-enabled-checkbox" ${savedTypewriterEnabled ? 'checked' : ''}>
+    <span class="toggle-slider"></span>
+    </label>
+    `;
+
+    const twCheckbox = twToggleRow.querySelector('#typewriter-enabled-checkbox');
+
+    // Controls Container (show/hide based on toggle)
+    const twControls = document.createElement('div');
+    twControls.className = 'audio-control-group';
+    twControls.style.display = savedTypewriterEnabled ? 'flex' : 'none';
+
+    // ==========================================================================
+    // SWEEP FADE TOGGLE
+    // ==========================================================================
+
+    const fadeEnabled = localStorage.getItem('typewriterFadeEnabled') === 'true';
+
+    const fadeToggleRow = document.createElement('div');
+    fadeToggleRow.className = 'toggle-row';
+    fadeToggleRow.innerHTML = `
+    <div class="toggle-info">
+    <span class="toggle-label">Fade</span>
+    <span class="toggle-description">Letters fade in smoothly as they appear</span>
+    </div>
+    <label class="toggle-switch">
+    <input type="checkbox" id="typewriter-fade-checkbox" ${fadeEnabled ? 'checked' : ''}>
+    <span class="toggle-slider"></span>
+    </label>
+    `;
+
+    const fadeCheckbox = fadeToggleRow.querySelector('#typewriter-fade-checkbox');
+    fadeCheckbox.addEventListener('change', function() {
+        localStorage.setItem('typewriterFadeEnabled', this.checked ? 'true' : 'false');
+    });
+
+    twControls.appendChild(fadeToggleRow);
+
+    // Speed Slider
+    const currentSpeed = parseInt(localStorage.getItem("typewriterSpeed") ?? "30", 10);
+    const minSpeed = 1;
+    const maxSpeed = 200;
+    const speedPercentage = ((currentSpeed - minSpeed) / (maxSpeed - minSpeed)) * 100;
+
+    const speedRow = document.createElement('div');
+    speedRow.className = 'slider-row';
+    speedRow.innerHTML = `
+    <div class="slider-header">
+    <span class="slider-label">Speed</span>
+    <span class="slider-value" id="typewriter-speed-value">${currentSpeed}ms</span>
+    </div>
+    <div class="slider-track-wrapper">
+    <div class="slider-track">
+    <input type="range" class="slider-input" id="typewriter-speed-slider"
+    min="${minSpeed}" max="${maxSpeed}" value="${currentSpeed}">
+    <div class="slider-fill" id="speed-fill" style="width: ${speedPercentage}%"></div>
+    <div class="slider-handle" id="speed-handle" style="left: ${speedPercentage}%"></div>
+    </div>
+    <div class="slider-labels">
+    <span>Fast</span>
+    <span>Slow</span>
+    </div>
+    </div>
+    `;
+
+    const speedSlider = speedRow.querySelector('#typewriter-speed-slider');
+    const speedDisplay = speedRow.querySelector('#typewriter-speed-value');
+    const speedFill = speedRow.querySelector('#speed-fill');
+    const speedHandle = speedRow.querySelector('#speed-handle');
+
+    speedSlider.addEventListener('input', function() {
+        const val = parseInt(this.value);
+        const percentage = ((val - minSpeed) / (maxSpeed - minSpeed)) * 100;
+        speedDisplay.textContent = `${val}ms`;
+        speedFill.style.width = `${percentage}%`;
+        speedHandle.style.left = `${percentage}%`;
+        localStorage.setItem('typewriterSpeed', val);
+    });
+
+    twControls.appendChild(speedRow);
+    twSection.appendChild(twToggleRow);
+    twSection.appendChild(twControls);
+    wrapper.appendChild(twSection);
 
     // Toggle handler - show/hide controls with display: none
     twCheckbox.addEventListener('change', function() {

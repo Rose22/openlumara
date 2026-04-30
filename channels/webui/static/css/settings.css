@@ -1539,7 +1539,8 @@
  *  ========================================================================== */
 
 .typography-settings-section,
-.audio-settings-section {
+.audio-settings-section,
+.streaming-sound-section {
     padding: 20px;
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
@@ -1547,6 +1548,10 @@
 }
 
 .audio-settings-section {
+    margin-top: 20px;
+}
+
+.streaming-sound-section {
     margin-top: 20px;
 }
 
@@ -1574,6 +1579,11 @@
 
 .settings-section-icon.audio-icon {
     background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+}
+
+.settings-section-icon.streaming-sound-icon {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
     color: white;
 }
 
@@ -2070,7 +2080,8 @@
 /* Responsive */
 @media (max-width: 600px) {
     .typography-settings-section,
-    .audio-settings-section {
+    .audio-settings-section,
+    .streaming-sound-section {
         padding: 16px;
     }
 

@@ -619,7 +619,7 @@ def delete_message():
 
     messages = _run_async(channel_instance.context.chat.get())
 
-    if 0 <= index < len(messages):
+    if 0 <= int(index) < len(messages):
         if messages[index].get('role') not in ('user', 'assistant', 'command', 'command_response'):
             if not messages[index].get('role', '').startswith('announce_'):
                 return jsonify({'success': False, 'error': 'Cannot delete this message type'})

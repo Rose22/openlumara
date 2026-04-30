@@ -318,6 +318,9 @@ async function send(providedContent = null) {
                             // Wait for typewriter to finish before finalizing
                             if (isTypewriterRunning) {
                                 await waitForTypewriter();
+                            } else if (!useTypewriter) {
+                                // Play completion sound if typewriter mode was off
+                                TypewriterAudioManager.play('completion');
                             }
                             finalizeAllContent();
                             collapseFinishedReasoning(aiMsgDiv);
@@ -353,6 +356,8 @@ async function send(providedContent = null) {
                             // Clear processing indicators when content starts
                             clearProcessingIndicators();
 
+                            const streamingSoundEnabled = localStorage.getItem('streamingSoundEnabled') !== 'false';
+
                             appendStreamText('content', token, useTypewriter);
                             if (useTypewriter) {
                                 const activeSeg = streamSegments.find(s => s.id === activeTypewriterSegId);
@@ -364,6 +369,11 @@ async function send(providedContent = null) {
                                 }
                             } else {
                                 renderStreamSegments(aiMsgDiv);
+                            }
+
+                            // Play sound on every token if streaming sound is enabled AND typewriter mode is OFF
+                            if (!useTypewriter && streamingSoundEnabled && token.trim() !== '') {
+                                TypewriterAudioManager.play('typewriter');
                             }
                         }
                     }
@@ -436,6 +446,9 @@ async function send(providedContent = null) {
 
         if (isTypewriterRunning) {
             await waitForTypewriter();
+        } else if (!useTypewriter) {
+            // Play completion sound if typewriter mode was off
+            TypewriterAudioManager.play('completion');
         }
 
         // Only finalize if not already done via commit
