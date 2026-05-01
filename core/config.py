@@ -49,7 +49,6 @@ default_config = {
 }
 
 DEFAULT_MODULES = (
-    "openlumara_prompt",
     "identity",
     "models",
     "channel",

@@ -11,7 +11,7 @@ class Memory(core.module.Module):
     """Gives your AI a persistent memory system"""
 
     settings = {
-        "put_memory_autonomy_instructions_in_system_prompt": True,
+        "put_memory_autonomy_instructions_in_system_prompt": False,
         "put_pinned_memories_in_system_prompt": True,
         "max_pinned_memories": 20
     }
@@ -50,7 +50,8 @@ class Memory(core.module.Module):
                 count += 1
 
             pinned = [f"{m['id']}:\n{m['content']}" for m in prompt_mem_list]
-            pinned_str = "\n\n".join(pinned)+"\n\n" or "There are currently no pinned memories.\n\n"
+            pinned_str = "\n\n".join(pinned) or "There are currently no pinned memories."
+            pinned_str+="\n\n"
 
         if not pinned_str and not automem_prompt:
             return None
