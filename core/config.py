@@ -59,7 +59,7 @@ DEFAULT_MODULES = (
     "lists",
     "system",
     "scheduler",
-    "tokens",
+    "token_threshold",
     "time"
 )
 
