@@ -725,8 +725,11 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         except Exception as e:
             core.log("coder", f"Backup cleanup failed: {e}")
 
-    async def restore_backup(self, project_name: str, file_path: list) -> dict:
-        """Restores a file from backup. If backup_path is None, restores from the most recent backup."""
+    async def restore_backup(self, project_name: str, file_path: list, version_index: int = 0) -> dict:
+        """Restores a file from backup. 
+        If version_index is 0, restores from the most recent backup. 
+        Otherwise, restores the backup at the specified index (from the list provided by list_backups).
+        """
         file_path_str = self._get_file_path(project_name, file_path)
 
         if not os.path.exists(file_path_str):
@@ -740,10 +743,16 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
                 if f.startswith(basename + ".") and f.endswith(".bak"):
                     full_path = os.path.join(backup_dir, f)
                     backups.append((os.path.getmtime(full_path), full_path))
+            
             if not backups:
                 return {"success": False, "error": "No backups found"}
-            backups.sort(reverse=True)
-            backup_path = backups[0][1]
+            
+            backups.sort(reverse=True)  # newest first
+            
+            if version_index < 0 or version_index >= len(backups):
+                return {"success": False, "error": f"Invalid version index. Available indices: 0 to {len(backups)-1}"}
+            
+            backup_path = backups[version_index][1]
 
             shutil.copy2(backup_path, file_path_str)
             return {
@@ -752,6 +761,42 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             }
         except Exception as e:
             return {"success": False, "error": f"Restore failed: {e}"}
+    async def list_backups(self, project_name: str, file_path: list) -> dict:
+        """Lists available backups for a file, ordered from newest to oldest."""
+        file_path_str = self._get_file_path(project_name, file_path)
+        if not os.path.exists(file_path_str):
+             return {"success": False, "error": "File does not exist"}
+
+        try:
+            backup_dir = self._get_backup_dir()
+            basename = os.path.basename(file_path_str)
+            backups = []
+            for f in os.listdir(backup_dir):
+                if f.startswith(basename + ".") and f.endswith(".bak"):
+                    full_path = os.path.join(backup_dir, f)
+                    mtime = os.path.getmtime(full_path)
+                    backups.append({
+                        "mtime": mtime,
+                        "filename": os.path.basename(f),
+                        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(mtime))
+                    })
+
+            if not backups:
+                return {"success": True, "backups": []}
+
+            # Sort by mtime descending (newest first)
+            backups.sort(key=lambda x: x["mtime"], reverse=True)
+
+            # Add index to each backup for easy selection
+            for i, b in enumerate(backups):
+                b["index"] = i
+                del b["mtime"]
+
+            return {"success": True, "backups": backups}
+        except Exception as e:
+            return {"success": False, "error": f"List backups failed: {e}"}
+
+
 
     # ==================== Symbol Helpers ====================
 
@@ -786,8 +831,11 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         for child in node.children:
             self._walk_for_symbols(child, language, symbols, prefix=prefix)
 
-    def _find_symbol_line(self, file_path_str: str, symbol_name: str, language: str) -> Optional[int]:
-        """Helper to find the line number of a symbol by its name."""
+    def _find_symbol_info(self, file_path_str: str, symbol_name: str, language: str) -> Optional[Tuple[Optional[Any], int]]:
+        """
+        Find a symbol by name and return its node (if Tree-sitter is used) and line number.
+        Returns (node, line_number) or (None, line_number) for regex fallback, or None if not found.
+        """
         if HAS_TREE_SITTER and language in LANGUAGE_MAP:
             try:
                 result = self._parse_file(file_path_str, language)
@@ -827,7 +875,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
                 find_node(tree.root_node, parts)
                 if target_node:
-                    return target_node.start_point[0] + 1
+                    return (target_node, target_node.start_point[0] + 1)
             except Exception:
                 pass
 
@@ -847,11 +895,16 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
                     for pattern, sym_type in patterns:
                         match = re.search(pattern, line)
                         if match and match.group(1) == last_part:
-                            return idx + 1
+                            return (None, idx + 1)
         except Exception:
             pass
 
         return None
+
+    def _find_symbol_line(self, file_path_str: str, symbol_name: str, language: str) -> Optional[int]:
+        """Helper to find the line number of a symbol by its name."""
+        info = self._find_symbol_info(file_path_str, symbol_name, language)
+        return info[1] if info else None
 
     def _find_symbol_end_line(self, lines, start_idx: int, body_type: str) -> int:
         """
@@ -1360,7 +1413,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         if not os.path.exists(file_path_str):
             return self.result("error: file does not exist", success=False)
 
-        await self._backup_file(file_path_str)
+        backup_path = await self._backup_file(file_path_str)
 
         if not language:
             language = self._get_language_from_ext(file_path_str)
@@ -1382,7 +1435,10 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
                 is_valid, error = self._verify_syntax(file_path_str)
                 if not is_valid:
-                    return self.result(f"error: {error}. The edit was applied but the file contains syntax errors.", success=False)
+                    if backup_path and os.path.exists(backup_path):
+                        shutil.copy2(backup_path, file_path_str)
+                        return self.result(f"error: {error}. The edit was rolled back due to syntax errors.", success=False)
+                    return self.result(f"error: {error}. The edit was applied but the file contains syntax errors (and no backup could be used for rollback).", success=False)
 
                 return self.result(f"Symbol '{symbol_name}' edited in {os.path.join(project_name, *file_path)}", success=True)
 
@@ -1411,7 +1467,10 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
             is_valid, error = self._verify_syntax(file_path_str)
             if not is_valid:
-                return self.result(f"error: {error}. The edit was applied but the file contains syntax errors.", success=False)
+                if backup_path and os.path.exists(backup_path):
+                    shutil.copy2(backup_path, file_path_str)
+                    return self.result(f"error: {error}. The edit was rolled back due to syntax errors.", success=False)
+                return self.result(f"error: {error}. The edit was applied but the file contains syntax errors (and no backup could be used for rollback).", success=False)
 
             return self.result(f"Symbol '{symbol_name}' edited in {os.path.join(project_name, *file_path)}", success=True)
         except Exception as e:
@@ -1422,6 +1481,10 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             return self.result("error: Symbol adding is disabled.", success=False)
 
         file_path_str = self._get_file_path(project_name, file_path)
+        if not os.path.exists(file_path_str):
+            return self.result("error: file does not exist", success=False)
+
+        backup_path = await self._backup_file(file_path_str)
 
         if not language:
             language = self._get_language_from_ext(file_path_str)
@@ -1475,7 +1538,10 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
             is_valid, error = self._verify_syntax(file_path_str)
             if not is_valid:
-                return self.result(f"error: {error}. The symbol was added but the file contains syntax errors.", success=False)
+                if backup_path and os.path.exists(backup_path):
+                    shutil.copy2(backup_path, file_path_str)
+                    return self.result(f"error: {error}. The symbol was added but the file contains syntax errors. Rolled back.", success=False)
+                return self.result(f"error: {error}. The symbol was added but the file contains syntax errors (and no backup could be used for rollback).", success=False)
 
             return self.result(f"Symbol '{name}' added before '{target_symbol_name}'", success=True)
         except Exception as e:
@@ -1488,6 +1554,8 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
             return self.result("error: file does not exist", success=False)
+
+        backup_path = await self._backup_file(file_path_str)
 
         if not language:
             language = self._get_language_from_ext(file_path_str)
@@ -1546,7 +1614,10 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
             is_valid, error = self._verify_syntax(file_path_str)
             if not is_valid:
-                return self.result(f"error: {error}. The symbol was added but the file contains syntax errors.", success=False)
+                if backup_path and os.path.exists(backup_path):
+                    shutil.copy2(backup_path, file_path_str)
+                    return self.result(f"error: {error}. The symbol was added but the file contains syntax errors. Rolled back.", success=False)
+                return self.result(f"error: {error}. The symbol was added but the file contains syntax errors (and no backup could be used for rollback).", success=False)
 
             return self.result(f"Symbol '{name}' added after '{target_symbol_name}'", success=True)
         except Exception as e:
@@ -1699,7 +1770,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         if not os.path.exists(file_path_str):
             return self.result("error: file does not exist", success=False)
 
-        await self._backup_file(file_path_str)
+        backup_path = await self._backup_file(file_path_str)
 
         try:
             with open(file_path_str, 'r', encoding='utf-8') as f:
@@ -1715,7 +1786,10 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
             is_valid, error = self._verify_syntax(file_path_str)
             if not is_valid:
-                return self.result(f"error: {error}. The edit was applied but the file contains syntax errors.", success=False)
+                if backup_path and os.path.exists(backup_path):
+                    shutil.copy2(backup_path, file_path_str)
+                    return self.result(f"error: {error}. The edit was rolled back due to syntax errors.", success=False)
+                return self.result(f"error: {error}. The edit was applied but the file contains syntax errors (and no backup could be used for rollback).", success=False)
 
             return self.result(f"Successfully applied edit to {os.path.join(project_name, *file_path)}", success=True)
 
@@ -1921,7 +1995,11 @@ Use in this order:
 Use in this order:
 1. **edit_symbol / add_symbol_before / add_symbol_after** (preferred) - for inserting/replacing specific symbols.
 2. **edit** - exact text replacement. Use to make granular edits that don't need entire symbol-level rewrites.
-2. **append_to_file** - adds content to end of file.
+3. **append_to_file** - adds content to end of file.
+
+### Backup & Rollback
+1. **list_backups** - see available versions.
+2. **restore_backup** - roll back using a version index.
 
 ### Searching
 Use in this order:
