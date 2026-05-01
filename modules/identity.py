@@ -13,10 +13,11 @@ class Identity(core.module.Module):
             return None
 
         identity = "\n".join(self.identity) if len(self.identity) > 0 else None
-        sysprompt = None
-        if identity:
-            sysprompt = f"{identity}\nYou can use the identity_set() tool to modify this identity if needed."
-        return sysprompt
+
+        if not identity:
+            return None
+
+        return identity
 
     async def set(self, content: str):
         """Defines who you are as an AI. Also defines your writing style, so save style writing details to your identity. Only call this if user explicitly asks for it. When defining your identity, ALWAYS start with "You are". Give yourself a name. Make one up if user doesn't provide it. Don't use words like "i", "i'm" or "i am". Write in 2nd person when using this tool.
