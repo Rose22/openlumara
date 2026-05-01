@@ -12,7 +12,11 @@ class Characters(core.module.Module):
         super().__init__(*args, **kwargs)
         self.characters = core.storage.StorageDict("characters", type="json")
         self.user_profile = core.storage.StorageDict("character_user", "json")
-        self._header = "Profiles"
+        self.active = False
+
+        if self.config.get("put_character_list_in_system_prompt"):
+            # disable character listing tool
+            self.disabled_tools.append("get_all")
 
     @core.module.command("characters")
     async def _list_characters(self, args: list = []):
@@ -50,6 +54,9 @@ class Characters(core.module.Module):
         characters = "\n".join(char_list)
         return characters
 
+    async def get_all(self):
+        return self.result(await self._list_characters())
+
     @core.module.command("character", help={
         "": "show current character",
         "<name>": "switch to character <name>",
@@ -59,12 +66,14 @@ class Characters(core.module.Module):
         name = " ".join(args)
         if not name:
             char = await self.channel.context.chat.get_data("character")
+            self.active = True
             if char:
                 return f"currently active character: {char}"
             else:
                 return "please provide a character name."
         elif name in("reset", "default"):
                 await self.channel.context.chat.set_data("character", "")
+                self.active = False
                 return "character has been reset to default"
 
         character = self._find_character(name)
@@ -74,19 +83,27 @@ class Characters(core.module.Module):
         return f"character switched to {character}"
 
     async def on_system_prompt(self):
-        if not self.config.get("put_character_list_in_system_prompt"):
-            return None
+        self._header = "Identity" if self.active else "Characters"
 
         curr_char = self.characters.get(await self.channel.context.chat.get_data("character"))
-        tool_text = f"Characters available to switch yourself to:\n{await self._list_characters()}" if core.config.get("model", {}).get("use_tools") and not curr_char else ""
-        if not curr_char: return tool_text
+        tool_text = f"Characters available to switch yourself to:\n{await self._list_characters()}" if (
+            core.config.get("model", {}).get("use_tools") and
+            self.config.get("put_character_list_in_system_prompt") and
+            not curr_char
+        ) else ""
+
+        if not curr_char:
+            return tool_text or None
+
         char_name = await self.channel.context.chat.get_data("character")
-        char_profile = self.characters.get(char_name, {}).get("identity", "")
+        char_profile = self._rewrite_character(char_name, self.characters.get(char_name, {}).get("identity", ""))
+
         user_name = self.user_profile.get("name", "User")
         prefs = self.user_profile.get("preferences", "")
-        char_text = f"Name: {char_name}\nProfile: {char_profile}\n\nWrite your replies as {char_name} in a chat between {char_name} and {user_name}. {prefs}"
-        user_prof = f"## User\nName: {self.user_profile.get('name')}\nProfile: {self.user_profile.get('profile')}" if self.user_profile else ""
-        return f"{user_prof}\n\n## You\n{char_text}\n\n{tool_text}"
+
+        char_text = f"You are {char_name}. You are talking to {user_name}.\n\n{char_profile}\n\n{prefs}\n{tool_text}"
+
+        return char_text
 
     async def switch(self, name: str):
         """Switches you to a different character. This will change your personality! Use this if user requests it."""
@@ -96,13 +113,16 @@ class Characters(core.module.Module):
         character = self.characters.get(name)
         await self.channel.context.chat.set_data("character", name)
 
+        self.active = True
+
         user_name = self.user_profile.get("name", "User")
         preferences = self.user_profile.get("preferences", "")
-        return self.result(str({"instructions": f"Write your next reply as {name} in a chat between {name} and {user_name}. {preferences}", "character": self._rewrite_character(name, character.get("identity"))}))
+        return self.result(f"Switch successful. Write your response as the character's first message.")
     
     async def switch_to_default(self):
         """Switches you back to your default identity."""
         await self.channel.context.chat.set_data("character", "")
+        self.active = False
         return "success"
 
     def _case_insensitive_replace(self, text, old, new):
@@ -153,11 +173,8 @@ class Characters(core.module.Module):
             "{char}": name,
             "{{user}}": user_name,
             "{user}": user_name,
-            "you are": f"{name} is",
-            "you should": f"{name} should",
-            "you must": f"{name} must",
-            "you want": f"{name} wants",
-            "you have": f"{name} has"
+            "you": name,
+            "user": user_name
         }
 
         for word, replacement in replacement_map.items():
@@ -166,7 +183,7 @@ class Characters(core.module.Module):
         return character
 
     async def add(self, name: str, character: str, category: str):
-        """Adds a new character to your character storage. Defines who you are as an AI. Also defines your writing style. Use {char} to refer to yourself. Use {user} to refer to the user."""
+        """Adds a new character to your character storage. Defines who you are as an AI. Also defines your writing style. Use `{char}` to refer to yourself. Use `{user}` to refer to the user."""
         if not name.strip():
             return self.result("character name cannot be empty", False)
 
@@ -184,20 +201,20 @@ class Characters(core.module.Module):
         self.characters.save()
         return self.result("character added")
 
-    # async def read(self, name: str):
-    #     """
-    #     Reads a character profile.
-    #     DO NOT use if trying to read the character you're currently switched to!
-    #     ALWAYS use before editing a character!
-    #     """
-    #     char_name = self._find_character(name)
-    #     if not char_name:
-    #         return "character does not exist!"
-    #
-    #     character = self.characters[char_name]
-    #     character_profile = character.get("identity", "")
-    #
-    #     return self.result(character_profile)
+    async def read(self, name: str):
+        """
+        Reads a character profile.
+        DO NOT use if trying to read the character you're currently switched to!
+        ALWAYS use before editing a character!
+        """
+        char_name = self._find_character(name)
+        if not char_name:
+            return "character does not exist!"
+
+        character = self.characters[char_name]
+        character_profile = character.get("identity", "")
+
+        return self.result(character_profile)
 
     async def edit(self, name: str, category: str, character: str):
         """Edits an existing character. Use ONLY if user explicitly requests it. When using this tool, write out the full character definition. This tool fully replaces the definition! Don't summarize a character definition. Write out the FULL profile. Use {char} to refer to yourself. Use {user} to refer to the user."""
@@ -222,17 +239,17 @@ class Characters(core.module.Module):
             return self.result(f"character {name} deleted")
         return self.result("character doesn't exist!", False)
 
-    async def set_user_profile(self, name: str, profile: str):
+    async def set_user_name(self, name: str):
         self.user_profile["name"] = name
-        self.user_profile["profile"] = profile
         self.user_profile.save()
-        return self.result("profile set")
-    async def clear_user_profile(self):
-        """Clears the profile of the user. ONLY use if user explicitly asks for it!"""
-        del(self.user_profile["name"])
-        del(self.user_profile["profile"])
+        return self.result("name set")
+
+    @core.module.command("username")
+    async def cmd_set_user_name(self, args: list):
+        name = " ".join(args)
+        self.user_profile["preferences"] = preferences
         self.user_profile.save()
-        return self.result("profile cleared")
+        return "Your name has been set!"
 
     async def set_preferences(self, preferences: str):
         """Sets any preferences the user has for the writing style and tone of the characters. e.g. "Write your replies in a short, easy to understand style, in at most 2 paragraphs."""
