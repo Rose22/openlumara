@@ -14,6 +14,8 @@ class Characters(core.module.Module):
         self.user_profile = core.storage.StorageDict("character_user", "json")
         self.active = False
 
+        self._header = "Identity"
+
         if self.config.get("put_character_list_in_system_prompt"):
             # disable character listing tool
             self.disabled_tools.append("get_all")
@@ -83,8 +85,6 @@ class Characters(core.module.Module):
         return f"character switched to {character}"
 
     async def on_system_prompt(self):
-        self._header = "Identity" if self.active else "Characters"
-
         curr_char = await self.channel.context.chat.get_data("character")
 
         tool_text = f"Characters available to switch yourself to:\n{await self._list_characters()}" if (
