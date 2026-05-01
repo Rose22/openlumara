@@ -85,7 +85,8 @@ class Characters(core.module.Module):
     async def on_system_prompt(self):
         self._header = "Identity" if self.active else "Characters"
 
-        curr_char = self.characters.get(await self.channel.context.chat.get_data("character"))
+        curr_char = await self.channel.context.chat.get_data("character")
+
         tool_text = f"Characters available to switch yourself to:\n{await self._list_characters()}" if (
             core.config.get("model", {}).get("use_tools") and
             self.config.get("put_character_list_in_system_prompt") and
@@ -97,6 +98,7 @@ class Characters(core.module.Module):
 
         char_name = await self.channel.context.chat.get_data("character")
         char_profile = self._rewrite_character(char_name, self.characters.get(char_name, {}).get("identity", ""))
+        char_profile = char_profile.replace("\\n", "\n")
 
         user_name = self.user_profile.get("name", "User")
         prefs = self.user_profile.get("preferences", "")
@@ -213,6 +215,7 @@ class Characters(core.module.Module):
 
         character = self.characters[char_name]
         character_profile = character.get("identity", "")
+        character_profile = character_profile.replace("\\n", "\n")
 
         return self.result(character_profile)
 
