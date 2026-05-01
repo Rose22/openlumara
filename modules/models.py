@@ -3,34 +3,27 @@ import core
 class Models(core.module.Module):
     """Lets you or the AI switch between AI models"""
 
-    settings = {
-        "put_model_list_in_system_prompt": True
-    }
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.models = None
 
-    async def on_system_prompt(self):
-        """Returns a list of AI/LLM models available to switch to"""
-        if not self.config.get("put_model_list_in_system_prompt"):
-            return None
-
+    async def _load_models(self):
         if not self.models:
             models = await self.manager.API.list_models()
             if not models:
                 return None
             self.models = models
 
-        current_model = self.manager.API.get_model()
-        if len(self.models) > 1:
-            output = f"Current model: {current_model}\nModels you can switch to using the models_switch() toolcall: "
-            output += ", ".join(self.models)
-        else:
-            self._header = "current model"
-            output = current_model
+    async def get_available(self):
+        """Returns a list of AI/LLM models available to switch to"""
+        await self._load_models()
 
-        return output
+        output = []
+
+        for model in self.models:
+            output.append(str(model))
+
+        return self.result(output)
 
     @core.module.command("model")
     async def model(self, args: list):
@@ -47,17 +40,16 @@ class Models(core.module.Module):
     @core.module.command("models")
     async def models(self, args: list):
         """Lists available models."""
-        if not self.models:
-            models = await self.manager.API.list_models()
-            if not models:
-                return "Failed to fetch models"
-            self.models = models
-
+        await self._load_models()
         return "\n".join(self.models)
 
     async def switch(self, name: str):
+        """Switches you to a different AI model"""
         if not self.models:
-            return False
+            models = await self.manager.API.list_models()
+            if not models:
+                return None
+            self.models = models
 
         found = False
         found_id = None
@@ -67,7 +59,7 @@ class Models(core.module.Module):
                 found_id = model_id
 
         if not found:
-            return "model does not exist. use models_list() first"
+            return "model does not exist. use models_get_available() first"
 
         core.config.config["model"]["name"] = found_id
         core.config.config.save()

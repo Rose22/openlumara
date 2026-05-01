@@ -78,7 +78,7 @@ class Characters(core.module.Module):
             return None
 
         curr_char = self.characters.get(await self.channel.context.chat.get_data("character"))
-        tool_text = f"You can switch between identities using character_switch(). User can switch characters using the `/character` command. Characters available to switch yourself to:\n{await self._list_characters()}" if core.config.get("model", {}).get("use_tools") and not curr_char else ""
+        tool_text = f"Characters available to switch yourself to:\n{await self._list_characters()}" if core.config.get("model", {}).get("use_tools") and not curr_char else ""
         if not curr_char: return tool_text
         char_name = await self.channel.context.chat.get_data("character")
         char_profile = self.characters.get(char_name, {}).get("identity", "")

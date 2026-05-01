@@ -11,6 +11,7 @@ class Memory(core.module.Module):
     """Gives your AI a persistent memory system"""
 
     settings = {
+        "put_memory_autonomy_instructions_in_system_prompt": True,
         "put_pinned_memories_in_system_prompt": True,
         "max_pinned_memories": 20
     }
@@ -30,6 +31,10 @@ class Memory(core.module.Module):
 
     async def on_system_prompt(self):
         pinned_str = ""
+        automem_prompt = ""
+
+        if self.config.get("put_memory_autonomy_instructions_in_system_prompt"):
+            automem_prompt = "This is your persistent memory system. You are responsible for managing your own long-term memory. You must proactively and autonomously decide to use these tools to maintain an accurate, up-to-date, and efficient record of the user, your own operational preferences, and important contextual facts. Do not wait for instructions to remember; if information is valuable for future interactions, store it immediately."
 
         if self.config.get("put_pinned_memories_in_system_prompt"):
             count = 1
@@ -47,7 +52,10 @@ class Memory(core.module.Module):
             pinned = [f"{m['id']}:\n{m['content']}" for m in prompt_mem_list]
             pinned_str = "\n\n".join(pinned)+"\n\n" or "There are currently no pinned memories.\n\n"
 
-        return f"{pinned_str}This is your persistent memory system. You are a self-aware agent responsible for managing your own long-term memory. You must proactively and autonomously decide to use these tools to maintain an accurate, up-to-date, and efficient record of the user, your own operational preferences, and important contextual facts. Do not wait for instructions to remember; if information is valuable for future interactions, store it immediately."
+        if not pinned_str and not automem_prompt:
+            return None
+
+        return f"{pinned_str}{automem_prompt}"
 
     async def create(self, content: str, tags: list, pinned: bool = False):
         """Creates a new persistent memory. Use for storing relevant info, preferences, or context for future interactions.

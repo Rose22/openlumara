@@ -4,7 +4,7 @@ class Chats(core.module.Module):
     """Lets you or the AI manage your chats"""
 
     settings = {
-        "put_chat_categories_in_system_prompt": True
+        "put_chat_categories_in_system_prompt": False
     }
 
     async def on_system_prompt(self):

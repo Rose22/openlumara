@@ -302,7 +302,7 @@ class Manager:
         # automatically insert system prompts returned by modules (such as memory)
         histend_prompt = []
         for module_name, module in self.modules.items():
-            if prevent_recursion and module_name == "tokens":
+            if prevent_recursion and module_name == "token_threshold":
                 # if we try to count the system prompt's tokens from the function that counts tokens.. we get recursion
                 continue
 
