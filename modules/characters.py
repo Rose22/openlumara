@@ -177,8 +177,11 @@ class Characters(core.module.Module):
             "{char}": name,
             "{{user}}": user_name,
             "{user}": user_name,
-            "you": name,
-            "user": user_name
+            "you are": f"{name} is",
+            "you should": f"{name} should",
+            "you must": f"{name} must",
+            "you want": f"{name} wants",
+            "you have": f"{name} has"
         }
 
         for word, replacement in replacement_map.items():
