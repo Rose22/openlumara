@@ -98,12 +98,14 @@ class Characters(core.module.Module):
 
         char_name = await self.channel.context.chat.get_data("character")
         char_profile = self._rewrite_character(char_name, self.characters.get(char_name, {}).get("identity", ""))
-        char_profile = char_profile.replace("\\n", "\n")
-
         user_name = self.user_profile.get("name", "User")
-        prefs = self.user_profile.get("preferences", "")
+        user_prefs = self.user_profile.get("preferences", "")
 
-        char_text = f"You are {char_name}. You are talking to {user_name}.\n\n{char_profile}\n\n{prefs}\n{tool_text}"
+        # all of this is stored as json strings, so newlines need to be restored
+        char_profile = char_profile.replace("\\n", "\n")
+        user_prefs = user_prefs.replace("\\n", "\n")
+
+        char_text = f"You are {char_name}. You are talking to {user_name}.\n\n{char_profile}\n\n{user_prefs}\n{tool_text}"
 
         return char_text
 
