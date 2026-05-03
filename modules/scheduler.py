@@ -110,17 +110,17 @@ class Scheduler(core.module.Module):
     # Execution
     # ---------------------------------------------------------
 
-    async def _execute_job(self, job: dict) -> None:
+        async def _execute_job(self, job: dict) -> None:
         """Performs the actual action of the job."""
         job_id = job.get("id")
 
         # Determine the target channel for this job
         channel_name = (job.get("channel") or "").lower().strip()
         job_channel = self.manager.channels.get(channel_name)
-        if not job_channel and self.channel:
+        if job_channel is None and self.channel:
             job_channel = self.channel
 
-        if not job_channel:
+        if job_channel is None:
             core.log("scheduler", f"error executing job {job_id}: no channel available for tool calls")
             return
 
@@ -164,7 +164,7 @@ class Scheduler(core.module.Module):
         final_content = ""
         tool_calls = response.get("tool_calls")
 
-        if tool_calls:
+        if tool_calls and job_channel:
             # Use a local manager to avoid race conditions and ensure the correct channel is used
             tc_manager = core.toolcalls.ToolcallManager(job_channel)
 
@@ -175,6 +175,9 @@ class Scheduler(core.module.Module):
                 if token.get("type") == "content":
                     final_content_list.append(token.get("content", ""))
             final_content = "".join(final_content_list)
+        elif tool_calls:
+            core.log("scheduler", f"error executing job {job_id}: tool calls found but job_channel is invalid")
+            return
         else:
             final_content = response.get("content", "")
 
@@ -183,6 +186,7 @@ class Scheduler(core.module.Module):
                 await job_channel.announce(final_content, "schedule")
             elif self.channel:
                 await self.channel.announce(final_content, "schedule")
+
 
     # ---------------------------------------------------------
     # Time Calculations
