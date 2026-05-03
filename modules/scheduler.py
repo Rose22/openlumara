@@ -121,8 +121,13 @@ class Scheduler(core.module.Module):
             job_channel = self.channel
 
         if not job_channel:
-                core.log("scheduler", f"error executing job {job_id}: no channel available for tool calls")
-                return
+            core.log("scheduler", f"error executing job {job_id}: no channel available for tool calls")
+            return
+
+        # Ensure context is available
+        if not hasattr(job_channel, 'context') or job_channel.context is None:
+            core.log("scheduler", f"error executing job {job_id}: channel has no valid context")
+            return
 
         tools = [
             t for t in self.manager.tools
@@ -134,12 +139,12 @@ class Scheduler(core.module.Module):
         event_message = {
             "role": "user",
             "content": f"""
-[AUTOMATED SYSTEM INSTRUCTION]
-Please follow these instructions:
+    [AUTOMATED SYSTEM INSTRUCTION]
+    Please follow these instructions:
 
-{action}
-Use tools if needed. For simple reminders, do not use tools.
-""".strip()
+    {action}
+    Use tools if needed. For simple reminders, do not use tools.
+    """.strip()
         }
 
         await job_channel.context.chat.add(event_message)
