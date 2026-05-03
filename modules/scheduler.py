@@ -80,7 +80,7 @@ class Scheduler(core.module.Module):
                 self._remove_job_from_storage(job_id)
 
         except Exception as e:
-            core.log("scheduler", f"error executing job {job_id}: {e}")
+            core.log_error(f"[SCHEDULER] error executing job {job_id}", e)
 
     def _reschedule_job(self, job: dict) -> None:
         """Updates a recurring job's time in-place and reschedules it."""
