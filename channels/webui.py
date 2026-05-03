@@ -92,6 +92,9 @@ FAILED_ATTEMPTS = defaultdict(list)
 RATE_LIMIT_WINDOW = 900  # 15 minutes
 MAX_ATTEMPTS = 5
 
+# Set of active Bearer tokens for API access
+ACTIVE_TOKENS = set()
+
 app = Flask(
     __name__,
     static_folder=os.path.join(WEBUI_DIR, "static")
@@ -291,6 +294,33 @@ def login():
             return render_template_string(LOGIN_TEMPLATE, error=error)
     return render_template_string(LOGIN_TEMPLATE)
 
+@app.route('/api/login', methods=['POST'])
+def api_login():
+    global channel_instance
+
+    # Get expected credentials from config
+    webui_config = core.config.get("channels", {}).get("settings", {}).get("webui", {})
+    expected_username = webui_config.get("username")
+    expected_password = webui_config.get("password")
+
+    if not expected_username or not expected_password:
+        return jsonify({'error': 'Authentication not configured on server'}), 500
+
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'Missing JSON body'}), 400
+
+    username = data.get('username')
+    password = data.get('password')
+
+    if username == expected_username and password == expected_password:
+        # Generate a secure random token
+        token = secrets.token_urlsafe(32)
+        ACTIVE_TOKENS.add(token)
+        return jsonify({'token': token})
+    else:
+        return jsonify({'error': 'Invalid username or password'}), 401
+
 @app.route('/logout')
 def logout():
     session.pop('username', None)
@@ -301,6 +331,23 @@ def logout():
         return redirect(url_for('index'))
 
     return redirect(url_for('login'))
+
+@app.route('/api/logout', methods=['POST'])
+def api_logout():
+    """Invalidate the current API token or session."""
+    auth_header = request.headers.get('Authorization')
+    
+    # 1. Handle Token-based logout
+    if auth_header and auth_header.startswith('Bearer '):
+        token = auth_header[len('Bearer '):]
+        if token in ACTIVE_TOKENS:
+            ACTIVE_TOKENS.remove(token)
+            return jsonify({'success': True})
+        return jsonify({'error': 'Invalid or expired token'}), 401
+        
+    # 2. Handle Session-based logout (fallback/convenience)
+    session.pop('username', None)
+    return jsonify({'success': True})
 
 @app.before_request
 def require_login():
@@ -314,12 +361,25 @@ def require_login():
         # If no auth is configured, allow everything
         return None
         
-    if request.endpoint in ['login', 'static']:
+    if request.endpoint in ['login', 'static', 'api_login']:
         return None
-    if 'username' not in session:
-        if request.is_json or request.path.startswith('/api/') or request.path.startswith('/messages') or request.path.startswith('/send') or request.path.startswith('/stream'):
-            return jsonify({'error': 'Unauthorized'}), 401
-        return redirect(url_for('login'))
+
+    # 1. Check Session Authentication
+    if 'username' in session:
+        return None
+
+    # 2. Check Token Authentication
+    auth_header = request.headers.get('Authorization')
+    if auth_header and auth_header.startswith('Bearer '):
+        token = auth_header[len('Bearer '):]
+        if token in ACTIVE_TOKENS:
+            return None
+
+    # 3. If not authenticated, decide whether to redirect or return 401
+    if request.is_json or request.path.startswith('/api/') or request.path.startswith('/messages') or request.path.startswith('/send') or request.path.startswith('/stream'):
+        return jsonify({'error': 'Unauthorized'}), 401
+        
+    return redirect(url_for('login'))
 
 # =============================================================================
 # Flask Routes
