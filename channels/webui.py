@@ -14,7 +14,9 @@ import uuid
 import base64
 import socket
 import secrets
+import time
 from datetime import datetime
+from collections import defaultdict
 from flask import Flask, render_template_string, request, jsonify, Response, cli, session, redirect, url_for
 from threading import Thread
 from queue import Queue
@@ -84,11 +86,19 @@ CSS_FILES = [
     "storage_editor"
 ]
 
+
+# Rate limiting for login attempts
+FAILED_ATTEMPTS = defaultdict(list)
+RATE_LIMIT_WINDOW = 900  # 15 minutes
+MAX_ATTEMPTS = 5
+
 app = Flask(
     __name__,
     static_folder=os.path.join(WEBUI_DIR, "static")
 )
-app.secret_key = secrets.token_hex(32)
+# Use a persistent secret key if configured, otherwise use a random one
+webui_config = core.config.get("channels", {}).get("settings", {}).get("webui", {})
+app.secret_key = webui_config.get("secret_key", secrets.token_hex(32))
 
 # Disable Flask logging
 cli.show_server_banner = lambda *args: print(end="")
@@ -153,8 +163,8 @@ class Webui(core.channel.Channel):
         "host": "localhost",
         "port": 5000,
         "use_short_replies": False,
-        "username": "admin",
-        "password": "admin"
+        "username": "",
+        "password": ""
     }
 
     async def run(self):
@@ -245,7 +255,23 @@ with open(os.path.join(WEBUI_DIR, "login.html"), "r") as f:
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    global channel_instance
+
+    if not bool(channel_instance.config.get("username")):
+        return redirect(url_for('index'))
+
     if request.method == 'POST':
+        ip_address = request.remote_addr
+        now = time.time()
+
+        # Rate limiting check
+        attempts = FAILED_ATTEMPTS[ip_address]
+        # Cleanup old attempts
+        attempts[:] = [t for t in attempts if now - t < RATE_LIMIT_WINDOW]
+        
+        if len(attempts) >= MAX_ATTEMPTS:
+            return render_template_string(LOGIN_TEMPLATE, error="Too many failed attempts. Please try again in 15 minutes.")
+
         username = request.form.get('username')
         password = request.form.get('password')
         
@@ -256,8 +282,10 @@ def login():
         
         if expected_username and expected_password and username == expected_username and password == expected_password:
             session['username'] = username
+            FAILED_ATTEMPTS.pop(ip_address, None) # Clear failures on success
             return redirect(url_for('index'))
         else:
+            FAILED_ATTEMPTS[ip_address].append(now)
             error = "Invalid username or password"
             return render_template_string(LOGIN_TEMPLATE, error=error)
     return render_template_string(LOGIN_TEMPLATE)
@@ -265,13 +293,20 @@ def login():
 @app.route('/logout')
 def logout():
     session.pop('username', None)
+    webui_config = core.config.get("channels", {}).get("settings", {}).get("webui", {})
+
+    username = webui_config.get("username")
+    if isinstance(username, str) and len(username) == 0:
+        return redirect(url_for('index'))
+
     return redirect(url_for('login'))
 
 @app.before_request
 def require_login():
+    global channel_instance
+
     # If no auth is configured, allow everything
-    webui_config = core.config.get("channels", {}).get("settings", {}).get("webui", {})
-    if not webui_config.get("username"):
+    if not bool(channel_instance.config.get("username")):
         return None
         
     if request.endpoint in ['login', 'static']:
@@ -288,7 +323,9 @@ def require_login():
 @app.route('/')
 def index():
     """Serve the main HTML page."""
-    return render_template_string(HTML_TEMPLATE, js_files=JS_FILES, css_files=CSS_FILES)
+    global channel_instance
+
+    return render_template_string(HTML_TEMPLATE, js_files=JS_FILES, css_files=CSS_FILES, auth_enabled=bool(channel_instance.config.get("username")))
 
 def get_api_status():
     """
