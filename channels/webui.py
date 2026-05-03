@@ -163,8 +163,9 @@ class Webui(core.channel.Channel):
         "host": "localhost",
         "port": 5000,
         "use_short_replies": False,
-        "username": "",
-        "password": ""
+        "require_login": True,
+        "username": "admin",
+        "password": "admin"
     }
 
     async def run(self):
@@ -305,8 +306,12 @@ def logout():
 def require_login():
     global channel_instance
 
-    # If no auth is configured, allow everything
-    if not bool(channel_instance.config.get("username")):
+    if not bool(channel_instance.config.get("require_login")):
+        if 'username' in session:
+            # auto-logout when auth is turned off
+            del(session['username'])
+
+        # If no auth is configured, allow everything
         return None
         
     if request.endpoint in ['login', 'static']:
@@ -325,7 +330,7 @@ def index():
     """Serve the main HTML page."""
     global channel_instance
 
-    return render_template_string(HTML_TEMPLATE, js_files=JS_FILES, css_files=CSS_FILES, auth_enabled=bool(channel_instance.config.get("username")))
+    return render_template_string(HTML_TEMPLATE, js_files=JS_FILES, css_files=CSS_FILES, require_login=bool(channel_instance.config.get("require_login")))
 
 def get_api_status():
     """
