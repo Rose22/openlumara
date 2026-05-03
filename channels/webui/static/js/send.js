@@ -200,24 +200,29 @@ async function send(providedContent = null) {
     }
 
     // Check API status
+    let isConnected = false;
     try {
         const statusResponse = await fetch('/api/status', { signal: AbortSignal.timeout(5000) });
         if (statusResponse.ok) {
             const statusData = await statusResponse.json();
-            if (!statusData.connected) {
-                removePlaceholder();
-                if (!isRegenerate) {
-                    showApiConfigError(
-                        statusData.error || 'API is not connected.',
-                        statusData.error_type,
-                        statusData.action
-                    );
-                }
-                return;
+            if (statusData.connected) {
+                isConnected = true;
             }
         }
     } catch (err) {
         console.error('Could not check API status:', err);
+    }
+
+    if (!isConnected) {
+        const reconnected = await reconnectApi();
+        if (!reconnected) {
+            removePlaceholder();
+            if (!isRegenerate) {
+                showApiConfigError('API is not connected.', 'connection_failed');
+            }
+            return;
+        }
+        isConnected = true;
     }
 
     // Build payload
