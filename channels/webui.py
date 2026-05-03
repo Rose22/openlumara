@@ -1094,8 +1094,9 @@ def new_chat():
     data = request.get_json() or {}
     title = data.get('title', '')
     category = data.get('category', '')  # Accept category from frontend
+    metadata = data.get('metadata', {})
 
-    _run_async(channel_instance.context.chat.new(title=title, category=category))
+    _run_async(channel_instance.context.chat.new(title=title, category=category, metadata=metadata))
 
     return jsonify({
         'success': True,
@@ -1103,7 +1104,8 @@ def new_chat():
             'id': _run_async(channel_instance.context.chat.get_id()),
             'title': title,
             'category': category,
-            'messages': []
+            'messages': [],
+            'metadata': metadata
         }
     })
 @app.route("/chat/clear", methods=["POST"])

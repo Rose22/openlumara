@@ -86,7 +86,7 @@ class Chat:
 
         return None
 
-    async def new(self, category: str = "general", title: str = ""):
+    async def new(self, category: str = "general", title: str = "", metadata = {}):
         """create a new chat"""
         now = datetime.datetime.utcnow().isoformat()
 
@@ -96,7 +96,7 @@ class Chat:
             "category": category,
             "tags": [],
             "messages": [],
-            "custom_data": {},
+            "custom_data": metadata,
             "created": now,
             "updated": now
         })
