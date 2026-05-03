@@ -21,8 +21,8 @@
     --text-secondary: #a0a0a0;
     --text-muted: #666666;
     --text-code: #d0d0d0;
-    --accent: #4ade80;
-    --accent-glow: rgba(74, 222, 128, 0.6);
+    --accent: #ababab;
+    --accent-glow: rgba(255, 255, 255, 0.5);
     --error: #f08080;
     --error-bg: linear-gradient(135deg, #3a1a1a 0%, #2a0a0a 100%);
     --error-border: #5a2a2a;
