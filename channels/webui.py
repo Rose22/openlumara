@@ -15,10 +15,11 @@ import base64
 import socket
 import secrets
 from datetime import datetime
-from flask import Flask, render_template_string, request, jsonify, Response, cli
+from flask import Flask, render_template_string, request, jsonify, Response, cli, session, redirect, url_for
 from threading import Thread
 from queue import Queue
 import logging
+from functools import wraps
 
 import core
 import msgpack
@@ -151,7 +152,9 @@ class Webui(core.channel.Channel):
     settings = {
         "host": "localhost",
         "port": 5000,
-        "use_short_replies": False
+        "use_short_replies": False,
+        "username": "admin",
+        "password": "admin"
     }
 
     async def run(self):
@@ -230,6 +233,137 @@ def _run_async(coro):
     except Exception as e:
         core.log("webui", f"Error running async task: {e}")
         return None
+
+# =============================================================================
+# Authentication
+# =============================================================================
+
+LOGIN_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - OpenLumara</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .login-container {
+            background-color: #2d2d2d;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 400px;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+        input {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 4px;
+            border: 1px solid #444;
+            background-color: #3d3d3d;
+            color: white;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            padding: 0.75rem;
+            border: none;
+            border-radius: 4px;
+            background-color: #007bff;
+            color: white;
+            font-size: 1rem;
+            cursor: pointer;
+            margin-top: 1rem;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .error {
+            color: #ff4d4d;
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h1>OpenLumara Login</h1>
+        {% if error %}
+            <div class="error">{{ error }}</div>
+        {% endif %}
+        <form method="POST">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <button type="submit">Login</button>
+        </form>
+    </div>
+</body>
+</html>
+"""
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        # Get expected credentials from config
+        webui_config = core.config.get("channels", {}).get("settings", {}).get("webui", {})
+        expected_username = webui_config.get("username")
+        expected_password = webui_config.get("password")
+        
+        if expected_username and expected_password and username == expected_username and password == expected_password:
+            session['username'] = username
+            return redirect(url_for('index'))
+        else:
+            error = "Invalid username or password"
+            return render_template_string(LOGIN_TEMPLATE, error=error)
+    return render_template_string(LOGIN_TEMPLATE)
+
+@app.route('/logout')
+def logout():
+    session.pop('username', None)
+    return redirect(url_for('login'))
+
+@app.before_request
+def require_login():
+    # If no auth is configured, allow everything
+    webui_config = core.config.get("channels", {}).get("settings", {}).get("webui", {})
+    if not webui_config.get("username"):
+        return None
+        
+    if request.endpoint in ['login', 'static']:
+        return None
+    if 'username' not in session:
+        if request.is_json or request.path.startswith('/api/') or request.path.startswith('/messages') or request.path.startswith('/send') or request.path.startswith('/stream'):
+            return jsonify({'error': 'Unauthorized'}), 401
+        return redirect(url_for('login'))
 
 # =============================================================================
 # Flask Routes
