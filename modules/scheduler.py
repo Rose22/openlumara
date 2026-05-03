@@ -110,7 +110,7 @@ class Scheduler(core.module.Module):
     # Execution
     # ---------------------------------------------------------
 
-        async def _execute_job(self, job: dict) -> None:
+    async def _execute_job(self, job: dict) -> None:
         """Performs the actual action of the job."""
         job_id = job.get("id")
 
