@@ -245,11 +245,12 @@ LOGIN_TEMPLATE = """
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - OpenLumara</title>
+    <link rel="stylesheet" href="/static/css/variables.css" />
     <style>
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #1a1a1a;
-            color: #e0e0e0;
+            font-family: var(--font-family);
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
             display: flex;
             justify-content: center;
             align-items: center;
@@ -257,68 +258,90 @@ LOGIN_TEMPLATE = """
             margin: 0;
         }
         .login-container {
-            background-color: #2d2d2d;
-            padding: 2rem;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            background-color: var(--bg-secondary);
+            padding: 2.5rem;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-soft);
+            border: 1px solid var(--border-color);
             width: 100%;
             max-width: 400px;
         }
         h1 {
             text-align: center;
-            margin-bottom: 1.5rem;
+            margin-bottom: 2rem;
+            font-size: 2rem;
+            color: var(--accent);
         }
         .form-group {
-            margin-bottom: 1rem;
+            margin-bottom: 1.5rem;
         }
         label {
             display: block;
             margin-bottom: 0.5rem;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
         }
         input {
             width: 100%;
-            padding: 0.75rem;
-            border-radius: 4px;
-            border: 1px solid #444;
-            background-color: #3d3d3d;
-            color: white;
+            padding: 0.8rem;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-color);
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
             box-sizing: border-box;
+            font-size: 1rem;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px var(--accent-glow);
         }
         button {
             width: 100%;
-            padding: 0.75rem;
+            padding: 0.8rem;
             border: none;
-            border-radius: 4px;
-            background-color: #007bff;
-            color: white;
-            font-size: 1rem;
+            border-radius: var(--radius-md);
+            background: var(--accent);
+            color: var(--bg-primary);
+            font-size: 1.1rem;
+            font-weight: 600;
             cursor: pointer;
             margin-top: 1rem;
+            transition: transform 0.1s, filter 0.2s;
         }
         button:hover {
-            background-color: #0056b3;
+            filter: brightness(1.1);
+        }
+        button:active {
+            transform: scale(0.98);
         }
         .error {
-            color: #ff4d4d;
+            color: var(--error);
+            background-color: var(--error-bg);
+            padding: 0.75rem;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--error-border);
             text-align: center;
-            margin-bottom: 1rem;
+            margin-bottom: 1.5rem;
+            font-size: 0.9rem;
         }
     </style>
 </head>
 <body>
     <div class="login-container">
-        <h1>OpenLumara Login</h1>
+        <h1>OpenLumara</h1>
         {% if error %}
             <div class="error">{{ error }}</div>
         {% endif %}
         <form method="POST">
             <div class="form-group">
                 <label for="username">Username</label>
-                <input type="text" id="username" name="username" required>
+                <input type="text" id="username" name="username" required autocomplete="username">
             </div>
             <div class="form-group">
                 <label for="password">Password</label>
-                <input type="password" id="password" name="password" required>
+                <input type="password" id="password" name="password" required autocomplete="current-password">
             </div>
             <button type="submit">Login</button>
         </form>

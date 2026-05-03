@@ -801,3 +801,35 @@ z-index: 5;
     background-color: var(--accent);
     color: var(--bg-primary);
 }
+
+
+/* ==========================================================================
+ *  Category Pane Footer
+ * ========================================================================== */
+.category-footer {
+    padding: 12px;
+    border-top: 1px solid var(--border-sidebar);
+    margin-top: auto;
+}
+
+.category-logout-btn {
+    width: 100%;
+    padding: 10px;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.9rem;
+}
+
+.category-logout-btn:hover {
+    background: var(--error-bg);
+    color: white;
+    border-color: var(--error);
+}
