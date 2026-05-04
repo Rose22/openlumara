@@ -7,7 +7,7 @@
     justify-content: center;
     gap: 8px;
     padding: 10px 20px;
-    background: linear-gradient(180deg, var(--bg-tertiary) 0%, var(--bg-primary) 100%);
+    background: var(--bg-primary);
     border-bottom: 1px solid var(--border-color);
     height: 44px;
     max-height: 44px;

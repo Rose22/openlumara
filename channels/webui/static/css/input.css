@@ -1,19 +1,27 @@
 /* ==========================================================================
- *  Input Area - Modern Design
+ *  Input Area - Modern Design with Improved Alignment
  *  ========================================================================== */
 .input-area {
     padding: 20px;
     background: var(--bg-primary);
     display: flex;
     gap: 12px;
-    align-items: flex-end;
+    align-items: center;
     flex-shrink: 0;
+    border-top: none; /* Removed default border to be replaced by token bar when visible */
+    box-sizing: border-box;
+}
+
+/* Restore normal border & adjust padding when token bar is hidden */
+body.token-bar-hidden .input-area {
     border-top: 1px solid var(--border-color);
 }
 
 /* Upload Button */
 #upload {
-    padding: 14px 16px;
+    padding: 0;
+    width: 48px;
+    height: 48px;
     background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-full);
@@ -24,6 +32,7 @@
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    box-sizing: border-box;
 }
 
 #upload:hover {
@@ -36,6 +45,7 @@
 #upload svg {
     width: 20px;
     height: 20px;
+    flex-shrink: 0;
 }
 
 #file-input {
@@ -46,6 +56,8 @@
 #message {
     flex: 1;
     padding: 14px 20px;
+    height: 48px; 
+    min-height: auto;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-full);
     background: var(--bg-input);
@@ -54,10 +66,19 @@
     outline: none;
     transition: all 0.2s ease;
     resize: none;
-    min-height: 48px;
     max-height: 200px;
     font-family: inherit;
     line-height: 1.5;
+    box-sizing: border-box;
+    vertical-align: middle;
+    
+    /* Hide Scrollbar */
+    scrollbar-width: none; 
+    -ms-overflow-style: none;
+}
+
+#message::-webkit-scrollbar { 
+    display: none; 
 }
 
 #message:focus {
@@ -76,13 +97,19 @@
 
 /* Send Button */
 #send, #stop {
-    padding: 14px 28px;
+    padding: 0 24px; 
+    height: 48px; 
     border-radius: var(--radius-full);
     font-size: 0.95rem;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.15s ease;
     flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    vertical-align: middle;
 }
 
 #send {
@@ -114,53 +141,44 @@
 }
 
 #stop:active { transform: scale(0.96); }
-#stop.show { display: block; }
+#stop.show { display: inline-flex; }
 
-/* Token Usage Bar */
+/* Token Usage Bar - Slim & Replaces Top Border */
 .token-usage-container {
-    position: relative;
-    padding: 0;
-    margin: 0;
+    height: 24px; /* Slim profile */
     display: flex;
-    flex-direction: row;
     align-items: center;
-    gap: 0px;
-    height: 8px;
-    background: var(--bg-primary);
-}
-
-.token-usage-container.active {
-    opacity: 1;
+    justify-content: space-between;
+    padding: 0 16px;
+    background: var(--bg-primary); /* Blends seamlessly with input area */
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    box-sizing: border-box;
+    z-index: 5;
 }
 
 .token-usage-bar-bg {
     flex-grow: 1;
-    height: 3px;
-    background: rgba(255, 255, 255, 0.1);
+    height: 2px; /* Ultra-slim track */
+    background: rgba(255, 255, 255, 0.08);
     border-radius: var(--radius-full);
     overflow: hidden;
+    margin: 0 10px;
 }
 
 .token-usage-bar-fill {
     height: 100%;
     width: 0%;
-    background: linear-gradient(90deg, #10b981, #34d399);
+    background: linear-gradient(90deg, #6366f1, #8b5cf6); /* Sleek gradient */
     border-radius: var(--radius-full);
-    transition: width 0.5s ease, background-color 0.5s ease;
+    transition: width 0.3s ease;
 }
 
 .token-usage-text {
-    position: absolute;
-    right: 12px;
-    transform: translateY(-5px);
-    font-size: 9px;
-    line-height: 1;
     white-space: nowrap;
-    min-width: fit-content;
-}
-
-.token-usage-container.active .token-usage-text {
-    color: rgba(255, 255, 255, 1);
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    font-weight: 500;
 }
 
 body.token-bar-hidden .input-area {
@@ -172,10 +190,13 @@ body.token-bar-hidden .input-area {
     font-size: 0.8rem;
     color: var(--text-secondary, #888);
     font-style: italic;
-    margin: 4px 0 8px 12px;
+    margin: 4px 0 0 0; 
     padding: 2px 8px;
     animation: streamingFadeIn 0.3s ease-out;
     display: inline-block;
+    width: 100%;
+    box-sizing: border-box;
+    text-align: left;
 }
 
 @keyframes streamingFadeIn {
@@ -194,17 +215,19 @@ body.token-bar-hidden .input-area {
     color: var(--text-secondary, #888);
     margin-top: 4px;
     font-style: italic;
+    text-align: left;
 }
 
 .typing-status-text {
     display: block;
-    text-align: center;
+    text-align: left; 
     font-size: 0.75rem;
     color: var(--text-secondary, #888);
     margin-bottom: 4px;
     margin-top: 0;
     font-style: italic;
     width: 100%;
+    box-sizing: border-box;
     animation: statusFadeIn 0.2s ease-out;
 }
 
