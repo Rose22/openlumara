@@ -350,6 +350,31 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             tree, source_bytes = result
 
             if tree.root_node.has_error:
+                # Special handling for HTML: tree-sitter-html is very strict about bare &
+                # and flags them as errors. These are extremely common in practice
+                # and browsers handle them gracefully, so we ignore them if they're the only errors.
+                if lang == 'html':
+                    error_nodes = []
+                    def _collect_errors(node):
+                        if node.type == 'ERROR':
+                            error_nodes.append(node)
+                        for child in node.children:
+                            _collect_errors(child)
+                    _collect_errors(tree.root_node)
+                    
+                    if error_nodes:
+                        all_ampersand_issues = True
+                        for err_node in error_nodes:
+                            snippet = source_bytes[err_node.start_byte:err_node.end_byte].decode('utf-8', errors='replace').strip()
+                            # If the error contains a bare & and lacks structural HTML markers (tags, quotes), treat as trivial
+                            if '&' in snippet and '<' not in snippet and '>' not in snippet and '"' not in snippet and "'" not in snippet:
+                                continue
+                            all_ampersand_issues = False
+                            break
+                        
+                        if all_ampersand_issues:
+                            return True, None
+
                 error_msg = self._first_error_message(tree.root_node, source_bytes, os.path.basename(file_path))
                 if error_msg:
                     return False, error_msg
