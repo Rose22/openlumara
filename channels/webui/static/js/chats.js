@@ -394,15 +394,23 @@ async function restoreCurrentChat() {
         if (data.success && data.chat && data.chat.id) {
             currentChatId = data.chat.id;
 
-            // NEW: Sync the active category to match the current chat's category
-            // This ensures the sidebar is looking at the correct group/list
+            // Determine the effective category (handling metadata dynamically)
+            let chatCategory = 'general';
             if (data.chat.category && data.chat.category !== 'general') {
-                activeCategory = data.chat.category;
+                chatCategory = data.chat.category;
             } else {
-                activeCategory = 'general';
+                for (const [prefix, path] of Object.entries(METADATA_GROUP_CONFIG)) {
+                    const val = getNestedValue(data.chat, path);
+                    if (val) {
+                        chatCategory = `${prefix}:${val}`;
+                        break;
+                    }
+                }
             }
+            
+            activeCategory = chatCategory;
 
-            // NEW: Ensure the chat list is actually loaded/rendered in the sidebar
+            // Ensure the chat list is actually loaded/rendered in the sidebar
             await loadChats();
 
             const messages = data.chat.messages || [];
@@ -411,14 +419,14 @@ async function restoreCurrentChat() {
             updateChatTitleBar(data.chat.title, tags);
 
             if (messages.length > 0) {
-                renderAllMessages(messages);
+                renderAllMessages(messages, true);
                 updateTokenUsage();
                 lastMessageIndex = messages.length;
             } else {
                 clearChatUI();
             }
 
-            // NEW: Scroll to the selected chat in the sidebar
+            // Scroll to the selected chat in the sidebar
             scrollToActiveChat();
 
         } else {
@@ -432,6 +440,8 @@ async function restoreCurrentChat() {
         updateChatTitleBar(null);
     }
 }
+
+
 
 
 function clearChatUI() {
@@ -764,8 +774,7 @@ async function newChat() {
             category = 'general';
             const path = METADATA_GROUP_CONFIG[prefix];
             const parts = path.split('.');
-            // If the path is 'custom_data.character', the key in the metadata dict is 'character'
-            const key = parts.includes('custom_data') ? parts[parts.length - 1] : parts[parts.length - 1];
+            const key = parts[parts.length - 1];
             metadata = { [key]: id };
         }
 
@@ -783,12 +792,16 @@ async function newChat() {
 
         if (data.success && data.chat) {
             await loadChats();
+            // Force the sidebar to stay on the current active category 
+            // in case loadChats() or selectCategory() reset it.
+            selectCategory(activeCategory);
             closeSidebar();
         }
     } catch (e) {
         console.error('Failed to create new chat:', e);
     }
 }
+
 
 
 

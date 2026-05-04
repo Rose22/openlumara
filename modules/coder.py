@@ -1138,7 +1138,8 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             # Verify syntax
             is_valid, error = self._verify_syntax(file_path_str)
             if not is_valid:
-                return self.result(f"error: {error}. The file was created but contains syntax errors.", success=False)
+                os.remove(file_path_str) # delete it so the AI can try again
+                return self.result(f"error: {error}. There were syntax errors, so the file was not written to disk. Try again.", success=False)
 
             return self.result(f"File created.", success=True)
         except Exception as e:
