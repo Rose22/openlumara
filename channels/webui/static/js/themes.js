@@ -22,7 +22,7 @@ const themes = {
             // === BASE SURFACES — refined zinc palette ===
             '--bg-primary': '#09090b',
             '--bg-secondary': '#18181b',
-            '--bg-tertiary': '#27272a',
+            '--bg-tertiary': '#232326',
             
             // === MESSAGE BACKGROUNDS — clean, flat with subtle borders ===
             '--bg-message-user': 'linear-gradient(135deg, #1e1e22 0%, #18181b 100%)',
@@ -48,9 +48,9 @@ const themes = {
             '--text-muted': '#71717a',
             '--text-code': '#e4e4e7',
             
-            // === ACCENT — crisp white emphasis ===
-            '--accent': '#d4d4d8',
-            '--accent-glow': 'rgba(255, 255, 255, 0.12)',
+            // === ACCENT — muted zinc for subtle emphasis ===
+            '--accent': '#a1a1aa',
+            '--accent-glow': 'rgba(161, 161, 170, 0.15)',
             
             // === STATUS COLORS — muted but legible ===
             '--error': '#f87171',

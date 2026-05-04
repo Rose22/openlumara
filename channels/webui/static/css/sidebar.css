@@ -54,10 +54,10 @@
 .new-chat-btn {
     width: 100%;
     padding: 12px 16px;
-    background: var(--accent);
+    background: var(--bg-tertiary);
     border: none;
     border-radius: var(--radius-md);
-    color: var(--bg-primary);
+    color: var(--text-primary);
     font-size: 0.9rem;
     font-weight: 600;
     cursor: pointer;

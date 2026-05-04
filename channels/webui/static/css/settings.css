@@ -297,7 +297,7 @@
 .toggle-slider {
     position: absolute;
     inset: 0;
-    background-color: var(--bg-tertiary, #333);
+    background-color: var(--bg-secondary, #333);
     border: 1px solid var(--border-color, #444);
     border-radius: 24px;
     transition: all 0.2s ease;

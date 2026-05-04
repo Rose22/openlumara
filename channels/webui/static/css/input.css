@@ -22,10 +22,10 @@ body.token-bar-hidden .input-area {
     padding: 0;
     width: 48px;
     height: 48px;
-    background: var(--bg-tertiary);
+    background: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
-    color: var(--text-secondary);
+    color: var(--text-primary);
     cursor: pointer;
     transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
     display: flex;
@@ -47,7 +47,7 @@ body.token-bar-hidden .input-area {
 }
 
 #upload:hover {
-    background: var(--bg-secondary);
+    background: var(--bg-tertiary);
     color: var(--accent);
     border-color: var(--accent);
     transform: scale(1.08);
@@ -148,17 +148,17 @@ body.token-bar-hidden .input-area {
     justify-content: center;
     box-sizing: border-box;
     vertical-align: middle;
-    color: var(--text-secondary);
+    color: var(--text-primary);
     position: relative;
     overflow: hidden;
 }
 
 #send {
-    background: var(--bg-tertiary);
+    background: var(--bg-secondary);
     border: 1px solid var(--border-color);
 }
 #send:hover {
-    background: var(--bg-secondary);
+    background: var(--bg-tertiary);
     color: var(--accent);
     border-color: var(--accent);
     transform: translateY(-2px);
