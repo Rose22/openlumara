@@ -128,7 +128,6 @@ body.token-bar-hidden .input-area {
 #stop:hover {
     background: var(--button-stop-hover);
     box-shadow: 0 0 15px var(--button-stop-glow);
-    color: var(--accent);
     border-color: var(--accent);
 }
 

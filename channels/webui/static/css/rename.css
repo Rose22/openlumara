@@ -7,6 +7,7 @@
     align-items: center;
     gap: 8px;
     width: 100%;
+    box-sizing: border-box;
 }
 
 .inline-rename-container.sidebar-rename {
@@ -25,11 +26,33 @@
     font-family: inherit;
     outline: none;
     transition: all 0.2s ease;
+    box-sizing: border-box;
+    line-height: normal;
 }
 
 .inline-rename-input:focus {
     border-color: var(--accent);
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+/* Prevent layout shift when renaming sidebar chats */
+.inline-rename-container.sidebar-rename {
+    width: 100%;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+.inline-rename-container.sidebar-rename .inline-rename-input {
+    width: 100%;
+    min-width: 0;
+    padding: 8px 12px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    line-height: 1.4;
+    margin: 0;
+    box-sizing: border-box;
+    height: auto;
 }
 
 .inline-rename-actions {
