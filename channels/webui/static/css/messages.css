@@ -319,7 +319,6 @@
 
 .tool-call-card:hover {
     border-color: var(--tool-border-hover);
-    transform: translateY(-2px);
     box-shadow: var(--shadow-soft);
 }
 
@@ -360,12 +359,8 @@
     padding: 8px 12px;
     cursor: pointer;
     user-select: none;
-    background: var(--bg-secondary);
+    background: var(--tool-bg);
     transition: background 0.15s ease;
-}
-
-.tool-call-header:hover {
-    background: var(--bg-tertiary);
 }
 
 .tool-call-toggle {
@@ -515,7 +510,6 @@
     align-items: flex-start;
     gap: 12px;
     padding: 6px 10px;
-    background: var(--bg-tertiary);
     border-radius: var(--radius-sm);
     font-size: 0.85rem;
 }
@@ -549,7 +543,6 @@
 
 .tool-call-args-streaming {
     font-family: var(--code-font);
-    background: var(--bg-secondary);
     padding: 8px 12px;
     border-radius: var(--radius-sm);
     word-break: break-all;
@@ -583,7 +576,6 @@
     white-space: pre-wrap;
     word-break: break-word;
     padding: 8px 10px;
-    background: var(--bg-secondary);
     border-radius: var(--radius-sm);
 }
 
@@ -598,18 +590,12 @@
     align-items: center;
     gap: 4px;
     padding: 2px 8px;
-    background: var(--bg-tertiary);
     border-radius: var(--radius-sm);
     font-size: 0.8rem;
     color: var(--text-muted);
     cursor: pointer;
     transition: background 0.15s ease;
 }
-
-.tool-response-summary:hover {
-    background: rgba(0, 0, 0, 0.35);
-}
-
 .tool-response-summary-icon {
     font-size: 0.75rem;
 }
@@ -625,10 +611,6 @@
     gap: 8px;
     padding: 3px 6px;
     border-radius: var(--radius-sm);
-}
-
-.tool-response-kv:hover {
-    background: var(--bg-secondary);
 }
 
 .tool-response-key {
@@ -668,10 +650,6 @@
     border-radius: var(--radius-sm);
 }
 
-.tool-response-array-item:hover {
-    background: var(--bg-secondary);
-}
-
 .tool-response-index {
     color: var(--text-muted);
     font-size: 0.7rem;
@@ -693,7 +671,6 @@
     align-items: center;
     gap: 6px;
     padding: 4px 10px;
-    background: var(--bg-tertiary);
     border-radius: var(--radius-sm);
     font-size: 0.8rem;
     cursor: default;
@@ -742,35 +719,37 @@
 }
 
 /* =============================================================================
- *  Tool Processing Indicator - Bold Style
+ *  Tool Processing Indicator - Enhanced Fancy Style
  *  ============================================================================= */
 
 .tool-processing-indicator {
-    animation: processingFadeIn 0.2s ease-out;
+    animation: processingFadeIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) ease-out;
 }
 
 @keyframes processingFadeIn {
-    from { opacity: 0; transform: translateY(-4px); }
-    to { opacity: 1; transform: translateY(0); }
+    from { opacity: 0; transform: translateY(-6px) scale(0.95); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .tool-processing-content {
     position: relative;
     display: inline-flex;
     align-items: center;
-    gap: 10px;
-    padding: 10px 18px;
-    background: var(--bg-tertiary);
+    gap: 12px;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, var(--bg-tertiary) 0%, var(--bg-secondary) 100%);
     border-radius: var(--radius-md);
     z-index: 0;
+    box-shadow: 0 4px 15px -5px rgba(0, 0, 0, 0.3);
 }
 
+/* The beloved border animation */
 .tool-processing-content::before {
     content: '';
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    background: conic-gradient(from var(--angle), var(--tool-border), var(--accent));
+    background: conic-gradient(from var(--angle), transparent, var(--tool-border), var(--accent), transparent);
     z-index: -1;
     animation: rotate 2s linear infinite;
     padding: 1px;
@@ -778,7 +757,7 @@
     -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
     mask-composite: exclude;
     -webkit-mask-composite: xor;
-    opacity: 0.5;
+    opacity: 0.8;
 }
 
 @property --angle {
@@ -792,10 +771,11 @@
 }
 
 .tool-processing-spinner {
-    width: 14px;
-    height: 14px;
-    color: var(--text-muted);
+    width: 16px;
+    height: 16px;
+    color: var(--accent);
     animation: processingSpin 1s linear infinite;
+    filter: drop-shadow(0 0 4px var(--accent-glow));
 }
 
 @keyframes processingSpin {
@@ -805,8 +785,19 @@
 
 .tool-processing-text {
     font-size: 0.9rem;
-    color: var(--text-muted);
-    font-weight: 500;
+    color: var(--text-secondary);
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    background: linear-gradient(90deg, var(--text-secondary) 0%, var(--accent) 50%, var(--text-secondary) 100%);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: textShimmer 3s linear infinite;
+}
+
+@keyframes textShimmer {
+    to { background-position: 200% center; }
 }
 
 /* =============================================================================

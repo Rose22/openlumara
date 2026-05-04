@@ -50,7 +50,6 @@ body.token-bar-hidden .input-area {
     background: var(--bg-tertiary);
     color: var(--accent);
     border-color: var(--accent);
-    transform: scale(1.08);
     box-shadow: 0 4px 12px rgba(var(--accent-rgb, 171, 171, 171), 0.3);
 }
 
@@ -63,10 +62,6 @@ body.token-bar-hidden .input-area {
     height: 20px;
     flex-shrink: 0;
     transition: transform 0.2s ease;
-}
-
-#upload:hover svg {
-    transform: scale(1.1);
 }
 
 #file-input {
