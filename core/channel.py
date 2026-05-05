@@ -76,7 +76,11 @@ class Channel:
 
         # process any /commands
         cmd_response = None
-        if message.get("role", "user") == "user":
+        is_cmd = message.get("content", "").strip().lower().startswith(
+            core.config.get("core", "cmd_prefix").strip().lower()
+        )
+
+        if is_cmd and message.get("role", "user") == "user":
             try:
                 cmd_response = await self.commands.process_input(message)
             except Exception as e:
@@ -174,18 +178,23 @@ class Channel:
 
         user_message = message #alias for readability
 
+        # process any /commands
         cmd_response = None
-        if message.get("role", "user") == "user":
+        is_cmd = message.get("content", "").strip().lower().startswith(
+            core.config.get("core", "cmd_prefix").strip().lower()
+        )
+
+        if is_cmd and message.get("role", "user") == "user":
             try:
                 cmd_response = await self.commands.process_input(user_message)
             except Exception as e:
                 core.log_error("error while executing command", e)
 
-        if cmd_response:
-            # insert and return the command response without sending it to the AI
-            for word in cmd_response:
-                yield {"type": "content", "content": word}
-            return
+            if cmd_response:
+                # insert and return the command response without sending it to the AI
+                for word in cmd_response:
+                    yield {"type": "content", "content": word}
+                return
 
         # attempt auto-reconnect once
         if not self.manager.API.connected:

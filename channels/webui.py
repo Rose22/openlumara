@@ -381,6 +381,15 @@ def require_login():
         
     return redirect(url_for('login'))
 
+@app.route('/api/health')
+def check_health():
+    """simple ping endpoint to check if the bearer token is still valid"""
+
+    # since the @require_login() decorator will send
+    # the unauthorised message if the bearer token has expired,
+    # we can just send this
+    return jsonify({"status": "OK"}), 200
+
 # =============================================================================
 # Flask Routes
 # =============================================================================

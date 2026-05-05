@@ -11,7 +11,7 @@ class Client(discord.Client):
 
     async def _stream_to_discord(self, token_stream, discord_channel):
         """streams a message to discord in steps"""
-        message_obj = await discord_channel.send("...")
+        message_obj = await discord_channel.send("...", mention_author=self.ai_channel.config.get("use_replies"))
 
         # Buffers for the CURRENT active discord message
         current_text_buffer = []
@@ -156,22 +156,28 @@ class Client(discord.Client):
                             # if group chat is enabled, make the AI aware of who is speaking
                             if self.ai_channel.config.get("enable_group_chat"):
                                 content = f"{message.author.display_name} said: {content}"
+                    except Exception as e:
+                        return await message.channel.send(f"error while processing your request: {e}")
 
-                        response_obj = self.ai_channel.send_stream({"role": "user", "content": content})
+                    try:
+                        if self.ai_channel.config.get("use_message_streaming"):
+                            response_obj = self.ai_channel.send_stream({"role": "user", "content": content})
+                            response_content = await self._stream_to_discord(response_obj, message.channel)
+                        else:
+                            response_content = await self.ai_channel.send({"role": "user", "content": content})
+                            await message.channel.send(response_content.get("content"), mention_author=self.ai_channel.config.get("use_replies"))
+
+                        core.log("discord", f"<{message.guild.me.name}> {response_content}")
                     except Exception as e:
                         return await message.channel.send(f"error while sending request to AI: {e}")
-
-                try:
-                    response_content = await self._stream_to_discord(response_obj, message.channel)
-                    core.log("discord", f"<{message.guild.me.name}> {response_content}")
-                except Exception as e:
-                    return await message.channel.send(f"error while receiving response from AI: {e} | {e.__traceback__.tb_frame.f_code.co_filename}, {e.__traceback__.tb_frame.f_code.co_name}, ln:{e.__traceback__.tb_lineno}")
 
 class Discord(core.channel.Channel):
     settings =  {
         "token": "TOKEN_HERE",
         "authorised_user_id": "USER_ID_HERE",
         "require_mentions": False,
+        "use_message_streaming": False,
+        "use_replies": True,
         "enable_group_chat": False,
         "announce_startup": False,
         "announce_shutdown": False
