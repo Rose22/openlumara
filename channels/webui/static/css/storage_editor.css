@@ -55,12 +55,16 @@
     border-radius: var(--radius-sm);
     color: var(--text-secondary);
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .storage-add-file-btn:hover {
     background: var(--bg-tertiary);
     color: var(--text-primary);
+    transform: scale(1.05);
 }
 
 .storage-file-list {
@@ -74,7 +78,7 @@
     font-size: 0.85rem;
     color: var(--text-secondary);
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
     display: flex;
     align-items: center;
     gap: 8px;
@@ -82,11 +86,15 @@
 
 .storage-file-item:hover {
     background: var(--bg-tertiary);
+    color: var(--text-primary);
+    transform: translateX(4px);
 }
 
 .storage-file-item.active {
-    background: var(--accent-primary);
-    color: var(--text-primary);
+    background: var(--bg-secondary);
+    border-left-color: var(--accent);
+    color: var(--accent);
+    font-weight: 600;
 }
 
 .storage-file-icon {
@@ -106,6 +114,18 @@
     flex-direction: column;
     background: var(--bg-primary);
     min-width: 0;
+    animation: storageEditorFadeIn 0.3s ease-out forwards;
+}
+
+@keyframes storageEditorFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .storage-placeholder {
@@ -116,10 +136,17 @@
     justify-content: center;
     color: var(--text-tertiary);
     gap: 16px;
+    animation: storageEditorFadeIn 0.3s ease-out forwards;
 }
 
 .storage-placeholder svg {
     opacity: 0.5;
+    transition: all 0.2s ease;
+}
+
+.storage-placeholder:hover svg {
+    opacity: 0.8;
+    transform: scale(1.1);
 }
 
 .storage-loading {
@@ -130,6 +157,7 @@
     justify-content: center;
     gap: 12px;
     color: var(--text-secondary);
+    animation: storageEditorFadeIn 0.3s ease-out forwards;
 }
 
 .storage-spinner {
@@ -143,6 +171,24 @@
 
 @keyframes spin {
     to { transform: rotate(360deg); }
+}
+
+/* Smooth scrollbar for storage editor */
+.storage-sidebar::-webkit-scrollbar,
+.storage-editor::-webkit-scrollbar {
+    width: 6px;
+}
+
+.storage-sidebar::-webkit-scrollbar-thumb,
+.storage-editor::-webkit-scrollbar-thumb {
+    background: var(--scrollbar);
+    border-radius: var(--radius-full);
+    transition: background 0.2s ease;
+}
+
+.storage-sidebar::-webkit-scrollbar-thumb:hover,
+.storage-editor::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-hover);
 }
 
 .storage-error {
@@ -824,11 +870,12 @@
 }
 
 .storage-btn {
-    padding: 8px 20px;
-    border-radius: var(--radius-sm);
+    padding: 10px 24px;
+    border-radius: var(--radius-md);
     font-size: 0.85rem;
+    font-weight: 600;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all 0.2s ease;
 }
 
 .storage-btn.secondary {
@@ -840,16 +887,19 @@
 .storage-btn.secondary:hover {
     background: var(--bg-tertiary);
     color: var(--text-primary);
+    border-color: var(--accent);
 }
 
 .storage-btn.primary {
-    background: var(--accent-primary);
-    border: 1px solid var(--accent-primary);
-    color: var(--text-primary);
+    background: var(--accent);
+    border: 1px solid var(--accent);
+    color: var(--bg-primary);
 }
 
 .storage-btn.primary:hover {
-    opacity: 0.9;
+    filter: brightness(1.15);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-soft);
 }
 
 /* JSON Tree Toggle */

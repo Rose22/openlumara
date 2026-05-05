@@ -35,6 +35,7 @@ class Scheduler(core.module.Module):
         # Cancel existing handle if present (prevents duplicates on edit/restart)
         if job_id in self.scheduled_handles:
             self.scheduled_handles[job_id].cancel()
+            del self.scheduled_handles[job_id]
 
         try:
             trigger_time = datetime.datetime.fromisoformat(job.get("trigger_time", ""))
@@ -49,9 +50,12 @@ class Scheduler(core.module.Module):
             # Run immediately if due
             asyncio.create_task(self._job_wrapper(job))
         else:
-            loop = asyncio.get_running_loop()
-            handle = loop.call_later(delay, lambda: asyncio.create_task(self._job_wrapper(job)))
-            self.scheduled_handles[job_id] = handle
+            try:
+                loop = asyncio.get_running_loop()
+                handle = loop.call_later(delay, lambda: asyncio.create_task(self._job_wrapper(job)))
+                self.scheduled_handles[job_id] = handle
+            except Exception as e:
+                core.log_error(f"[SCHEDULER] error scheduling job {job_id}", e)
 
     async def _job_wrapper(self, job: dict) -> None:
         """Executes the job and handles cleanup or recurrence."""
@@ -80,7 +84,7 @@ class Scheduler(core.module.Module):
                 self._remove_job_from_storage(job_id)
 
         except Exception as e:
-            core.log("scheduler", f"error executing job {job_id}: {e}")
+            core.log_error(f"[SCHEDULER] error executing job {job_id}", e)
 
     def _reschedule_job(self, job: dict) -> None:
         """Updates a recurring job's time in-place and reschedules it."""
@@ -117,16 +121,22 @@ class Scheduler(core.module.Module):
         # Determine the target channel for this job
         channel_name = (job.get("channel") or "").lower().strip()
         job_channel = self.manager.channels.get(channel_name)
-        if not job_channel and self.channel:
+        if job_channel is None and self.channel:
             job_channel = self.channel
 
-        if not job_channel:
-                core.log("scheduler", f"error executing job {job_id}: no channel available for tool calls")
-                return
+        if job_channel is None:
+            core.log("scheduler", f"error executing job {job_id}: no channel available for tool calls")
+            return
 
+        # Ensure context is available
+        if job_channel is None or not hasattr(job_channel, 'context') or job_channel.context is None:
+            core.log("scheduler", f"error executing job {job_id}: channel has no valid context")
+            return
+
+        # Filter out scheduler tools to prevent circular scheduling
         tools = [
             t for t in self.manager.tools
-            if t.get("function", {}).get("name") != "scheduler_add_job"
+            if not t.get("function", {}).get("name", "").startswith("scheduler_")
         ]
 
         action = job.get("action")
@@ -134,12 +144,12 @@ class Scheduler(core.module.Module):
         event_message = {
             "role": "user",
             "content": f"""
-[AUTOMATED SYSTEM INSTRUCTION]
-Please follow these instructions:
+    [AUTOMATED SYSTEM INSTRUCTION]
+    Please follow these instructions:
 
-{action}
-Use tools if needed. For simple reminders, do not use tools.
-""".strip()
+    {action}
+    Use tools if needed. For simple reminders, do not use tools.
+    """.strip()
         }
 
         await job_channel.context.chat.add(event_message)
@@ -159,7 +169,7 @@ Use tools if needed. For simple reminders, do not use tools.
         final_content = ""
         tool_calls = response.get("tool_calls")
 
-        if tool_calls:
+        if tool_calls and job_channel:
             # Use a local manager to avoid race conditions and ensure the correct channel is used
             tc_manager = core.toolcalls.ToolcallManager(job_channel)
 
@@ -170,14 +180,21 @@ Use tools if needed. For simple reminders, do not use tools.
                 if token.get("type") == "content":
                     final_content_list.append(token.get("content", ""))
             final_content = "".join(final_content_list)
+        elif tool_calls:
+            core.log("scheduler", f"error executing job {job_id}: tool calls found but job_channel is invalid")
+            return
         else:
             final_content = response.get("content", "")
 
         if final_content:
-            if job_channel:
-                await job_channel.announce(final_content, "schedule")
-            elif self.channel:
-                await self.channel.announce(final_content, "schedule")
+            try:
+                if job_channel:
+                    await job_channel.announce(final_content, "schedule")
+                elif self.channel:
+                    await self.channel.announce(final_content, "schedule")
+            except Exception as e:
+                core.log_error(f"[SCHEDULER] error announcing job {job_id} result", e)
+
 
     # ---------------------------------------------------------
     # Time Calculations
@@ -203,19 +220,23 @@ Use tools if needed. For simple reminders, do not use tools.
             if recur.get("target_weekday") is not None:
                 # Specific day of week (e.g., "Mondays")
                 target_weekday = recur["target_weekday"]
+                # Calculate days until target weekday
                 days_until = (target_weekday - now.weekday()) % 7
+                # If it's today but time has passed, go to next week
                 if days_until == 0 and candidate <= now:
                     days_until = 7
                 candidate += datetime.timedelta(days=days_until)
 
             elif recur.get("weekdays_only"):
-                # Weekdays only
+                # Weekdays only (Mon-Fri)
+                # If candidate is on weekend OR time has passed today, advance to next weekday
                 if candidate.weekday() >= 5 or candidate <= now:
                     candidate = self._advance_to_next_weekday(candidate)
 
             else:
                 # Daily interval
                 interval_days = recur.get("days", 1)
+                # If time has passed today, advance by interval
                 if candidate <= now:
                     candidate += datetime.timedelta(days=interval_days)
 
@@ -257,9 +278,9 @@ Use tools if needed. For simple reminders, do not use tools.
         """Displays schedule as a human-readable list."""
         result = []
         for job in self.schedule:
-            job_id = job.get("id")
+            job_id = job.get("id", "unknown")
             action = job.get("action", "")
-            chan_str = job.get("channel")
+            chan_str = job.get("channel", "unknown channel")
             time_str = self._format_job_time(job)
             result.append(f"{job_id}: {time_str} on {chan_str}: {action}")
         return "\n".join(result)
@@ -293,26 +314,29 @@ Use tools if needed. For simple reminders, do not use tools.
         return "every " + ", ".join(parts) if parts else "invalid schedule"
 
     def _format_one_time_job(self, job: dict) -> str:
-        trigger_dt = datetime.datetime.fromisoformat(job.get("trigger_time", ""))
-        delta = trigger_dt - datetime.datetime.now()
-        total_seconds = int(delta.total_seconds())
+        try:
+            trigger_dt = datetime.datetime.fromisoformat(job.get("trigger_time", ""))
+            delta = trigger_dt - datetime.datetime.now()
+            total_seconds = int(delta.total_seconds())
 
-        h, rem = divmod(total_seconds, 3600)
-        m, s = divmod(rem, 60)
+            h, rem = divmod(total_seconds, 3600)
+            m, s = divmod(rem, 60)
 
-        parts = []
-        if h > 0: parts.append(f"{h} hour{'s' if h != 1 else ''}")
-        if m > 0: parts.append(f"{m} minute{'s' if m != 1 else ''}")
-        if s > 0 or not parts: parts.append(f"{s} second{'s' if s != 1 else ''}")
+            parts = []
+            if h > 0: parts.append(f"{h} hour{'s' if h != 1 else ''}")
+            if m > 0: parts.append(f"{m} minute{'s' if m != 1 else ''}")
+            if s > 0 or not parts: parts.append(f"{s} second{'s' if s != 1 else ''}")
 
-        return f"one-time, {', '.join(parts)} from now"
+            return f"one-time, {', '.join(parts)} from now"
+        except (ValueError, TypeError):
+            return "one-time, invalid time"
 
     def _weekday_name(self, weekday: int) -> str:
         days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
         return days[weekday] if 0 <= weekday < 7 else "Unknown"
 
     async def on_system_prompt(self) -> str:
-        if not self.config.get("put_scheduled_jobs_in_system_prompt"):
+        if not self.config.get("put_scheduled_jobs_in_system_prompt", True):
             return None
 
         if self.schedule:
@@ -355,17 +379,38 @@ Use tools if needed. For simple reminders, do not use tools.
         if target_time:
             parts = target_time.split(':')
             if len(parts) >= 2:
-                target_hour = int(parts[0])
-                target_minute = int(parts[1])
-                if len(parts) == 3:
-                    target_second = int(parts[2])
+                try:
+                    target_hour = int(parts[0])
+                    target_minute = int(parts[1])
+                    if len(parts) == 3:
+                        target_second = int(parts[2])
+                    
+                    # Validate time values
+                    if target_hour < 0 or target_hour > 23:
+                        return self.result("error: hour must be between 0 and 23", False)
+                    if target_minute < 0 or target_minute > 59:
+                        return self.result("error: minute must be between 0 and 59", False)
+                    if target_second is not None and (target_second < 0 or target_second > 59):
+                        return self.result("error: second must be between 0 and 59", False)
+                except ValueError:
+                    return self.result("error: invalid time format, use HH:MM or HH:MM:SS", False)
+
+        # Validate target_weekday
+        if target_weekday is not None and (target_weekday < 0 or target_weekday > 6):
+            return self.result("error: target_weekday must be between 0 (Monday) and 6 (Sunday)", False)
 
         try:
+            # Build recurrence dict - only include target_hour if it's not None
             recur = {
                 "weeks": weeks, "days": days, "hours": hours, "minutes": minutes, "seconds": seconds,
-                "target_hour": target_hour, "target_minute": target_minute, "target_second": target_second,
                 "target_weekday": target_weekday, "weekdays_only": weekdays_only
             }
+            # Only add time fields if they have values
+            if target_hour is not None:
+                recur["target_hour"] = target_hour
+                recur["target_minute"] = target_minute or 0
+                if target_second is not None:
+                    recur["target_second"] = target_second
 
             trigger_time = self._calculate_next_trigger(recur)
             if trigger_time is None:
@@ -415,13 +460,15 @@ Use tools if needed. For simple reminders, do not use tools.
             import re
             existing_recur = existing.get("recurs_in", {})
             
-            weeks = days = hours = minutes = seconds = 0
+            weeks = days = hours = minutes = seconds = None
             target_hour = target_minute = target_second = None
             
-            # Parse relative_duration
-            if relative_duration:
+            # Parse relative_duration if provided
+            if relative_duration is not None:
                 pattern = r'(\d+)\s*([wdhms])'
                 matches = re.findall(pattern, relative_duration)
+                # Reset all to 0 first
+                weeks = days = hours = minutes = seconds = 0
                 for val, unit in matches:
                     val = int(val)
                     if unit == 'w': weeks = val
@@ -430,29 +477,87 @@ Use tools if needed. For simple reminders, do not use tools.
                     elif unit == 'm': minutes = val
                     elif unit == 's': seconds = val
 
-            # Parse target_time
-            if target_time:
+            # Parse target_time if provided
+            if target_time is not None:
                 parts = target_time.split(':')
                 if len(parts) >= 2:
-                    target_hour = int(parts[0])
-                    target_minute = int(parts[1])
-                    if len(parts) == 3:
-                        target_second = int(parts[2])
+                    try:
+                        target_hour = int(parts[0])
+                        target_minute = int(parts[1])
+                        if len(parts) == 3:
+                            target_second = int(parts[2])
+                        
+                        # Validate time values
+                        if target_hour < 0 or target_hour > 23:
+                            return self.result("error: hour must be between 0 and 23", False)
+                        if target_minute < 0 or target_minute > 59:
+                            return self.result("error: minute must be between 0 and 59", False)
+                        if target_second is not None and (target_second < 0 or target_second > 59):
+                            return self.result("error: second must be between 0 and 59", False)
+                    except ValueError:
+                        return self.result("error: invalid time format, use HH:MM or HH:MM:SS", False)
 
+            # Validate target_weekday if provided
+            if target_weekday is not None and (target_weekday < 0 or target_weekday > 6):
+                return self.result("error: target_weekday must be between 0 (Monday) and 6 (Sunday)", False)
+
+            # Build recurrence dict using provided values or existing ones
+            # For numeric fields: use provided value if not None, else existing
+            # For target_weekday: special handling since None is valid value (no specific weekday)
             recur = {
-                "weeks": weeks or existing_recur.get("weeks", 0), "days": days or existing_recur.get("days", 0), "hours": hours or existing_recur.get("hours", 0), "minutes": minutes or existing_recur.get("minutes", 0), "seconds": seconds or existing_recur.get("seconds", 0),
-                "target_hour": target_hour or existing_recur.get("target_hour"), "target_minute": target_minute or existing_recur.get("target_minute", 0), "target_second": target_second or existing_recur.get("target_second", 0),
-                "target_weekday": target_weekday or existing_recur.get("target_weekday"), "weekdays_only": weekdays_only or existing_recur.get("weekdays_only", False)
+                "weeks": weeks if weeks is not None else existing_recur.get("weeks", 0),
+                "days": days if days is not None else existing_recur.get("days", 0),
+                "hours": hours if hours is not None else existing_recur.get("hours", 0),
+                "minutes": minutes if minutes is not None else existing_recur.get("minutes", 0),
+                "seconds": seconds if seconds is not None else existing_recur.get("seconds", 0),
+                "target_weekday": target_weekday if target_weekday is not None else existing_recur.get("target_weekday"),
+                # For booleans, use 'or' logic to preserve "don't change" behavior for False defaults
+                "weekdays_only": weekdays_only or existing_recur.get("weekdays_only", False)
             }
+            
+            # Handle time fields
+            if target_hour is not None:
+                recur["target_hour"] = target_hour
+                recur["target_minute"] = target_minute or 0
+                if target_second is not None:
+                    recur["target_second"] = target_second
+            elif "target_hour" in existing_recur:
+                # Keep existing time if not being changed
+                recur["target_hour"] = existing_recur.get("target_hour")
+                recur["target_minute"] = existing_recur.get("target_minute", 0)
+                recur["target_second"] = existing_recur.get("target_second", 0)
+
+            # Calculate new trigger time if time-related parameters were changed
+            # We need to recalculate if any time parameter was provided
+            time_params_changed = (
+                relative_duration is not None or 
+                target_time is not None or 
+                target_weekday is not None
+                # Note: weekdays_only is boolean with default False, can't reliably detect if changed
+            )
+            
+            # Also recalculate if weekdays_only was explicitly set to True
+            # (Can't detect if explicitly set to False due to API limitation)
+            if weekdays_only:
+                time_params_changed = True
+            
+            if time_params_changed:
+                new_trigger_time = self._calculate_next_trigger(recur)
+                if new_trigger_time is None:
+                    return self.result("error: invalid schedule parameters (zero interval)", False)
+                trigger_time_str = new_trigger_time.isoformat()
+            else:
+                trigger_time_str = existing.get("trigger_time")
 
             # Update in place
             updated_job = {
                 "id": id,
                 "action": action or existing.get("action"),
                 "channel": channel or existing.get("channel"),
-                "trigger_time": existing.get("trigger_time"),
-                "recurring": recurring or existing.get("recurring"),
-                "recurs_in": recur if (recurring or existing.get("recurring")) else None
+                "trigger_time": trigger_time_str,
+                # For recurring, use 'or' logic to preserve "don't change" behavior for False default
+                "recurring": recurring or existing.get("recurring", False),
+                "recurs_in": recur if (recurring or existing.get("recurring", False)) else None
             }
 
             self.schedule[index] = updated_job

@@ -420,7 +420,7 @@ function performGlobalSearch(query) {
             <div class="global-search-result"
             data-chat-id="${chat.id}"
             data-index="${index}"
-            onclick="selectGlobalSearchResult('${chat.id}')"
+            onclick="selectGlobalSearchResult('${escapeHtml(chat.id)}')"
             tabindex="0"
             role="button"
             aria-label="Open chat: ${escapeHtml(title)}">
@@ -429,7 +429,7 @@ function performGlobalSearch(query) {
             <span class="global-search-result-date">${date}</span>
             </div>
             ${result.snippet ? `
-                <div class="global-search-result-snippet">${result.snippet}</div>
+                <div class="global-search-result-snippet">${DOMPurify.sanitize(result.snippet)}</div>
                 ` : ''}
                 ${tags.length > 0 ? `
                     <div class="global-search-result-tags">

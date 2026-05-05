@@ -115,7 +115,7 @@ class StorageList(list):
         if self.autoreload and not TEMPORARY:
             self.load()
 
-        return super().get(*args, **kwargs)
+        return super().get(*args)
 
 class StorageDict(dict):
     """subclassed dict that handles storage of data. supports a variety of storage formats."""
@@ -305,7 +305,7 @@ class StorageDict(dict):
         if self.autoreload and not TEMPORARY:
             self.load()
 
-        return super().get(*args, **kwargs)
+        return super().get(*args)
 
 class StorageText:
     """simple class that saves its content to a text file"""

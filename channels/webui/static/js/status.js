@@ -5,6 +5,7 @@ let statusMessageElement = null;
 let lastActiveChatId = null;
 
 function showConnectionStatus(status) {
+    hideConnectionStatus();
     const wrapper = document.createElement('div');
     wrapper.className = 'message-wrapper announce';
     wrapper.setAttribute('role', 'status');

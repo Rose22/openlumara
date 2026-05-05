@@ -1,5 +1,5 @@
 /* ==========================================================================
- *  Keyboard Shortcuts Modal
+ *  Keyboard Shortcuts Modal - Modern Design
  *  ========================================================================== */
 
 .shortcuts-list {
@@ -10,7 +10,7 @@
 
 .shortcut-item {
     display: flex;
-    padding: 8px 0;
+    padding: 12px 0;
     border-bottom: 1px solid var(--border-color);
     align-items: center;
     justify-content: space-between;
@@ -26,15 +26,18 @@
 }
 
 .shortcut-key {
-    padding: 4px 8px;
+    padding: 5px 10px;
     background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
-    border-radius: var(--radius-sm);
-    font-family: monospace;
+    border-radius: var(--radius-md);
+    font-family: var(--code-font);
     font-size: 0.8rem;
+    color: var(--text-primary);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .shortcut-desc {
-    font-size: 0.9rem;
+    font-size: 0.95rem;
     color: var(--text-secondary);
+    font-weight: 500;
 }

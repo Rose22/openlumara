@@ -1,184 +1,314 @@
 /* ==========================================================================
- *  Input Area
+ *  Input Area - Modern Design with Improved Alignment
  *  ========================================================================== */
 .input-area {
-    padding: 16px;
+    padding: 10px;
     background: var(--bg-primary);
     display: flex;
     gap: 12px;
-    align-items: flex-end;
+    align-items: center;
     flex-shrink: 0;
+    border-top: none; /* Removed default border to be replaced by token bar when visible */
+    box-sizing: border-box;
 }
 
+/* Restore normal border & adjust padding when token bar is hidden */
+body.token-bar-hidden .input-area {
+    border-top: 1px solid var(--border-color);
+}
+
+/* Upload Button */
 #upload {
-padding: 14px 16px;
-background: var(--bg-tertiary);
-border: 1px solid var(--border-color);
-border-radius: var(--radius-full);
-color: var(--text-secondary);
-cursor: pointer;
-transition: all 0.2s;
-display: flex;
-align-items: center;
-justify-content: center;
-flex-shrink: 0;
+    padding: 0;
+    width: 48px;
+    height: 48px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-sizing: border-box;
+    position: relative;
+    overflow: hidden;
+}
+
+#upload::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at center, var(--accent) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
 }
 
 #upload:hover {
-background: var(--bg-secondary);
-color: var(--accent);
-border-color: var(--accent);
+    background: var(--bg-tertiary);
+    color: var(--accent);
+    border-color: var(--accent);
+    box-shadow: 0 4px 12px rgba(var(--accent-rgb, 171, 171, 171), 0.3);
+}
+
+#upload:hover::before {
+    opacity: 0.1;
 }
 
 #upload svg {
-width: 20px;
-height: 20px;
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    transition: transform 0.2s ease;
 }
 
 #file-input {
-display: none;
+    display: none;
 }
 
+/* Message Input - Pill Shape */
 #message {
-flex: 1;
-padding: 12px 18px;
-border: 1px solid var(--border-color);
-border-radius: var(--radius-full);
-background: var(--bg-input);
-color: var(--text-primary);
-font-size: 1rem;
-outline: none;
-transition: all 0.2s;
-resize: none;
-min-height: 48px;
-max-height: 200px;
-font-family: inherit;
-line-height: 1.4;
+    flex: 1;
+    padding: 14px 20px;
+    height: 48px; 
+    min-height: auto;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    background: var(--bg-input);
+    color: var(--text-primary);
+    font-size: 1rem;
+    outline: none;
+    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    resize: none;
+    max-height: 200px;
+    font-family: inherit;
+    line-height: 1.5;
+    box-sizing: border-box;
+    vertical-align: middle;
+    
+    /* Hide Scrollbar */
+    scrollbar-width: none; 
+    -ms-overflow-style: none;
+}
+
+#message::-webkit-scrollbar { 
+    display: none; 
 }
 
 #message:focus {
-border-color: var(--accent);
-box-shadow: 0 0 0 3px var(--accent-glow);
+    border-color: var(--accent);
 }
 
 #message::placeholder {
-color: var(--text-muted);
+    color: var(--text-muted);
+    transition: opacity 0.2s ease;
+}
+
+#message:focus::placeholder {
+    opacity: 0.6;
 }
 
 #message:disabled {
-opacity: 0.5;
-cursor: not-allowed;
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
 }
 
+#message::placeholder {
+    color: var(--text-muted);
+}
+
+#message:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Send Button */
 #send, #stop {
-padding: 14px 24px;
-border-radius: var(--radius-full);
-font-size: 1rem;
-font-weight: 600;
-cursor: pointer;
-transition: all 0.15s ease;
-flex-shrink: 0;
+    padding: 0 24px; 
+    height: 48px; 
+    border-radius: var(--radius-lg);
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    vertical-align: middle;
+    color: var(--text-primary);
+    position: relative;
+    overflow: hidden;
 }
 
 #send {
-background: var(--button-bg);
-border: 1px solid var(--accent);
-color: var(--text-primary);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+}
+#send:hover {
+    background: var(--bg-tertiary);
+    color: var(--accent);
+    border-color: var(--accent);
+    box-shadow: 0 4px 12px rgba(var(--accent-rgb, 171, 171, 171), 0.3);
+}
+
+#send::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.1) 50%, transparent 70%);
+    transform: translateX(-100%);
+    transition: transform 0.6s ease;
+}
+
+#send:hover::after {
+    transform: translateX(100%);
 }
 
 #send.hidden { display: none; }
 
 #stop:hover {
-background: var(--button-stop-hover);
-box-shadow: 0 0 15px var(--button-stop-glow);
+    background: var(--button-stop-hover);
+    box-shadow: 0 0 15px var(--button-stop-glow);
+    border-color: var(--accent);
+    transform: translateY(-2px);
 }
 
-#send:active { transform: scale(0.96); }
-#send:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+#send:active, #stop:active { 
+    transform: scale(0.96) translateY(0); 
+}
+#send:disabled { 
+    opacity: 0.5; 
+    cursor: not-allowed; 
+    transform: none; 
+}
 
 #stop {
-background: var(--error-bg);
-border: 1px solid var(--error-border);
-color: var(--error);
-display: none;
+    background: var(--error-bg);
+    border: 1px solid var(--error-border);
+    color: var(--error);
+    display: none;
 }
 
 #stop:hover {
-background: linear-gradient(135deg, #5a2a2a 0%, #4a1a1a 100%);
-box-shadow: 0 0 15px rgba(248, 113, 113, 0.3);
+    background: linear-gradient(135deg, #5a2a2a 0%, #4a1a1a 100%);
+    box-shadow: 0 0 15px rgba(248, 113, 113, 0.3);
 }
 
-#stop:active { transform: scale(0.96); }
-#stop.show { display: block; }
+#stop.show { 
+    display: inline-flex;
+    animation: buttonPopIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
 
+@keyframes buttonPopIn {
+    from {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Token Usage Bar - Slim & Replaces Top Border */
 .token-usage-container {
-    position: relative; /* Added: This allows the text to anchor to this container */
-    padding: 0;
-    margin: 0;
-    display: flex;
-    flex-direction: row;
     align-items: center;
-    gap: 0px;
-    height: 8px;
-    background: var(--bg-primary);
-}
-
-/* This class will be added by JS when usage is high */
-.token-usage-container.active {
-    opacity: 1;
+    justify-content: space-between;
+    background: var(--bg-primary); /* Blends seamlessly with input area */
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    box-sizing: border-box;
 }
 
 .token-usage-bar-bg {
-    flex-grow: 1;
-    height: 2px;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 0px;
+    width: 100%;
+    height: 1px; /* Ultra-slim track */
+    background: var(--border-color);
     overflow: hidden;
 }
 
 .token-usage-bar-fill {
     height: 100%;
     width: 0%;
-    background: #10b981; /* Green */
-    transition: width 0.5s ease, background-color 0.5s ease;
+    background: var(--accent) !important; /* Sleek gradient */
+    transition: width 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.token-usage-bar-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    transform: translateX(-100%);
+    animation: shimmer 2s infinite;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.token-usage-container.shimmer-active .token-usage-bar-fill::after {
+    opacity: 1;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
 }
 
 .token-usage-text {
-    position: absolute;
-    right: 12px;        /* Offsets it from the right edge */
-    transform: translateY(-5px); /* Nudges it up slightly so it "floats" with breathing room */
-
-    font-size: 9px;
-    line-height: 1;
+    position: relative;
+    height: 0px;
     white-space: nowrap;
-    min-width: fit-content;
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    transition: color 0.2s ease;
+    text-align: right;
+    margin-right: 15px;
+    bottom: 0.45rem;
 }
 
-/* High usage text color */
-.token-usage-container.active .token-usage-text {
-    color: rgba(255, 255, 255, 1);
+/* Warning state for high token usage */
+.token-usage-container.warning .token-usage-bar-fill {
+    background: linear-gradient(90deg, #f59e0b, #ef4444);
 }
 
+.token-usage-container.warning .token-usage-text {
+    color: var(--error);
+}
 
-/* Add a border to the input area when the token bar is hidden */
 body.token-bar-hidden .input-area {
     border-top: 1px solid var(--border-color);
 }
 
-/* Streaming Status Indicator Styles */
+/* Streaming Status Indicator */
 .streaming-status-indicator {
     font-size: 0.8rem;
     color: var(--text-secondary, #888);
     font-style: italic;
-    margin: 4px 0 8px 12px;
+    margin: 4px 0 0 0; 
     padding: 2px 8px;
     animation: streamingFadeIn 0.3s ease-out;
     display: inline-block;
+    width: 100%;
+    box-sizing: border-box;
+    text-align: left;
+}
+
+@keyframes streamingFadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 /* Optimistic UI Styles */
-
-/* The temporary user message */
 .user-placeholder {
     opacity: 0.7;
     filter: grayscale(0.5);
@@ -189,19 +319,19 @@ body.token-bar-hidden .input-area {
     color: var(--text-secondary, #888);
     margin-top: 4px;
     font-style: italic;
+    text-align: left;
 }
-
-/* Refined Typing Status Styles (Above the dots) */
 
 .typing-status-text {
     display: block;
-    text-align: center;
+    text-align: left; 
     font-size: 0.75rem;
     color: var(--text-secondary, #888);
-    margin-bottom: 4px; /* Space below the text, before the dots */
-    margin-top: 0;      /* No space above the text */
+    margin-bottom: 4px;
+    margin-top: 0;
     font-style: italic;
     width: 100%;
+    box-sizing: border-box;
     animation: statusFadeIn 0.2s ease-out;
 }
 
@@ -210,7 +340,6 @@ body.token-bar-hidden .input-area {
 }
 
 @keyframes statusFadeIn {
-    from { opacity: 0; transform: translateY(2px); } /* Slight slide down into place */
+    from { opacity: 0; transform: translateY(2px); }
     to { opacity: 1; transform: translateY(0); }
 }
-

@@ -7,8 +7,21 @@ marked.setOptions({
     gfm: true
 });
 
+// Escape HTML
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
 function renderMarkdown(text) {
-    return marked.parse(text);
+    // parse markdown
+    const rendered = marked.parse(text);
+
+    // and protect against XSS
+    const clean = DOMPurify.sanitize(rendered);
+
+    return clean;
 }
 
 function highlightCode(element) {

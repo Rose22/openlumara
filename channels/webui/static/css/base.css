@@ -12,20 +12,21 @@ html, body {
     width: 100%;
     font-family: var(--font-family);
     font-size: var(--font-size-base);
-    /* The pattern overlay allows for transparency effects */
     background-image: var(--bg-pattern);
-    background-size: var(--bg-pattern-size); /* Adjust pattern size as needed */
+    background-size: var(--bg-pattern-size);
     color: var(--text-primary);
-    line-height: 1.5;
+    line-height: 1.6;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overflow: hidden;
+    text-rendering: optimizeLegibility;
 }
 
-input, button, select, h1, h2, h3 {
-    font-family: var(--font-family);
+input, button, select, h1, h2, h3, textarea {
+    font-family: inherit;
 }
 
+/* Pattern overlay for chat background */
 #chat::before {
     content: '';
     position: absolute;
@@ -34,20 +35,20 @@ input, button, select, h1, h2, h3 {
     right: 0;
     bottom: 0;
     background-image: var(--bg-pattern);
-    background-size: var(--bg-pattern-size); /* Size of the dots/grid */
-    opacity: 0.5; /* Subtlety is key! */
-    pointer-events: none; /* Let clicks pass through */
+    background-size: var(--bg-pattern-size);
+    opacity: 0.3;
+    pointer-events: none;
     z-index: 0;
 }
 
 /* ==========================================================================
- *  Global Scrollbar Styling (Theme Aware)
+ *  Modern Scrollbar Styling (Theme Aware)
  *  ========================================================================== */
 
 /* Webkit browsers (Chrome, Safari, Edge) */
 ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -56,14 +57,13 @@ input, button, select, h1, h2, h3 {
 
 ::-webkit-scrollbar-thumb {
     background: var(--scrollbar);
-    border-radius: 4px;
+    border-radius: var(--radius-full);
 }
 
 ::-webkit-scrollbar-thumb:hover {
     background: var(--scrollbar-hover);
 }
 
-/* Optional: Corner styling for boxes with both scrollbars */
 ::-webkit-scrollbar-corner {
     background: transparent;
 }
@@ -81,7 +81,9 @@ input, button, select, h1, h2, h3 {
 .setting-array-items,
 .toggle-list-grid,
 .custom-font-options,
-.settings-nav {
+.settings-nav,
+.storage-file-list,
+.storage-dict-keys-list {
     scrollbar-width: thin;
     scrollbar-color: var(--scrollbar) transparent;
 }
@@ -92,9 +94,11 @@ input, button, select, h1, h2, h3 {
 .modal::-webkit-scrollbar,
 .setting-array-items::-webkit-scrollbar,
 .toggle-list-grid::-webkit-scrollbar,
-.settings-nav::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+.settings-nav::-webkit-scrollbar,
+.storage-file-list::-webkit-scrollbar,
+.storage-dict-keys-list::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
 }
 
 .settings-sidebar::-webkit-scrollbar-thumb,
@@ -102,9 +106,11 @@ input, button, select, h1, h2, h3 {
 .modal::-webkit-scrollbar-thumb,
 .setting-array-items::-webkit-scrollbar-thumb,
 .toggle-list-grid::-webkit-scrollbar-thumb,
-.settings-nav::-webkit-scrollbar-thumb {
+.settings-nav::-webkit-scrollbar-thumb,
+.storage-file-list::-webkit-scrollbar-thumb,
+.storage-dict-keys-list::-webkit-scrollbar-thumb {
     background: var(--scrollbar);
-    border-radius: 4px;
+    border-radius: var(--radius-full);
 }
 
 .settings-sidebar::-webkit-scrollbar-thumb:hover,
@@ -112,6 +118,107 @@ input, button, select, h1, h2, h3 {
 .modal::-webkit-scrollbar-thumb:hover,
 .setting-array-items::-webkit-scrollbar-thumb:hover,
 .toggle-list-grid::-webkit-scrollbar-thumb:hover,
-.settings-nav::-webkit-scrollbar-thumb:hover {
+.settings-nav::-webkit-scrollbar-thumb:hover,
+.storage-file-list::-webkit-scrollbar-thumb:hover,
+.storage-dict-keys-list::-webkit-scrollbar-thumb:hover {
     background: var(--scrollbar-hover);
+}
+
+/* ==========================================================================
+ *  Selection Styling
+ *  ========================================================================== */
+
+::selection {
+    background: color-mix(in srgb, var(--accent) 30%, transparent);
+    color: var(--text-primary);
+}
+
+/* ==========================================================================
+ *  Focus Ring Accessibility
+ *  ========================================================================== */
+
+:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* ==========================================================================
+ *  Animation Utilities & Performance Optimizations
+ *  ========================================================================== */
+
+/* Hardware acceleration for smoother animations */
+.animate-smooth,
+.sidebar,
+.modal-overlay,
+.chat-item,
+.tool-call-card,
+.reasoning-block {
+    will-change: transform, opacity;
+}
+
+/* Reduced motion preference for accessibility */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* Smooth scroll behavior */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Focus visible improvements */
+:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+}
+
+/* Button press effect */
+button, .chat-item, .category-item, .tool-call-header {
+    transform-origin: center;
+}
+
+button:active, 
+.chat-item:active, 
+.category-item:active,
+.tool-call-header:active {
+    transform: scale(0.98);
+}
+
+/* ==========================================================================
+ *  Skeleton Loading Animation
+ *  ========================================================================== */
+@keyframes skeletonPulse {
+    0% { background-position: -200px 0; }
+    100% { background-position: calc(200px + 100%) 0; }
+}
+
+.skeleton {
+    background: linear-gradient(90deg, var(--bg-tertiary) 25%, var(--bg-secondary) 50%, var(--bg-tertiary) 75%);
+    background-size: 200px 100%;
+    animation: skeletonPulse 1.5s ease-in-out infinite;
+    border-radius: var(--radius-sm);
+}
+
+.skeleton-text {
+    height: 1em;
+    margin-bottom: 0.5em;
+    width: 100%;
+}
+
+.skeleton-text:last-child {
+    width: 75%;
+}
+
+.skeleton-circle {
+    border-radius: var(--radius-full);
+}
+
+.skeleton-rect {
+    border-radius: var(--radius-md);
 }

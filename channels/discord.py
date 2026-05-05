@@ -51,12 +51,10 @@ class Client(discord.Client):
                 if t_type != "content":
                     continue
 
-                # Handle Content/Errors
                 if content:
                     current_text_buffer.append(content)
                     full_response_text.append(content)
 
-                # Construct the visual message for the CURRENT message
                 tools_text = "\n".join(current_tool_buffer)
                 text_part = "".join(current_text_buffer)
 
@@ -107,8 +105,7 @@ class Client(discord.Client):
         else:
             visual_buffer = tools_text + text_part
 
-        if visual_buffer:
-            await message_obj.edit(content=visual_buffer)
+        await message_obj.edit(content=visual_buffer or "BLANK")
 
         return "".join(full_response_text)
 
@@ -146,9 +143,19 @@ class Client(discord.Client):
                            content = content.replace("<@>", "")
                            content = content.strip()
 
-                        # if group chat is enabled, make the AI aware of who is speaking
-                        if self.ai_channel.config.get("enable_group_chat") and not content.startswith(core.config.get("core").get("cmd_prefix", "/")):
-                            content = f"{message.author.display_name} said: {content}"
+                        cmd_prefix = core.config.get("core").get("cmd_prefix", "/")
+                        is_cmd = content.lower().startswith(cmd_prefix.lower())
+
+                        if is_cmd:
+                            # only allow authorised user to use commands
+                            authorised_id = self.ai_channel.config.get("authorised_user_id")
+
+                            if message.author.id != authorised_id:
+                                return await message.channel.send("Only the bot owner is allowed to use commands!")
+                        else:
+                            # if group chat is enabled, make the AI aware of who is speaking
+                            if self.ai_channel.config.get("enable_group_chat"):
+                                content = f"{message.author.display_name} said: {content}"
 
                         response_obj = self.ai_channel.send_stream({"role": "user", "content": content})
                     except Exception as e:
@@ -163,6 +170,7 @@ class Client(discord.Client):
 class Discord(core.channel.Channel):
     settings =  {
         "token": "TOKEN_HERE",
+        "authorised_user_id": "USER_ID_HERE",
         "require_mentions": False,
         "enable_group_chat": False,
         "announce_startup": False,

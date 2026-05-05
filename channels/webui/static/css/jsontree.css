@@ -1,8 +1,8 @@
-/* JSON Tree Styles */
+/* JSON Tree Styles - Modern Design */
 .json-tree {
-    font-family: monospace;
+    font-family: var(--code-font);
     font-size: 0.85rem;
-    line-height: 1.5;
+    line-height: 1.6;
     color: var(--text-primary);
     padding-left: 0;
     margin: 0;
@@ -19,6 +19,7 @@
 .json-tree li {
     position: relative;
     padding-left: 0.5em;
+    margin: 2px 0;
 }
 
 /* The connecting line dot */
@@ -35,6 +36,7 @@
 .json-key {
     color: var(--accent);
     margin-right: 4px;
+    font-weight: 500;
 }
 
 .json-string {
@@ -42,12 +44,13 @@
 }
 
 .json-number {
-    color: var(--accent-secondary);
+    color: var(--info);
+    font-weight: 500;
 }
 
 .json-boolean {
     color: var(--accent);
-    font-weight: bold;
+    font-weight: 600;
 }
 
 .json-null {
@@ -55,25 +58,26 @@
     font-style: italic;
 }
 
-/* Toggle Button */
+/* Toggle Button - Modern Style */
 .tree-toggle {
     cursor: pointer;
     user-select: none;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 16px;
-    height: 16px;
+    width: 18px;
+    height: 18px;
     margin-right: 4px;
-    border-radius: 3px;
-    background: rgba(128, 128, 128, 0.1);
-    color: var(--text-primary);
+    border-radius: var(--radius-sm);
+    background: var(--bg-tertiary);
+    color: var(--text-muted);
     font-size: 10px;
-    transition: transform 0.2s ease;
+    transition: all 0.2s ease;
 }
 
 .tree-toggle:hover {
-    background: rgba(128, 128, 128, 0.2);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
 }
 
 .tree-toggle.collapsed {
@@ -88,4 +92,8 @@
     color: var(--text-muted);
     font-style: italic;
     margin-left: 4px;
+    padding: 2px 6px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-full);
+    font-size: 0.75rem;
 }

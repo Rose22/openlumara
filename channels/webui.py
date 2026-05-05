@@ -14,11 +14,14 @@ import uuid
 import base64
 import socket
 import secrets
+import time
 from datetime import datetime
-from flask import Flask, render_template_string, request, jsonify, Response, cli
+from collections import defaultdict
+from flask import Flask, render_template_string, request, jsonify, Response, cli, session, redirect, url_for
 from threading import Thread
 from queue import Queue
 import logging
+from functools import wraps
 
 import core
 import msgpack
@@ -33,8 +36,8 @@ JS_FILES = [
     "themes",
     "icons",
     "variables",
-    "markdown",
     "content_helpers",
+    "markdown",
     "messages",
     "msg_actions",
     "sidebar",
@@ -83,11 +86,22 @@ CSS_FILES = [
     "storage_editor"
 ]
 
+
+# Rate limiting for login attempts
+FAILED_ATTEMPTS = defaultdict(list)
+RATE_LIMIT_WINDOW = 900  # 15 minutes
+MAX_ATTEMPTS = 5
+
+# Set of active Bearer tokens for API access
+ACTIVE_TOKENS = set()
+
 app = Flask(
     __name__,
     static_folder=os.path.join(WEBUI_DIR, "static")
 )
-app.secret_key = secrets.token_hex(32)
+# Use a persistent secret key if configured, otherwise use a random one
+webui_config = core.config.get("channels", {}).get("settings", {}).get("webui", {})
+app.secret_key = webui_config.get("secret_key", secrets.token_hex(32))
 
 # Disable Flask logging
 cli.show_server_banner = lambda *args: print(end="")
@@ -151,7 +165,10 @@ class Webui(core.channel.Channel):
     settings = {
         "host": "localhost",
         "port": 5000,
-        "use_short_replies": False
+        "use_short_replies": False,
+        "require_login": False,
+        "username": "admin",
+        "password": "admin"
     }
 
     async def run(self):
@@ -232,13 +249,148 @@ def _run_async(coro):
         return None
 
 # =============================================================================
+# Authentication
+# =============================================================================
+
+# Load login template
+LOGIN_TEMPLATE = None
+with open(os.path.join(WEBUI_DIR, "login.html"), "r") as f:
+    LOGIN_TEMPLATE = f.read()
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    global channel_instance
+
+    if not bool(channel_instance.config.get("username")):
+        return redirect(url_for('index'))
+
+    if request.method == 'POST':
+        ip_address = request.remote_addr
+        now = time.time()
+
+        # Rate limiting check
+        attempts = FAILED_ATTEMPTS[ip_address]
+        # Cleanup old attempts
+        attempts[:] = [t for t in attempts if now - t < RATE_LIMIT_WINDOW]
+        
+        if len(attempts) >= MAX_ATTEMPTS:
+            return render_template_string(LOGIN_TEMPLATE, error="Too many failed attempts. Please try again in 15 minutes.")
+
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        # Get expected credentials from config
+        webui_config = core.config.get("channels", {}).get("settings", {}).get("webui", {})
+        expected_username = webui_config.get("username")
+        expected_password = webui_config.get("password")
+        
+        if expected_username and expected_password and username == expected_username and password == expected_password:
+            session['username'] = username
+            FAILED_ATTEMPTS.pop(ip_address, None) # Clear failures on success
+            return redirect(url_for('index'))
+        else:
+            FAILED_ATTEMPTS[ip_address].append(now)
+            error = "Invalid username or password"
+            return render_template_string(LOGIN_TEMPLATE, error=error)
+    return render_template_string(LOGIN_TEMPLATE)
+
+@app.route('/api/login', methods=['POST'])
+def api_login():
+    global channel_instance
+
+    # Get expected credentials from config
+    webui_config = core.config.get("channels", {}).get("settings", {}).get("webui", {})
+    expected_username = webui_config.get("username")
+    expected_password = webui_config.get("password")
+
+    if not expected_username or not expected_password:
+        return jsonify({'error': 'Authentication not configured on server'}), 500
+
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'Missing JSON body'}), 400
+
+    username = data.get('username')
+    password = data.get('password')
+
+    if username == expected_username and password == expected_password:
+        # Generate a secure random token
+        token = secrets.token_urlsafe(32)
+        ACTIVE_TOKENS.add(token)
+        return jsonify({'token': token})
+    else:
+        return jsonify({'error': 'Invalid username or password'}), 401
+
+@app.route('/logout')
+def logout():
+    session.pop('username', None)
+    webui_config = core.config.get("channels", {}).get("settings", {}).get("webui", {})
+
+    username = webui_config.get("username")
+    if isinstance(username, str) and len(username) == 0:
+        return redirect(url_for('index'))
+
+    return redirect(url_for('login'))
+
+@app.route('/api/logout', methods=['POST'])
+def api_logout():
+    """Invalidate the current API token or session."""
+    auth_header = request.headers.get('Authorization')
+    
+    # 1. Handle Token-based logout
+    if auth_header and auth_header.startswith('Bearer '):
+        token = auth_header[len('Bearer '):]
+        if token in ACTIVE_TOKENS:
+            ACTIVE_TOKENS.remove(token)
+            return jsonify({'success': True})
+        return jsonify({'error': 'Invalid or expired token'}), 401
+        
+    # 2. Handle Session-based logout (fallback/convenience)
+    session.pop('username', None)
+    return jsonify({'success': True})
+
+@app.before_request
+def require_login():
+    global channel_instance
+
+    if not bool(channel_instance.config.get("require_login")):
+        if 'username' in session:
+            # auto-logout when auth is turned off
+            del(session['username'])
+
+        # If no auth is configured, allow everything
+        return None
+        
+    if request.endpoint in ['login', 'static', 'api_login']:
+        return None
+
+    # 1. Check Session Authentication
+    if 'username' in session:
+        return None
+
+    # 2. Check Token Authentication
+    auth_header = request.headers.get('Authorization')
+    if auth_header and auth_header.startswith('Bearer '):
+        token = auth_header[len('Bearer '):]
+        if token in ACTIVE_TOKENS:
+            return None
+
+    # 3. If not authenticated, decide whether to redirect or return 401
+    if request.is_json or request.path.startswith('/api/') or request.path.startswith('/messages') or request.path.startswith('/send') or request.path.startswith('/stream'):
+        return jsonify({'error': 'Unauthorized'}), 401
+        
+    return redirect(url_for('login'))
+
+# =============================================================================
 # Flask Routes
 # =============================================================================
 
 @app.route('/')
 def index():
     """Serve the main HTML page."""
-    return render_template_string(HTML_TEMPLATE, js_files=JS_FILES, css_files=CSS_FILES)
+    global channel_instance
+
+    return render_template_string(HTML_TEMPLATE, js_files=JS_FILES, css_files=CSS_FILES, require_login=bool(channel_instance.config.get("require_login")))
 
 def get_api_status():
     """
@@ -619,7 +771,7 @@ def delete_message():
 
     messages = _run_async(channel_instance.context.chat.get())
 
-    if 0 <= index < len(messages):
+    if 0 <= int(index) < len(messages):
         if messages[index].get('role') not in ('user', 'assistant', 'command', 'command_response'):
             if not messages[index].get('role', '').startswith('announce_'):
                 return jsonify({'success': False, 'error': 'Cannot delete this message type'})
@@ -942,8 +1094,9 @@ def new_chat():
     data = request.get_json() or {}
     title = data.get('title', '')
     category = data.get('category', '')  # Accept category from frontend
+    metadata = data.get('metadata', {})
 
-    _run_async(channel_instance.context.chat.new(title=title, category=category))
+    _run_async(channel_instance.context.chat.new(title=title, category=category, metadata=metadata))
 
     return jsonify({
         'success': True,
@@ -951,7 +1104,8 @@ def new_chat():
             'id': _run_async(channel_instance.context.chat.get_id()),
             'title': title,
             'category': category,
-            'messages': []
+            'messages': [],
+            'metadata': metadata
         }
     })
 @app.route("/chat/clear", methods=["POST"])

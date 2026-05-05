@@ -1,5 +1,5 @@
 /* =============================================================================
- *  Typewriter Animation Styles
+ *  Typewriter Animation Styles - Enhanced
  *  ============================================================================= */
 
 /* Base character wrapper */
@@ -8,10 +8,10 @@
     opacity: 1;
 }
 
-/* Fade effect - characters fade in */
+/* Fade effect - characters fade in smoothly */
 @keyframes tw-fade {
-    0% { opacity: 0; }
-    100% { opacity: 1; }
+    0% { opacity: 0; transform: translateY(2px); }
+    100% { opacity: 1; transform: translateY(0); }
 }
 
 .tw-char.tw-fade {
@@ -30,4 +30,20 @@
 .tw-char {
     animation-fill-mode: forwards;
     animation-iteration-count: 1;
+}
+
+/* Blinking cursor for typewriter effect */
+@keyframes tw-cursor-blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
+}
+
+.typewriter-cursor {
+    display: inline-block;
+    width: 2px;
+    height: 1em;
+    background: var(--accent);
+    margin-left: 2px;
+    animation: tw-cursor-blink 0.8s ease-in-out infinite;
+    vertical-align: text-bottom;
 }

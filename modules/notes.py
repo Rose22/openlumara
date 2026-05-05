@@ -3,23 +3,9 @@ import core
 class Notes(core.module.Module):
     """Lets your AI store notes in a notebook. Notes are folders with markdown files, no vendor lock-in!"""
 
-    settings = {
-        "put_note_categories_in_system_prompt": True
-    }
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.data = core.storage.StorageDict("notes", "markdown")
-
-    async def on_system_prompt(self):
-        if not self.config.get("put_note_categories_in_system_prompt"):
-            return None
-
-        if not self.data.keys():
-            return None
-
-        categories = ", ".join(self.data.keys())
-        return f"current categories containing notes: {categories}"
 
     async def create(self, name: str, category: str, content: str):
         if category not in self.data.keys():
@@ -34,7 +20,7 @@ class Notes(core.module.Module):
 
     async def read(self, category: str, name: str):
         if category not in self.data.keys():
-            return self.result("category doesn't exist", False)
+            return self.result("category doesn't exist. use get_categories first!", False)
 
         if name not in self.data[category].keys():
             return self.result("note does not exist", False)
@@ -44,7 +30,7 @@ class Notes(core.module.Module):
     async def edit(self, category: str, name: str, content: str):
         """Edits an existing note. ALWAYS read the note first before editing."""
         if category not in self.data.keys():
-            return self.result("category doesn't exist", False)
+            return self.result("category doesn't exist. use get_categories first!", False)
 
         if name not in self.data[category].keys():
             return self.result("note does not exist", False)
@@ -62,9 +48,12 @@ class Notes(core.module.Module):
             else:
                 yield current_key, value
 
+    async def get_categories(self):
+        return self.result(self.data.keys())
+
     async def list(self, category: str):
         if category not in self.data.keys():
-            return self.result("category doesn't exist", False)
+            return self.result("category doesn't exist. use get_categories first!", False)
 
         return self.result(list(self.data.get(category, {}).keys()))
 
@@ -77,7 +66,7 @@ class Notes(core.module.Module):
 
     async def delete(self, category: str, name: str):
         if category not in self.data.keys():
-            return self.result("category doesn't exist", False)
+            return self.result("category doesn't exist. use get_categories first!", False)
 
         if name not in self.data[category].keys():
             return self.result("note does not exist", False)

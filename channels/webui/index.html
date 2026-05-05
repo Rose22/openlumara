@@ -17,6 +17,7 @@
     {% endfor %}
     <title>OpenLumara</title>
 
+    <script src="/static/js/lib/purify.min.js"></script> <!-- XSS protection -->
     <script src="/static/js/lib/marked.min.js"></script>
     <link rel="stylesheet" href="/static/css/code-themes/github-dark.css">
     <script src="/static/js/lib/highlight.min.js"></script>
@@ -34,6 +35,18 @@
                     <div class="category-list" id="category-list">
                         <!-- JS will populate this -->
                     </div>
+                    {% if require_login %}
+                    <div class="category-footer">
+                        <button class="category-logout-btn" onclick="window.location.href='/logout'" title="Logout">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                                <polyline points="16 17 21 12 16 7"></polyline>
+                                <line x1="21" y1="12" x2="9" y2="12"></line>
+                            </svg>
+                            <span>Logout</span>
+                        </button>
+                    </div>
+                    {% endif %}
                 </div>
 
                 <div class="category-handle" onclick="toggleCategoryStrip()" title="Toggle Category Strip"></div>
@@ -502,11 +515,11 @@
 
                 <div id="upload-queue-container" class="upload-queue-container hidden"></div>
 
+                <span id="token-usage-text" class="token-usage-text"></span>
                 <div id="token-usage-container" class="token-usage-container">
                     <div class="token-usage-bar-bg">
                         <div id="token-usage-fill" class="token-usage-bar-fill"></div>
                     </div>
-                    <span id="token-usage-text" class="token-usage-text"></span>
                 </div>
 
                 <div class="input-area">

@@ -51,13 +51,13 @@ class Manager:
         self.savedata = core.storage.StorageDict("save", "msgpack")
 
         # retrieve enabled channels from config
-        enabled_channels = core.config.get("channels").get("enabled", [])
+        enabled_channels = core.config.get("channels", "enabled", [])
         if self.args.cli:
             enabled_channels = ["cli"]
 
         # retrieve enabled modules from config
-        enabled_modules = core.config.get("modules").get("enabled", [])
-        enabled_user_modules = core.config.get("user_modules", {}).get("enabled", [])
+        enabled_modules = core.config.get("modules", "enabled", [])
+        enabled_user_modules = core.config.get("user_modules", "enabled", [])
         loaded_module_names = []
 
         if self.pure_mode:
@@ -65,7 +65,7 @@ class Manager:
             enabled_user_modules = []
             enabled_user_modules = []
         elif self.coding_mode:
-            enabled_modules = ["coder", "openlumara_prompt"]
+            enabled_modules = ["coder"]
             enabled_user_modules = []
 
         if not enabled_channels:
@@ -241,8 +241,10 @@ class Manager:
         return self.API.get_connection_status()
 
     async def get_system_prompt(self):
-        # Allow generating system prompt even when disconnected
-        # (modules may still need to provide context)
+        # only run on_system_prompt if the manager has a channel reference
+        if not self.channel:
+            return ""
+
         if self.pure_mode:
             return ""
 
@@ -292,6 +294,10 @@ class Manager:
             return ""
 
     async def get_end_prompt(self, prevent_recursion=False):
+        # only run if the manager has a channel reference
+        if not self.channel:
+            return None
+
         # don't return endprompt if characters module is active
         active_character = None
         if self.channel:
@@ -302,7 +308,7 @@ class Manager:
         # automatically insert system prompts returned by modules (such as memory)
         histend_prompt = []
         for module_name, module in self.modules.items():
-            if prevent_recursion and module_name == "tokens":
+            if prevent_recursion and module_name == "token_threshold":
                 # if we try to count the system prompt's tokens from the function that counts tokens.. we get recursion
                 continue
 

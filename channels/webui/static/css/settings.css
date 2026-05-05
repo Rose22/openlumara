@@ -34,6 +34,7 @@
     width: 200px;
     background: var(--bg-secondary);
     border-right: 1px solid var(--border-color);
+    overflow-x: clip;
     overflow-y: auto;
 }
 
@@ -45,7 +46,7 @@
     display: flex;
     gap: 10px;
     width: 100%;
-    padding: 10px 16px 10px 20px;
+    padding: 12px 16px 12px 20px;
     background: none;
     border: none;
     border-left: 3px solid transparent;
@@ -53,19 +54,23 @@
     text-align: left;
     color: var(--text-secondary);
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
     align-items: center;
+    border-radius: 0 var(--radius-md) var(--radius-md) 0;
+    margin-bottom: 2px;
 }
 
 .settings-nav-item:hover {
     background: var(--bg-tertiary);
     color: var(--text-primary);
+    transform: translateX(4px);
 }
 
 .settings-nav-item.active {
     background: var(--bg-tertiary);
     border-left-color: var(--accent);
     color: var(--accent);
+    font-weight: 600;
 }
 
 .settings-nav-item svg {
@@ -79,6 +84,18 @@
     padding: 24px;
     overflow-y: auto;
     position: relative;
+    animation: settingsContentFadeIn 0.3s ease-out forwards;
+}
+
+@keyframes settingsContentFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 /* Loading & Error States */
@@ -92,6 +109,25 @@
     gap: 12px;
     text-align: center;
     color: var(--text-muted);
+    animation: settingsContentFadeIn 0.3s ease-out forwards;
+}
+
+/* Smooth scrollbar for settings */
+.settings-sidebar::-webkit-scrollbar,
+.settings-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.settings-sidebar::-webkit-scrollbar-thumb,
+.settings-content::-webkit-scrollbar-thumb {
+    background: var(--scrollbar);
+    border-radius: var(--radius-full);
+    transition: background 0.2s ease;
+}
+
+.settings-sidebar::-webkit-scrollbar-thumb:hover,
+.settings-content::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-hover);
 }
 
 .settings-loading {
@@ -262,7 +298,7 @@
 .toggle-slider {
     position: absolute;
     inset: 0;
-    background-color: var(--bg-tertiary, #333);
+    background-color: var(--bg-secondary, #333);
     border: 1px solid var(--border-color, #444);
     border-radius: 24px;
     transition: all 0.2s ease;
@@ -964,12 +1000,12 @@
 .settings-btn {
     display: flex;
     gap: 8px;
-    padding: 10px 20px;
-    border-radius: 6px;
+    padding: 12px 24px;
+    border-radius: var(--radius-md);
     font-size: 0.9rem;
-    font-weight: 500;
+    font-weight: 600;
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: all 0.2s ease;
     align-items: center;
 }
 
@@ -980,12 +1016,15 @@
 }
 
 .settings-btn.primary:hover:not(:disabled) {
-    filter: brightness(1.1);
+    filter: brightness(1.15);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-soft);
 }
 
 .settings-btn.primary:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+    transform: none;
 }
 
 .settings-btn.secondary {
@@ -995,7 +1034,8 @@
 }
 
 .settings-btn.secondary:hover {
-    background: var(--bg-primary);
+    background: var(--bg-secondary);
+    border-color: var(--accent);
 }
 
 .btn-loading {
@@ -1539,7 +1579,8 @@
  *  ========================================================================== */
 
 .typography-settings-section,
-.audio-settings-section {
+.audio-settings-section,
+.streaming-sound-section {
     padding: 20px;
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
@@ -1547,6 +1588,10 @@
 }
 
 .audio-settings-section {
+    margin-top: 20px;
+}
+
+.streaming-sound-section {
     margin-top: 20px;
 }
 
@@ -1574,6 +1619,11 @@
 
 .settings-section-icon.audio-icon {
     background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+}
+
+.settings-section-icon.streaming-sound-icon {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
     color: white;
 }
 
@@ -2070,7 +2120,8 @@
 /* Responsive */
 @media (max-width: 600px) {
     .typography-settings-section,
-    .audio-settings-section {
+    .audio-settings-section,
+    .streaming-sound-section {
         padding: 16px;
     }
 

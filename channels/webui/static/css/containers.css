@@ -1,6 +1,6 @@
 /* ==========================================================================
- *   App Container
- *   ========================================================================== */
+ *   App Container - Modern Layout
+ *  ========================================================================== */
 .app-wrapper {
     display: flex;
     height: 100%;
@@ -8,15 +8,15 @@
 }
 
 /* ==========================================================================
- *  Chat Container
+ *  Chat Container - Enhanced Design
  *  ========================================================================== */
 .chat-container {
     flex: 1;
     overflow-y: auto;
-    padding: 16px;
+    padding: 20px;
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 18px;
     background: var(--bg-primary);
     min-height: 0;
 }
@@ -25,4 +25,62 @@
     background: linear-gradient(var(--bg-primary), var(--bg-primary)) padding-box,
     linear-gradient(90deg, var(--accent) 50%, transparent 50%) border-box;
     border: 2px dashed var(--accent);
+}
+
+/* ==========================================================================
+ *  Main Content Area - Modern Design
+ *  ========================================================================== */
+.main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    background: var(--bg-primary);
+}
+
+.app-container {
+    display: flex;
+    flex-direction: column;
+    width: var(--chat-content-width, 100%);
+    height: 100%;
+    margin: 0 auto;
+    background: var(--bg-secondary);
+    box-shadow: var(--shadow-medium);
+    min-height: 0;
+}
+
+/* Drop Overlay - Modern Design */
+.drop-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(8px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    pointer-events: none;
+}
+
+.drop-overlay.active {
+    display: flex;
+}
+
+.drop-overlay-content {
+    background: var(--bg-tertiary);
+    border: 2px dashed var(--accent);
+    border-radius: var(--radius-xl);
+    padding: 48px 72px;
+    text-align: center;
+    box-shadow: var(--shadow-strong);
+}
+
+.drop-overlay-content svg {
+    width: 56px;
+    height: 56px;
+    margin-bottom: 16px;
+    color: var(--accent);
 }

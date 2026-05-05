@@ -79,6 +79,7 @@ class APIClient():
         return {
             "connected": self.connected,
             "error": self._connection_error,
+            "url": api_config.get("url"),
             "model": self._model,
             "attempts": self._connection_attempts,
             "url_configured": bool(api_config.get("url")),

@@ -361,7 +361,7 @@ core:
 
                 lines.append(f"Connected: {'Yes' if status['connected'] else 'No'}")
                 lines.append(f"Model: {status['model'] or 'Not set'}")
-                lines.append(f"URL configured: {'Yes' if status['url_configured'] else 'No'}")
+                lines.append(f"URL: {status['url']}")
                 lines.append(f"Key configured: {'Yes' if status['key_configured'] else 'No'}")
 
                 if status['error']:

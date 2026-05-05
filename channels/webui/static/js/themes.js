@@ -19,54 +19,76 @@ const themes = {
         name: 'Monochrome',
         mode: 'dark',
         vars: {
-            '--bg-primary': '#0a0a0a',
-            '--bg-secondary': '#121212',
-            '--bg-tertiary': '#1c1c1c',
-            '--bg-message-user': 'linear-gradient(135deg, #2e2e2e 0%, #222222 100%)',
-            '--bg-message-ai': '#151515',
-            '--bg-message-announce': 'linear-gradient(135deg, #1e1e1e 0%, #141414 100%)',
-            '--bg-message-command': 'linear-gradient(135deg, #1a2a1a 0%, #0f1f0f 100%)',
-            '--bg-message-command-response': 'linear-gradient(135deg, #1a1a2a 0%, #0f0f1f 100%)',
-            '--bg-input': '#101010',
-            '--bg-code': '#0a0a0a',
-            '--bg-sidebar': '#080808',
-            '--border-color': '#252525',
-            '--border-message': '#333333',
-            '--border-user': '#404040',
-            '--border-sidebar': '#1a1a1a',
-            '--text-primary': '#e8e8e8',
-            '--text-secondary': '#a8a8a8',
-            '--text-muted': '#5a5a5a',
-            '--text-code': '#d4d4d4',
-            '--accent': '#ababab',
-            '--accent-glow': 'rgba(255, 255, 255, 0.5)',
-            '--accent-secondary': '#38bdf8',
-            '--error': '#ef4444',
-            '--error-bg': 'linear-gradient(135deg, #2a1515 0%, #1a0a0a 100%)',
-            '--error-border': '#4a2020',
-            '--important': '#eab308',
-            '--important-bg': 'linear-gradient(135deg, #2a2a10 0%, #1a1a08 100%)',
-            '--important-border': '#4a4a20',
-            '--info': '#38bdf8',
-            '--info-bg': 'linear-gradient(135deg, #102030 0%, #081018 100%)',
-            '--info-border': '#1a3040',
-            '--button-bg': 'linear-gradient(135deg, #2a2a2a 0%, #1e1e1e 100%)',
-            '--button-hover': 'linear-gradient(135deg, #383838 0%, #2a2a2a 100%)',
-            '--button-stop': 'linear-gradient(135deg, #3a1a1a 0%, #2a1010 100%)',
-            '--button-stop-hover': 'linear-gradient(135deg, #4a2020 0%, #3a1515 100%)',
-            '--button-stop-glow': 'rgba(239, 68, 68, 0.3)',
-            '--scrollbar': '#202020',
-            '--scrollbar-hover': '#303030',
-            '--shadow-soft': '0 2px 8px rgba(0, 0, 0, 0.4)',
+            // === BASE SURFACES — refined zinc palette ===
+            '--bg-primary': '#09090b',
+            '--bg-secondary': '#18181b',
+            '--bg-tertiary': '#232326',
+            
+            // === MESSAGE BACKGROUNDS — clean, flat with subtle borders ===
+            '--bg-message-user': 'linear-gradient(135deg, #1e1e22 0%, #18181b 100%)',
+            '--bg-message-ai': '#111114',
+            '--bg-message-announce': '#1a1a1e',
+            '--bg-message-command': 'linear-gradient(135deg, #0f1a12 0%, #0c1410 100%)',
+            '--bg-message-command-response': 'linear-gradient(135deg, #120f1a 0%, #0e0c14 100%)',
+            
+            // === INPUT & CODE — slightly elevated ===
+            '--bg-input': '#111114',
+            '--bg-code': '#0c0c0e',
+            '--bg-sidebar': '#0c0c0e',
+            
+            // === BORDERS — subtle zinc strokes ===
+            '--border-color': '#27272a',
+            '--border-message': '#3f3f46',
+            '--border-user': '#52525b',
+            '--border-sidebar': '#1f1f22',
+            
+            // === TEXT — zinc scale for hierarchy ===
+            '--text-primary': '#fafafa',
+            '--text-secondary': '#a1a1aa',
+            '--text-muted': '#71717a',
+            '--text-code': '#e4e4e7',
+            
+            // === ACCENT — muted zinc for subtle emphasis ===
+            '--accent': '#a1a1aa',
+            '--accent-glow': 'rgba(161, 161, 170, 0.15)',
+            
+            // === STATUS COLORS — muted but legible ===
+            '--error': '#f87171',
+            '--error-bg': 'linear-gradient(135deg, #1c0f0f 0%, #140a0a 100%)',
+            '--error-border': '#3f2020',
+            
+            '--important': '#fbbf24',
+            '--important-bg': 'linear-gradient(135deg, #1c1a0f 0%, #14120a 100%)',
+            '--important-border': '#3f3820',
+            
+            '--info': '#60a5fa',
+            '--info-bg': 'linear-gradient(135deg, #0f141c 0%, #0a0e14 100%)',
+            '--info-border': '#20283f',
+            
+            // === BUTTONS — clean flat design ===
+            '--button-bg': '#27272a',
+            '--button-hover': '#3f3f46',
+            '--button-stop': '#3b1a1a',
+            '--button-stop-hover': '#4a2020',
+            '--button-stop-glow': 'rgba(248, 113, 113, 0.2)',
+            
+            // === SCROLLBAR — minimal ===
+            '--scrollbar': '#27272a',
+            '--scrollbar-hover': '#3f3f46',
+            
+            // === SHADOWS — soft, modern ===
+            '--shadow-soft': '0 1px 3px rgba(0, 0, 0, 0.5)',
             '--shadow-glow': '0 0 20px var(--accent-glow)',
-            '--tool-bg': '#181818',
-            '--tool-bg-secondary': '#121212',
-            '--tool-border': '#303030',
-            '--tool-border-hover': '#404040',
-            '--tool-pending-bg': 'rgba(255, 255, 255, 0.15)',
-            '--tool-pending-color': '#ffffff',
-            '--tool-completed-bg': 'rgba(56, 189, 248, 0.15)',
-            '--tool-completed-color': '#38bdf8',
+            
+            // === TOOL PANEL — elevated surfaces ===
+            '--tool-bg': '#18181b',
+            '--tool-bg-secondary': '#111114',
+            '--tool-border': '#27272a',
+            '--tool-border-hover': '#3f3f46',
+            '--tool-pending-bg': 'rgba(255, 255, 255, 0.06)',
+            '--tool-pending-color': '#e4e4e7',
+            '--tool-completed-bg': 'rgba(96, 165, 250, 0.1)',
+            '--tool-completed-color': '#60a5fa',
         }
     },
     'dark-material': {
@@ -1105,54 +1127,76 @@ const themes = {
         name: 'Monochrome',
         mode: 'light',
         vars: {
-            '--bg-primary': '#fafafa',
-            '--bg-secondary': '#f0f0f0',
-            '--bg-tertiary': '#e8e8e8',
-            '--bg-message-user': 'linear-gradient(135deg, #e0e0e0 0%, #ebebeb 100%)',
-            '--bg-message-ai': '#f5f5f5',
-            '--bg-message-announce': 'linear-gradient(135deg, #e8e8e8 0%, #f0f0f0 100%)',
-            '--bg-message-command': 'linear-gradient(135deg, #d8e8d8 0%, #e0f0e0 100%)',
-            '--bg-message-command-response': 'linear-gradient(135deg, #e0d8e8 0%, #e8e0f0 100%)',
+            // === BASE SURFACES — refined zinc palette ===
+            '--bg-primary': '#ffffff',
+            '--bg-secondary': '#f4f4f5',
+            '--bg-tertiary': '#e4e4e7',
+            
+            // === MESSAGE BACKGROUNDS — clean, flat with subtle borders ===
+            '--bg-message-user': 'linear-gradient(135deg, #f0f0f2 0%, #e8e8ea 100%)',
+            '--bg-message-ai': '#fafafa',
+            '--bg-message-announce': '#f4f4f5',
+            '--bg-message-command': 'linear-gradient(135deg, #e8f5e9 0%, #e0f0e4 100%)',
+            '--bg-message-command-response': 'linear-gradient(135deg, #ede8f5 0%, #e4e0f0 100%)',
+            
+            // === INPUT & CODE — slightly elevated ===
             '--bg-input': '#ffffff',
-            '--bg-code': '#fafafa',
-            '--bg-sidebar': '#f5f5f5',
-            '--border-color': '#d8d8d8',
-            '--border-message': '#c8c8c8',
-            '--border-user': '#b8b8b8',
-            '--border-sidebar': '#e8e8e8',
-            '--text-primary': '#1a1a1a',
-            '--text-secondary': '#4a4a4a',
-            '--text-muted': '#8a8a8a',
-            '--text-code': '#2a2a2a',
-            '--accent': '#333333',
-            '--accent-glow': 'rgba(0, 0, 0, 0.15)',
-            '--accent-secondary': '#0ea5e9',
-            '--error': '#dc2626',
-            '--error-bg': 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
-            '--error-border': '#fca5a5',
-            '--important': '#ca8a04',
-            '--important-bg': 'linear-gradient(135deg, #fefce8 0%, #fef9c3 100%)',
+            '--bg-code': '#f4f4f5',
+            '--bg-sidebar': '#fafafa',
+            
+            // === BORDERS — subtle zinc strokes ===
+            '--border-color': '#d4d4d8',
+            '--border-message': '#e4e4e7',
+            '--border-user': '#a1a1aa',
+            '--border-sidebar': '#e4e4e7',
+            
+            // === TEXT — zinc scale for hierarchy ===
+            '--text-primary': '#09090b',
+            '--text-secondary': '#52525b',
+            '--text-muted': '#a1a1aa',
+            '--text-code': '#18181b',
+            
+            // === ACCENT — crisp dark emphasis ===
+            '--accent': '#27272a',
+            '--accent-glow': 'rgba(0, 0, 0, 0.06)',
+            
+            // === STATUS COLORS — muted but legible ===
+            '--error': '#ef4444',
+            '--error-bg': 'linear-gradient(135deg, #fef2f2 0%, #fff1f1 100%)',
+            '--error-border': '#fecaca',
+            
+            '--important': '#eab308',
+            '--important-bg': 'linear-gradient(135deg, #fefce8 0%, #fffbeb 100%)',
             '--important-border': '#fde047',
-            '--info': '#0284c7',
-            '--info-bg': 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
-            '--info-border': '#7dd3fc',
-            '--button-bg': 'linear-gradient(135deg, #e8e8e8 0%, #f0f0f0 100%)',
-            '--button-hover': 'linear-gradient(135deg, #d8d8d8 0%, #e8e8e8 100%)',
-            '--button-stop': 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
-            '--button-stop-hover': 'linear-gradient(135deg, #fecaca 0%, #fca5a5 100%)',
-            '--button-stop-glow': 'rgba(220, 38, 38, 0.2)',
-            '--scrollbar': '#d0d0d0',
-            '--scrollbar-hover': '#b8b8b8',
-            '--shadow-soft': '0 2px 8px rgba(0, 0, 0, 0.08)',
+            
+            '--info': '#3b82f6',
+            '--info-bg': 'linear-gradient(135deg, #eff6ff 0%, #f0f7ff 100%)',
+            '--info-border': '#bfdbfe',
+            
+            // === BUTTONS — clean flat design ===
+            '--button-bg': '#e4e4e7',
+            '--button-hover': '#d4d4d8',
+            '--button-stop': '#fee2e2',
+            '--button-stop-hover': '#fecaca',
+            '--button-stop-glow': 'rgba(239, 68, 68, 0.1)',
+            
+            // === SCROLLBAR — minimal ===
+            '--scrollbar': '#d4d4d8',
+            '--scrollbar-hover': '#a1a1aa',
+            
+            // === SHADOWS — soft, modern ===
+            '--shadow-soft': '0 1px 2px rgba(0, 0, 0, 0.05)',
             '--shadow-glow': '0 0 20px var(--accent-glow)',
-            '--tool-bg': '#f0f0f0',
-            '--tool-bg-secondary': '#f8f8f8',
-            '--tool-border': '#d0d0d0',
-            '--tool-border-hover': '#b8b8b8',
-            '--tool-pending-bg': 'rgba(0, 0, 0, 0.08)',
-            '--tool-pending-color': '#333333',
-            '--tool-completed-bg': 'rgba(14, 165, 233, 0.1)',
-            '--tool-completed-color': '#0284c7',
+            
+            // === TOOL PANEL — elevated surfaces ===
+            '--tool-bg': '#f4f4f5',
+            '--tool-bg-secondary': '#fafafa',
+            '--tool-border': '#e4e4e7',
+            '--tool-border-hover': '#d4d4d8',
+            '--tool-pending-bg': 'rgba(0, 0, 0, 0.04)',
+            '--tool-pending-color': '#27272a',
+            '--tool-completed-bg': 'rgba(59, 130, 246, 0.08)',
+            '--tool-completed-color': '#3b82f6',
         }
     },
     'light-pink': {
@@ -2196,15 +2240,15 @@ const themes = {
             '--radius-xl': '999px',
 
             // === COLORS (Hot Pink Palette) ===
-            '--bg-primary': '#ffeef5',
-            '--bg-secondary': '#fff0f5',
-            '--bg-tertiary': '#ffd6e7',
+            '--bg-primary': '#ffe2ef',
+            '--bg-secondary': '#ffcbe2',
+            '--bg-tertiary': '#ffd2e6',
             '--bg-message-user': 'linear-gradient(135deg, #ff9ecc 0%, #ff85c0 100%)',
-            '--bg-message-ai': '#ffffff',
+            '--bg-message-ai': '#ffc9dc',
             '--bg-message-announce': 'linear-gradient(135deg, #fff0f5 0%, #ffe0eb 100%)',
             '--bg-message-command': 'linear-gradient(135deg, #ff85c0 0%, #ff69b4 100%)', // Hot Pink
             '--bg-message-command-response': 'linear-gradient(135deg, #ffd6e7 0%, #ffcae0 100%)', // Soft Pink
-            '--bg-input': '#ffffff',
+            '--bg-input': '#ffd3ea',
             '--bg-code': '#fff5f8',
             '--bg-sidebar': '#ffe8f0',
 
@@ -2244,7 +2288,7 @@ const themes = {
             '--shadow-soft': '0 4px 15px rgba(255, 20, 147, 0.15)',
             '--shadow-glow': '0 0 25px var(--accent-glow)',
 
-            '--tool-bg': '#fff0f5',
+            '--tool-bg': '#ffd3ea',
             '--tool-bg-secondary': '#fff5f8',
             '--tool-border': '#ffc8e2',
             '--tool-border-hover': '#ff99cc',

@@ -1,23 +1,23 @@
 /* ==========================================================================
- *  Chat Title Bar
+ *  Chat Title Bar - Modern Design
  *  ========================================================================== */
 .chat-title-bar {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
-    padding: 8px 16px;
+    padding: 10px 20px;
     background: var(--bg-primary);
     border-bottom: 1px solid var(--border-color);
-    height: 40px;
-    max-height: 40px;
+    height: 44px;
+    max-height: 44px;
     position: relative;
     flex-wrap: wrap;
 }
 
 .chat-title-text {
-    font-size: 0.9rem;
-    font-weight: 500;
+    font-size: 0.95rem;
+    font-weight: 600;
     color: var(--text-secondary);
     white-space: nowrap;
     overflow: hidden;
@@ -40,10 +40,10 @@
     padding: 6px;
     background: transparent;
     border: 1px solid transparent;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-md);
     color: var(--text-muted);
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.2s ease;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -58,7 +58,7 @@
 }
 
 .chat-title-rename:hover {
-    background: var(--bg-tertiary);
+    background: var(--bg-secondary);
     border-color: var(--border-color);
     color: var(--text-primary);
 }
@@ -95,7 +95,7 @@
     padding: 0;
     background: transparent;
     border: none;
-    border-radius: 4px;
+    border-radius: var(--radius-md);
     color: var(--text-muted);
     cursor: pointer;
     transition: all 0.15s ease;
@@ -107,7 +107,7 @@
 }
 
 .chat-title-edit-btn:hover {
-    background: var(--bg-hover);
+    background: var(--bg-secondary);
     color: var(--text-primary);
 }
 
@@ -118,14 +118,16 @@
 }
 
 .chat-action-btn.edit:hover {
-    background: var(--bg-hover);
+    background: var(--bg-tertiary);
     color: var(--text-primary);
 }
 
 /* Ensure title text can contain edit input */
 #chat-title-text {
-min-width: 0;
-flex: 1;
+    min-width: 0;
+    flex: 1;
+    line-height: 24px;
+    height: 24px; /* Fixed height to prevent layout shift during rename */
 }
 
 /* No-chat state for title bar */
@@ -135,7 +137,8 @@ flex: 1;
 
 @media (max-width: 600px) {
     .chat-title-bar {
-        padding: 6px 12px;
+        padding: 8px 12px;
+        height: 40px;
     }
 
     .chat-title-text {
@@ -149,11 +152,11 @@ flex: 1;
 }
 
 /* ==========================================================================
- *  Search Bar
+ *  Search Bar - Modern Design
  *  ========================================================================== */
 .search-container {
     display: none;
-    padding: 12px 16px;
+    padding: 14px 20px;
     background: var(--bg-primary);
     border-bottom: 1px solid var(--border-color);
 }
@@ -165,26 +168,26 @@ flex: 1;
 .search-input-wrapper {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     max-width: 600px;
     margin: 0 auto;
 }
 
 .search-input {
     flex: 1;
-    padding: 10px 16px;
+    padding: 12px 18px;
     background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-full);
     color: var(--text-primary);
     font-size: 0.9rem;
     outline: none;
-    transition: all 0.2s;
+    transition: all 0.2s ease;
 }
 
 .search-input:focus {
     border-color: var(--accent);
-    box-shadow: 0 0 0 3px var(--accent-glow);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent);
 }
 
 .search-input::placeholder {
@@ -195,15 +198,15 @@ flex: 1;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    width: 34px;
+    height: 34px;
     padding: 0;
     background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     color: var(--text-secondary);
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all 0.15s ease;
 }
 
 .search-nav-btn:hover:not(:disabled) {
@@ -227,7 +230,7 @@ flex: 1;
 .search-count {
     padding: 6px 12px;
     background: var(--bg-tertiary);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-full);
     font-size: 0.8rem;
     color: var(--text-secondary);
     white-space: nowrap;
@@ -237,27 +240,26 @@ flex: 1;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    width: 34px;
+    height: 34px;
     padding: 0;
     background: transparent;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     color: var(--text-muted);
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all 0.15s ease;
 }
 
 .search-close-btn:hover {
     background: var(--bg-tertiary);
-    color: var(--text-primary);
+    color: var(--error);
     border-color: var(--error);
 }
 
 /* Search highlighting */
 .message.search-highlight {
-    /* Subtle background to show message contains matches */
-    box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb, 74, 222, 128), 0.2);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
 /* Match highlighting */

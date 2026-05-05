@@ -8,6 +8,10 @@ class Config(core.module.Module):
     unsafe = True
     _header = "OpenLumara config"
 
+    settings = {
+        "put_config_in_system_prompt": True
+    }
+
     def _redact_sensitive_info(self, data):
         """Recursively redacts sensitive information from a dictionary or list."""
         sensitive_keywords = ["token", "key", "secret", "password", "auth", "credential"]
@@ -29,6 +33,9 @@ class Config(core.module.Module):
             return data
 
     async def on_system_prompt(self):
+        if not self.config.get("put_config_in_system_prompt"):
+            return None
+
         try:
             # Deep copy to avoid mutating the actual live configuration
             config_data = copy.deepcopy(core.config.config)

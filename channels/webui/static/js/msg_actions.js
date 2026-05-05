@@ -12,6 +12,17 @@ async function editMessage(index, currentContent) {
     const messageEl = chat.querySelector(`[data-index="${index}"]`);
     if (!messageEl) return;
 
+    const messageBubble = messageEl.querySelector('.message');
+    let initialWidth = '100%';
+    let initialHeight = 'auto';
+    if (messageBubble) {
+        const computedStyle = window.getComputedStyle(messageBubble);
+        initialWidth = computedStyle.width;
+        // Use the rendered height, but ensure it's at least 80px for usability
+        const renderedHeight = Math.max(parseInt(computedStyle.height) || 80, 80);
+        initialHeight = renderedHeight + 'px';
+    }
+
     const editContainer = document.createElement('div');
     editContainer.className = 'edit-container';
 
@@ -19,6 +30,8 @@ async function editMessage(index, currentContent) {
     textarea.className = 'edit-textarea';
     textarea.value = currentContent;
     textarea.setAttribute('aria-label', 'Edit message');
+    textarea.style.width = initialWidth;
+    textarea.style.height = initialHeight;
 
     const actions = document.createElement('div');
     actions.className = 'edit-actions';

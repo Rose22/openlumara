@@ -49,7 +49,6 @@ default_config = {
 }
 
 DEFAULT_MODULES = (
-    "openlumara_prompt",
     "identity",
     "models",
     "channel",
@@ -60,11 +59,68 @@ DEFAULT_MODULES = (
     "lists",
     "system",
     "scheduler",
-    "tokens",
+    "token_threshold",
     "time"
 )
 
 DEFAULT_CHANNELS = ["webui"] # "cli" is disabled for Esobold
+
+class ConfigManager:
+    def __init__(self, config, base_path=None):
+        self.root_config = config
+        self.base_path = base_path or []
+
+    def get(self, *args, **kwargs):
+        """Shorthand for accessing nested config values.
+        Usage: config.get("api", "url") or config.get("api", "url", default_value)
+        """
+        default = kwargs.get("default", None)
+        if not args:
+            return default
+
+        keys = list(args)
+        # If the last argument is not a string, or is empty, treat it as an explicit default
+        if keys and not isinstance(keys[-1], str) or not keys[-1]:
+            default = keys.pop()
+
+        # Start from the root config and traverse through the base path
+        current = self.root_config
+        for k in self.base_path:
+            if isinstance(current, dict) and k in current:
+                current = current[k]
+            else:
+                return default
+
+        # Then traverse through the provided keys
+        for key in keys:
+            if isinstance(current, dict) and key in current:
+                current = current[key]
+            else:
+                return default
+        return current
+
+    def __getitem__(self, key):
+        """Access items using bracket notation: config['key']"""
+        current = self.root_config
+        for k in self.base_path + [key]:
+            if isinstance(current, dict) and k in current:
+                current = current[k]
+            else:
+                raise KeyError(key)
+        return current
+
+    def __setitem__(self, key, value):
+        """Set items using bracket notation: config['key'] = value"""
+        current = self.root_config
+        for k in self.base_path:
+            if k not in current or not isinstance(current[k], dict):
+                current[k] = {}
+            current = current[k]
+        
+        current[key] = value
+        if hasattr(self.root_config, 'save'):
+            self.root_config.save()
+
 
 def _discover_available_names(package):
     """
@@ -291,17 +347,31 @@ def load(file_path=None):
         print(f"A new configuration file has been created at {config.path}.")
 
 def get(*args, **kwargs):
-    """shorthand for accessing config values"""
-    global config
-    global default_config
+    """Shorthand for accessing nested config values.
+    Usage: config.get("api", "url") or config.get("api", "url", default_value)
+    """
+    global config, default_config
 
-    if config is None:
-        try:
-            val = default_config
-            for arg in args:
-                val = val[arg]
-            return val
-        except (KeyError, TypeError):
-            return None
+    default = kwargs.get("default", None)
+    if not args:
+        return default
 
-    return config.get(*args, **kwargs)
+    keys = list(args)
+    # If the last argument is not a string, or is empty, treat it as an explicit default
+    if keys and not isinstance(keys[-1], str) or not keys[-1]:
+        default = keys.pop()
+
+    # Safely resolve to a dictionary
+    try:
+        value = dict(config) if config else dict(default_config)
+    except (TypeError, ValueError):
+        value = dict(default_config)
+
+    for key in keys:
+        if isinstance(value, dict) and key in value:
+            value = value[key]
+        else:
+            return default
+    return value
+
+

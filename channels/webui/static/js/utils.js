@@ -38,7 +38,7 @@ function scrollToBottomDelayed() {
 }
 
 function autoResize(textarea) {
-    if (!textarea.value) {
+    if (!textarea.value || !textarea.value.includes('\n')) {
         textarea.style.height = '48px';
     } else {
         textarea.style.height = 'auto';

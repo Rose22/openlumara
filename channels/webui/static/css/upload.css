@@ -1,4 +1,4 @@
-/* Image upload styles */
+/* Image upload styles - Modern Design */
 .uploaded-image-container {
     display: flex;
     flex-direction: column;
@@ -9,15 +9,15 @@
 .uploaded-image-preview {
     max-width: 100%;
     max-height: 300px;
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     object-fit: contain;
-    background: var(--bg-secondary, #1a1a2e);
-    border: 1px solid var(--border-color, #333);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
 }
 
 .uploaded-image-caption {
     font-size: 0.85em;
-    color: var(--text-muted, #888);
+    color: var(--text-muted);
     text-align: center;
 }
 
@@ -25,46 +25,23 @@
 .message.ai img {
     max-width: 100%;
     max-height: 400px;
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     margin: 8px 0;
 }
 
 /* Markdown image styling */
 .message img {
     max-width: 100%;
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     margin: 8px 0;
 }
 
-.file-preview-container {
-    margin: 4px 0;
-}
-
-.file-preview {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.file-icon {
-    font-size: 1.2em;
-    user-select: none;
-}
-
-.file-name {
-    font-size: 0.9em;
-    color: var(--text-primary);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 250px;
-}
-
+/* Upload Queue - Modern Design */
 .upload-queue-container {
-    padding: 8px 12px;
-    background: rgba(30, 30, 30, 0.8);
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    max-height: 120px;
+    padding: 10px 16px;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-color);
+    max-height: 140px;
     overflow-y: auto;
     transition: all 0.2s ease;
 }
@@ -76,29 +53,33 @@
 .upload-queue-list {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
 }
 
 .upload-queue-item {
     display: flex;
     align-items: center;
     gap: 8px;
+    padding: 6px 10px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
 }
 
 .delete-queue-item {
-    margin-left: auto; /* Pushes button to the right */
+    margin-left: auto;
     background: none;
     border: none;
-    color: #888;
+    color: var(--text-muted);
     cursor: pointer;
     font-size: 1.2rem;
     line-height: 1;
     padding: 0 4px;
-    transition: color 0.2s;
+    transition: all 0.15s ease;
 }
 
 .delete-queue-item:hover {
-    color: #ff4d4d; /* Red on hover */
+    color: var(--error);
+    transform: scale(1.1);
 }
 
 .queue-file-icon {
@@ -109,5 +90,6 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
 }
-

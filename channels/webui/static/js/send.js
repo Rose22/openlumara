@@ -197,27 +197,33 @@ async function send(providedContent = null) {
     if (!isRegenerate) {
         placeholderUserWrapper = createPlaceholderUserMessage(message);
         chat.insertBefore(placeholderUserWrapper, typing);
+        scrollToBottom();
     }
 
     // Check API status
+    let isConnected = false;
     try {
         const statusResponse = await fetch('/api/status', { signal: AbortSignal.timeout(5000) });
         if (statusResponse.ok) {
             const statusData = await statusResponse.json();
-            if (!statusData.connected) {
-                removePlaceholder();
-                if (!isRegenerate) {
-                    showApiConfigError(
-                        statusData.error || 'API is not connected.',
-                        statusData.error_type,
-                        statusData.action
-                    );
-                }
-                return;
+            if (statusData.connected) {
+                isConnected = true;
             }
         }
     } catch (err) {
         console.error('Could not check API status:', err);
+    }
+
+    if (!isConnected) {
+        const reconnected = await reconnectApi();
+        if (!reconnected) {
+            removePlaceholder();
+            if (!isRegenerate) {
+                showApiConfigError('API is not connected.', 'connection_failed');
+            }
+            return;
+        }
+        isConnected = true;
     }
 
     // Build payload
@@ -265,6 +271,11 @@ async function send(providedContent = null) {
     const typewriterEnabled = localStorage.getItem("typewriterEnabled") !== 'false';
     const typewriterSpeed = parseInt(localStorage.getItem("typewriterSpeed") ?? "30", 10);
     const useTypewriter = typewriterEnabled && typewriterSpeed > 0;
+
+    const soundEnabled = localStorage.getItem("streamingSoundEnabled") !== 'false';
+    let playedCompletionSound = false;
+
+    scrollToBottom();
 
     try {
         const response = await fetch('/stream', {
@@ -318,6 +329,10 @@ async function send(providedContent = null) {
                             // Wait for typewriter to finish before finalizing
                             if (isTypewriterRunning) {
                                 await waitForTypewriter();
+                            } else if (!useTypewriter && soundEnabled) {
+                                // Play completion sound if typewriter mode was off
+                                TypewriterAudioManager.play('completion');
+                                playedCompletionSound = true;
                             }
                             finalizeAllContent();
                             collapseFinishedReasoning(aiMsgDiv);
@@ -364,6 +379,11 @@ async function send(providedContent = null) {
                                 }
                             } else {
                                 renderStreamSegments(aiMsgDiv);
+                            }
+
+                            // Play sound on every token if streaming sound is enabled AND typewriter mode is OFF
+                            if (!useTypewriter && soundEnabled && token.trim() !== '') {
+                                TypewriterAudioManager.play('typewriter');
                             }
                         }
                     }
@@ -436,6 +456,9 @@ async function send(providedContent = null) {
 
         if (isTypewriterRunning) {
             await waitForTypewriter();
+        } else if (!useTypewriter && !playedCompletionSound && soundEnabled) {
+            // Play completion sound if typewriter mode was off
+            TypewriterAudioManager.play('completion');
         }
 
         // Only finalize if not already done via commit
@@ -684,7 +707,7 @@ function waitForTypewriter() {
 
 function createPlaceholderUserMessage(text) {
     const wrapper = document.createElement('div');
-    wrapper.className = 'message-wrapper user user-placeholder';
+    wrapper.className = 'message-wrapper user user-placeholder animate-in';
 
     const msgDiv = document.createElement('div');
     msgDiv.className = 'message user';
@@ -714,6 +737,8 @@ function removePlaceholder() {
 function startStreamingUI(aiWrapper, typingIndicator) {
     typingIndicator.classList.remove('show');
     aiWrapper.classList.remove('hidden');
+    aiWrapper.classList.add('animate-in');
+    scrollToBottom();
     return true;
 }
 

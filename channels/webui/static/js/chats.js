@@ -6,6 +6,23 @@ let activeCategory = 'general'; // Default category
 // OPTIMIZATION: Global map for O(1) chat data lookups (prevents JSON parsing in loops)
 let chatDataMap = new Map();
 
+/**
+ * Configuration for metadata-based grouping.
+ * Maps a prefix used in the UI to the path of the property in the chat object.
+ * To add a new group, add a entry here (e.g., 'model': 'model_id')
+ * and ensure the prefix is in CATEGORY_REGISTRY for styling.
+ */
+const METADATA_GROUP_CONFIG = {
+    'char': 'custom_data.character'
+};
+
+/**
+ * Helper to retrieve nested properties using dot notation.
+ */
+function getNestedValue(obj, path) {
+    return path.split('.').reduce((acc, part) => acc && acc[part], obj);
+}
+
 const CATEGORY_REGISTRY = {
     'char': {
         icon: ICONS.user,
@@ -113,6 +130,15 @@ function filterChatsByCategory(chats, categoryKey) {
     if (categoryKey === 'general') {
         return chats.filter(c => !c.category || c.category === 'general');
     }
+
+    // Check if this is a metadata-driven group (e.g., "char:Bob")
+    const [prefix, id] = categoryKey.split(':');
+    if (METADATA_GROUP_CONFIG[prefix]) {
+        const path = METADATA_GROUP_CONFIG[prefix];
+        return chats.filter(chat => getNestedValue(chat, path) === id);
+    }
+
+    // Fallback to standard category check
     return chats.filter(c => c.category === categoryKey);
 }
 
@@ -280,7 +306,7 @@ async function loadChats() {
         // OPTIMIZATION: Parallel fetch is good, ensure backend returns summary data only
         const [chatResponse, tagsResponse] = await Promise.all([
             fetch('/chats'),
-                                                               fetch('/chat/tags')
+            fetch('/chat/tags')
         ]);
 
         const chatData = await chatResponse.json();
@@ -290,20 +316,22 @@ async function loadChats() {
         allChats = chatData.chats || [];
 
         // OPTIMIZATION: Store chats in a Map for O(1) access by ID.
-        // This prevents looping through arrays or parsing JSON strings later.
         chatDataMap.clear();
         allChats.forEach(chat => chatDataMap.set(chat.id, chat));
 
         const categories = new Set();
         allChats.forEach(chat => {
+            // 1. Standard direct categories
             if (chat.category && chat.category !== 'general') {
-                if (!chat.category.startsWith('char:')) {
-                    categories.add(chat.category);
-                }
+                categories.add(chat.category);
             }
-            const characterName = chat.custom_data?.character;
-            if (characterName) {
-                categories.add(`char:${characterName}`);
+            
+            // 2. Metadata-driven groups (e.g. char:Bob, model:gpt-4)
+            for (const [prefix, path] of Object.entries(METADATA_GROUP_CONFIG)) {
+                const val = getNestedValue(chat, path);
+                if (val) {
+                    categories.add(`${prefix}:${val}`);
+                }
             }
         });
 
@@ -366,15 +394,23 @@ async function restoreCurrentChat() {
         if (data.success && data.chat && data.chat.id) {
             currentChatId = data.chat.id;
 
-            // NEW: Sync the active category to match the current chat's category
-            // This ensures the sidebar is looking at the correct group/list
+            // Determine the effective category (handling metadata dynamically)
+            let chatCategory = 'general';
             if (data.chat.category && data.chat.category !== 'general') {
-                activeCategory = data.chat.category;
+                chatCategory = data.chat.category;
             } else {
-                activeCategory = 'general';
+                for (const [prefix, path] of Object.entries(METADATA_GROUP_CONFIG)) {
+                    const val = getNestedValue(data.chat, path);
+                    if (val) {
+                        chatCategory = `${prefix}:${val}`;
+                        break;
+                    }
+                }
             }
+            
+            activeCategory = chatCategory;
 
-            // NEW: Ensure the chat list is actually loaded/rendered in the sidebar
+            // Ensure the chat list is actually loaded/rendered in the sidebar
             await loadChats();
 
             const messages = data.chat.messages || [];
@@ -383,14 +419,14 @@ async function restoreCurrentChat() {
             updateChatTitleBar(data.chat.title, tags);
 
             if (messages.length > 0) {
-                renderAllMessages(messages);
+                renderAllMessages(messages, true);
                 updateTokenUsage();
                 lastMessageIndex = messages.length;
             } else {
                 clearChatUI();
             }
 
-            // NEW: Scroll to the selected chat in the sidebar
+            // Scroll to the selected chat in the sidebar
             scrollToActiveChat();
 
         } else {
@@ -404,6 +440,8 @@ async function restoreCurrentChat() {
         updateChatTitleBar(null);
     }
 }
+
+
 
 
 function clearChatUI() {
@@ -726,30 +764,46 @@ async function moveChatToCategory(chatId, newCategory) {
 async function newChat() {
     if (isStreaming) await stopGeneration();
     try {
+        const [prefix, id] = activeCategory.split(':');
+        const isMetadataGroup = prefix && METADATA_GROUP_CONFIG[prefix];
+        
+        let category = activeCategory;
+        let metadata = {};
+
+        if (isMetadataGroup) {
+            category = 'general';
+            const path = METADATA_GROUP_CONFIG[prefix];
+            const parts = path.split('.');
+            const key = parts[parts.length - 1];
+            metadata = { [key]: id };
+        }
+
         const response = await fetch('/chat/new', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title: '', category: activeCategory })
+            body: JSON.stringify({ 
+                title: '', 
+                category: category,
+                metadata: metadata
+            })
         });
 
         const data = await response.json();
 
         if (data.success && data.chat) {
-            currentChatId = data.chat.id;
-            lastMessageIndex = 0;
-            updateChatTitleBar(data.chat.title);
-            updateTokenUsage();
-
-            const wrappers = chat.querySelectorAll('.message-wrapper');
-            wrappers.forEach(wrapper => wrapper.remove());
-
             await loadChats();
+            // Force the sidebar to stay on the current active category 
+            // in case loadChats() or selectCategory() reset it.
+            selectCategory(activeCategory);
             closeSidebar();
         }
     } catch (e) {
         console.error('Failed to create new chat:', e);
     }
 }
+
+
+
 
 
 // Internal helper to load a chat without closing the sidebar
@@ -791,7 +845,7 @@ async function updateTokenUsage() {
 
             // 1. Always update the numbers and the width
             fill.style.width = `${Math.min(percentage, 100)}%`;
-            text.textContent = `${data.current.toLocaleString()} / ${data.max.toLocaleString()}`;
+            text.textContent = `Tokens: ${data.current.toLocaleString()} / ${data.max.toLocaleString()}`;
 
             // 2. Handle "Notification" (Visual Prominence)
             if (percentage >= NOTIFY_THRESHOLD) {
@@ -811,6 +865,10 @@ async function updateTokenUsage() {
                 container.classList.remove('active');
                 fill.style.backgroundColor = '#10b981'; // Reset to green
             }
+
+            // 3. Toggle shimmer animation based on streaming state
+            const isStreamingActive = typeof isStreaming !== 'undefined' && isStreaming;
+            container.classList.toggle('shimmer-active', isStreamingActive);
         }
     } catch (e) {
         console.error('Token usage update failed:', e);
