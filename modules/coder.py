@@ -1170,7 +1170,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         except Exception as e:
             return self.result(f"error: {e}", False)
 
-    async def read_file(self, project_name: str, file_path: list, offset: int = None, limit: int = None):
+    async def read_file(self, project_name: str, file_path: list, limit: int, offset: int = None):
         """
         Reads a file with optional line offset and limit.
         Returns content as string, or error dict on failure.
@@ -1192,7 +1192,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
                 lines = f.readlines()
 
             total_lines = len(lines)
-            max_lines = self.config.get("max_read_lines", 5000)
+            max_lines = self.config.get("max_read_lines", 1000)
 
             # Apply offset (1-indexed)
             start_idx = 0
@@ -1774,6 +1774,46 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
         except Exception as e:
             return self.result(f"error: {e}", success=False)
+
+    async def search_replace(self, project_name: str, file_path: list, query: str, replacement: str, use_regex: bool = True):
+        """
+        Replace all instances of a string or regex pattern across the entire file content.
+        Replaces ALL OCCURENCES of the query string with the replacement string.
+        """
+        file_path_str = self._get_file_path(project_name, file_path)
+        if not os.path.exists(file_path_str):
+            return self.result("error: file does not exist!", success=False)
+
+        try:
+            with open(file_path_str, 'r', encoding='utf-8') as f:
+                content = f.read()
+
+            if use_regex:
+                try:
+                    pattern = re.compile(query, re.IGNORECASE)
+                    new_content, count = pattern.subn(replacement, content)
+                except re.error as e:
+                    return self.result(f"error: Invalid regex pattern: {e}", success=False)
+            else:
+                count = content.count(query)
+                new_content = content.replace(query, replacement)
+
+            if count > 0:
+                with open(file_path_str, 'w', encoding='utf-8') as f:
+                    f.write(new_content)
+
+                return self.result({
+                    "success": True,
+                    "message": f"Replaced {count} instance(s).",
+                    "file": os.path.join(project_name, *file_path),
+                    "replacements": count
+                }, success=True)
+            else:
+                return self.result({"success": True, "message": "No matches found. File unchanged.", "file": os.path.join(project_name, *file_path)}, success=True)
+
+        except Exception as e:
+            return self.result(f"error: {e}", success=False)
+
 
     def _generate_diff(self, orig_content: str, new_content: str):
         # Generate unified diff

@@ -289,7 +289,7 @@ class Channel:
 
         if not fetched_token_usage:
             # yield an estimated token usage if the API didn't provide one
-            yield {"type": "token_usage", "content": self.context.chat.count_tokens(), "source": "estimation"}
+            yield {"type": "token_usage", "content": await self.context.chat.count_tokens(), "source": "estimation"}
 
         if not tool_calls_occurred: # don't add an extra message at the end of a toolcalling chain
 

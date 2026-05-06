@@ -95,6 +95,16 @@ def run_from_args(arg_list: list = []):
         else:
             exit()
 
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
 def add_arguments_recursive(parser, config, prefix=""):
     """
     Recursively traverses the config dict and adds arguments to the parser.
@@ -115,6 +125,8 @@ def add_arguments_recursive(parser, config, prefix=""):
             # Special handling for lists (like your 'enabled' keys)
             if isinstance(value, list):
                 parser.add_argument(arg_flag, type=str, metavar="<multiple,values>", help=f"Comma-separated list for {arg_name}")
+            elif arg_type == bool:
+                parser.add_argument(arg_flag, type=str2bool, default=None, metavar=f"<{key.lower()}>")
             else:
                 parser.add_argument(arg_flag, type=arg_type, default=None, metavar=f"<{key.lower()}>")
 
@@ -152,6 +164,8 @@ def override_config_with_args(live_config, args_namespace):
                 current_level[target_key] = [item.strip() for item in value.split(',')]
             else:
                 current_level[target_key] = value
+
+            core.log("core", f"overrode setting {target_key} with: {value}")
         else:
             # If it's not in the config, it's likely an app flag (like --pure or --cli)
             # We do nothing and let the rest of the program handle it via 'args'
