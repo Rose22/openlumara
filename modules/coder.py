@@ -1711,7 +1711,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
     # ==================== Search Operations ====================
 
-    async def search(self, project_name: str, file_path: list, query: str, context_lines: int = 5, max_matches: int = 10, use_regex: bool = True):
+    async def search_in_file(self, project_name: str, file_path: list, query: str, context_lines: int = 5, max_matches: int = 10, use_regex: bool = True):
         """
         Search for text or regex pattern within a file.
         Returns snippets with line numbers and surrounding context.
@@ -2048,31 +2048,31 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
     # ==================== System Prompt ====================
 
     async def on_system_prompt(self):
-        output = """## Code Editing Tool Usage
+        output = """
+## Coder Tool Priority
+Where 10 is highest priority and 0 is lowest priority,
+Prefer coding tool usage in order of priority. Only use low-priority coding tools if higher priority ones did not provide sufficient results.
 
 ### Reading
-Use in this order:
-1. **get_outline** (first) - lists all symbols in a file.
-2. **get_symbol** (primary) - reads a symbol by name (e.g., "MyClass.my_method").
-3. **read_file** (offset/limit) - only if outline/symbol aren't enough.
-4. **read_file** (full) - LAST RESORT ONLY.
+10: **get_outline**
+09: **get_symbol**
+08: **search_in_file**
+07: **read_file**
 
 ### Editing
-Use in this order:
-1. **edit_symbol / add_symbol_before / add_symbol_after** (preferred) - for inserting/replacing specific symbols.
-2. **edit** - exact text replacement. Use to make granular edits that don't need entire symbol-level rewrites.
-3. **append_to_file** - adds content to end of file.
+10: **edit_symbol / add_symbol_before / add_symbol_after**
+09: **edit**
+08: **search_replace**
+07: **append_to_file**
 
 ### Backup & Rollback
-1. **list_backups** - see available versions.
-2. **restore_backup** - roll back using a version index.
+10: **list_backups**
+09: **restore_backup**
 
-### Searching
-Use in this order:
-1. **grep** - regex/text across project files.
-2. **find_files** - glob patterns.
-3. **search** - text/regex within a single file.
-4. **list_full_project_tree** - overall project layout.
+### Project Exploration
+10: **grep**
+09: **find_files**
+08: **list_full_project_tree**
 
 ### Content Format
 - All content params must be RAW source code.
