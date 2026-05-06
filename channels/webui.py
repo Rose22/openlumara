@@ -212,7 +212,8 @@ class Webui(core.channel.Channel):
         try:
             self.server.serve_forever()
         except Exception as e:
-            core.log("webui", f"Server error: {e}")
+            err_msg = core.detail_error(e) if core.debug else e
+            core.log("webui", f"Server error: {err_msg}")
         finally:
             core.log("webui", "WebUI server down")
 
@@ -499,9 +500,10 @@ def list_models():
         models = _run_async(channel_instance.manager.API.list_models())
         return jsonify({'models': models})
     except Exception as e:
+        err_msg = core.detail_error(e) if core.debug else str(e)
         return jsonify({
             'models': [],
-            'error': str(e)
+            'error': err_msg
         }), 500
 
 @app.route('/messages')
@@ -583,7 +585,8 @@ def token_usage():
         usage = _run_async(channel_instance.context.get_token_usage())
         return jsonify(usage)
     except Exception as e:
-        core.log("webui", f"Error getting token usage: {e}")
+        err_msg = core.detail_error(e) if core.debug else e
+        core.log("webui", f"Error getting token usage: {err_msg}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/stream', methods=['POST'])
@@ -627,7 +630,8 @@ def stream_message():
 
                     token_queue.put(token_data)
             except Exception as e:
-                token_queue.put(('error', {'error': 'exception', 'message': str(e)}))
+                err_msg = core.detail_error(e) if core.debug else e
+                token_queue.put(('error', {'error': 'exception', 'message': f"error while receiving response from AI: {err_msg}"}))
             finally:
                 token_queue.put(done)
 
@@ -656,7 +660,8 @@ def stream_message():
 
                     yield f"data: {serialized_history_str}\n\n"
                 except Exception as e:
-                    yield f"data: {json.dumps({'_meta': {'type': 'error'}, 'error': str(e)})}\n\n"
+                    err_msg = core.detail_error(e) if core.debug else str(e)
+                    yield f"data: {json.dumps({'_meta': {'type': 'error'}, 'error': err_msg})}\n\n"
                 break
 
             # --- ERROR & CANCELLATION ---
@@ -855,7 +860,8 @@ def upload_file():
         return jsonify({'success': True, 'total': total, 'type': 'multi'})
 
     except Exception as e:
-        core.log("webui", f"Upload error: {e}")
+        err_msg = core.detail_error(e) if core.debug else str(e)
+        core.log("webui", f"Upload error: {err_msg}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 # =============================================================================
@@ -1418,8 +1424,9 @@ def load_storage_file():
         return jsonify({'success': False, 'error': 'Unsupported file type'})
 
     except Exception as e:
+        err_msg = core.detail_error(e) if core.debug else e
         core.log("webui", f"Error loading storage file: {e}")
-        return jsonify({'success': False, 'error': str(e)})
+        return jsonify({'success': False, 'error': str(err_msg)})
 
 @app.route('/storage/save', methods=['POST'])
 def save_storage_file():
@@ -1484,8 +1491,9 @@ def save_storage_file():
         return jsonify({'success': True})
 
     except Exception as e:
+        err_msg = core.detail_error(e) if core.debug else str(e)
         core.log("webui", f"Error saving storage file: {e}")
-        return jsonify({'success': False, 'error': str(e)})
+        return jsonify({'success': False, 'error': err_msg})
 
 @app.route('/storage/delete-key', methods=['POST'])
 def delete_storage_key():
@@ -1544,8 +1552,9 @@ def delete_storage_key():
         })
 
     except Exception as e:
+        err_msg = core.detail_error(e) if core.debug else str(e)
         core.log("webui", f"Error deleting key: {e}")
-        return jsonify({'success': False, 'error': str(e)})
+        return jsonify({'success': False, 'error': err_msg})
 
 @app.route('/storage/add-key', methods=['POST'])
 def add_storage_key():
@@ -1604,8 +1613,9 @@ def add_storage_key():
         })
 
     except Exception as e:
+        err_msg = core.detail_error(e) if core.debug else str(e)
         core.log("webui", f"Error adding key: {e}")
-        return jsonify({'success': False, 'error': str(e)})
+        return jsonify({'success': False, 'error': err_msg})
 
 # =============================================================================
 # Server control routes

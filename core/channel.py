@@ -61,13 +61,6 @@ class Channel:
         # fallback
         return ""
 
-    async def get_token_usage(self):
-        if not self.token_usage:
-            # fall back to manual counting
-            return self.context.get_token_usage()
-
-        return self.token_usage
-
     async def send(self, message: dict):
         """sends a message to the AI from within the current channel"""
 
@@ -75,21 +68,22 @@ class Channel:
         await self._set_as_active_channel()
 
         # process any /commands
-        cmd_response = None
-        is_cmd = message.get("content", "").strip().lower().startswith(
-            core.config.get("core", "cmd_prefix").strip().lower()
-        )
+        if isinstance(message.get("content"), str):
+            cmd_response = None
+            is_cmd = message.get("content", "").strip().lower().startswith(
+                core.config.get("core", "cmd_prefix").strip().lower()
+            )
 
-        if is_cmd and message.get("role", "user") == "user":
-            try:
-                cmd_response = await self.commands.process_input(message)
-            except Exception as e:
-                core.log_error("error while executing command", e)
+            if is_cmd and message.get("role", "user") == "user":
+                try:
+                    cmd_response = await self.commands.process_input(message)
+                except Exception as e:
+                    core.log_error("error while executing command", e)
 
-            if cmd_response:
-                return {"role": "assistant", "content": cmd_response}
-            else:
-                return {"role": "assistant", "content": "BLANK"}
+                if cmd_response:
+                    return {"role": "assistant", "content": cmd_response}
+                else:
+                    return {"role": "assistant", "content": "BLANK"}
 
         # if not a command, send the message to the AI and return it's response
 
@@ -179,22 +173,23 @@ class Channel:
         user_message = message #alias for readability
 
         # process any /commands
-        cmd_response = None
-        is_cmd = message.get("content", "").strip().lower().startswith(
-            core.config.get("core", "cmd_prefix").strip().lower()
-        )
+        if isinstance(message.get("content"), str):
+            cmd_response = None
+            is_cmd = message.get("content", "").strip().lower().startswith(
+                core.config.get("core", "cmd_prefix").strip().lower()
+            )
 
-        if is_cmd and message.get("role", "user") == "user":
-            try:
-                cmd_response = await self.commands.process_input(user_message)
-            except Exception as e:
-                core.log_error("error while executing command", e)
+            if is_cmd and message.get("role", "user") == "user":
+                try:
+                    cmd_response = await self.commands.process_input(user_message)
+                except Exception as e:
+                    core.log_error("error while executing command", e)
 
-            if cmd_response:
-                # insert and return the command response without sending it to the AI
-                for word in cmd_response:
-                    yield {"type": "content", "content": word}
-                return
+                if cmd_response:
+                    # insert and return the command response without sending it to the AI
+                    for word in cmd_response:
+                        yield {"type": "content", "content": word}
+                    return
 
         # attempt auto-reconnect once
         if not self.manager.API.connected:
@@ -205,6 +200,22 @@ class Channel:
 
         # add user's message to context
         await self.context.chat.add(user_message)
+
+        # estimate tokens used for user message
+        user_message_token_estimation = 0
+        if self.context.chat.using_api_token_data:
+            # if using API token count
+            user_msg_tokens = await self.context.chat.count_tokens([user_message])
+            user_message_token_estimation = await self.context.chat.get_token_usage()+user_msg_tokens
+
+            # add to existing API token count
+            await self.context.chat.set_token_usage(user_message_token_estimation)
+        else:
+            # just fully estimate
+            user_message_token_estimation = await self.context.chat.count_tokens()
+
+        # yield so it updates throughout all channels that display token count
+        yield {"type": "token_usage", "content": user_message_token_estimation, "source": "estimation"}
 
         # run module event hooks
         for module_name, module in self.manager.modules.items():
@@ -224,6 +235,7 @@ class Channel:
         final_reasoning = []
         tc_response = None
         tool_calls_occurred = False
+        fetched_token_usage = False
 
         # and stream the response to the caller of this method
         async for token in self.manager.API.send_stream(context):
@@ -265,9 +277,23 @@ class Channel:
                 # this is the final token usage count, usually emitted at the end of the stream
                 token_usage = token.get("content")
                 if isinstance(token_usage, int):
-                    self.context.chat.token_usage = token_usage
+                    # set the flag so that token counting is always using API data
+                    if not self.context.chat.using_api_token_data:
+                        self.context.chat.using_api_token_data = True
 
-        if not tool_calls_occurred:
+                    # cache this so chat.get_token_usage() returns this value
+                    await self.context.chat.set_token_usage(token_usage)
+
+                    fetched_token_usage = True
+                yield token
+
+        if not fetched_token_usage:
+            # yield an estimated token usage if the API didn't provide one
+            yield {"type": "token_usage", "content": self.context.chat.count_tokens(), "source": "estimation"}
+
+        if not tool_calls_occurred: # don't add an extra message at the end of a toolcalling chain
+
+            # add the assistant's response to context
             assistant_message = {
                 "role": "assistant",
                 "content": "".join(final_content)

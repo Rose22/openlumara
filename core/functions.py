@@ -9,10 +9,15 @@ def log(category: str, msg: str):
     if not core.quiet:
         print(f"[{category.upper()}] {msg}", flush=True)
 
+def detail_error(e: Exception):
+    """provides more detail about an exception, but in a compact format"""
+
+    return f"{e} | {e.__traceback__.tb_frame.f_code.co_filename}, {e.__traceback__.tb_frame.f_code.co_name}, ln:{e.__traceback__.tb_lineno}\n\n{traceback.format_exc()}"
+
 def log_error(msg: str, e: Exception):
     """console log but with extra spice for errors"""
     if core.debug:
-        log("error", f"{msg}: {e} | {e.__traceback__.tb_frame.f_code.co_filename}, {e.__traceback__.tb_frame.f_code.co_name}, ln:{e.__traceback__.tb_lineno}")
+        log("error", f"{msg}: {detail_error(e)}")
         traceback.print_exception(e, file=sys.stdout)
     else:
         log("error", f"{msg}: {e}")

@@ -9,6 +9,7 @@ class Chat:
         "category": "general",
         "tags": [],
         "custom_data": {},
+        "token_usage": 0
     }
 
     """contains openAI messages array, and can save and load sets of messages from files"""
@@ -17,7 +18,7 @@ class Chat:
         self.channel = channel
         self.current = None
         self.current_save_path = os.path.join(core.get_data_path(), f"{self.channel.name}_current_chat")
-        self.token_usage = 0 # uses API results to cache last message's token usage
+        self.using_api_token_data = False # gets instantly set to True upon first receive of token usage data
 
         for index in range(len(self.data) - 1, -1, -1):
             chat = self.data[index]
@@ -103,6 +104,9 @@ class Chat:
         index = len(self.data) - 1
         self._set_current(index)
 
+        await self.set_token_usage(0)
+        self.using_api_token_data = False
+
         self.data.save()
         return True
     async def clear(self):
@@ -110,6 +114,12 @@ class Chat:
             return False
 
         self.data[self.current]["messages"] = []
+        
+        # Reset token_usage since we're clearing the chat
+        # API token usage is only valid for the exact context that was sent
+        await self.set_token_usage(0)
+        self.using_api_token_data = False
+        
         await self.save()
 
         return True
@@ -258,6 +268,7 @@ class Chat:
         self.data[self.current]["messages"] = messages
         await self.save()
         return True
+
     async def add(self, message: dict, temporary = False):
         """add message to current chat"""
         if self.current is None:
@@ -283,6 +294,7 @@ class Chat:
 
         await self.save()
         return index
+
     async def pop(self, index: int = None):
         """pop message from current chat"""
         if self.current is None:
@@ -302,49 +314,66 @@ class Chat:
 
         messages = await self.get()
         if not messages:
-            return 0 # no messages, so length is 0
+            return True  # no messages to trim
 
-        # get rid of temporary messages
+        # get rid of temporary messages first
         for index, msg in enumerate(messages):
             if msg.get("temporary"):
                 await self.pop(index)
 
-        if not num_tokens:
-            # fall back to counting messages list using tiktoken
-            num_tokens = await self.count_tokens()
-
-        # re-fetch messages, cuz we popped
+        # re-fetch messages after removing temporary ones
         messages = await self.get()
+        if not messages:
+            return True
 
-        request_too_big = False
-        context_trimmed = False
-        tokens_exceeded = (num_tokens >= max_tokens)
-        message_count_exceeded = (len(messages) >= max_messages)
-        num_tokens = await self.count_tokens()
+        # Calculate current token count if not provided
+        if num_tokens is None:
+            num_tokens = await self.get_token_usage()
 
-        # need to recalculate it cuz this is a while loop
-        while len(messages) >= max_messages or num_tokens >= max_tokens:
-            # pop!
+        # Leave a small buffer (5%) to avoid hitting exact limit
+        token_buffer = max_tokens * 0.05
+        effective_max_tokens = max_tokens - token_buffer
+
+        # Check if we need to trim
+        needs_trimming = False
+        if len(messages) > max_messages:
+            needs_trimming = True
+        elif num_tokens > effective_max_tokens:
+            needs_trimming = True
+
+        if not needs_trimming:
+            return True
+
+        # Track if we had to trim due to token limit
+        trimmed_due_to_tokens = num_tokens > effective_max_tokens
+        trimmed_due_to_messages = len(messages) > max_messages
+
+        # Trim messages until we're under limits
+        while messages and (len(messages) > max_messages or num_tokens > effective_max_tokens):
+            # Remove the oldest message
             await self.pop(0)
 
-            # keep re-fetching
+            # Update messages and token count
             messages = await self.get()
             if not messages:
-                request_too_big = True
-                # we've exhausted all messages. handle it later in this function
+                # All messages removed - this shouldn't happen unless single message exceeds limit
                 break
 
-            # keep recalculating tokens
             num_tokens = await self.count_tokens()
 
-            if request_too_big:
-                # the entire thing was too big including user's input! inform them
-                await self.channel.announce("Your request exceeds the max amount of tokens allowed. Please send a smaller request!", "error")
-            # elif message_count_exceeded:
-            #     await self.channel.announce(f"You exceeded the max amount of messages set in your settings! Context size trimmed.\n\nAmount of messages: {len(messages)}\nMax messages allowed: {max_messages}", "error")
-            # elif context_trimmed:
-            #     await self.channel.announce("Input was too large! Context size trimmed.\n\nSent tokens: {num_tokens}\nMax allowed tokens: {max_tokens}", "error")
-        return len(messages) <= max_messages
+        # Check if we still have a problem after trimming
+        if messages:
+            num_tokens = await self.count_tokens()
+            if num_tokens > max_tokens:
+                # Even after trimming all but current message, we're over limit
+                # This means the current message itself is too large
+                await self.channel.announce(
+                    "Your request exceeds the maximum token limit. Please send a smaller message!",
+                    "error"
+                )
+                return False
+
+        return True
 
     async def _insert_blank_user_msg(self, message: dict):
         messages = await self.get()
@@ -354,8 +383,6 @@ class Chat:
             messages and
             # and the last message was an assistant message
             messages[-1].get("role") == "assistant" and
-            # and that last assistant message didn't have toolcalls
-            not messages[-1].get("tool_calls") and
             # and the message we're about to post is an assistant message
             message.get("role") == "assistant"
         ):
@@ -367,46 +394,81 @@ class Chat:
             await self.add({"role": "user", "content": "[SYSTEM_TICK]"})
         return True
 
-    async def count_tokens(self, messages: list = None) -> int:
+    async def get_token_usage(self):
         """
-        Counts tokens locally using tiktoken.
-        Used as a fallback if the API doesn't return usage data.
+        Returns the chat's current total token usage.
+        Prioritizes the API's data above all,
+        but if not available, will fall back on counting locally using tiktoken
         """
-        # if we have API token usage results (happens in core/channel.py),
-        # just return that
-        if self.token_usage > 0:
-            return self.token_usage
+        if not self.using_api_token_data:
+            return await self.count_tokens()
 
-        # otherwise fall back to counting with tiktoken
+        return self.data[self.current]["token_usage"]
+
+    async def set_token_usage(self, usage: int):
+        self.data[self.current]["token_usage"] = usage
+        self.data.save()
+
+    async def count_tokens(self, messages: list = None):
+        """
+        Counts token usage locally using tiktoken
+        """
 
         import tiktoken
+
+        # Get the model name from the API client
+        model_name = None
+        if hasattr(self.channel, 'manager') and hasattr(self.channel.manager, 'API'):
+            model_name = self.channel.manager.API._model
+
+        encoding = None
         try:
             # Try to get the specific tokenizer for the model (e.g. gpt-4)
-            encoding = tiktoken.encoding_for_model(self.channel.manager.API._model)
-        except KeyError:
-            # Fallback to a standard encoding for unknown/custom models
+            if model_name:
+                encoding = tiktoken.encoding_for_model(model_name)
+        except (KeyError, ValueError):
+            # Fallback for unknown/custom models
+            pass
+
+        if not encoding:
+            # Final fallback to cl100k_base (used by GPT-4, Claude, etc.)
             encoding = tiktoken.get_encoding("cl100k_base")
 
         num_tokens = 0
-        _messages = messages if messages else await self.get()
+        _messages = messages or await self.channel.context.get(system_prompt=True, end_prompt=True)
         if not _messages:
             return 0
 
         for message in _messages:
-            # OpenAI message format overhead is ~4 tokens per message
-            # <im_start>{role/name}\n{content}<im_end>\n
-            num_tokens += 4
-            for key, value in message.items():
-                if value and isinstance(value, str):
-                    # if it's just a normal text message, count tokens using its contents
-                    num_tokens += len(encoding.encode(value))
-                elif value and isinstance(value, list):
-                    # if its multimodal, skip all non-text content because we filter that out when using context.get()
-                    for part in value:
-                        part_text = part.get("text", None)
-                        if isinstance(part, dict) and part_text:
-                            num_tokens += len(encoding.encode(part_text))
+            # Conservative token counting:
+            # - 3 tokens for message overhead (OpenAI format: <im_start>role\ncontent<im_end>\n)
+            # - Role is counted as part of content
+            # - This is simpler and less likely to overcount than more complex formulas
 
-        # Add 2-3 tokens for the assistant priming at the end
-        num_tokens += 2
+            num_tokens += 3
+
+            # Count content
+            if "content" in message:
+                content = message["content"]
+                if isinstance(content, str):
+                    num_tokens += len(encoding.encode(content))
+                elif isinstance(content, list):
+                    # if its multimodal, skip all non-text content because we filter that out when using context.get()
+                    for part in content:
+                        if isinstance(part, dict):
+                            part_text = part.get("text")
+                            if isinstance(part_text, str):
+                                num_tokens += len(encoding.encode(part_text))
+
+            # If there's a name, add it (it's part of the message)
+            if "name" in message and isinstance(message["name"], str):
+                num_tokens += len(encoding.encode(message["name"]))
+
+            # Count reasoning content if present
+            if "reasoning_content" in message and isinstance(message["reasoning_content"], str):
+                num_tokens += len(encoding.encode(message["reasoning_content"]))
+
+        # Add 1 token for final assistant priming (conservative)
+        num_tokens += 1
+
         return int(num_tokens)

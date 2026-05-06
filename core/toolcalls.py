@@ -175,32 +175,13 @@ class ToolcallManager:
             await self.channel.announce("toolcalling chain cancelled", "info")
             return
 
-        # # build the toolcalling prompt
-        # try:
-        #     # attempt to get chat message history
-        #     context = await self.channel.context.chat.get()
-        # except:
-        #     # in case we don't have a chat, just use a blank messages array
-        #     context = {}
-
-        # prompt = [
-        #     {
-        #         "role": "system",
-        #         "content": (
-        #             "If the tool response provides sufficient answers, "
-        #             "explain the results to the user. If not, call another tool."
-        #         )
-        #     }
-        # ] + context
-
         final_content = []
         final_reasoning = []
         had_recursive_call = False
-        total_tool_usage = 0
 
         try:
             async for token in self.channel.manager.API.send_stream(
-                await self.channel.context.get(end_prompt=False),
+                await self.channel.context.get(system_prompt=True, end_prompt=False),
                 tools=self.channel.manager.tools
             ):
                 token_type = token.get("type")
@@ -213,6 +194,17 @@ class ToolcallManager:
                     yield token
                 elif token_type in ["tool_call_delta", "tool", "tool_calls"]:
                     yield token
+
+                if token_type == "token_usage":
+                    usage = token.get("content")
+                    if usage is not None:
+                        # set the flag so that token counting is always using API data
+                        if not self.channel.context.chat.using_api_token_data:
+                            self.channel.context.chat.using_api_token_data = True
+
+                        await self.channel.context.chat.set_token_usage(usage)
+                        # yield it to the frontend so the token bar updates in real-time
+                        yield token
 
                 if token_type == "tool_calls":
                     had_recursive_call = True
@@ -227,19 +219,13 @@ class ToolcallManager:
                         yield token
 
                     # the AI has decided to call more tools, so we make a recursive call
+                    # Pass along the accumulated token usage
                     async for sub_token in self.process(
                         repaired_tool_calls if tool_calls else [],
                         assistant_content="".join(final_content),
                         assistant_reasoning="".join(final_reasoning)
                     ):
                         yield sub_token
-
-                if token_type == "token_usage":
-                    usage = token.get("content")
-                    if usage is not None:
-                        total_tool_usage += usage
-                        # Yield it to the frontend so the token bar updates in real-time
-                        yield token
 
             # only add final message if we didn't make a recursive call
             # (the innermost call handles adding the final message)
@@ -263,6 +249,3 @@ class ToolcallManager:
                 f"Error while handling tool calls: {e}",
                 "error"
             )
-
-        if total_tool_usage > 0:
-            self.channel.context.chat.token_usage = total_tool_usage
