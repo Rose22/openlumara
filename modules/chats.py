@@ -59,7 +59,7 @@ class Chats(core.module.Module):
         return found_chats
 
     # command version
-    @core.module.command("search", temporary=True)
+    @core.module.command("search")
     async def cmd_search(self, args: list):
         """Searches within your chat history"""
         query = " ".join(args)

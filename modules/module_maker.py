@@ -90,7 +90,7 @@ class ModuleMaker(modules.sandboxed_files.SandboxedFiles):
 
                 return self.result(f"this is my tool, {name}! also, {msg_from_ai}", success=True) # using self.result is VITAL to ensure the output of a tool gets properly returned and parsed
 
-            @core.module.command("my_command", temporary=False, help={
+            @core.module.command("my_command", send_to_ai=False, help={
                 "": "show list of profiles", # this is shown for the command by itself without arguments
                 "<name>": "show profile for <name>",
                 "<name> <profile>": "set <name>'s profile to <profile>"

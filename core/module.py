@@ -82,7 +82,7 @@ class Module:
 # Registry format: {"command_name": [(class_type, method), ...]}
 _command_registry = {}
 
-def command(name, help=None, temporary=False):
+def command(name, help=None, send_to_ai=False):
     """
     Decorator to register a method as a command handler.
     Accepts a string description or a dictionary for subcommand help.
@@ -90,7 +90,7 @@ def command(name, help=None, temporary=False):
     """
     def decorator(func):
         func._is_command = True
-        func._is_temporary = temporary
+        func._is_temporary = (not send_to_ai)
         func._command_name = name.lower().strip()
 
         desc = help

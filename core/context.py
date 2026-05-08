@@ -22,17 +22,29 @@ class Context:
         if not self.channel.manager.API.connected:
             return None
 
-        # context = system prompt (top) + message history (middle) + endprompt (bottom)
-        context = []
+        # Configuration
+        max_messages = int(core.config.get("api").get("max_messages", 200))
+        max_tokens = int(core.config.get("api").get("max_context", 8192))
 
-        # always insert system prompt at start of context
+        # 1. Prepare Components
+        system_msg = []
         if system_prompt:
-            context = [{"role": "system", "content": await self.channel.manager.get_system_prompt()}]
+            content = await self.channel.manager.get_system_prompt()
+            if content:
+                system_msg = [{"role": "system", "content": content}]
 
-        # insert message history
-        messages = copy.deepcopy(await self.chat.get()) # deepcopy so that we don't modify the original
+        # Get history from the chat (the full, untrimmed version)
+        messages = copy.deepcopy(await self.chat.get())
+
+        # Remove ghost messages from history
+        messages = [msg for msg in messages if not msg.get("ghost")]
+        
+        # Apply max_messages limit to history first
+        if messages and len(messages) > max_messages:
+            messages = messages[-max_messages:]
+
+        # Strip multimodal data from all messages except the last one to save tokens
         if messages:
-            # strip multimodal data from all messages except the last one to save tokens
             for i in range(len(messages) - 1):
                 msg = messages[i]
                 content = msg.get("content")
@@ -43,28 +55,38 @@ class Context:
                         if isinstance(part, dict) and part.get("type") == "text"
                     ]
 
-            context.extend(messages)
-
-        """
-        insert endprompt
-
-        the endprompt is information provided by modules that should be at the very end so that context doesnt have to get reprocessed every time,
-        since context reprocessing happens from the point of change onward!
-
-        like if you change something in context, it'll reprocess everything after the part where you made the change.
-
-        so the endprompt is useful for info that changes constantly,
-        such as the current time and date.
-        """
+        end_msg = []
         if end_prompt:
-            # we add the end prompt message as a user message before the actual user messages
-            # because it turns out multiple consecutive user messages ARE allowed
-            # just not multiple consecutive assistant messages or system messages...
             histend = await self.channel.manager.get_end_prompt(prevent_recursion=prevent_recursion)
             if histend:
-                context.append({"role": "user", "content": histend})
+                end_msg = [{"role": "user", "content": histend}]
 
-        return context
+        # 2. Build and Trim Context
+        # We combine them to check the total token count
+        full_context = system_msg + messages + end_msg
+        
+        # Calculate current token count
+        current_tokens = await self.chat.count_tokens(full_context)
+
+        # Leave a small buffer (5%) to avoid hitting exact limit
+        token_buffer = max_tokens * 0.05
+        effective_max_tokens = max_tokens - token_buffer
+
+        # If we are over the limit, we trim the history (the middle part)
+        # We don't trim the system prompt or the end prompt as they are essential.
+        while current_tokens > effective_max_tokens and messages:
+            messages.pop(0)
+            full_context = system_msg + messages + end_msg
+            current_tokens = await self.chat.count_tokens(full_context)
+
+        # If we are STILL over the limit even with empty history, it's a single massive message
+        if current_tokens > max_tokens and messages:
+             await self.channel.announce(
+                "Your request exceeds the maximum token limit. Please send a smaller message!",
+                "error"
+            )
+
+        return full_context
 
     async def get_size(self):
         message_history = await self.get(system_prompt=False)

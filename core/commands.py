@@ -144,7 +144,7 @@ def _get_config_value(path: list):
 
 class Commands:
     # delete these after they are shown to the user once
-    TEMPORARY = ("context", "prompt", "tools", "stop")
+    GHOST = ("help", "clear", "context", "prompt", "tools", "stop")
 
     def __init__(self, channel):
         self.channel = channel
@@ -196,15 +196,15 @@ core:
         return "\n\n".join(output)
 
     def _check_if_temporary(self, cmd: str):
-        # set temporary flag on temporary commands so that they disappear upon the next user message
+        # set ghost flag on temporary commands so that they emit as ghost messages (invisible to the AI)
         if (
-            # manually marked as temporary
-            cmd in self.TEMPORARY
+            # manually marked as ghost
+            cmd in self.GHOST
             or
-            # marked as temporary within the decorator (@core.module.command(name, temporary=True)
+            # marked as ghost within the decorator (@core.module.command(name, send_to_ai=False)
             core.module.command_is_temporary(cmd)
             or
-            # just make them all temporary if tool usage is turned off
+            # just make them all ghosted if tool usage is turned off
             not core.config.get("model").get("use_tools")
         ):
             return True
@@ -236,12 +236,12 @@ core:
         if args:
             args_display += " "
             args_display += " ".join(args)
-        await self.channel.context.chat.add({"role": "user", "content": f"{cmd_prefix}{cmd[0]}{args_display}"}, temporary=use_temporary)
+        await self.channel.context.chat.add({"role": "user", "content": f"{cmd_prefix}{cmd[0]}{args_display}"}, ghost=use_temporary)
 
         result = await self._process_input(message)
 
         # insert command result into context, flagging as temporary if needed
-        await self.channel.context.chat.add({"role": "assistant", "content": f"[Command Output]:\n{result}"}, temporary=use_temporary)
+        await self.channel.context.chat.add({"role": "assistant", "content": f"[Command Output]:\n{result}"}, ghost=use_temporary)
 
         return result
 

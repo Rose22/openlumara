@@ -269,7 +269,7 @@ class Chat:
         await self.save()
         return True
 
-    async def add(self, message: dict, temporary = False):
+    async def add(self, message: dict, ghost = False):
         """add message to current chat"""
         if self.current is None:
             await self.new()
@@ -283,11 +283,11 @@ class Chat:
                 # this happens when the user uploads a media file. don't set that as a title, lol
                 pass
 
-        # if temporary, set the flag. gets handled in self.trim()
-        if temporary:
-            message["temporary"] = True
+        # if marked as a ghost message, set the flag. gets handled in self.trim()
+        # ghost messages are invisible to the AI
+        if ghost:
+            message["ghost"] = True
 
-        await self.trim() # automatically trim chat history
         await self._insert_blank_user_msg(message)
         self.data[self.current]["messages"].append(message)
         index = len(self.data[self.current]["messages"]) - 1
@@ -304,76 +304,6 @@ class Chat:
         index = len(self.data[self.current]["messages"]) - 1
         await self.save()
         return index
-
-    async def trim(self, max_messages: int = None, max_tokens: int = None, num_tokens: int = None):
-        """trims chat history to keep token consumption low"""
-        if not max_messages:
-            max_messages = int(core.config.get("api").get("max_messages", 200))
-        if not max_tokens:
-            max_tokens = int(core.config.get("api").get("max_context", 8192))
-
-        messages = await self.get()
-        if not messages:
-            return True  # no messages to trim
-
-        # get rid of temporary messages first
-        for index, msg in enumerate(messages):
-            if msg.get("temporary"):
-                await self.pop(index)
-
-        # re-fetch messages after removing temporary ones
-        messages = await self.get()
-        if not messages:
-            return True
-
-        # Calculate current token count if not provided
-        if num_tokens is None:
-            num_tokens = await self.get_token_usage()
-
-        # Leave a small buffer (5%) to avoid hitting exact limit
-        token_buffer = max_tokens * 0.05
-        effective_max_tokens = max_tokens - token_buffer
-
-        # Check if we need to trim
-        needs_trimming = False
-        if len(messages) > max_messages:
-            needs_trimming = True
-        elif num_tokens > effective_max_tokens:
-            needs_trimming = True
-
-        if not needs_trimming:
-            return True
-
-        # Track if we had to trim due to token limit
-        trimmed_due_to_tokens = num_tokens > effective_max_tokens
-        trimmed_due_to_messages = len(messages) > max_messages
-
-        # Trim messages until we're under limits
-        while messages and (len(messages) > max_messages or num_tokens > effective_max_tokens):
-            # Remove the oldest message
-            await self.pop(0)
-
-            # Update messages and token count
-            messages = await self.get()
-            if not messages:
-                # All messages removed - this shouldn't happen unless single message exceeds limit
-                break
-
-            num_tokens = await self.count_tokens()
-
-        # Check if we still have a problem after trimming
-        if messages:
-            num_tokens = await self.count_tokens()
-            if num_tokens > max_tokens:
-                # Even after trimming all but current message, we're over limit
-                # This means the current message itself is too large
-                await self.channel.announce(
-                    "Your request exceeds the maximum token limit. Please send a smaller message!",
-                    "error"
-                )
-                return False
-
-        return True
 
     async def _insert_blank_user_msg(self, message: dict):
         messages = await self.get()

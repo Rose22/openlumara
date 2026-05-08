@@ -136,6 +136,13 @@ class APIClient():
             "max_completion_tokens": core.config.get("api", {}).get("max_output_tokens", 8192)
         }
 
+        # add model param fields
+        for field, value in core.config.get("model", default={}).items():
+            if field in ["name", "use_tools", "reasoning_effort"]:
+                continue
+
+            req[field] = value
+
         reasoning_effort = core.config.get("model", {}).get("reasoning_effort")
         if reasoning_effort:
             req["reasoning_effort"] = reasoning_effort

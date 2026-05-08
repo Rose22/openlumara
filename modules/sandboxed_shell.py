@@ -115,7 +115,7 @@ class SandboxedShell(core.module.Module):
         except Exception as e:
             return self.result(f"Module Error: {str(e)}", False)
 
-    @core.module.command("shell", temporary=False, help={
+    @core.module.command("shell", send_to_ai=True, help={
         "<cmd>": "runs a command in the sandboxed shell"
     })
     async def cmd_shell(self, args):
@@ -142,7 +142,7 @@ class SandboxedShell(core.module.Module):
         except Exception as e:
             return f"error while running sandboxed shell command: {e}"
 
-    @core.module.command("shell_setup", temporary=False)
+    @core.module.command("shell_setup", send_to_ai=True)
     async def cmd_setup(self, args):
         """shows details about your sandbox setup"""
 

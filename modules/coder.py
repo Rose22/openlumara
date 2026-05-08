@@ -1201,12 +1201,14 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
             # Apply limit
             end_idx = total_lines
-            if limit is not None:
-                end_idx = min(start_idx + limit, total_lines)
+            end_limit_idx = min(start_idx + limit, total_lines)
+            if limit is not None and end_limit_idx < total_lines:
+                end_idx = end_limit_idx
 
             # Enforce max lines
             if (end_idx - start_idx) > max_lines:
                 end_idx = start_idx + max_lines
+                truncated = True
 
             selected_lines = lines[start_idx:end_idx]
             result = "".join(selected_lines)
@@ -1218,6 +1220,9 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
                 while len(result.encode('utf-8')) > max_bytes and result:
                     result = result[:-1]
                 truncated = True
+
+            if offset and not result:
+                return self.result("Offset was beyond file's ending, please use a lower offset", success=False)
 
             response = result
             if truncated:
@@ -2055,24 +2060,17 @@ Prefer coding tool usage in order of priority. Only use low-priority coding tool
 
 ### Reading
 10: **get_outline**
-09: **get_symbol**
-08: **search_in_file**
-07: **read_file**
+9: **get_symbol**
+8: **search_in_file**
+7: **read_file**
 
 ### Editing
 10: **edit_symbol / add_symbol_before / add_symbol_after**
-09: **edit**
-08: **search_replace**
-07: **append_to_file**
+9: **edit**
+8: **search_replace**
+7: **append_to_file**
 
-### Backup & Rollback
-10: **list_backups**
-09: **restore_backup**
-
-### Project Exploration
-10: **grep**
-09: **find_files**
-08: **list_full_project_tree**
+Other tools can be used as needed without special priority rules.
 
 ### Content Format
 - All content params must be RAW source code.
