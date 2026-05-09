@@ -235,6 +235,54 @@ function organizeSettingsIntoCategories(originalData, moduleInfo = {}) {
 
         // Regular object logic
         if (typeof topValue === 'object' && topValue !== null && !Array.isArray(topValue)) {
+            if (topValue.type === 'group') {
+                const groupKey = `${category}.${topKey}`;
+                const groupTitle = formatLabel(topKey);
+
+                if (!categories[category].groups.has(groupKey)) {
+                    categories[category].groups.set(groupKey, {
+                        title: groupTitle,
+                        items: [],
+                        description: topValue.description || null
+                    });
+                }
+
+                const group = categories[category].groups.get(groupKey);
+
+                for (const [itemKey, itemValue] of Object.entries(topValue.items)) {
+                    let val = itemValue;
+                    let type = detectType(itemValue, `${groupKey}.${itemKey}`);
+                    let desc = null;
+
+                    if (typeof itemValue === 'object' && itemValue !== null && !Array.isArray(itemValue) && 'default' in itemValue) {
+                        val = itemValue.default;
+                        desc = itemValue.description;
+                    }
+
+                    group.items.push({
+                        key: `${groupKey}.${itemKey}`,
+                        value: val,
+                        type: type,
+                        description: desc
+                    });
+                }
+                continue;
+            }
+
+            if (topValue.type || topValue.default !== undefined) {
+                let type = topValue.type || detectType(topValue.default, `${category}.${topKey}`);
+                if (type === 'long_text') type = 'textarea';
+                
+                addToGroup('_direct_', null, {
+                    key: `${category}.${topKey}`,
+                    value: topValue.default,
+                    type: type,
+                    description: topValue.description || null,
+                    options: topValue.options || null
+                }, true);
+                continue;
+            }
+
             const simpleItems = [];
             const complexItems = [];
 
@@ -298,6 +346,7 @@ function flattenSettingsObject(obj, prefix, schema = {}, callback) {
             if (subSchema.type === 'long_text') type = 'textarea';
             else if (subSchema.type === 'number') type = 'number';
             else if (subSchema.type === 'slider') type = 'slider';
+            else if (subSchema.type === 'select') type = 'select';
         }
 
         // 2. Determine description
@@ -319,7 +368,8 @@ function flattenSettingsObject(obj, prefix, schema = {}, callback) {
                     // 3. Pass through range properties for sliders/numbers
                     min: subSchema.min,
                     max: subSchema.max,
-                    step: subSchema.step
+                    step: subSchema.step,
+                    options: subSchema.options || null
                 });
             }
     }
@@ -687,6 +737,9 @@ function createSettingItem(item) {
         case 'slider':
             inputEl = createSliderInput(item.key, item.value, item.min, item.max, item.step);
             break;
+        case 'select':
+            inputEl = createSelectInput(item.key, item.value, item.options);
+            break;
         default:
             inputEl = createTextInput(item.key, item.value, item.type);
     }
@@ -746,6 +799,56 @@ function createSliderInput(key, value, min = 0, max = 100, step = 1) {
     });
 
     wrapper.appendChild(sliderRow);
+    return wrapper;
+}
+
+// Create select dropdown input with description update
+function createSelectInput(key, value, options) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'setting-select-wrapper';
+    wrapper.dataset.key = key;
+
+    const select = document.createElement('select');
+    select.className = 'setting-input';
+    select.dataset.key = key;
+
+    // options is { "val1": "Label 1", "val2": "Label 2" }
+    for (const [optLabel, optValue] of Object.entries(options)) {
+        const option = document.createElement('option');
+        option.value = optValue;
+        option.textContent = optLabel;
+        if (optValue === value) {
+            option.selected = true;
+        }
+        select.appendChild(option);
+    }
+
+    const descContainer = document.createElement('div');
+    descContainer.className = 'setting-select-description';
+    descContainer.style.marginTop = '8px';
+    descContainer.style.fontSize = '0.85em';
+    descContainer.style.color = 'var(--text-muted)';
+    descContainer.style.minHeight = '1.2em';
+
+    console.log(options);
+
+    const updateDescription = () => {
+        const selectedKey = select.options[select.selectedIndex].text;
+        console.log(selectedKey);
+        descContainer.textContent = options[selectedKey] || '';
+    };
+
+    select.onchange = () => {
+        updateDescription();
+        handleSettingChange(key, select.value);
+    };
+
+    wrapper.appendChild(select);
+    wrapper.appendChild(descContainer);
+    
+    // Initial description update
+    updateDescription();
+
     return wrapper;
 }
 

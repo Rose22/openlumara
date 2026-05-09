@@ -285,6 +285,14 @@
     color: var(--text-primary);
 }
 
+/* Select description: appears below the select dropdown */
+.setting-select-description {
+    margin: 4px 0 12px 0;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    color: var(--text-primary);
+}
+
 /* Module Card: appears inside the small card container */
 .toggle-list-item-description {
     font-size: 0.75rem;
