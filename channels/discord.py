@@ -22,6 +22,7 @@ class Client(discord.Client):
         message_content_full = []
         shown_reasoning_text = False
         char_counter = 0
+
         async with message_obj.channel.typing():
             async for token in token_stream:
                 word = token.get("content")
@@ -39,7 +40,7 @@ class Client(discord.Client):
                 if len(message_content) >= CHUNK_SIZE:
                     core.log("discord", f"<{message_obj.guild.me.name}> {message_content_str}")
                     message_obj = await discord_channel.send("...")
-                    message_content = [token]
+                    message_content = [word]
 
                 # edit message every few seconds
                 if datetime.datetime.now() >= next_edit_time or len(message_content) >= CHUNK_SIZE:
@@ -53,7 +54,7 @@ class Client(discord.Client):
                         await message_obj.edit(content=message_content_str)
 
                 if len(message_content) >= CHUNK_SIZE or char_limit_exceeded:
-                    message_content = [token]
+                    message_content = [word]
                     message_obj = await discord_channel.send("...")
 
         if message_content:
