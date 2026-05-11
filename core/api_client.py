@@ -450,7 +450,8 @@ class APIClient():
 
                 if final_tool_calls and core.config.get("model").get("use_tools", False):
                     # yield the full toolcall object as a single token to be interpreted by the function that is iterating through _recv_stream()
-                    yield {"type": "tool_calls", "tool_calls": final_tool_calls}
+                    tool_call_dicts = [tc.model_dump(warnings=False) for tc in final_tool_calls]
+                    yield {"type": "tool_calls", "tool_calls": tool_call_dicts}
 
         except Exception as e:
             core.log_error("error while receiving response from AI", e)

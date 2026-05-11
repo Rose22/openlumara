@@ -471,6 +471,10 @@ class Channel:
             parsed = json_repair.loads(args_str)
             if isinstance(parsed, dict):
                 data = parsed
+            else:
+                # If it's not a dict, it might be a partial dict that json_repair 
+                # couldn't quite fix into a dict. Let's try the regex fallback.
+                raise ValueError("Not a dict")
         except Exception:
             # Fallback to robust partial parsing if json_repair fails to produce a dict
             # This mimics the WebUI's ability to extract keys even from incomplete JSON
@@ -490,13 +494,24 @@ class Channel:
                 
                 # Use json_repair to try and get the value by wrapping it in a dict
                 try:
+                    # Try to get the value by wrapping it in a dict
                     repaired = json_repair.loads(f'{{"v": {potential_value_str}}}')
                     if isinstance(repaired, dict) and "v" in repaired:
                         data[key] = repaired["v"]
                     else:
-                        data[key] = potential_value_str
+                        # Fallback: strip quotes and trailing JSON structural characters
+                        val = potential_value_str.lstrip()
+                        if val.startswith('"'):
+                            val = val[1:]
+                        val = val.rstrip('"} ,]')
+                        data[key] = val
                 except Exception:
-                    data[key] = potential_value_str
+                    # Final fallback: strip quotes and trailing JSON structural characters
+                    val = potential_value_str.lstrip()
+                    if val.startswith('"'):
+                        val = val[1:]
+                    val = val.rstrip('"} ,]')
+                    data[key] = val
 
         # 3. Generate the delta based on the current (potentially partial) data
         for key, value in data.items():
@@ -527,7 +542,7 @@ class Channel:
         self._tool_state["raw_args"] = args_str
         return delta
 
-    async def format_stream_for_text(self, stream, chunk_size=None):
+    async def format_stream_for_text(self, stream, chunk_size=None, use_markdown=True):
         """
         helper function so that channels don't need to implement this themselves...
         takes care of properly displaying all the agentic turns
@@ -540,6 +555,7 @@ class Channel:
         show_reasoning = self.config.get("show_reasoning")
         last_token_was_newline = False
         token_counter = 0
+        char_counter = 0
 
         async for token in stream:
             token_type = token.get("type")
@@ -549,49 +565,66 @@ class Channel:
             try:
                 # collapse more than 2 newlines to just 2
                 content = re.sub(r'\n{3,}', '\n\n', content)
-
-                # format the reasoning to look all fancy
-                newline_str = "\n" if not currently_reasoning else "\n > "
                 content = content.replace("\n", newline_str)
+
+                if show_reasoning:
+                    # format the reasoning to look all fancy
+                    newline_str = "\n" if not currently_reasoning else "\n> "
             except:
                 pass
 
             # ensure formatting displays correctly even when split into chunks
             if chunk_size and token_counter >= chunk_size:
-                if currently_reasoning:
+                if currently_reasoning and show_reasoning:
                     yield text_to_token("> ")
                 token_counter = 0
 
-            # f token_type in ("content", "reasoning") and content == "\n":
-            #     if last_token_was_newline:
-            #         last_token_was_newline = False
-            #         continue
-            #     else:
-            #         last_token_was_newline = True
-
             if token_type == "reasoning" and not currently_reasoning:
                 if show_reasoning:
-                    yield text_to_token("\n\n**Reasoning:**\n> ")
+                    think_str = "\n## Thinking:\n> "
                     currently_reasoning = True
                 else:
-                    yield text_to_token("thinking..\n")
+                    think_str = "\n*thinking..*\n"
                     currently_reasoning = True
-            elif token_type == "tool":
-                yield text_to_token("\n(processing results..)\n\n")
+
+                char_counter += len(think_str)
+                yield text_to_token(think_str)
+
+            header_str = None
+            if token_type == "tool":
+                header_str = "\n(processing results..)\n"
             elif token_type == "content" and show_reasoning and currently_reasoning:
-                yield text_to_token("\n\n**Conclusion:**\n")
+                header_str = "\n## Conclusion:\n"
+
+            if header_str:
+                char_counter += len(header_str)
+                yield text_to_token(header_str)
+
 
             if token_type in ["content", "tool_calls", "tool"] and currently_reasoning:
                 # we can have multiple reasoning blocks
                 currently_reasoning = False
 
-            elif token_type == "tool_call_delta":
+            if token_type == "tool_call_delta" and self.config.get("stream_tool_calls"):
                 # Extract the accumulated tool call from the delta
                 tc_list = token.get("tool_calls", [])
                 if tc_list:
                     tc = tc_list[0]
                     # Render the partial/full tool call fancy style
-                    yield text_to_token(self._render_tool_token(tc.function.name, tc.function.arguments))
+                    tool_delta_str = self._render_tool_token(tc.function.name, tc.function.arguments)
+
+                    # fix fake newlines
+                    tool_delta_str = tool_delta_str.replace("\\n", "\n")
+
+                    char_counter += len(tool_delta_str)
+                    yield text_to_token(tool_delta_str)
+            elif token_type == "tool_calls":
+                tool_calls = token.get("tool_calls")
+                for tool_call in tool_calls:
+                    tool_str = "\n"+self.tc_manager.display_call(tool_call)
+
+                char_counter += len(tool_str)
+                yield text_to_token(tool_str)
 
             if token_type == "content":
                 yield text_to_token(content)
@@ -599,6 +632,9 @@ class Channel:
                 yield text_to_token(content)
 
             token_counter += 1
+
+            if isinstance(content, str):
+                char_counter == len(content)
 
     async def on_push(self, message: dict):
         raise NotImplementedError

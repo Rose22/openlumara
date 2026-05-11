@@ -22,7 +22,7 @@ class Characters(core.module.Module):
 
         self._header = "Identity"
 
-        if self.config.get("put_character_list_in_system_prompt"):
+        if self.config.get("insert_system_prompt"):
             # disable character listing tool
             self.disabled_tools.append("get_all")
 
@@ -95,7 +95,7 @@ class Characters(core.module.Module):
 
         tool_text = f"Characters available to switch yourself to:\n{await self._list_characters()}" if (
             core.config.get("model", {}).get("use_tools") and
-            self.config.get("put_character_list_in_system_prompt") and
+            self.config.get("insert_system_prompt") and
             not curr_char
         ) else ""
 

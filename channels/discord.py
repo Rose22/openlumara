@@ -4,6 +4,7 @@ import asyncio
 import datetime
 import json_repair
 
+MAX_CHARS = 1900
 CHUNK_SIZE = 400
 
 class Client(discord.Client):
@@ -13,28 +14,46 @@ class Client(discord.Client):
 
     async def _stream_to_discord(self, token_stream, discord_channel):
         """streams a message to discord in steps"""
-        message_obj = await discord_channel.send("...")
+        message_obj = await discord_channel.send("processing your request...")
 
         message_content = []
 
         next_edit_time = datetime.datetime.now()
         message_content_full = []
         shown_reasoning_text = False
+        char_counter = 0
         async with message_obj.channel.typing():
             async for token in token_stream:
-                # if tokens exceed 200, add a new message to target for the edits
-                if len(message_content) >= CHUNK_SIZE:
-                    message_content = []
-                    message_obj = await discord_channel.send("...")
-
                 word = token.get("content")
+
+                if not word:
+                    # wtf
+                    continue
+
                 message_content.append(word)
                 message_content_full.append(word)
+                message_content_str = "".join(message_content)
+                char_limit_exceeded = len(message_content_str) > MAX_CHARS
 
-                # edit message every few seconds or if token limit reached
+                # if tokens exceed limit, add a new message to target for the edits
+                if len(message_content) >= CHUNK_SIZE:
+                    core.log("discord", f"<{message_obj.guild.me.name}> {message_content_str}")
+                    message_obj = await discord_channel.send("...")
+
+                # edit message every few seconds
                 if datetime.datetime.now() >= next_edit_time or len(message_content) >= CHUNK_SIZE:
-                    await message_obj.edit(content="".join(message_content))
-                    next_edit_time = datetime.datetime.now() + datetime.timedelta(seconds=1)
+                    try:
+                        await message_obj.edit(content=message_content_str)
+                        next_edit_time = datetime.datetime.now() + datetime.timedelta(seconds=1)
+                    except:
+                        # fuck off
+                        core.log("discord", f"<{message_obj.guild.me.name}> {message_content_str}")
+                        message_obj = await discord_channel.send("...")
+                        await message_obj.edit(content=message_content_str)
+
+                if len(message_content) >= CHUNK_SIZE or char_limit_exceeded:
+                    message_content = []
+                    message_obj = await discord_channel.send("...")
 
         if message_content:
             await message_obj.edit(content="".join(message_content))
@@ -139,6 +158,7 @@ class Discord(core.channel.Channel):
         "require_mentions": False,
         "use_message_streaming": False,
         "show_reasoning": False,
+        "stream_tool_calls": False,
         "use_replies": True,
         "enable_group_chat": False,
         "announce_startup": False,
