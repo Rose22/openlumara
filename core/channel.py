@@ -566,7 +566,7 @@ class Channel:
             },
             "markdown": {
                 "thinking_header": "\n### Thinking\n> ",
-                "thinking_str": "**thinking..**\n",
+                "thinking_str": "*thinking..*\n",
                 "conclusion_header": "\n",
                 "processing_tool": "\n(processing results..)\n",
                 "thinking_newline": "\n> "

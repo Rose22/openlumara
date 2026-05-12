@@ -210,7 +210,7 @@ class WritingStyle(core.module.Module):
             case "robotic":
                 constraints[-1] += "Speak in a robotic way."
             case "uwu":
-                constraints[-1] += "Speak in uwuspeak."
+                constraints[-1] += "Speak in uwuspeak. Frequently say uwu."
             case "nya":
                 constraints[-1] += "Speak like a catgirl. Use nya a lot."
             case "feminine":

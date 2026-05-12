@@ -182,8 +182,8 @@ class APIClient():
             # request token usage from the API
             req["stream_options"] = {"include_usage": True}
 
-        if core.debug:
-            core.log("debug:request", str(req))
+        # if core.debug:
+        #     core.log("debug:request", str(req))
 
         try:
             # check for cancellation before starting the request

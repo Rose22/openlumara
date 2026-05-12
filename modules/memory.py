@@ -11,7 +11,7 @@ class Memory(core.module.Module):
     """Gives your AI a persistent memory system"""
 
     settings = {
-        "memory_prompt": {
+        "insert_system_prompt": {
             "default": True,
             "description": "Put extra instructions in the system prompt to help the AI autonomously use its memory system to remember things without you having to explicitely ask for it"
         },
@@ -36,7 +36,7 @@ class Memory(core.module.Module):
         pinned_str = ""
         automem_prompt = ""
 
-        if self.config.get("memory_prompt"):
+        if self.config.get("insert_system_prompt"):
             automem_prompt = "This is your persistent memory system. You are responsible for managing your own long-term memory. You must proactively and autonomously decide to use these tools to maintain an accurate, up-to-date, and efficient record of the user, your own operational preferences, and important contextual facts. Do not wait for instructions to remember; if information is valuable for future interactions, store it immediately."
 
         if self.config.get("put_pinned_memories_in_system_prompt"):

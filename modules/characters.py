@@ -10,7 +10,7 @@ class Characters(core.module.Module):
         },
         "disable_agent_prompts_when_character_active": {
             "default": True,
-            "description": "Automatically disables all prompts from other modules so that the system prompt when a character is active is purely the character profile"
+            "description": "Automatically disables all prompts from other modules when a character is active, so that the only thing in the system prompt is the character definition. This can help a lot with making characters behave purely like characters, and less like, well, personal assistants."
         }
     }
 

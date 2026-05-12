@@ -7,7 +7,10 @@ class Scheduler(core.module.Module):
     """Lets your AI send you scheduled reminders and do things at specified times"""
 
     settings = {
-        "put_scheduled_jobs_in_system_prompt": True,
+        "insert_system_prompt": {
+            "description": "Whether to insert a list of all currently scheduled jobs in the system prompt. This will make your AI aware of upcoming scheduled jobs at all times!",
+            "default": True
+        },
         "allow_recurring_jobs": True
     }
 
@@ -348,7 +351,7 @@ class Scheduler(core.module.Module):
         return days[weekday] if 0 <= weekday < 7 else "Unknown"
 
     async def on_system_prompt(self) -> str:
-        if not self.config.get("put_scheduled_jobs_in_system_prompt", True):
+        if not self.config.get("insert_system_prompt", True):
             return None
 
         if self.schedule:
