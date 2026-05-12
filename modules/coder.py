@@ -106,7 +106,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
                 "description": "Skip these folders when listing projects recursively. Helps not flood your context with hundreds of files, such as with python's venv and __pycache__",
                 "default": ["venv", "__pycache__"]
             },
-            "max_file_size_mb": {
+            "max_file_size": {
                 "description": "Max file size (in MB) the coder should be able to read in one go",
                 "default": 10
             },
@@ -380,11 +380,11 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
     def _check_file_size(self, file_path: str) -> Tuple[bool, Optional[str]]:
         """Check if file size is within configured limits."""
-        max_size_bytes = self.config.get("max_file_size_mb", 10) * 1024 * 1024
+        max_size_bytes = self.config.get("max_file_size", 10) * 1024 * 1024
         try:
             size = os.path.getsize(file_path)
             if size > max_size_bytes:
-                return False, f"File size ({size / (1024*1024):.1f}MB) exceeds limit ({self.config.get('max_file_size_mb', 10)}MB)"
+                return False, f"File size ({size / (1024*1024):.1f}MB) exceeds limit ({self.config.get('max_file_size', 10)}MB)"
             return True, None
         except OSError:
             return True, None
@@ -1264,7 +1264,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
 
 
-    async def read_file(self, project_name: str, file_path: list, limit: int, offset: int = None):
+    async def read_file(self, project_name: str, file_path: list, limit: int = None, offset: int = None):
         """
         Reads a file with optional line offset and limit.
         Returns content as string, or error dict on failure.
@@ -1283,7 +1283,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
                 lines = f.readlines()
 
             total_lines = len(lines)
-            max_lines = self.config.get("max_read_lines", 1000)
+            max_lines = self.config.get("limits", "max_read_lines", default=1000)
 
             # Apply offset (1-indexed)
             start_idx = 0
@@ -1306,7 +1306,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
             # Truncate if too large (50KB)
             size_limit_reached = False
-            max_bytes = 50 * 1024
+            max_bytes = self.config.get("limits", "max_file_size") * 1024 * 1024
             if len(result.encode('utf-8')) > max_bytes:
                 while len(result.encode('utf-8')) > max_bytes and result:
                     result = result[:-1]

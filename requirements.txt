@@ -7,8 +7,8 @@ json-repair
 aiofiles
 python-ulid
 requests
-flask
-flask_socketio
+fastapi
+uvicorn
 beautifulsoup4
 discord.py
 python-telegram-bot

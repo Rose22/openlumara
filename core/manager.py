@@ -179,7 +179,7 @@ class Manager:
                     else:
                         module.on_shutdown()
                 except Exception as e:
-                    core.log("warning", f"Error shutting down {module_name}: {e}")
+                    core.log_error(f"Error shutting down {module_name}", e)
 
         # shutdown channels
         for channel_name, channel in self.channels.items():
@@ -193,7 +193,7 @@ class Manager:
                         await channel._shutdown()
                         channel.on_shutdown()
                 except Exception as e:
-                    core.log("warning", f"Error shutting down {channel_name}: {e}")
+                    core.log_error(f"Error shutting down {channel_name}", e)
 
         # Cancel all running tasks so gather() returns
         for task in list(self._async_tasks):

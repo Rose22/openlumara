@@ -78,27 +78,49 @@ async function init() {
 
         // WebSocket Connection
         let socket = null;
-        
-        function connectWebSocket() {
-            socket = io({
-                transports: ['websocket', 'polling'],
-                reconnection: true,
-                reconnectionDelay: 1000,
-                reconnectionAttempts: 5
-            });
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 5;
 
-            socket.on('connect', () => {
+        function connectWebSocket() {
+            // Determine protocol (ws:// or wss://)
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
+
+            socket = new WebSocket(wsUrl);
+
+            socket.onopen = () => {
                 console.log('WebSocket connected');
                 isConnected = true;
-            });
+                reconnectAttempts = 0; // Reset attempts on successful connection
+            };
 
-            socket.on('push_message', (msg) => {
-                handleNewMessage(msg);
-            });
-            
-            socket.on('disconnect', (reason) => {
-                console.log('WebSocket disconnected:', reason);
-            });
+            socket.onmessage = (event) => {
+                try {
+                    // Native WebSockets transmit raw strings, so we parse JSON here.
+                    // Socket.IO did this automatically.
+                    const msg = JSON.parse(event.data);
+                    handleNewMessage(msg);
+                } catch (e) {
+                    console.error('Error parsing WebSocket message:', e);
+                }
+            };
+
+            socket.onclose = (event) => {
+                console.log('WebSocket disconnected:', event.reason);
+                isConnected = false;
+
+                // Manual Reconnection Logic (since we aren't using Socket.IO's auto-reconnect)
+                if (reconnectAttempts < maxReconnectAttempts) {
+                    reconnectAttempts++;
+                    console.log(`Attempting to reconnect (${reconnectAttempts}/${maxReconnectAttempts})...`);
+                    setTimeout(connectWebSocket, 1000 * reconnectAttempts);
+                }
+            };
+
+            socket.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                // onclose will be called immediately after onerror, handling the UI state
+            };
         }
 
         // State for turn grouping
