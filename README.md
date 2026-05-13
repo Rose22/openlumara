@@ -68,7 +68,7 @@ If you're familiar with python, this'll be very easy for you:
 import core
 
 # extend the class from core.channel.Channel to get all the required functionality
-class ChannelExample(core.channel.Channel):
+class Example(core.channel.Channel):
     """
     To make a channel, subclass from `core.channel.Channel`.
     Make sure to `import core`
@@ -97,62 +97,21 @@ class ChannelExample(core.channel.Channel):
             response = await self.send("user", user_input)
             self.announce(response) # don't use _announce, use announce without the _
 
-    async def _announce(self, message: str):
+    async def on_push(self, message: dict):
         """
         This function will be called by other parts of the framework when the channel should push a message out to the user.
-        You can use it within tools, for example to send a notification or reminder to the user!
-
-        If you want to call it yourself, use .announce(), not ._announce(). Otherwise it won't properly insert the messages into context!
+        You can use it within tools, for example to send a notification or reminder to the user
+        
+        message is an openAI message dict, like so:
+        {
+            "role": "assistant",
+            "content": "hi i said something"
+        }
         """
-        core.log("example channel", message)
-```
-
-# How to create your own module
-Like channels, a module is just a simple class that you can extend/subclass from. It has a few special methods that can be used to talk to the rest of the framework!
-
-```python
-import core
-
-class MyModule(core.module.Module):
-    """
-    To make a module, subclass from `core.module.Module`
-    Make sure to `import core`
-
-    Modules can use self.manager to access the manager object, and self.manager.channel to access the current channel!
-
-    You can use all the channel's features from there, like send(), send_stream(), and announce(). See the channel example for details!
-    """
-
-    async def my_tool(self, some_text: str, a_number: int):
-        """
-        The docstrings contain instructions for the AI.
-        The AI will see them and use them to determine what to do!
-
-        It has a special section, Args. Use it to further instruct the AI on what each argument does. It automatically gets added to the argument list for the AI to look at.
-
-        Args:
-            some_text: just some text. put whatever you want here, AI!
-            a_number: put a random number here
-        """
-
-    async def on_system_prompt(self):
-        return "Hi! I'm a system prompt! I'll be inserted automatically into the system prompt (above conversation history)"
-
-    async def on_ready(self):
-        """This method will run once the module is ready to be used. Use it instead of __init__() if you can."""
-        self.manager.channel.announce("i'm up i swear!")
-
-    async def on_background(self):
-        """This method will be added as a background task that will run contineously in the background. Use it for things like schedulers, cronjobs, etc!"""
-        return False
-
-    @core.module.command("my_command", help={
-        "": "the command without any arguments",
-        "name": "perform this command on that name"
-    })
-    async def my_command(self, args: list):
-        """Lets you define custom commands! The args are the string provided to the command, split into words."""
-        return None
+        core.log("example", message)
+        
+        # optionally also add it to chat history so that the AI knows about it
+        await self.context.chat.add(message)
 ```
 
 ## ⛔⛔⛔ THIS IS A LOBSTER-FREE ZONE ⛔⛔⛔
