@@ -25,7 +25,7 @@ https://github.com/user-attachments/assets/c6bde601-022b-44c4-80b7-16ed6c7f74eb
 
 <img width="480" alt="Screenshot_20260513_203346" src="https://github.com/user-attachments/assets/20566b93-e37f-4676-ae76-401d5a905d2a" />
 <img width="480" alt="Screenshot_20260513_203353" src="https://github.com/user-attachments/assets/c2677f62-e315-47b6-b65c-8a66fa6e35f1" />
-<img width="480" alt="Screenshot_20260513_203346" src="https://github.com/user-attachments/assets/cbaa76f3-80ec-4b2a-947c-83c8d4a8faa5" />
+<img width="480" alt="Screenshot_20260513_203359" src="https://github.com/user-attachments/assets/45e9f7b8-7f5a-44e2-bdc4-e9ea3f54d422" />
 
 > [!TIP]
 > Not sure how to use OpenLumara? Just ask your AI running on OpenLumara! It knows everything needed to get started. Find the instructions annoying? Just ask your AI to turn off the `channel` module, or use `/module channel` to toggle it off manually.
