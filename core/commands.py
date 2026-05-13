@@ -1,6 +1,7 @@
 import core
 import textwrap
 import asyncio
+import shlex
 
 def get_commands_help(modules_dict):
     """
@@ -97,11 +98,12 @@ def _set_config_value(path: list, value: str):
         # Traverse the dictionary following the path
         current = target
         for i, key in enumerate(path[:-1]):
-            # If the key doesn't exist or the current level isn't a dictionary,
-            # create a new dictionary to allow for deep nesting.
-            if key not in current or not isinstance(current[key], dict):
-                current[key] = {}
             current = current[key]
+
+        # Check if the target key already exists and is a dictionary
+        # This prevents overwriting a settings group with a single value
+        if path[-1] in current and isinstance(current[path[-1]], dict):
+            return "That's a settings group! Check which settings are in it instead of trying to set its value"
 
         # Set the final value
         current[path[-1]] = typed_value
@@ -122,6 +124,8 @@ def _get_config_value(path: list):
     """
     try:
         # Use the shorthand get from the config module which handles the StorageDict
+        if not path:
+            return "Available settings: "+", ".join(core.config.config.keys())
         root_item = core.config.get(path[0])
         if root_item == None:
             return f"{path[0]} is not a valid settings category"
@@ -215,7 +219,7 @@ core:
         cmd_prefix = core.config.get("core").get("cmd_prefix", "/")
         cmd_prefix_index = message_content.lower().find(cmd_prefix.lower())+len(cmd_prefix)
 
-        cmd = message_content[cmd_prefix_index:].split()
+        cmd = shlex.split(message_content[cmd_prefix_index:])
         args = cmd[1:]
 
         return (cmd_prefix, cmd, args)
@@ -393,10 +397,6 @@ core:
                     return "module with that name doesn't exist"
 
                 await self.channel.manager.toggle_module(module_name)
-                await self.channel.push("restarting to apply module change..")
-                await asyncio.sleep(0.1)
-                await self.channel.manager.restart()
-
                 return "module toggled"
             case "tools":
                 if not core.config.get("model").get("use_tools", False):
@@ -421,29 +421,42 @@ core:
                 return "\n\n".join(tool_map_display)
             case "config":
                 if not args:
-                    return "Usage: /config <set|get> <path> [value]"
+                    return str(_get_config_value([]))
 
-                subcommand = args[0].lower()
+                # Determine if it's a SET or a GET using type detection during traversal
+                is_set = False
+                path_to_use = args
+                value_to_use = None
 
-                if subcommand == "set":
-                    # Expected: ['set', 'key1', 'key2', 'value']
-                    if len(args) < 3:
-                        return "Usage: /config set <key1> <key2> ... <value>"
-
-                    path = args[1:-1]
-                    value = args[-1]
-                    return str(_set_config_value(path, value))
-
-                elif subcommand == "get":
-                    # Expected: ['get', 'key1', 'key2']
-                    if len(args) < 2:
-                        return "Usage: /config get <key1> <key2> ..."
-
-                    path = args[1:]
-                    return str(_get_config_value(path))
-
+                current = core.config.config
+                for i, arg in enumerate(args):
+                    if arg in current:
+                        if isinstance(current[arg], dict):
+                            # It's a group. Continue traversing.
+                            current = current[arg]
+                        else:
+                            # It's a value.
+                            if i < len(args) - 1:
+                                # We hit a value but there are more args.
+                                # This means the user is trying to SET the value of this key.
+                                is_set = True
+                                path_to_use = args[:-1]
+                                value_to_use = args[-1]
+                                break
+                            else:
+                                # We reached the end of args and it's a value. This is a GET.
+                                break
+                    else:
+                        # Key not found. This must be a SET for a new key.
+                        is_set = True
+                        path_to_use = args[:-1]
+                        value_to_use = args[-1]
+                        break
+                
+                if is_set:
+                    return str(_set_config_value(path_to_use, value_to_use))
                 else:
-                    return f"Unknown subcommand '{subcommand}'. Use 'set' or 'get'."
+                    return str(_get_config_value(path_to_use))
 
             case "context":
                 """shows current context window"""
