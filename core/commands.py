@@ -139,6 +139,38 @@ def _get_config_value(path: list):
             last_path_key = path_key
 
         if isinstance(sub_item, dict):
+            # NEW LOGIC: If we are looking at a specific module/channel/user_module's settings
+            # path format: [section, 'settings', name]
+            if len(path) == 3 and path[1] == "settings":
+                section = path[0] # 'modules', 'channels', or 'user_modules'
+                name = path[2]    # the module/channel name
+                
+                structure = core.config.get_module_structure()
+                if name in structure:
+                    mod_info = structure[name]
+                    schema = mod_info["settings"]
+                    lines = []
+                    for s_name, s_schema in schema.items():
+                        desc = ""
+                        if isinstance(s_schema, dict):
+                            desc = s_schema.get("description", "")
+                            if "options" in s_schema and isinstance(s_schema["options"], dict):
+                                opts = s_schema["options"]
+                                opt_list = [f"{k}: {v}" for k, v in opts.items()]
+                                if opt_list:
+                                    desc += " Options: " + ", ".join(opt_list)
+                        
+                        if desc:
+                            lines.append(f"{s_name}: {desc}")
+                        else:
+                            lines.append(f"{s_name}")
+                    
+                    if lines:
+                        return "\n".join(lines)
+                    else:
+                        return f"No settings found for {name}"
+
+            # Original behavior
             sub_keys = ", ".join(sub_item.keys())
             sub_item = f"Available settings in {last_path_key}: {sub_keys}"
 
