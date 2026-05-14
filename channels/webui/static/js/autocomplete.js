@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function initAutocomplete() {
     try {
-        const prefixRes = await fetch('/get_command_prefix');
+        const prefixRes = await fetch('/api/command_prefix');
         if (prefixRes.ok) {
             commandPrefix = await prefixRes.json();
         }
@@ -26,7 +26,7 @@ async function initAutocomplete() {
     }
 
     try {
-        const commandsRes = await fetch('/get_commands');
+        const commandsRes = await fetch('/api/commands');
         if (commandsRes.ok) {
             allCommands = await commandsRes.json();
         }

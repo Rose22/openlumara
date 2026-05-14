@@ -233,3 +233,25 @@ async function handleFileUpload(event) {
         alert('Failed to process uploaded files. Please try again.');
     }
 }
+
+
+// =============================================================================
+// Paste Support
+// =============================================================================
+
+document.addEventListener('paste', async (e) => {
+    const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+    const files = [];
+    for (let i = 0; i < items.length; i++) {
+        if (items[i].kind === 'file') {
+            files.push(items[i].getAsFile());
+        }
+    }
+
+    if (files.length > 0) {
+        e.preventDefault();
+        handleFileUpload({
+            target: { files: files }
+        });
+    }
+});
