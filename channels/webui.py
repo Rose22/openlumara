@@ -18,7 +18,7 @@ from collections import defaultdict
 from typing import List, Set, Dict, Any, Optional
 
 import uvicorn
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, Response, Depends, HTTPException, status
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, Response, Depends, HTTPException, status, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse, StreamingResponse, JSONResponse
@@ -88,14 +88,17 @@ stream_cancellations: Set[str] = set()
 class ConnectionManager:
     def __init__(self):
         self.active_connections: List[WebSocket] = []
+        self.connection_users: Dict[WebSocket, str] = {}  # Track authenticated users
 
-    async def connect(self, websocket: WebSocket):
+    async def connect(self, websocket: WebSocket, user: str = "anonymous"):
         await websocket.accept()
         self.active_connections.append(websocket)
+        self.connection_users[websocket] = user
 
     def disconnect(self, websocket: WebSocket):
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
+        self.connection_users.pop(websocket, None)
 
     async def broadcast(self, message: dict):
         for connection in self.active_connections:
@@ -107,9 +110,48 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
+async def authenticate_websocket(websocket: WebSocket) -> Optional[str]:
+    """
+    Authenticate WebSocket connection using token or session.
+    Returns username if authenticated, None otherwise.
+    """
+    if not channel_instance:
+        return None
+
+    # If login not required, allow anonymous
+    if not bool(channel_instance.config.get("require_login")):
+        return "anonymous"
+
+    # Method 1: Check session (via cookies - works with browser clients)
+    session = getattr(websocket, 'session', None)
+    if session and session.get('username'):
+        return session.get('username')
+
+    # Method 2: Check Bearer token in query parameters
+    token = websocket.query_params.get('token')
+    if token and token in ACTIVE_TOKENS:
+        return "token_user"
+
+    # Method 3: Check Authorization header (some clients send headers)
+    auth_header = websocket.headers.get('authorization', '')
+    if auth_header.startswith('Bearer '):
+        token = auth_header[7:]
+        if token in ACTIVE_TOKENS:
+            return "token_user"
+
+    return None
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    await manager.connect(websocket)
+    # Authenticate before accepting connection
+    user = await authenticate_websocket(websocket)
+
+    if user is None:
+        # Reject unauthenticated connection
+        await websocket.close(code=1008, reason="Unauthorized")
+        return
+
+    await manager.connect(websocket, user)
     try:
         while True:
             data_text = await websocket.receive_text()
@@ -121,9 +163,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     # Signal the API to stop
                     if channel_instance and channel_instance.manager.API:
                         channel_instance.manager.API.cancel_request = True
-                        # Note: We don't have the current stream_id here easily, 
-                        # but the API will stop the current active request.
-                    
+
                 elif msg_type == "cancel":
                     stream_id = data.get("id")
                     if stream_id:
@@ -145,8 +185,6 @@ async def websocket_endpoint(websocket: WebSocket):
             except Exception as e:
                 core.log("webui", f"WebSocket command error: {e}")
 
-            except WebSocketDisconnect:
-                manager.disconnect(websocket)
     except WebSocketDisconnect:
         manager.disconnect(websocket)
     except Exception as e:
@@ -192,6 +230,8 @@ async def add_security_headers(request: Request, call_next):
     response.headers['Content-Security-Policy'] = csp
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
 
     if request.url.path in ['/', '/sw.js']:
         response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
@@ -216,12 +256,25 @@ async def get_current_user(request: Request):
 
     return None
 
+async def require_auth(request: Request):
+    """Dependency to require authentication for specific routes."""
+    user = await get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    return user
+
+# Define paths that don't require authentication
+PUBLIC_PATHS = {
+    '/login', '/api/login', '/api/health',
+    '/manifest.json', '/sw.js', '/icon-192.png', '/icon-512.png'
+}
+
 @app.middleware("http")
 async def require_login_middleware(request: Request, call_next):
     global channel_instance
 
-    # Allow health checks and static files immediately
-    if request.url.path.startswith('/static') or request.url.path in ['/login', '/api/login', '/manifest.json', '/sw.js', '/icon-192.png', '/icon-512.png']:
+    # Allow static files and public paths immediately
+    if request.url.path.startswith('/static') or request.url.path in PUBLIC_PATHS:
         return await call_next(request)
 
     if not channel_instance:
@@ -238,7 +291,25 @@ async def require_login_middleware(request: Request, call_next):
         return await call_next(request)
 
     # Not authenticated
-    if request.headers.get("accept") == "application/json" or request.url.path.startswith('/api') or request.url.path.startswith('/messages') or request.url.path.startswith('/send') or request.url.path.startswith('/stream'):
+    # For API routes and JSON requests, return 401
+    is_api_request = (
+        request.url.path.startswith('/api') or
+        request.url.path.startswith('/messages') or
+        request.url.path.startswith('/send') or
+        request.url.path.startswith('/stream') or
+        request.url.path.startswith('/edit') or
+        request.url.path.startswith('/delete') or
+        request.url.path.startswith('/cancel') or
+        request.url.path.startswith('/upload') or
+        request.url.path.startswith('/chat') or
+        request.url.path.startswith('/storage') or
+        request.url.path.startswith('/settings') or
+        request.url.path.startswith('/server') or
+        request.url.path.startswith('/get_') or
+        request.headers.get("accept") == "application/json"
+    )
+
+    if is_api_request:
         return JSONResponse({'error': 'Unauthorized'}, status_code=401)
 
     return RedirectResponse(url='/login', status_code=303)
@@ -341,6 +412,7 @@ async def index(request: Request):
 
 @app.get("/api/health")
 async def health_check():
+    """Public health check endpoint - no auth required."""
     return {"status": "OK"}
 
 def get_api_status():
@@ -380,25 +452,25 @@ def get_api_status():
     return result
 
 @app.get("/api/status")
-async def api_status():
+async def api_status(user: str = Depends(require_auth)):
     return get_api_status()
 
 @app.post("/api/reconnect")
-async def api_reconnect():
+async def api_reconnect(user: str = Depends(require_auth)):
     if not channel_instance:
         raise HTTPException(status_code=500, detail="Channel not available")
     result = await channel_instance.manager.reconnect_api()
     return result
 
 @app.post("/api/disconnect")
-async def api_disconnect():
+async def api_disconnect(user: str = Depends(require_auth)):
     if not channel_instance:
         raise HTTPException(status_code=500, detail="Channel not available")
     await channel_instance.manager.API.disconnect()
     return {'success': True}
 
 @app.get("/api/models")
-async def list_models():
+async def list_models(user: str = Depends(require_auth)):
     if not channel_instance:
         raise HTTPException(status_code=500, detail="Channel not available")
     if not channel_instance.manager.API.connected:
@@ -410,7 +482,7 @@ async def list_models():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/messages")
-async def get_messages():
+async def get_messages(user: str = Depends(require_auth)):
     if not channel_instance:
         return {'messages': [], 'count': 0}
 
@@ -425,7 +497,7 @@ async def get_messages():
     return {'messages': messages, 'count': len(messages), 'current_chat_id': current_id}
 
 @app.get("/messages/since")
-async def get_messages_since(index: int = 0):
+async def get_messages_since(index: int = 0, user: str = Depends(require_auth)):
     if not channel_instance:
         return {'messages': [], 'count': 0}
 
@@ -448,7 +520,7 @@ async def get_messages_since(index: int = 0):
     }
 
 @app.get("/api/token_usage")
-async def token_usage():
+async def token_usage(user: str = Depends(require_auth)):
     if not channel_instance:
         raise HTTPException(status_code=500, detail="Channel not available")
     try:
@@ -457,17 +529,17 @@ async def token_usage():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/get_command_prefix")
-async def get_command_prefix():
+@app.get("/api/command_prefix")
+async def get_command_prefix(user: str = Depends(require_auth)):
     return core.config.get("core", "cmd_prefix")
 
-@app.get("/get_commands")
-async def get_commands():
+@app.get("/api/commands")
+async def get_commands(user: str = Depends(require_auth)):
     global channel_instance
     return core.commands.get_commands(channel_instance.manager.modules)
 
 @app.post("/stream")
-async def stream_message(request: Request):
+async def stream_message(request: Request, user: str = Depends(require_auth)):
     global channel_instance
 
     status = get_api_status()
@@ -507,7 +579,6 @@ async def stream_message(request: Request):
             messages = await channel_instance.context.chat.get() or []
             if messages:
                 last_msg = messages[-1]
-                # We need to serialize it properly for the frontend
                 await manager.broadcast({
                     "type": "message_added",
                     "message": serialize_for_json(last_msg)
@@ -528,7 +599,7 @@ async def stream_message(request: Request):
 
 
 @app.post("/send")
-async def send_message(request: Request):
+async def send_message(request: Request, user: str = Depends(require_auth)):
     global channel_instance
 
     status = get_api_status()
@@ -551,7 +622,7 @@ async def send_message(request: Request):
     }
 
 @app.post("/edit")
-async def edit_message(request: Request):
+async def edit_message(request: Request, user: str = Depends(require_auth)):
     data = await request.json()
     index = data.get('index', 0)
     new_content = data.get('content', '')
@@ -566,7 +637,7 @@ async def edit_message(request: Request):
     return {'success': False, 'error': f'Index {index} out of range'}
 
 @app.post("/delete")
-async def delete_message(request: Request):
+async def delete_message(request: Request, user: str = Depends(require_auth)):
     data = await request.json()
     index = data.get('index', 0)
 
@@ -579,7 +650,7 @@ async def delete_message(request: Request):
     return {'success': False, 'error': f'Index {index} out of range'}
 
 @app.post("/cancel")
-async def cancel_stream(request: Request):
+async def cancel_stream(request: Request, user: str = Depends(require_auth)):
     data = await request.json()
     stream_id = data.get('id')
     channel_instance.manager.API.cancel_request = True
@@ -588,7 +659,7 @@ async def cancel_stream(request: Request):
     return {'success': True}
 
 @app.post("/upload")
-async def upload_file(request: Request):
+async def upload_file(request: Request, user: str = Depends(require_auth)):
     data = await request.json()
     files_data = data.get('files', [])
     if not files_data:
@@ -617,21 +688,21 @@ async def upload_file(request: Request):
 # =============================================================================
 
 @app.post("/api/search")
-async def search_chats(request: Request):
+async def search_chats(request: Request, user: str = Depends(require_auth)):
     if not channel_instance:
         return JSONResponse({'error': 'Channel not available'}, status_code=500)
 
     data = await request.json()
     query = data.get("query", "").lower().strip()
     search_in_content = data.get("search_in_content", True)
-    category = data.get("category") # Optional category filter
+    category = data.get("category")
 
     if not query:
         return {"results": []}
 
     all_chats = await channel_instance.context.chat.get_all()
-    
-    # 1. Filter by category if provided
+
+    # Filter by category if provided
     if category:
         if category == 'general':
             all_chats = [c for c in all_chats if not c.get('category') or c.get('category') == 'general']
@@ -657,7 +728,7 @@ async def search_chats(request: Request):
                     for part in raw_content:
                         if isinstance(part, dict) and part.get('type') == 'text':
                             content_parts.append(part.get('text', ''))
-                
+
                 content = "".join(content_parts)
                 content_lower = content.lower()
 
@@ -665,12 +736,12 @@ async def search_chats(request: Request):
                     content_match = True
                     start_idx = content_lower.find(query)
                     end_idx = start_idx + len(query)
-                    
+
                     context_padding = 40
                     snippet_start = max(0, start_idx - context_padding)
                     snippet_end = min(len(content), end_idx + context_padding)
                     snippet = content[snippet_start:snippet_end]
-                    
+
                     if snippet_start > 0:
                         snippet = "..." + snippet
                     if snippet_end < len(content):
@@ -700,7 +771,7 @@ async def search_chats(request: Request):
 
 
 @app.get("/chats")
-async def list_chats():
+async def list_chats(user: str = Depends(require_auth)):
     if not channel_instance:
         return {'chats': []}
 
@@ -741,7 +812,7 @@ async def list_chats():
     return {'chats': chats}
 
 @app.get("/chat/load")
-async def load_chat(id: str):
+async def load_chat(id: str, user: str = Depends(require_auth)):
     if not channel_instance:
         raise HTTPException(status_code=500, detail="Channel not available")
 
@@ -770,7 +841,7 @@ async def load_chat(id: str):
     }
 
 @app.get("/chat/current")
-async def get_current_chat():
+async def get_current_chat(user: str = Depends(require_auth)):
     if not channel_instance:
         raise HTTPException(status_code=500, detail="Channel not available")
 
@@ -798,8 +869,7 @@ async def get_current_chat():
     }
 
 @app.post("/chat/rename")
-@app.post("/chat/rename")
-async def rename_chat(request: Request):
+async def rename_chat(request: Request, user: str = Depends(require_auth)):
     if not channel_instance:
         raise HTTPException(status_code=500, detail="Channel not available")
 
@@ -809,7 +879,7 @@ async def rename_chat(request: Request):
         raise HTTPException(status_code=400, detail="Title cannot be empty")
 
     await channel_instance.context.chat.set_title(new_title)
-    
+
     # Broadcast the update so all clients are in sync
     await manager.broadcast({
         "type": "chat_metadata_updated",
@@ -821,7 +891,7 @@ async def rename_chat(request: Request):
 
 
 @app.post("/chat/update_category")
-async def update_chat_category(request: Request):
+async def update_chat_category(request: Request, user: str = Depends(require_auth)):
     if not channel_instance:
         raise HTTPException(status_code=500, detail="Channel not available")
 
@@ -856,7 +926,7 @@ async def update_chat_category(request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/chat/new")
-async def new_chat(request: Request):
+async def new_chat(request: Request, user: str = Depends(require_auth)):
     if not channel_instance:
         raise HTTPException(status_code=500, detail="Channel not available")
 
@@ -874,12 +944,12 @@ async def new_chat(request: Request):
     }
 
 @app.post("/chat/clear")
-async def clear_chat():
+async def clear_chat(user: str = Depends(require_auth)):
     await channel_instance.context.chat.clear()
     return {"success": True}
 
 @app.post("/chat/delete")
-async def delete_chat(request: Request):
+async def delete_chat(request: Request, user: str = Depends(require_auth)):
     if not channel_instance:
         raise HTTPException(status_code=500, detail="Channel not available")
 
@@ -896,7 +966,7 @@ async def delete_chat(request: Request):
     return {'success': True}
 
 @app.get("/chat/tags")
-async def get_all_tags():
+async def get_all_tags(user: str = Depends(require_auth)):
     if not channel_instance:
         return {'tags': []}
 
@@ -910,7 +980,7 @@ async def get_all_tags():
     return {'tags': sorted(list(tags))}
 
 @app.post("/chat/tags")
-async def update_chat_tags(request: Request):
+async def update_chat_tags(request: Request, user: str = Depends(require_auth)):
     if not channel_instance:
         raise HTTPException(status_code=500, detail="Channel not available")
 
@@ -924,7 +994,7 @@ async def update_chat_tags(request: Request):
     return {'success': True, 'tags': tags}
 
 @app.post("/chat/tag")
-async def add_chat_tag(request: Request):
+async def add_chat_tag(request: Request, user: str = Depends(require_auth)):
     if not channel_instance:
         raise HTTPException(status_code=500, detail="Channel not available")
 
@@ -937,7 +1007,7 @@ async def add_chat_tag(request: Request):
     return {'success': success, 'tag': tag}
 
 @app.delete("/chat/tag")
-async def remove_chat_tag(request: Request):
+async def remove_chat_tag(request: Request, user: str = Depends(require_auth)):
     if not channel_instance:
         raise HTTPException(status_code=500, detail="Channel not available")
 
@@ -954,11 +1024,11 @@ async def remove_chat_tag(request: Request):
 # =============================================================================
 
 @app.get("/settings/load")
-async def load_settings():
+async def load_settings(user: str = Depends(require_auth)):
     return core.config.config
 
 @app.post("/settings/save")
-async def save_settings(request: Request):
+async def save_settings(request: Request, user: str = Depends(require_auth)):
     form_data = await request.json()
     result = core.config.config.load(data=form_data)
     core.config.config.save()
@@ -969,7 +1039,7 @@ async def save_settings(request: Request):
     return {"success": True}
 
 @app.get("/settings/get_module_info")
-async def get_module_info():
+async def get_module_info(user: str = Depends(require_auth)):
     module_info = {}
     for module_name, module_data in core.config.get_module_structure().items():
         metadata = module_data.get("metadata", {})
@@ -989,7 +1059,7 @@ async def get_module_info():
 # =============================================================================
 
 @app.get("/storage/list")
-async def list_storage_files():
+async def list_storage_files(user: str = Depends(require_auth)):
     """List all storage files in the data folder."""
     data_dir = core.get_data_path()
     if not os.path.exists(data_dir):
@@ -1037,7 +1107,7 @@ async def list_storage_files():
     return {'files': files, 'data_dir': data_dir}
 
 @app.get("/storage/load")
-async def load_storage_file(file: str):
+async def load_storage_file(file: str, user: str = Depends(require_auth)):
     """Load a specific storage file."""
     data_dir = core.get_data_path()
     full_path = os.path.join(data_dir, file)
@@ -1045,7 +1115,7 @@ async def load_storage_file(file: str):
     if not os.path.exists(full_path):
         raise HTTPException(status_code=404, detail="File not found")
 
-    # Security check
+    # Security check - prevent path traversal
     if not os.path.abspath(full_path).startswith(os.path.abspath(data_dir)):
         raise HTTPException(status_code=403, detail="Access denied")
 
@@ -1089,7 +1159,7 @@ async def load_storage_file(file: str):
         raise HTTPException(status_code=500, detail=err_msg)
 
 @app.post("/storage/save")
-async def save_storage_file(request: Request):
+async def save_storage_file(request: Request, user: str = Depends(require_auth)):
     """Save a storage file."""
     data = await request.json()
     file_path = data.get('file')
@@ -1102,7 +1172,7 @@ async def save_storage_file(request: Request):
     data_dir = core.get_data_path()
     full_path = os.path.join(data_dir, file_path)
 
-    # Security check
+    # Security check - prevent path traversal
     if not os.path.abspath(full_path).startswith(os.path.abspath(data_dir)):
         raise HTTPException(status_code=403, detail="Access denied")
 
@@ -1156,7 +1226,7 @@ async def save_storage_file(request: Request):
         raise HTTPException(status_code=500, detail=err_msg)
 
 @app.post("/storage/delete-key")
-async def delete_storage_key(request: Request):
+async def delete_storage_key(request: Request, user: str = Depends(require_auth)):
     """Delete a key from a dict storage file."""
     data = await request.json()
     file_path = data.get('file')
@@ -1168,7 +1238,7 @@ async def delete_storage_key(request: Request):
     data_dir = core.get_data_path()
     full_path = os.path.join(data_dir, file_path)
 
-    # Security check
+    # Security check - prevent path traversal
     if not os.path.abspath(full_path).startswith(os.path.abspath(data_dir)):
         raise HTTPException(status_code=403, detail="Access denied")
 
@@ -1217,7 +1287,7 @@ async def delete_storage_key(request: Request):
         raise HTTPException(status_code=500, detail=err_msg)
 
 @app.post("/storage/add-key")
-async def add_storage_key(request: Request):
+async def add_storage_key(request: Request, user: str = Depends(require_auth)):
     """Add a new key to a dict storage file."""
     data = await request.json()
     file_path = data.get('file')
@@ -1229,7 +1299,7 @@ async def add_storage_key(request: Request):
     data_dir = core.get_data_path()
     full_path = os.path.join(data_dir, file_path)
 
-    # Security check
+    # Security check - prevent path traversal
     if not os.path.abspath(full_path).startswith(os.path.abspath(data_dir)):
         raise HTTPException(status_code=403, detail="Access denied")
 
@@ -1282,7 +1352,7 @@ async def add_storage_key(request: Request):
 # =============================================================================
 
 @app.post("/server/restart")
-async def restart_server():
+async def restart_server(user: str = Depends(require_auth)):
     global channel_instance
     core.log("webui", "Restart triggered")
     await channel_instance.manager.restart()
@@ -1383,4 +1453,12 @@ class Webui(core.channel.Channel):
         """Triggered when a message is pushed (announcements, etc)"""
         await manager.broadcast(message)
 
-app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
+# Add SessionMiddleware with secure settings
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=SECRET_KEY,
+    session_cookie="webui_session",
+    max_age=None,  # Session cookie (deleted when browser closes)
+    same_site="lax",  # CSRF protection
+    https_only=False  # Set to True in production with HTTPS
+)
