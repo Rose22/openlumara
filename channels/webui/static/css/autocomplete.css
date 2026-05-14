@@ -1,0 +1,100 @@
+/* ==========================================================================
+ *  Command Autocomplete Dropdown
+ *  ========================================================================== */
+.autocomplete-container {
+    left: 0;
+    right: 0;
+    z-index: 100;
+    pointer-events: auto;
+}
+
+.autocomplete-dropdown {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    max-height: 300px;
+    overflow-y: auto;
+    display: none;
+    flex-direction: column;
+    margin-bottom: 8px;
+}
+
+.autocomplete-dropdown.show {
+    display: flex;
+}
+
+.autocomplete-category {
+    padding: 6px 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-color);
+    letter-spacing: 0.05em;
+}
+
+.autocomplete-category:first-child {
+    border-top-left-radius: var(--radius-md);
+    border-top-right-radius: var(--radius-md);
+}
+
+.autocomplete-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.15s ease;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+}
+
+.autocomplete-item:hover,
+.autocomplete-item.selected {
+    background: var(--bg-hover);
+    color: var(--accent);
+}
+
+.autocomplete-item.selected {
+    font-weight: 500;
+}
+
+.autocomplete-item .cmd-name {
+    font-family: monospace;
+    font-weight: 600;
+}
+
+.autocomplete-item .cmd-desc {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    margin-left: auto;
+    text-align: right;
+    max-width: 60%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.autocomplete-empty {
+    padding: 12px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+/* Scrollbar for dropdown */
+.autocomplete-dropdown::-webkit-scrollbar {
+    width: 6px;
+}
+.autocomplete-dropdown::-webkit-scrollbar-track {
+    background: transparent;
+}
+.autocomplete-dropdown::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 3px;
+}
+.autocomplete-dropdown::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}

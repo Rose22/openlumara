@@ -38,7 +38,7 @@ WEBUI_DIR = core.get_path("channels/webui")
 JS_FILES = [
     "themes", "icons", "variables", "content_helpers", "markdown", "messages",
     "msg_actions", "sidebar", "utils", "notif", "status", "polling", "chats",
-    "tags", "search", "export", "modals", "input", "send", "upload", "theming",
+    "tags", "search", "export", "modals", "autocomplete", "input", "send", "upload", "theming",
     "audio", "modal_settings", "storage_editor", "responsive", "init"
 ]
 
@@ -47,7 +47,7 @@ CSS_FILES = [
     "variables", "base", "containers", "sidebar", "tags", "rename", "content",
     "header", "titlebar", "search", "modals", "search", "containers", "messages",
     "input", "upload", "keyboard", "responsive", "typewriter", "settings",
-    "storage_editor"
+    "storage_editor", "autocomplete"
 ]
 
 # Rate limiting for login attempts
@@ -457,7 +457,15 @@ async def token_usage():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/stream")
+@app.get("/get_command_prefix")
+async def get_command_prefix():
+    return core.config.get("core", "cmd_prefix")
+
+@app.get("/get_commands")
+async def get_commands():
+    global channel_instance
+    return core.commands.get_commands(channel_instance.manager.modules)
+
 @app.post("/stream")
 async def stream_message(request: Request):
     global channel_instance

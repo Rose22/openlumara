@@ -152,7 +152,7 @@ document.addEventListener('keydown', (event) => {
             return;
         }
 
-        if (!isMobile && !event.ctrlKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+        if (!isMobile && event.ctrlKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
             if (messageHistory.length > 0) {
                 if (event.key === 'ArrowUp') {
                     if (historyIndex === -1) {
