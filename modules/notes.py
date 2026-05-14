@@ -49,7 +49,7 @@ class Notes(core.module.Module):
                 yield current_key, value
 
     async def get_categories(self):
-        return self.result(self.data.keys())
+        return self.result(list(self.data.keys()))
 
     async def list(self, category: str):
         if category not in self.data.keys():
