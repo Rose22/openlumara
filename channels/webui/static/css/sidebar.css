@@ -14,7 +14,6 @@
                 min-width 0.35s cubic-bezier(0.4, 0, 0.2, 1), 
                 transform 0.35s cubic-bezier(0.4, 0, 0.2, 1),
                 opacity 0.25s ease-out;
-    will-change: transform, width, opacity;
 }
 
 .sidebar.collapsed {
