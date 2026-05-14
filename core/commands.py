@@ -3,52 +3,80 @@ import textwrap
 import asyncio
 import shlex
 
-def get_commands_help(modules_dict):
+CMD_PREFIX = core.config.get("core").get("cmd_prefix", "/")
+
+BUILTIN_COMMANDS = {
+    "core": {
+        "prompt": "show system prompt",
+        "prompt <module name>": "show system prompt for that module",
+        "history": "show full chat history",
+        "context full": "show full context being sent to AI",
+        "context raw": "show full context as raw JSON",
+        "status": "show status info",
+        "config": "Explore, view, and set config settings",
+        "restart": "restarts the server",
+        "stop": "stops the AI in it's tracks",
+        "connect": "attempt to connect to the API",
+        "disconnect": "disconnect from the API",
+        "reconnect": "reconnect to the API",
+        "ping": "test command that echoes \"Pong!\"",
+        "help": "this help",
+    },
+    "chats": {
+        "new": "starts a new chat",
+        "clear": "clear current chat history",
+        "chats": "list previous chats",
+        "chat <ID>": "load a chat by its ID",
+        "chat rename <name>": "rename current chat",
+        "chat category <category>": "put chat in that category",
+    },
+    "modules": {
+        "modules": "list modules",
+        "module": "enable/disable a module by name",
+        "tools": "list tools available to the AI"
+    }
+}
+
+# auto add cmd prefix to the builtin commands
+BUILTIN_COMMANDS = {
+    module: {f"{CMD_PREFIX}{cmd}": desc for cmd, desc in commands.items()}
+    for module, commands in BUILTIN_COMMANDS.items()
+}
+
+def get_commands(modules_dict: dict = None):
     """
-    Builds a help string grouped by module instance.
+    Return all available commands as a list of dicts (key=command, value=description)
     """
-    output = []
-    cmd_prefix = core.config.get("core").get("cmd_prefix", "/")
+    commands = {}
+    commands.update(BUILTIN_COMMANDS)
 
-    for module_name, instance in modules_dict.items():
-        module_cmds = []
+    if modules_dict:
+        for module_name, instance in modules_dict.items():
+            module_cmds = {}
 
-        # Scan the global registry for commands belonging to this instance's class
-        for cmd_name, handlers in core.module._command_registry.items():
-            for registered_cls, method in handlers:
-                if isinstance(instance, registered_cls):
-                    desc = method._command_description
+            # Scan the global registry for commands belonging to this instance's class
+            for cmd_name, handlers in core.module._command_registry.items():
+                for registered_cls, method in handlers:
+                    if isinstance(instance, registered_cls):
+                        desc = method._command_description
 
-                    # Handle dictionary help for subcommands
-                    if isinstance(desc, dict):
-                        for subcmd, subdesc in desc.items():
-                            # Concatenate base command with subcommand key
-                            # e.g. "identity" + " " + "set <text>" -> "identity set <text>"
-                            full_cmd = f"{cmd_name} {subcmd}".strip()
-                            module_cmds.append(f"{cmd_prefix}{full_cmd:<20} {subdesc}")
-                    else:
-                        # Handle standard string description
-                        module_cmds.append(f"{cmd_prefix}{cmd_name:<20} {desc}")
+                        # Handle dictionary help for subcommands
+                        if isinstance(desc, dict):
+                            for subcmd, subdesc in desc.items():
+                                # Concatenate base command with subcommand key
+                                # e.g. "identity" + " " + "set <text>" -> "identity set <text>"
+                                full_cmd = f"{cmd_name} {subcmd}".strip()
+                                module_cmds[f"{CMD_PREFIX}{full_cmd}"] = subdesc
+                        else:
+                            # Handle standard string description
+                            module_cmds[f"{CMD_PREFIX}{cmd_name}"] = desc
 
-                    break # Only take the first matching handler
 
-        # If this module has any commands, add them to the output
-        if module_cmds:
-            # Sort alphabetically
-            module_cmds.sort()
+            # If this module has any commands, add them to the output
+            if module_cmds and module_name not in commands:
+                commands[module_name] = module_cmds
 
-            # Retrieve class docstring
-            doc = instance.__class__.__doc__
-
-            if doc:
-                clean_doc = textwrap.dedent(doc).strip()
-                section = f"== {module_name} ==\n{clean_doc}\n\n" + "\n".join(module_cmds)
-            else:
-                section = f"== {module_name} ==\n" + "\n".join(module_cmds)
-
-            output.append(section)
-
-    return "\n\n".join(output)
+    return commands
 
 def _convert_type(value: str):
     """
@@ -186,49 +214,18 @@ class Commands:
         self.channel = channel
 
     async def _get_help(self):
+        # Get automated command help grouped by module
         output = []
 
-        help_text = """
-== built in commands ==
-chats:
-/new                        starts a new chat
-/clear                      clear current chat history
-/chats                      list previous chats
-/chat <ID>                  load a chat by its ID
-/chat rename <name>         rename current chat
-/chat category <category>   put chat in that category
+        cmd_help = core.commands.get_commands(self.channel.manager.modules)
+        if cmd_help:
+            for category, commands in cmd_help.items():
+                output.append(f"== {category} ==")
+                for command, desc in commands.items():
+                    output.append(f"{command:<30} {desc}")
+                output.append("") # newline
 
-modules:
-/modules                    list modules
-/module                     enable/disable a module by name
-/tools                      list tools available to the AI
-
-core:
-/prompt                     show system prompt
-/prompt <module name>       show system prompt for that module
-/history                    show full chat history
-/context full               show full context being sent to AI
-/context raw                show full context as raw JSON
-/status                     show status info
-/config                     Explore, view, and set config settings
-/restart                    restarts the server
-/stop                       stops the AI in it's tracks
-/connect                    attempt to connect to the API
-/disconnect                 disconnect from the API
-/reconnect                  reconnect to the API
-/ping                       test command that echoes "Pong!"
-/help                       this help
-        """.strip()
-
-        output.append(help_text)
-
-        if self.channel.manager.modules:
-            # Get automated command help grouped by module
-            cmd_help = core.commands.get_commands_help(self.channel.manager.modules)
-            if cmd_help:
-                output.append(cmd_help)
-
-        return "\n\n".join(output)
+        return "\n".join(output)
 
     def _check_if_temporary(self, cmd: str):
         # set ghost flag on temporary commands so that they emit as ghost messages (invisible to the AI)

@@ -4,6 +4,7 @@ quiet = False
 debug = False
 
 from core.functions import *
+import core.config
 import core.storage
 import core.module
 import core.commands
@@ -13,7 +14,6 @@ import core.chat
 import core.channel
 
 import core.modules
-import core.config
 import core.api_client
 
 import core.manager
