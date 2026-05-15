@@ -644,12 +644,9 @@ function renderSettingsForm(categories) {
             if (directGroup && directGroup.isDirect) {
                 directGroup.items.forEach(item => {
                     const itemEl = createSettingItem(item);
-
-                    // Apply full-width class to module/user module toggle lists
                     if (item.isModuleList) {
                         itemEl.classList.add('full-width-item');
                     }
-
                     itemsContainer.appendChild(itemEl);
                 });
             }
@@ -658,10 +655,20 @@ function renderSettingsForm(categories) {
             const groupsGrid = document.createElement('div');
             groupsGrid.className = 'settings-groups-grid';
 
-            // Then render grouped items into the grid
-            data.groups.forEach((groupData, groupKey) => {
-                if (groupKey === '_direct_') return;
+            // --- START OF SORTING LOGIC ---
+            // 1. Convert Map to Array
+            // 2. Filter out the '_direct_' key
+            // 3. Sort the resulting array by the group's title
+            const sortedGroupEntries = Array.from(data.groups.entries())
+            .filter(([groupKey]) => groupKey !== '_direct_')
+            .sort((a, b) => {
+                const titleA = a[1].title || '';
+                const titleB = b[1].title || '';
+                return titleA.localeCompare(titleB);
+            });
 
+            // 4. Iterate over the sorted array instead of the Map
+            sortedGroupEntries.forEach(([groupKey, groupData]) => {
                 const groupContainer = document.createElement('div');
                 groupContainer.className = 'settings-group';
                 groupContainer.dataset.group = groupKey;
@@ -687,10 +694,11 @@ function renderSettingsForm(categories) {
 
                 groupContainer.appendChild(header);
                 groupContainer.appendChild(content);
-                groupsGrid.appendChild(groupContainer); // Append to the grid
+                groupsGrid.appendChild(groupContainer);
             });
+            // --- END OF SORTING LOGIC ---
 
-            itemsContainer.appendChild(groupsGrid); // Append grid to the main container
+            itemsContainer.appendChild(groupsGrid);
         }
 
         section.appendChild(itemsContainer);
@@ -702,6 +710,7 @@ function renderSettingsForm(categories) {
         firstSection.classList.add('active');
     }
 }
+
 
 // Toggle settings group collapse
 function toggleSettingsGroup(header) {
