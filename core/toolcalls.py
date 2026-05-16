@@ -238,7 +238,7 @@ class ToolcallManager:
                 elif token_type == "reasoning":
                     final_reasoning.append(token.get("content"))
                     yield token
-                elif token_type in ["tool_call_delta", "tool", "tool_calls"]:
+                elif token_type in ["tool_call_delta", "tool", "tool_calls", "prompt_progress", "timings"]:
                     yield token
 
                 if token_type == "token_usage":
