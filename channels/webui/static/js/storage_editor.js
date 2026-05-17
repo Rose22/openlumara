@@ -562,9 +562,6 @@ function showInJsonEditor(value, key) {
             style="min-height: ${textareaHeight}px"
             oninput="updateJsonValue('${keyLabel}', this.value)"
             placeholder="Enter string value...">${escapeHtml(displayValue)}</textarea>
-            <div class="storage-json-editor-hint">
-            Newlines are displayed as actual line breaks
-            </div>
             `;
         } else if (typeof value === 'number') {
             html += `
@@ -761,7 +758,6 @@ function renderListItems() {
         <textarea
         oninput="updateListItem(${index}, this.value)"
         placeholder="Enter content...">${escapeHtml(displayValue)}</textarea>
-        <div class="storage-list-item-type ${typeInfo.class}">${typeInfo.label}</div>
         <div class="storage-list-item-actions">
         <button class="storage-list-item-btn" onclick="moveListItem(${index}, -1)" ${index === 0 ? 'disabled' : ''}>
         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

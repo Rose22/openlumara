@@ -8,34 +8,39 @@ import logging
 import traceback
 from typing import Optional, Dict, Any, List
 from collections import deque
-from nio import (
-    AsyncClient,
-    AsyncClientConfig,
-    LoginResponse,
-    RoomMessageText,
-    RoomMessageEmote,
-    RoomMessageImage,
-    RoomMessageAudio,
-    RoomMessageVideo,
-    RoomMessageFile,
-    MegolmEvent,
-    InviteMemberEvent,
-    SyncResponse,
-    SyncError,
-    RoomSendResponse,
-    KeyVerificationStart,
-    KeyVerificationCancel,
-    KeyVerificationKey,
-    KeyVerificationMac,
-    RoomKeyRequest,
-    RoomKeyRequestCancellation,
-    ToDeviceError,
-    KeysClaimError,
-    ShareGroupSessionError,
-    LocalProtocolError,
-    UnknownEvent,
-)
-from nio.store import SqliteStore
+
+try:
+    from nio import (
+        AsyncClient,
+        AsyncClientConfig,
+        LoginResponse,
+        RoomMessageText,
+        RoomMessageEmote,
+        RoomMessageImage,
+        RoomMessageAudio,
+        RoomMessageVideo,
+        RoomMessageFile,
+        MegolmEvent,
+        InviteMemberEvent,
+        SyncResponse,
+        SyncError,
+        RoomSendResponse,
+        KeyVerificationStart,
+        KeyVerificationCancel,
+        KeyVerificationKey,
+        KeyVerificationMac,
+        RoomKeyRequest,
+        RoomKeyRequestCancellation,
+        ToDeviceError,
+        KeysClaimError,
+        ShareGroupSessionError,
+        LocalProtocolError,
+        UnknownEvent,
+    )
+    from nio.store import SqliteStore
+except:
+    # how to make the entire file stop importing?
+    raise core.exceptions.DependencyMissing("matrix-nio is not installed")
 
 # Attempt to import encrypted media classes (available in newer nio versions)
 try:
@@ -74,8 +79,7 @@ logging.getLogger("nio").setLevel(logging.WARNING)
 
 class Matrix(core.channel.Channel):
     """
-    A Matrix channel with E2EE support using matrix-nio.
-    Merged with robust session handling and decryption retries.
+    Matrix channel with encryption support. Experimental, a bit unstable.
     """
 
     running = False

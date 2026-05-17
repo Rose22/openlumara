@@ -175,3 +175,13 @@
     transform: translateY(-1px);
     box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4);
 }
+
+#export-modal {
+    width: 320px;
+    height: 350px;
+}
+
+#shortcuts-modal {
+    width: 50%;
+    height: 650px;
+}

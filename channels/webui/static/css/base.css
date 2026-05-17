@@ -147,14 +147,14 @@ input, button, select, h1, h2, h3, textarea {
  *  ========================================================================== */
 
 /* Hardware acceleration for smoother animations */
-.animate-smooth,
+/*.animate-smooth,
 .sidebar,
 .modal-overlay,
 .chat-item,
 .tool-call-card,
 .reasoning-block {
     will-change: transform, opacity;
-}
+}*/
 
 /* Reduced motion preference for accessibility */
 @media (prefers-reduced-motion: reduce) {

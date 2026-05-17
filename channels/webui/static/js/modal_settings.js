@@ -8,6 +8,7 @@ let settingsHasChanges = false;
 let cachedModels = null;
 let modelsLoadError = null;
 let moduleInfoCache = {};
+let showUnsafeSettings = localStorage.getItem('showUnsafeSettings') === 'true';
 
 // Category icons
 const SETTINGS_ICONS = {
@@ -80,9 +81,7 @@ function organizeSettingsIntoCategories(originalData, moduleInfo = {}) {
 
     let order = 1;
 
-    // Process each top-level key (category)
     for (const [topKey, topValue] of Object.entries(originalData)) {
-        // Skip theme keys
         if (topKey.toLowerCase() === 'theme' || topKey.toLowerCase() === 'theme_mode') {
             continue;
         }
@@ -90,14 +89,14 @@ function organizeSettingsIntoCategories(originalData, moduleInfo = {}) {
         const category = topKey;
         categories[category] = {
             title: formatLabel(category),
-            description: CATEGORY_DESCRIPTIONS[category] ||
-            `Configure ${formatLabel(category).toLowerCase()}`,
+            description: CATEGORY_DESCRIPTIONS[category] || `Configure ${formatLabel(category).toLowerCase()}`,
             groups: new Map(),
             order: order++
         };
 
-        // Helper to add item to the correct group
         const addToGroup = (groupKey, groupTitle, item, isDirect = false) => {
+            if (item.unsafe && !showUnsafeSettings) return;
+
             if (!categories[category].groups.has(groupKey)) {
                 categories[category].groups.set(groupKey, {
                     title: groupTitle,
@@ -109,8 +108,7 @@ function organizeSettingsIntoCategories(originalData, moduleInfo = {}) {
         };
 
         // Special handling for modules and channels
-        if (topKey === 'modules' || topKey === 'user_modules') {
-            // Get list of enabled items to filter settings
+        if (topKey === 'modules' || topKey === 'user_modules' || topKey === 'channels') {
             const enabledItems = new Set(topValue.enabled || []);
             const allItems = getAllToggleItems(topValue);
 
@@ -125,7 +123,6 @@ function organizeSettingsIntoCategories(originalData, moduleInfo = {}) {
                 }
             }
 
-            // Add the toggle list directly (ungrouped) at the top
             addToGroup('_direct_', null, {
                 key: topKey,
                 value: {
@@ -138,36 +135,46 @@ function organizeSettingsIntoCategories(originalData, moduleInfo = {}) {
                 isModuleList: true
             }, true);
 
-            // Only show settings for enabled items
             if (topValue.settings && typeof topValue.settings === 'object') {
                 for (const [itemName, itemSettings] of Object.entries(topValue.settings)) {
-                    // Skip settings for disabled modules/channels
-                    if (!enabledItems.has(itemName)) {
-                        continue;
-                    }
+                    if (!enabledItems.has(itemName)) continue;
 
                     const groupKey = `${topKey}.settings.${itemName}`;
                     const groupTitle = formatLabel(itemName);
+                    const itemSchema = moduleInfo[itemName]?.settings_schema || {};
 
                     if (typeof itemSettings === 'object' && itemSettings !== null &&
                         !Array.isArray(itemSettings) && !isToggleList(itemSettings)) {
-                        // Flatten nested settings
-                        flattenSettingsObject(itemSettings, groupKey, (item) => {
+                        flattenSettingsObject(itemSettings, groupKey, itemSchema, (item) => {
                             addToGroup(groupKey, groupTitle, item);
                         });
                         } else {
-                            // Simple value or toggle list
+                            // Handle simple values by checking the schema for an explicit type
+                            let type = detectType(itemSettings, groupKey);
+                            if (itemSchema[itemName] && itemSchema[itemName].type) {
+                                type = itemSchema[itemName].type;
+                            }
+
+                            let description = FIELD_DESCRIPTIONS[groupKey] || null;
+                            if (!description && itemSchema[itemName] && itemSchema[itemName].description) {
+                                description = itemSchema[itemName].description;
+                            }
+
                             addToGroup(groupKey, groupTitle, {
                                 key: groupKey,
                                 value: itemSettings,
-                                type: isToggleList(itemSettings) ? 'toggle_list' : detectType(itemSettings, groupKey),
-                                       description: FIELD_DESCRIPTIONS[groupKey] || null
+                                type: type,
+                                description: description,
+                                unsafe: itemSchema[itemName]?.unsafe || false,
+                                min: itemSchema[itemName]?.min,
+                                max: itemSchema[itemName]?.max,
+                                step: itemSchema[itemName]?.step
                             });
                         }
+
                 }
             }
-
-            // Add any other top-level items that aren't settings (direct, ungrouped)
+            // ... (rest of module direct items logic remains the same)
             for (const [secondKey, secondValue] of Object.entries(topValue)) {
                 if (secondKey === 'settings' || secondKey === 'enabled' ||
                     secondKey === 'disabled' || secondKey === 'disabled_prompts') {
@@ -191,27 +198,38 @@ function organizeSettingsIntoCategories(originalData, moduleInfo = {}) {
                 type: 'toggle_list'
             }, true);
 
-            // If toggle list has a settings sub-object, show settings for enabled items only
             if (topValue.settings && typeof topValue.settings === 'object') {
                 const enabledItems = new Set(topValue.enabled || []);
                 for (const [itemName, itemSettings] of Object.entries(topValue.settings)) {
-                    if (!enabledItems.has(itemName)) {
-                        continue;
-                    }
+                    if (!enabledItems.has(itemName)) continue;
                     const groupKey = `${topKey}.settings.${itemName}`;
                     const groupTitle = formatLabel(itemName);
+                    const itemSchema = moduleInfo[itemName]?.settings_schema || {};
 
                     if (typeof itemSettings === 'object' && itemSettings !== null &&
                         !Array.isArray(itemSettings) && !isToggleList(itemSettings)) {
-                        flattenSettingsObject(itemSettings, groupKey, (item) => {
+                        flattenSettingsObject(itemSettings, groupKey, itemSchema, (item) => {
                             addToGroup(groupKey, groupTitle, item);
                         });
                         } else {
+                            let type = detectType(itemSettings, groupKey);
+                            if (itemSchema[itemName] && itemSchema[itemName].type) {
+                                type = itemSchema[itemName].type;
+                            }
+
+                            let description = FIELD_DESCRIPTIONS[groupKey] || null;
+                            if (!description && itemSchema[itemName] && itemSchema[itemName].description) {
+                                description = itemSchema[itemName].description;
+                            }
+
                             addToGroup(groupKey, groupTitle, {
                                 key: groupKey,
                                 value: itemSettings,
-                                type: isToggleList(itemSettings) ? 'toggle_list' : detectType(itemSettings, groupKey),
-                                       description: FIELD_DESCRIPTIONS[groupKey] || null
+                                type: type,
+                                description: renderMarkdown(description),
+                                min: itemSchema[itemName]?.min,
+                                max: itemSchema[itemName]?.max,
+                                step: itemSchema[itemName]?.step
                             });
                         }
                 }
@@ -219,26 +237,67 @@ function organizeSettingsIntoCategories(originalData, moduleInfo = {}) {
             continue;
         }
 
-        // Regular object - separate simple values from complex values
+        // Regular object logic
         if (typeof topValue === 'object' && topValue !== null && !Array.isArray(topValue)) {
-            // Categorize children
+            if (topValue.type === 'group') {
+                const groupKey = `${category}.${topKey}`;
+                const groupTitle = formatLabel(topKey);
+
+                if (!categories[category].groups.has(groupKey)) {
+                    categories[category].groups.set(groupKey, {
+                        title: groupTitle,
+                        items: [],
+                        description: topValue.description || null
+                    });
+                }
+
+                const group = categories[category].groups.get(groupKey);
+
+                for (const [itemKey, itemValue] of Object.entries(topValue.items)) {
+                    let val = itemValue;
+                    let type = detectType(itemValue, `${groupKey}.${itemKey}`);
+                    let desc = null;
+
+                    if (typeof itemValue === 'object' && itemValue !== null && !Array.isArray(itemValue) && 'default' in itemValue) {
+                        val = itemValue.default;
+                        desc = itemValue.description;
+                    }
+
+                    group.items.push({
+                        key: `${groupKey}.${itemKey}`,
+                        value: val,
+                        type: type,
+                        description: desc
+                    });
+                }
+                continue;
+            }
+
+            if (topValue.type || topValue.default !== undefined) {
+                let type = topValue.type || detectType(topValue.default, `${category}.${topKey}`);
+                if (type === 'long_text') type = 'textarea';
+                
+                addToGroup('_direct_', null, {
+                    key: `${category}.${topKey}`,
+                    value: topValue.default,
+                    type: type,
+                    description: topValue.description || null,
+                    options: topValue.options || null
+                }, true);
+                continue;
+            }
+
             const simpleItems = [];
             const complexItems = [];
 
             for (const [secondKey, secondValue] of Object.entries(topValue)) {
-                if (isToggleList(secondValue)) {
-                    complexItems.push([secondKey, secondValue]);
-                } else if (Array.isArray(secondValue)) {
-                    complexItems.push([secondKey, secondValue]);
-                } else if (typeof secondValue === 'object' && secondValue !== null) {
+                if (isToggleList(secondValue) || Array.isArray(secondValue) || (typeof secondValue === 'object' && secondValue !== null)) {
                     complexItems.push([secondKey, secondValue]);
                 } else {
-                    // Simple value (string, number, boolean, null)
                     simpleItems.push([secondKey, secondValue]);
                 }
             }
 
-            // Add simple values directly (no grouping)
             for (const [key, value] of simpleItems) {
                 addToGroup('_direct_', null, {
                     key: `${category}.${key}`,
@@ -247,19 +306,16 @@ function organizeSettingsIntoCategories(originalData, moduleInfo = {}) {
                 }, true);
             }
 
-            // Group complex values
             for (const [secondKey, secondValue] of complexItems) {
                 const groupKey = `${topKey}.${secondKey}`;
                 const groupTitle = formatLabel(secondKey);
 
                 if (typeof secondValue === 'object' && secondValue !== null &&
                     !Array.isArray(secondValue) && !isToggleList(secondValue)) {
-                    // It's a nested object, flatten its contents
-                    flattenSettingsObject(secondValue, groupKey, (item) => {
+                    flattenSettingsObject(secondValue, groupKey, {}, (item) => {
                         addToGroup(groupKey, groupTitle, item);
                     });
                     } else {
-                        // It's a toggle list or array
                         addToGroup(groupKey, groupTitle, {
                             key: groupKey,
                             value: secondValue,
@@ -269,7 +325,6 @@ function organizeSettingsIntoCategories(originalData, moduleInfo = {}) {
                     }
             }
         } else {
-            // Simple value at top level (no groups)
             addToGroup(topKey, formatLabel(topKey), {
                 key: topKey,
                 value: topValue,
@@ -281,23 +336,73 @@ function organizeSettingsIntoCategories(originalData, moduleInfo = {}) {
     return categories;
 }
 
+
 // Flatten a settings object into dot-notation items
-function flattenSettingsObject(obj, prefix, callback) {
+function flattenSettingsObject(obj, prefix, schema = {}, callback) {
     for (const [key, value] of Object.entries(obj)) {
         const fullKey = prefix ? `${prefix}.${key}` : key;
+        const subSchema = (schema && schema[key]) ? schema[key] : {};
 
-        if (typeof value === 'object' && value !== null &&
-            !Array.isArray(value) && !isToggleList(value)) {
+        // Check if this is a "setting definition" object (has metadata)
+        const isDefinition = (typeof value === 'object' && value !== null && !Array.isArray(value) &&
+        ('default' in value || 'description' in value || 'type' in value || 'unsafe' in value));
+
+        if (!isDefinition && !isToggleList(value) && typeof value === 'object' && value !== null && !Array.isArray(value)) {
             // Nested object - recurse
-            flattenSettingsObject(value, fullKey, callback);
-            } else {
-                callback({
-                    key: fullKey,
-                    value: value,
-                    type: isToggleList(value) ? 'toggle_list' : detectType(value, fullKey),
-                         description: FIELD_DESCRIPTIONS[fullKey] || null
-                });
+            flattenSettingsObject(value, fullKey, subSchema, callback);
+        } else {
+            // Leaf node (either it's a definition, a toggle list, or a primitive)
+            let actualValue = value;
+            let actualDescription = null;
+            let actualType = null;
+            let actualUnsafe = false;
+
+            if (isDefinition) {
+                actualValue = 'default' in value ? value.default : value;
+                actualDescription = value.description || null;
+                actualUnsafe = value.unsafe || false;
+                if (value.type) {
+                    // Map custom types to UI types
+                    if (value.type === 'long_text') actualType = 'textarea';
+                    else if (value.type === 'select') actualType = 'select';
+                    else if (value.type === 'number') actualType = 'number';
+                    else if (value.type === 'slider') actualType = 'slider';
+                    else actualType = value.type;
+                }
             }
+
+            // If type is still not set, try to get it from subSchema or detect it
+            if (!actualType) {
+                if (subSchema.type) {
+                    if (subSchema.type === 'long_text') actualType = 'textarea';
+                    else if (subSchema.type === 'select') actualType = 'select';
+                    else if (subSchema.type === 'number') actualType = 'number';
+                    else if (subSchema.type === 'slider') actualType = 'slider';
+                    else actualType = subSchema.type;
+                } else if (isToggleList(actualValue)) {
+                    actualType = 'toggle_list';
+                } else {
+                    actualType = detectType(actualValue, fullKey);
+                }
+            }
+
+            // Final description check
+            if (!actualDescription) {
+                actualDescription = FIELD_DESCRIPTIONS[fullKey] || subSchema.description || null;
+            }
+
+            callback({
+                key: fullKey,
+                value: actualValue,
+                type: actualType,
+                description: actualDescription,
+                unsafe: actualUnsafe || subSchema.unsafe || false,
+                min: subSchema.min || (isDefinition ? value.min : undefined),
+                max: subSchema.max || (isDefinition ? value.max : undefined),
+                step: subSchema.step || (isDefinition ? value.step : undefined),
+                options: subSchema.options || (isDefinition ? value.options : null)
+            });
+        }
     }
 }
 
@@ -308,7 +413,7 @@ function detectType(value, key = '') {
     }
     if (value === null || value === undefined) return 'text';
     if (typeof value === 'boolean') return 'boolean';
-    if (typeof value === 'number') return 'number';
+    if (typeof value === 'number' && !key.toLowerCase().endsWith('id')) return 'number';
     if (Array.isArray(value)) return 'array';
     if (typeof value === 'object') return 'object';
     if (typeof value === 'string') {
@@ -542,12 +647,9 @@ function renderSettingsForm(categories) {
             if (directGroup && directGroup.isDirect) {
                 directGroup.items.forEach(item => {
                     const itemEl = createSettingItem(item);
-
-                    // Apply full-width class to module/user module toggle lists
                     if (item.isModuleList) {
                         itemEl.classList.add('full-width-item');
                     }
-
                     itemsContainer.appendChild(itemEl);
                 });
             }
@@ -556,10 +658,20 @@ function renderSettingsForm(categories) {
             const groupsGrid = document.createElement('div');
             groupsGrid.className = 'settings-groups-grid';
 
-            // Then render grouped items into the grid
-            data.groups.forEach((groupData, groupKey) => {
-                if (groupKey === '_direct_') return;
+            // --- START OF SORTING LOGIC ---
+            // 1. Convert Map to Array
+            // 2. Filter out the '_direct_' key
+            // 3. Sort the resulting array by the group's title
+            const sortedGroupEntries = Array.from(data.groups.entries())
+            .filter(([groupKey]) => groupKey !== '_direct_')
+            .sort((a, b) => {
+                const titleA = a[1].title || '';
+                const titleB = b[1].title || '';
+                return titleA.localeCompare(titleB);
+            });
 
+            // 4. Iterate over the sorted array instead of the Map
+            sortedGroupEntries.forEach(([groupKey, groupData]) => {
                 const groupContainer = document.createElement('div');
                 groupContainer.className = 'settings-group';
                 groupContainer.dataset.group = groupKey;
@@ -585,10 +697,11 @@ function renderSettingsForm(categories) {
 
                 groupContainer.appendChild(header);
                 groupContainer.appendChild(content);
-                groupsGrid.appendChild(groupContainer); // Append to the grid
+                groupsGrid.appendChild(groupContainer);
             });
+            // --- END OF SORTING LOGIC ---
 
-            itemsContainer.appendChild(groupsGrid); // Append grid to the main container
+            itemsContainer.appendChild(groupsGrid);
         }
 
         section.appendChild(itemsContainer);
@@ -600,6 +713,7 @@ function renderSettingsForm(categories) {
         firstSection.classList.add('active');
     }
 }
+
 
 // Toggle settings group collapse
 function toggleSettingsGroup(header) {
@@ -623,7 +737,13 @@ function createSettingItem(item) {
     label.textContent = formatLabel(item.key);
     wrapper.appendChild(label);
 
-    // Create appropriate input based on type
+    if (item.description) {
+        const desc = document.createElement('p');
+        desc.className = 'setting-description';
+        desc.innerHTML = renderMarkdown(item.description);
+        wrapper.appendChild(desc);
+    }
+
     let inputEl;
 
     switch (item.type) {
@@ -637,7 +757,7 @@ function createSettingItem(item) {
             inputEl = createToggleListInput(item.key, item.value, !!item.isModuleList);
             break;
         case 'boolean':
-            inputEl = createToggleInput(item.key, item.value);
+            inputEl = createToggleInput(item.key, item.value, item.unsafe);
             break;
         case 'number':
             inputEl = createNumberInput(item.key, item.value);
@@ -654,18 +774,122 @@ function createSettingItem(item) {
         case 'password':
             inputEl = createPasswordInput(item.key, item.value);
             break;
+        case 'slider':
+            inputEl = createSliderInput(item.key, item.value, item.min, item.max, item.step);
+            break;
+        case 'percentage':
+            inputEl = createPercentageSlider(item.key, item.value);
+            break;
+        case 'select':
+            inputEl = createSelectInput(item.key, item.value, item.options);
+            break;
         default:
             inputEl = createTextInput(item.key, item.value, item.type);
     }
 
+    if (item.unsafe) {
+        inputEl.classList.add('setting-item-unsafe');
+    }
+
     wrapper.appendChild(inputEl);
 
-    if (item.description) {
-        const desc = document.createElement('p');
-        desc.className = 'setting-description';
-        desc.textContent = item.description;
-        wrapper.appendChild(desc);
+    return wrapper;
+}
+
+// Generic Slider Input Implementation
+function createSliderInput(key, value, min = 0, max = 100, step = 1) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'setting-slider-container';
+
+    const currentVal = parseFloat(value) || 0;
+    const minVal = parseFloat(min);
+    const maxVal = parseFloat(max);
+    const stepVal = parseFloat(step) || 1;
+
+    // Calculate percentage for the visual fill
+    const getPercentage = (val) => ((val - minVal) / (maxVal - minVal)) * 100;
+    const percentage = getPercentage(currentVal);
+
+    const sliderRow = document.createElement('div');
+    sliderRow.className = 'slider-row';
+    sliderRow.innerHTML = `
+    <div class="slider-header">
+    <span class="slider-label">Value</span>
+    <span class="slider-value" id="${key}-val-display">${currentVal}</span>
+    </div>
+    <div class="slider-track-wrapper">
+    <div class="slider-track">
+    <input type="range" class="slider-input" id="${key}-input"
+    min="${min}" max="${max}" step="${step}" value="${currentVal}">
+    <div class="slider-fill" id="${key}-fill" style="width: ${percentage}%"></div>
+    <div class="slider-handle" id="${key}-handle" style="left: ${percentage}%"></div>
+    </div>
+    <div class="slider-labels">
+    <span>${min}</span>
+    <span>${max}</span>
+    </div>
+    </div>
+    `;
+
+    const input = sliderRow.querySelector('.slider-input');
+    const fill = sliderRow.querySelector('.slider-fill');
+    const handle = sliderRow.querySelector('.slider-handle');
+    const display = sliderRow.querySelector('.slider-value');
+
+    input.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        const p = getPercentage(val);
+        display.textContent = val;
+        fill.style.width = `${p}%`;
+        handle.style.left = `${p}%`;
+        handleSettingChange(key, val);
+    });
+
+    wrapper.appendChild(sliderRow);
+    return wrapper;
+}
+
+// Create select dropdown input with description update
+function createSelectInput(key, value, options) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'setting-select-wrapper';
+    wrapper.dataset.key = key;
+
+    const select = document.createElement('select');
+    select.className = 'setting-input';
+    select.dataset.key = key;
+
+    // options is { "val1": "Label 1", "val2": "Label 2" }
+    for (const [optKey, optValue] of Object.entries(options)) {
+        const option = document.createElement('option');
+        option.value = optKey;
+        option.textContent = optKey;
+        if (optKey === value) {
+            option.selected = true;
+        }
+        select.appendChild(option);
     }
+
+    const descContainer = document.createElement('div');
+    descContainer.className = 'setting-select-description';
+    descContainer.style.marginTop = '8px';
+    descContainer.style.fontSize = '0.85em';
+    descContainer.style.minHeight = '1.2em';
+
+    const updateDescription = () => {
+        descContainer.innerHTML = renderMarkdown(options[select.value]) || '';
+    };
+
+    select.onchange = () => {
+        updateDescription();
+        handleSettingChange(key, select.value);
+    };
+
+    wrapper.appendChild(select);
+    wrapper.appendChild(descContainer);
+
+    // Initial description update
+    updateDescription();
 
     return wrapper;
 }
@@ -845,7 +1069,15 @@ function createToggleListInput(key, value, isModuleList = false) {
     const descriptions = value.descriptions || {};
     const unsafeModules = value.unsafeModules || {};
 
-    const sortedItems = allItems.sort((a, b) => {
+    const sortedItems = allItems
+    .filter(item => {
+        // If we are in a module list and the item is unsafe, hide it if toggle is off
+        if (isModuleList && unsafeModules[item] && !showUnsafeSettings) {
+            return false;
+        }
+        return true;
+    })
+    .sort((a, b) => {
         const aEnabled = enabledSet.has(a);
         const bEnabled = enabledSet.has(b);
         const aUnsafe = unsafeModules[a] === true;
@@ -963,8 +1195,19 @@ function createToggleListInput(key, value, isModuleList = false) {
             itemWrapper.appendChild(name);
             itemWrapper.appendChild(toggle);
 
-            checkbox.onchange = () => {
+            checkbox.onchange = async () => {
                 const newState = checkbox.checked;
+
+                if (newState && isUnsafe) {
+                    const confirmed = await showConfirmDialog(
+                        "You are about to enable an unsafe setting. This could potentially affect the stability or security of the application. Proceed?"
+                    );
+                    if (!confirmed) {
+                        checkbox.checked = false;
+                        return;
+                    }
+                }
+
                 itemWrapper.classList.toggle('enabled', newState);
                 newState ? enabledSet.add(item) : enabledSet.delete(item);
                 status.querySelector('.toggle-count').textContent = `${enabledSet.size} of ${sortedItems.length} enabled`;
@@ -1121,7 +1364,7 @@ function createNumberInput(key, value) {
 }
 
 // Create toggle switch (single boolean)
-function createToggleInput(key, value) {
+function createToggleInput(key, value, isUnsafe = false) {
     const wrapper = document.createElement('div');
     wrapper.className = 'setting-toggle-wrapper';
 
@@ -1140,8 +1383,19 @@ function createToggleInput(key, value) {
     labelSpan.textContent = value ? 'Enabled' : 'Disabled';
 
     // Handle change
-    checkbox.onchange = () => {
+    checkbox.onchange = async () => {
         const newValue = checkbox.checked;
+
+        if (newValue && isUnsafe) {
+            const confirmed = await showConfirmDialog(
+                "You are about to enable an unsafe setting. Proceed?"
+            );
+            if (!confirmed) {
+                checkbox.checked = false;
+                return;
+            }
+        }
+
         labelSpan.textContent = newValue ? 'Enabled' : 'Disabled';
         handleSettingChange(key, newValue);
     };
@@ -2293,31 +2547,8 @@ function createThemeSection() {
     audioControls = document.createElement('div');
     audioControls.className = 'settings-control-group';
 
-    // Streaming Sound Toggle
-    const savedStreamingSoundEnabled = localStorage.getItem('streamingSoundEnabled') !== 'false';
-
-    const streamingSoundToggleRow = document.createElement('div');
-    streamingSoundToggleRow.className = 'toggle-row';
-    streamingSoundToggleRow.innerHTML = `
-    <div class="toggle-info">
-    <span class="toggle-label">Enable Streaming Sound</span>
-    <span class="toggle-description">Play typing sound on every token during streaming, even without typewriter animation</span>
-    </div>
-    <label class="toggle-switch">
-    <input type="checkbox" id="streaming-sound-enabled-checkbox" ${savedStreamingSoundEnabled ? 'checked' : ''}>
-    <span class="toggle-slider"></span>
-    </label>
-    `;
-
-    const streamingSoundCheckbox = streamingSoundToggleRow.querySelector('#streaming-sound-enabled-checkbox');
-    streamingSoundCheckbox.addEventListener('change', function() {
-        localStorage.setItem('streamingSoundEnabled', this.checked ? 'true' : 'false');
-    });
-
-    audioControls.appendChild(streamingSoundToggleRow);
-
     // Volume Control
-    const currentVolume = Math.round((parseFloat(localStorage.getItem('typewriterVolume') || '1.0')) * 100);
+    const currentVolume = Math.round((parseFloat(localStorage.getItem('typewriterVolume') || '0.7')) * 100);
 
     // Sync volume with manager on load
     TypewriterAudioManager.setVolume(currentVolume / 100);
@@ -2397,14 +2628,17 @@ function createThemeSection() {
         return !!localStorage.getItem(`${id}SoundData`);
     };
 
-    const createSoundInput = (id, labelText, iconPath, savedName) => {
+    const createSoundInput = (id, labelText, iconPath) => {
+        const savedName = localStorage.getItem(`${id}SoundName`);
         const hasAudio = isAudioLoaded(id);
+        const isEnabled = localStorage.getItem(`${id}Enabled`) === 'true'; // Default to false
 
         const container = document.createElement('div');
         container.className = 'sound-input-card';
         container.dataset.soundId = id;
 
         container.innerHTML = `
+        <div class="sound-header">
         <div class="sound-icon">
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         ${iconPath}
@@ -2412,7 +2646,13 @@ function createThemeSection() {
         </div>
         <div class="sound-info">
         <span class="sound-label">${labelText}</span>
-        <span class="sound-filename ${hasAudio ? 'loaded' : ''}" id="${id}-filename">${savedName || 'No file selected'}</span>
+        <span class="sound-filename ${hasAudio ? 'loaded' : ''}" id="${id}-filename">${savedName || 'Using generated sound'}</span>
+        </div>
+        <label class="sound-toggle">
+        <span class="toggle-label">Enabled</span>
+        <input type="checkbox" id="${id}-enabled-checkbox" ${isEnabled ? 'checked' : ''}>
+        <span class="toggle-slider"></span>
+        </label>
         </div>
         <div class="sound-actions">
         <button type="button" class="sound-action-btn preview" id="${id}-preview-btn" title="Preview sound" ${!hasAudio ? 'disabled' : ''}>
@@ -2434,7 +2674,7 @@ function createThemeSection() {
         </svg>
         </button>
         </div>
-        <input type="file" accept="audio/*" id="${id}-file-input" style="display: none;">
+        <input type="file" accept="audio/*" id="${id}-file-input" style="position: absolute; left: -9999px; top: auto; width: 1px; height: 1px; overflow: hidden;">
         `;
 
         const previewBtn = container.querySelector(`#${id}-preview-btn`);
@@ -2504,30 +2744,153 @@ function createThemeSection() {
             fileInput.value = '';
         });
 
+        // Toggle event listener
+        const enabledCheckbox = container.querySelector(`#${id}-enabled-checkbox`);
+        enabledCheckbox.addEventListener('change', function() {
+            localStorage.setItem(`${id}Enabled`, this.checked ? 'true' : 'false');
+        });
+
         return container;
     };
 
     const typewriterIcon = '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>';
     const completionIcon = '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>';
 
+    const sendSoundInput = createSoundInput(
+        'send_message',
+        'Message sent',
+        typewriterIcon
+    );
+    soundContainer.appendChild(sendSoundInput);
+
+    const responseSoundInput = createSoundInput(
+        'response_start',
+        'Message received',
+        typewriterIcon
+    );
+    soundContainer.appendChild(responseSoundInput);
+
+    const tokenSoundInput = createSoundInput(
+        'token',
+        'Token generation',
+        typewriterIcon
+    );
+    soundContainer.appendChild(tokenSoundInput);
+
     const twSoundInput = createSoundInput(
-        'typewriter',
-        'Typewriter Sound',
-        typewriterIcon,
-        localStorage.getItem("typewriterSoundName")
+        'typing',
+        'Typewriter',
+        typewriterIcon
     );
     soundContainer.appendChild(twSoundInput);
 
+    const reasoningSoundInput = createSoundInput(
+        'reasoning_end',
+        'Done thinking',
+        typewriterIcon
+    );
+    soundContainer.appendChild(reasoningSoundInput);
+
     const compSoundInput = createSoundInput(
         'completion',
-        'Completion Sound',
-        completionIcon,
-        localStorage.getItem("completionSoundName")
-    );1
+        'Response finished',
+        completionIcon
+    );
 
     soundContainer.appendChild(compSoundInput);
 
     audioControls.appendChild(soundContainer);
+
+    // === TYPING FREQUENCY SLIDER ===
+    const typingFreqRow = document.createElement('div');
+    typingFreqRow.className = 'slider-row';
+
+    const savedFreq = parseInt(localStorage.getItem('typingFreq')) || 600;
+    const freqMin = 100;
+    const freqMax = 8000;
+    const freqStep = 100;
+    const freqPercentage = ((savedFreq - freqMin) / (freqMax - freqMin)) * 100;
+
+    typingFreqRow.innerHTML = `
+    <div class="slider-header">
+    <span class="slider-label">Typing Sound Frequency</span>
+    <span class="slider-value" id="typing-freq-value">${savedFreq} Hz</span>
+    </div>
+    <div class="slider-track-wrapper">
+    <div class="slider-track">
+    <input type="range" class="slider-input" id="typing-freq-slider"
+    min="${freqMin}" max="${freqMax}" step="${freqStep}" value="${savedFreq}">
+    <div class="slider-fill" id="freq-fill" style="width: ${freqPercentage}%"></div>
+    <div class="slider-handle" id="freq-handle" style="left: ${freqPercentage}%"></div>
+    </div>
+    <div class="slider-labels">
+    <span>${freqMin} Hz</span>
+    <span>${freqMax} Hz</span>
+    </div>
+    </div>
+    `;
+
+    const freqSlider = typingFreqRow.querySelector('#typing-freq-slider');
+    const freqDisplay = typingFreqRow.querySelector('#typing-freq-value');
+    const freqFill = typingFreqRow.querySelector('#freq-fill');
+    const freqHandle = typingFreqRow.querySelector('#freq-handle');
+
+    freqSlider.addEventListener('input', function() {
+        const val = parseInt(this.value);
+        const percentage = ((val - freqMin) / (freqMax - freqMin)) * 100;
+        freqDisplay.textContent = `${val} Hz`;
+        freqFill.style.width = `${percentage}%`;
+        freqHandle.style.left = `${percentage}%`;
+        localStorage.setItem('typingFreq', val);
+    });
+
+    audioControls.appendChild(typingFreqRow);
+
+    // === TOKEN GENERATION FREQUENCY SLIDER ===
+    const tokenFreqRow = document.createElement('div');
+    tokenFreqRow.className = 'slider-row';
+
+    const savedTokenFreq = parseInt(localStorage.getItem('tokenFreq')) || 9000;
+    const tokenFreqMin = 100;
+    const tokenFreqMax = 9000;
+    const tokenFreqStep = 100;
+    const tokenFreqPercentage = ((savedTokenFreq - tokenFreqMin) / (tokenFreqMax - tokenFreqMin)) * 100;
+
+    tokenFreqRow.innerHTML = `
+    <div class="slider-header">
+    <span class="slider-label">Token Generation Sound Frequency</span>
+    <span class="slider-value" id="token-freq-value">${savedTokenFreq} Hz</span>
+    </div>
+    <div class="slider-track-wrapper">
+    <div class="slider-track">
+    <input type="range" class="slider-input" id="token-freq-slider"
+    min="${tokenFreqMin}" max="${tokenFreqMax}" step="${tokenFreqStep}" value="${savedTokenFreq}">
+    <div class="slider-fill" id="token-freq-fill" style="width: ${tokenFreqPercentage}%"></div>
+    <div class="slider-handle" id="token-freq-handle" style="left: ${tokenFreqPercentage}%"></div>
+    </div>
+    <div class="slider-labels">
+    <span>${tokenFreqMin} Hz</span>
+    <span>${tokenFreqMax} Hz</span>
+    </div>
+    </div>
+    `;
+
+    const tokenFreqSlider = tokenFreqRow.querySelector('#token-freq-slider');
+    const tokenFreqDisplay = tokenFreqRow.querySelector('#token-freq-value');
+    const tokenFreqFill = tokenFreqRow.querySelector('#token-freq-fill');
+    const tokenFreqHandle = tokenFreqRow.querySelector('#token-freq-handle');
+
+    tokenFreqSlider.addEventListener('input', function() {
+        const val = parseInt(this.value);
+        const percentage = ((val - tokenFreqMin) / (tokenFreqMax - tokenFreqMin)) * 100;
+        tokenFreqDisplay.textContent = `${val} Hz`;
+        tokenFreqFill.style.width = `${percentage}%`;
+        tokenFreqHandle.style.left = `${percentage}%`;
+        localStorage.setItem('tokenFreq', val);
+    });
+
+    audioControls.appendChild(tokenFreqRow);
+
 
     audioSection.appendChild(audioControls);
 
@@ -2558,7 +2921,7 @@ function createThemeSection() {
     twSection.appendChild(twHeader);
 
     // Enable/Disable Toggle
-    const savedTypewriterEnabled = localStorage.getItem('typewriterEnabled') !== 'false';
+    const savedTypewriterEnabled = localStorage.getItem('typewriterEnabled') === 'true';
 
     const twToggleRow = document.createElement('div');
     twToggleRow.className = 'toggle-row';
@@ -2679,6 +3042,43 @@ function createThemeSection() {
         twControls.classList.add('visible');
     }
 
+    const advancedSettingsSection = document.createElement('div');
+    const advancedSettingsLabel = document.createElement('h4');
+    advancedSettingsLabel.textContent = 'Advanced Settings';
+    advancedSettingsLabel.className = 'section-heading';
+
+    const unsafeVisibilityToggleRow = document.createElement('div');
+    unsafeVisibilityToggleRow.className = 'toggle-row toggle-unsafe';
+    unsafeVisibilityToggleRow.style.marginTop = '16px';
+    unsafeVisibilityToggleRow.style.paddingTop = '16px';
+    unsafeVisibilityToggleRow.style.borderTop = '1px solid var(--border-color)';
+
+    unsafeVisibilityToggleRow.innerHTML = `
+    <div class="toggle-info">
+    <span class="toggle-label">Show Unsafe Settings</span>
+    <span class="toggle-description">Unsafe settings are things like total system shell access, code execution, and anything else that could easily compromise your security or data. They are hidden by default because they are risky, but they are available for power users through this toggle.</span>
+    </div>
+    <label class="toggle-switch">
+    <input type="checkbox" id="show-unsafe-toggle">
+    <span class="toggle-slider"></span>
+    </label>
+    `;
+
+    const unsafeCheckbox = unsafeVisibilityToggleRow.querySelector('#show-unsafe-toggle');
+    unsafeCheckbox.checked = showUnsafeSettings;
+
+    unsafeCheckbox.addEventListener('change', function() {
+        showUnsafeSettings = this.checked;
+        localStorage.setItem('showUnsafeSettings', this.checked);
+
+        // Re-render the entire form to apply the filter
+        // Since loadSettings() triggers organizeSettingsIntoCategories()
+        loadSettings();
+    });
+
+    advancedSettingsSection.appendChild(unsafeVisibilityToggleRow);
+
+    wrapper.appendChild(advancedSettingsSection);
 
     // ==========================================================================
     // THEME MODE TOGGLE
@@ -2894,5 +3294,59 @@ function createReasoningEffortSlider(key, value) {
     desc.textContent = 'Set the reasoning effort for the model';
     wrapper.appendChild(desc);
 
+    return wrapper;
+}
+
+
+
+// Create percentage slider (0.0 to 1.0)
+function createPercentageSlider(key, value) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'setting-slider-container';
+
+    const currentVal = parseFloat(value) || 0;
+    const minVal = 0;
+    const maxVal = 1;
+    const stepVal = 0.01;
+
+    const getPercentage = (val) => (val * 100);
+    const percentage = getPercentage(currentVal);
+
+    const sliderRow = document.createElement('div');
+    sliderRow.className = 'slider-row';
+    sliderRow.innerHTML = `
+    <div class="slider-header">
+    <span class="slider-label">Percentage</span>
+    <span class="slider-value" id="${key}-val-display">${(currentVal * 100).toFixed(0)}%</span>
+    </div>
+    <div class="slider-track-wrapper">
+    <div class="slider-track">
+    <input type="range" class="slider-input" id="${key}-input"
+    min="0" max="1" step="0.01" value="${currentVal}">
+    <div class="slider-fill" id="${key}-fill" style="width: ${percentage}%"></div>
+    <div class="slider-handle" id="${key}-handle" style="left: ${percentage}%"></div>
+    </div>
+    <div class="slider-labels">
+    <span>0%</span>
+    <span>100%</span>
+    </div>
+    </div>
+    `;
+
+    const input = sliderRow.querySelector('.slider-input');
+    const fill = sliderRow.querySelector('.slider-fill');
+    const handle = sliderRow.querySelector('.slider-handle');
+    const display = sliderRow.querySelector('.slider-value');
+
+    input.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        const p = getPercentage(val);
+        display.textContent = `${(val * 100).toFixed(0)}%`;
+        fill.style.width = `${p}%`;
+        handle.style.left = `${p}%`;
+        handleSettingChange(key, val);
+    });
+
+    wrapper.appendChild(sliderRow);
     return wrapper;
 }

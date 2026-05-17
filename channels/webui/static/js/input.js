@@ -1,4 +1,16 @@
 // =============================================================================
+// Message History
+// =============================================================================
+const HISTORY_KEY = 'message_history';
+const MAX_HISTORY = 100;
+let messageHistory = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+let historyIndex = -1;
+
+function saveHistory() {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(messageHistory));
+}
+
+// =============================================================================
 // Keyboard Shortcuts - Global Handler
 // =============================================================================
 
@@ -39,11 +51,6 @@ document.addEventListener('keydown', (event) => {
         if (event.key === 'Enter') {
             event.preventDefault();
             send();
-            return;
-        }
-        if (event.key === 'l' || event.key === 'L') {
-            event.preventDefault();
-            clearChat();
             return;
         }
         if (event.key === 's' || event.key === 'S') {
@@ -116,14 +123,57 @@ document.addEventListener('keydown', (event) => {
         return;
     }
 
-    // When input is focused - handle message sending
+    // When input is focused - handle message sending and history
     if (isInputFocused && activeElement === inputField) {
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
         if (!isMobile && event.key === 'Enter' && !event.shiftKey) {
             event.preventDefault();
             event.stopPropagation();
+
+            const msg = inputField.value.trim();
+            if (msg) {
+                if (messageHistory.length === 0 || messageHistory[messageHistory.length - 1] !== msg) {
+                    messageHistory.push(msg);
+                    if (messageHistory.length > MAX_HISTORY) {
+                        messageHistory.shift();
+                    }
+                    saveHistory();
+                }
+                historyIndex = -1;
+            }
+
             send();
+            return;
+        }
+
+        if (!isMobile && event.ctrlKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+            if (messageHistory.length > 0) {
+                if (event.key === 'ArrowUp') {
+                    if (historyIndex === -1) {
+                        historyIndex = messageHistory.length - 1;
+                    } else if (historyIndex > 0) {
+                        historyIndex--;
+                    }
+                } else if (event.key === 'ArrowDown') {
+                    if (historyIndex !== -1) {
+                        if (historyIndex < messageHistory.length - 1) {
+                            historyIndex++;
+                        } else {
+                            historyIndex = -1;
+                        }
+                    }
+                }
+
+                if (historyIndex === -1) {
+                    inputField.value = '';
+                } else {
+                    inputField.value = messageHistory[historyIndex];
+                }
+            }
+            autoResize(inputField);
+            event.preventDefault();
+            event.stopPropagation();
             return;
         }
     }

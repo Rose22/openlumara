@@ -9,13 +9,35 @@ class SandboxedShell(core.module.Module):
     """
 
     settings = {
-        "internet_access": False,
-        "persistent_data": True,
-        "sandbox_path": "~/sandbox",
-        "cpu_limit": "0.5",
-        "memory_limit": "256m",
-        "max_processes": 50,
-        "execution_timeout": 30,
+        "internet_access": {
+            "default": False,
+            "description": "Whether the sandbox container has access to the internet"
+        },
+        "persistent_data": {
+            "default": True,
+            "description": "When on, the /data folder in the sandbox is persistent (and mapped to your host system). When off, it's a temporary folder in RAM (tmpfs)"
+        },
+        "sandbox_path": {
+            "default": "~/sandbox",
+            "description": "The path to the folder your shell will be limited to. It can't access anything outside this folder!"
+        },
+        "cpu_limit": {
+            "default": 0.5,
+            "type": "percentage",
+            "description": "The percentage of CPU use to limit processes inside the sandbox to. They will be prevented from exceeding this limit"
+        },
+        "memory_limit": {
+            "default": "256m",
+            "description": "Maximum amount of RAM use to allow (example: 150kb, 256m, 2gb)"
+        },
+        "max_processes": {
+            "default": 10,
+            "description": "Maximum amount of processes to allow"
+        },
+        "execution_timeout": {
+            "default": 30,
+            "description": "Maximum amount of time a process inside the shell is allowed to run for"
+        },
         "image": "python:3.11-slim"
     }
 
@@ -58,7 +80,7 @@ class SandboxedShell(core.module.Module):
             start_cmd = [
                 self.runtime, 'run', '-d',
                 '--name', self.container_name,
-                '--cpus', self.config.get("cpu_limit", default="0.5"),
+                '--cpus', str(self.config.get("cpu_limit", default=0.5)),
                 '--memory', self.config.get("memory_limit", default="256m"),
                 '--pids-limit', str(self.config.get("max_processes", default=50)),
                 '--network', 'bridge' if self.config.get("internet_access", default=False) else 'none'
@@ -115,7 +137,7 @@ class SandboxedShell(core.module.Module):
         except Exception as e:
             return self.result(f"Module Error: {str(e)}", False)
 
-    @core.module.command("shell", temporary=False, help={
+    @core.module.command("shell", send_to_ai=True, help={
         "<cmd>": "runs a command in the sandboxed shell"
     })
     async def cmd_shell(self, args):
@@ -142,7 +164,7 @@ class SandboxedShell(core.module.Module):
         except Exception as e:
             return f"error while running sandboxed shell command: {e}"
 
-    @core.module.command("shell_setup", temporary=False)
+    @core.module.command("shell_setup", send_to_ai=True)
     async def cmd_setup(self, args):
         """shows details about your sandbox setup"""
 

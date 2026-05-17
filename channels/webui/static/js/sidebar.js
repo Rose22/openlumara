@@ -124,15 +124,25 @@ document.addEventListener('DOMContentLoaded', initSidebarState);
 let touchStartX = 0;
 let touchEndX = 0;
 
+
 function handleSwipe() {
     try {
+        const sidebar = document.getElementById('sidebar');
+        const sidebarOverlay = document.getElementById('sidebar-overlay');
+
+        if (!sidebar) return;
+
         const swipeThreshold = 50;
         const diff = touchEndX - touchStartX;
 
         if (diff > swipeThreshold && touchStartX < 30) {
-            sidebar.classList.add('open');
-            if (sidebarOverlay) sidebarOverlay.classList.add('show');
+            // Swipe Right - Only used for opening the sidebar from a closed state
+            if (!sidebar.classList.contains('open')) {
+                sidebar.classList.add('open');
+                if (sidebarOverlay) sidebarOverlay.classList.add('show');
+            }
         } else if (diff < -swipeThreshold && sidebar.classList.contains('open')) {
+            // Swipe Left - Close the entire sidebar
             closeSidebar();
         }
     } catch (err) {

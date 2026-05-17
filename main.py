@@ -45,11 +45,8 @@ async def main_loop(arg_list):
     args_main.add_argument("--debug", help="Enable debug mode (display all warnings and errors)", action="store_true")
 
     args_settings = arg_parser.add_argument_group("settings")
-    add_arguments_recursive(args_settings, core.config.get_schema(
-        enabled_channels=core.config.get("channels").get("enabled"),
-        enabled_modules=core.config.get("modules").get("enabled"),
-        enabled_user_modules=core.config.get("user_modules").get("enabled")
-    ))
+    module_structure = core.config.get_module_structure()
+    add_arguments_recursive(args_settings, core.config.get_schema(), module_structure, main_parser=arg_parser)
 
     # do the arg parsing
     args, unknown = arg_parser.parse_known_args(arg_list)
@@ -74,11 +71,9 @@ async def main_loop(arg_list):
     # the manager class connects everything together
     manager = core.manager.Manager(cmdline_args=args)
     # run main loop
-    return await manager.run()
-
-    # unload everything
-    manager = None
-    core.config.config = None
+    result = await manager.run()
+    manager = None # wipe it all
+    return result
 
 def run_from_args(arg_list: list = []):
     while True:
@@ -105,21 +100,60 @@ def str2bool(v):
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
-def add_arguments_recursive(parser, config, prefix=""):
+def add_arguments_recursive(parser, config, module_structure, prefix="", current_group=None, main_parser=None):
     """
     Recursively traverses the config dict and adds arguments to the parser.
     """
+    if main_parser is None:
+        main_parser = parser
+
     for key, value in config.items():
-        # Build the argument name (e.g., --channels.settings.webui.port)
         arg_name = f"{prefix}.{key}" if prefix else key
         arg_flag = f"--{arg_name}"
 
         if isinstance(value, dict):
-            # If it's a dict, we drill down deeper
-            add_arguments_recursive(parser, value, prefix=arg_name)
+            # CHECK: Is this a leaf setting? (A dict that contains a 'default' key)
+            if "default" in value:
+                # We reached a leaf setting.
+                target_parser = current_group if current_group else parser
+                
+                default_val = value.get("default")
+                # Priority: description > help > default fallback
+                help_text = value.get("description") or None
+                
+                arg_type = type(default_val) if default_val is not None else str
+
+                if isinstance(default_val, list):
+                    target_parser.add_argument(arg_flag, type=str, metavar="<multiple,values>", help=help_text)
+                elif arg_type == bool:
+                    target_parser.add_argument(arg_flag, type=str2bool, default=None, metavar=default_val or "<value>", help=help_text)
+                else:
+                    target_parser.add_argument(arg_flag, type=arg_type, default=None, metavar=default_val or "<value>", help=help_text)
+            else:
+                # It's a nested dict, we drill down deeper
+                
+                # Check if this is a module/channel level to create a new group
+                module_name = None
+                if arg_name.startswith("modules.settings."):
+                    module_name = arg_name[len("modules.settings."):]
+                elif arg_name.startswith("channels.settings."):
+                    module_name = arg_name[len("channels.settings."):]
+                elif arg_name.startswith("user_modules.settings."):
+                    module_name = arg_name[len("user_modules.settings."):]
+                
+                new_group = current_group
+                if module_name and module_name in module_structure:
+                    meta = module_structure[module_name].get("metadata", {})
+                    doc = meta.get("doc", "")
+                    group_title = module_name.capitalize()
+                    new_group = main_parser.add_argument_group(group_title)
+                elif new_group is None:
+                    # If we aren't in a group and didn't find a module, continue with the current parser
+                    new_group = parser
+                
+                add_arguments_recursive(new_group, value, module_structure, prefix=arg_name, current_group=new_group, main_parser=main_parser)
         else:
-            # We reached a leaf node (a real value)
-            # We try to infer the type from the default value
+            # We reached a leaf node (a real value that isn't a dict)
             arg_type = type(value) if value is not None else str
 
             # Special handling for lists (like your 'enabled' keys)

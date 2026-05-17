@@ -7,7 +7,10 @@ class Lists(core.module.Module):
     """
 
     settings = {
-        "put_pinned_lists_in_system_prompt": True,
+        "insert_system_prompt": {
+            "description": "Whether to put pinned lists in the system prompt. This will make your AI aware of pinned lists and their content at all times! So you can simply ask your AI to pin one of your lists, and then it will always know what's in it. Careful though, this can blow up context size fast, depending on the list!",
+            "default": True
+        },
         "max_pinned_lists": 10
     }
 
@@ -17,7 +20,7 @@ class Lists(core.module.Module):
         self.data = core.storage.StorageDict("lists", "yaml")
 
     async def on_system_prompt(self):
-        if not self.config.get("put_pinned_lists_in_system_prompt"):
+        if not self.config.get("insert_system_prompt"):
             return None
 
         output = ""

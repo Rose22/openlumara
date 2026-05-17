@@ -2,6 +2,10 @@ import core
 import copy
 
 class Context:
+    # special message type (not intended to be added to context) that
+    # will cause context.get() to cut off messages before this cutoff point
+    SUMMARIZATION_CUTOFF = {"signal": "SUMMARIZATION_CUTOFF"}
+
     def __init__(self, channel):
         self.channel = channel
 
@@ -22,19 +26,53 @@ class Context:
         if not self.channel.manager.API.connected:
             return None
 
-        # context = system prompt (top) + message history (middle) + endprompt (bottom)
-        context = []
+        # Configuration
+        max_messages = int(core.config.get("api").get("max_messages", 200))
+        max_tokens = int(core.config.get("api").get("max_context", 8192))
+        system_role = "system" if not self.channel.manager.API.supports_developer_role else "developer"
+        dev_role = "developer" if self.channel.manager.API.supports_developer_role else "user"
 
-        # always insert system prompt at start of context
+        # 1. Prepare Components
+        system_msg = []
         if system_prompt:
-            context = [{"role": "system", "content": await self.channel.manager.get_system_prompt()}]
+            content = await self.channel.manager.get_system_prompt()
+            if content:
+                system_msg = [{"role": system_role, "content": content}]
 
-        # insert message history
-        messages = copy.deepcopy(await self.chat.get()) # deepcopy so that we don't modify the original
+        # Get history from the chat (the full, untrimmed version)
+        messages = copy.deepcopy(await self.chat.get())
+
+        # we need to support chat summarization without losing the user-facing end of chat history
+        # so that we can cut context without actually losing our logs..
+
+        # so, i'm using a special entry in the messages array that serves as a cutoff point
+        # from which to actually return the chat history
+
+        # find the last occurence of it and return only the messages from that point onward
+        for i in range(len(messages) - 1, -1, -1):
+            if messages[i].get("signal", "") == "SUMMARIZATION_CUTOFF":
+                messages = [{"role": "user", "content": "Summarize our chat so far"}]+messages[i:]
+                break
+
+        # Remove ghost messages from history
+        messages = [msg for msg in messages if not msg.get("ghost")]
+        
+        # If disabled, remove reasoning from all prior messages
+        if not core.config.get("model", "keep_reasoning_in_context"):
+            messages = [{k: v for k, v in m.items() if k != "reasoning_content"} for m in messages]
+
+        # Apply max_messages limit to history first
+        if messages and len(messages) > max_messages:
+            messages = messages[-max_messages:]
+
+        # Strip multimodal data from all messages except the last one to save tokens
         if messages:
-            # strip multimodal data from all messages except the last one to save tokens
             for i in range(len(messages) - 1):
                 msg = messages[i]
+                if msg.get("role") in ("tool", "tool_calls"):
+                    # dont mess with toolcalls
+                    continue
+
                 content = msg.get("content")
                 if isinstance(content, list):
                     # Keep only the parts of the message that are text
@@ -42,29 +80,66 @@ class Context:
                         part for part in content
                         if isinstance(part, dict) and part.get("type") == "text"
                     ]
+                elif isinstance(content, str):
+                    pass
+                else:
+                    # disallow non-string content
+                    continue
 
-            context.extend(messages)
+        # enforce correct turn order
+        if messages:
+            enforced_messages = []
+            for msg in messages:
+                if (
+                    enforced_messages and
+                    enforced_messages[-1].get("role") == "assistant" and
+                    msg.get("role") == "assistant" and
+                    # IMPORTANT: Only inject if neither message is a tool call.
+                    # Assistant -> Tool -> Assistant is VALID.
+                    # Assistant -> Assistant is INVALID.
+                    not enforced_messages[-1].get("role") == "tool"
+                ):
+                    # We inject a "spacer" user message.
+                    # Using a single space " " is less intrusive to the LLM
+                    # than "[SYSTEM_TICK]" and satisfies the API requirement.
+                    enforced_messages.append({"role": "user", "content": " "})
 
-        """
-        insert endprompt
+                enforced_messages.append(msg)
 
-        the endprompt is information provided by modules that should be at the very end so that context doesnt have to get reprocessed every time,
-        since context reprocessing happens from the point of change onward!
+            messages = enforced_messages
 
-        like if you change something in context, it'll reprocess everything after the part where you made the change.
-
-        so the endprompt is useful for info that changes constantly,
-        such as the current time and date.
-        """
+        end_msg = []
         if end_prompt:
-            # we add the end prompt message as a user message before the actual user messages
-            # because it turns out multiple consecutive user messages ARE allowed
-            # just not multiple consecutive assistant messages or system messages...
             histend = await self.channel.manager.get_end_prompt(prevent_recursion=prevent_recursion)
             if histend:
-                context.append({"role": "user", "content": histend})
+                end_msg = [{"role": dev_role, "content": histend}]
 
-        return context
+        # 2. Build and Trim Context
+        # We combine them to check the total token count
+        full_context = system_msg + messages + end_msg
+        
+        # Calculate current token count
+        current_tokens = await self.chat.count_tokens(full_context)
+
+        # Leave a small buffer (5%) to avoid hitting exact limit
+        token_buffer = max_tokens * 0.05
+        effective_max_tokens = max_tokens - token_buffer
+
+        # If we are over the limit, we trim the history (the middle part)
+        # We don't trim the system prompt or the end prompt as they are essential.
+        while current_tokens > effective_max_tokens and messages:
+            messages.pop(0)
+            full_context = system_msg + messages + end_msg
+            current_tokens = await self.chat.count_tokens(full_context)
+
+        # If we are STILL over the limit even with empty history, it's a single massive message
+        if current_tokens > max_tokens and messages:
+             await self.channel.announce(
+                "Your request exceeds the maximum token limit. Please send a smaller message!",
+                "error"
+            )
+
+        return full_context
 
     async def get_size(self):
         message_history = await self.get(system_prompt=False)
@@ -116,7 +191,6 @@ class Context:
             # when modules don't have a channel assigned yet, this error triggers. we handle it "gracefully".
             return {"current": 0, "max": max_tokens}
         except Exception as e:
-            core.log_error("error while fetching token usage", e)
             # Return a conservative estimate on error
             return {"current": 0, "max": max_tokens}
 

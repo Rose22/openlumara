@@ -6,9 +6,14 @@ import modules
 import user_modules
 import channels
 import pkgutil
+import hashlib
+import json
+import inspect
 
 config = None
 _registry_cache = None
+
+SCHEMA_CACHE_FILE = ".module_cache.json"
 
 default_config = {
     "core": {
@@ -27,6 +32,8 @@ default_config = {
     "model": {
         "name": "",
         "temperature": 0.7,
+        "enable_thinking": True,
+        "keep_reasoning_in_context": True,
         "reasoning_effort": None,
         "use_tools": True
     },
@@ -49,9 +56,13 @@ default_config = {
 }
 
 DEFAULT_MODULES = (
+    "tutorial",
+    "docs",
     "identity",
+    "writing_style",
     "models",
     "channel",
+    "modules",
     "chats",
     "context",
     "memory",
@@ -59,6 +70,8 @@ DEFAULT_MODULES = (
     "lists",
     "system",
     "scheduler",
+    "calendar",
+    "calculator",
     "token_threshold",
     "time"
 )
@@ -99,6 +112,17 @@ class ConfigManager:
                 return default
         return current
 
+    def to_dict(self):
+        # Start from the root config and traverse through the base path
+        current = self.root_config
+        for k in self.base_path:
+            if isinstance(current, dict) and k in current:
+                current = current[k]
+            else:
+                return {}
+
+        return dict(current)
+
     def __getitem__(self, key):
         """Access items using bracket notation: config['key']"""
         current = self.root_config
@@ -116,11 +140,20 @@ class ConfigManager:
             if k not in current or not isinstance(current[k], dict):
                 current[k] = {}
             current = current[k]
-        
+
         current[key] = value
         if hasattr(self.root_config, 'save'):
             self.root_config.save()
 
+    def __contains__(self, key):
+        """Check if key exists: 'key' in config"""
+        current = self.root_config
+        for k in self.base_path:
+            if isinstance(current, dict) and k in current:
+                current = current[k]
+            else:
+                return False
+        return isinstance(current, dict) and key in current
 
 def _discover_available_names(package):
     """
@@ -203,16 +236,189 @@ def _inject_settings_into_dict(target_dict, instances, section_key):
         name = core.modules.get_name(inst)
         defaults = getattr(inst, 'settings', {})
         if isinstance(defaults, dict) and defaults:
+            # We inject the full dict (including descriptions) into the schema.
+            # sync_config will later replace these dicts with flat values
+            # if the user has provided them in the config file.
             settings[name] = defaults.copy()
 
-def get_schema(enabled_channels=None, enabled_modules=None, enabled_user_modules=None):
+def _get_module_schema_cache():
     """
-    Returns the config schema. Only enabled modules are imported.
+    Returns a dictionary containing the cached schemas and checksums for all modules/channels.
+    If the cache is missing or outdated, it performs a refresh.
+    """
+    cache_path = os.path.abspath(os.path.join(core.get_path(), SCHEMA_CACHE_FILE))
+    cache = {"channels": {}, "modules": {}, "user_modules": {}}
+
+    # Load existing cache
+    if os.path.exists(cache_path):
+        try:
+            with open(cache_path, 'r') as f:
+                cache = json.load(f)
+        except Exception as e:
+            core.log_error("error while loading module cache", e)
+    else:
+        core.log("core", f"creating module cache at {cache_path}")
+
+    package_map = {
+        "channels": (channels, core.channel.Channel),
+        "modules": (modules, core.module.Module),
+        "user_modules": (user_modules, core.module.Module)
+    }
+
+    sections_to_refresh = set()
+
+    # 1. Check for deletions or changes in existing cache
+    for section_key, (package, _) in package_map.items():
+        available_names = _discover_available_names(package)
+
+        for name in list(cache[section_key].keys()):
+            if name not in available_names:
+                del cache[section_key][name]
+                sections_to_refresh.add(section_key)
+                continue
+
+            # Find the file path to check checksum
+            found_file = None
+            for sub_path in package.__path__:
+                # Try module.py
+                f1 = os.path.join(sub_path, f"{name}.py")
+                if os.path.exists(f1):
+                    found_file = f1
+                    break
+                # Try module/__init__.py
+                f2 = os.path.join(sub_path, name, "__init__.py")
+                if os.path.exists(f2):
+                    found_file = f2
+                    break
+
+            if found_file:
+                if cache[section_key][name].get("checksum") != _get_file_checksum(found_file):
+                    sections_to_refresh.add(section_key)
+            else:
+                sections_to_refresh.add(section_key)
+
+        # 2. Check for new modules
+        if section_key not in sections_to_refresh:
+            for name in available_names:
+                if name not in cache[section_key]:
+                    sections_to_refresh.add(section_key)
+                    break
+
+    # 3. Refresh cache if needed
+    if sections_to_refresh:
+        for section_key in sections_to_refresh:
+            package, base_class = package_map[section_key]
+            try:
+                # skip reloading modules because we just want the data
+                classes = core.modules.load(package, base_class, reload=False)
+
+                for cls in classes:
+                    name = core.modules.get_name(cls)
+                    settings = getattr(cls, 'settings', {})
+
+                    # Capture docstring and the unsafe class attribute
+                    docstring = inspect.getdoc(cls) or ""
+                    unsafe = getattr(cls, 'unsafe', False)
+
+                    module = inspect.getmodule(cls)
+                    checksum = ""
+                    if module and hasattr(module, '__file__') and module.__file__:
+                        py_file = module.__file__.replace('.pyc', '')
+                        checksum = _get_file_checksum(py_file) if os.path.exists(py_file) else _get_file_checksum(module.__file__)
+
+                    cache[section_key][name] = {
+                        "schema": settings,
+                        "checksum": checksum,
+                        "metadata": {
+                            "docstring": docstring,
+                            "unsafe": unsafe  # Added to cache
+                        }
+                    }
+
+            except Exception as e:
+                core.log_error(f"Failed to refresh cache for {section_key}", e)
+
+        try:
+            with open(cache_path, 'w') as f:
+                json.dump(cache, f, indent=2)
+        except Exception as e:
+            core.log_error("failed to save module cache", e)
+
+    return cache
+
+def _get_file_checksum(filepath):
+    """Calculate MD5 checksum of a file."""
+    hasher = hashlib.md5()
+    try:
+        with open(filepath, 'rb') as f:
+            while chunk := f.read(8192):
+                hasher.update(chunk)
+        return hasher.hexdigest()
+    except Exception:
+        return ""
+
+
+def get_schema(*args, **kwargs):
+    """
+    Returns the config schema using the on-disk cache.
+    Contains all possible module settings to allow persistence for disabled modules.
     """
     schema = copy.deepcopy(default_config)
-    for item in _get_registry_data(enabled_channels, enabled_modules, enabled_user_modules):
-        _inject_settings_into_dict(schema, item['instances'], item['section_key'])
+    cache = _get_module_schema_cache()
+
+    for section_key, section_cache in cache.items():
+        section = schema.setdefault(section_key, {})
+        settings = section.setdefault("settings", {})
+        for name, data in section_cache.items():
+            # Flatten the settings here so the schema only contains values.
+            # This prevents metadata (description, default) from leaking into the config file.
+            settings[name] = _flatten_settings(data["schema"])
+
     return schema
+
+def get_module_structure():
+    """
+    Returns a flat dictionary containing settings and metadata for all
+    available modules, channels, and user_modules.
+
+    Structure:
+    {
+        "name": {
+            "settings": { ... },
+            "metadata": {
+                "doc": "...",
+                "unsafe": True/False,
+                "type": "module" | "channel" | "user_module"
+            }
+        }
+    }
+    """
+    cache = _get_module_schema_cache()
+    metadata_registry = {}
+
+    # Map section keys to their descriptive type strings
+    type_map = {
+        "channels": "channel",
+        "modules": "module",
+        "user_modules": "user_module"
+    }
+
+    for section_key, section_cache in cache.items():
+        type_str = type_map.get(section_key, "unknown")
+
+        for name, data in section_cache.items():
+            metadata = data["metadata"]
+
+            metadata_registry[name] = {
+                "settings": data["schema"],
+                "metadata": {
+                    "doc": metadata["docstring"],
+                    "unsafe": metadata["unsafe"],
+                    "type": type_str
+                }
+            }
+
+    return metadata_registry
 
 def sync_config(user_config, schema):
     """Recursively syncs structural keys from the schema."""
@@ -253,36 +459,76 @@ def reconcile_lists(available_names, default_names, section_config):
         "disabled": sorted(list(disabled | new_disabled))
     }
 
-def sync_module_settings(config_dict, instances, section_key):
-    """Performs deep pruning and merging of module settings."""
+
+def _flatten_settings(settings_dict):
+    """Recursively flattens a settings dictionary by extracting 'default' values."""
+    if isinstance(settings_dict, dict) and "default" in settings_dict:
+        return _flatten_settings(settings_dict["default"])
+    if isinstance(settings_dict, dict):
+        return {k: _flatten_settings(v) for k, v in settings_dict.items()}
+    return settings_dict
+
+def _merge_module_settings(current_settings, module_defaults):
+    """Recursively merges current_settings with module_defaults schema."""
+    if isinstance(module_defaults, dict) and "default" in module_defaults:
+        if isinstance(current_settings, dict) and "default" in current_settings:
+            return module_defaults["default"]
+        return current_settings if current_settings is not None else module_defaults["default"]
+
+    if not isinstance(module_defaults, dict):
+        return current_settings if current_settings is not None else module_defaults
+
+    if not isinstance(current_settings, dict):
+        current_settings = {}
+
+    new_settings = {}
+    for k, v in module_defaults.items():
+        if k in current_settings:
+            new_settings[k] = _merge_module_settings(current_settings[k], v)
+        else:
+            new_settings[k] = _flatten_settings(v)
+    return new_settings
+
+def sync_module_settings(config_dict, instances, section_key, available_names):
+    """
+    Performs deep pruning and merging of module settings.
+    - Removes settings for modules not on disk.
+    - Keeps settings for disabled modules.
+    - Merges defaults for enabled modules.
+    """
     section = config_dict.setdefault(section_key, {})
     settings = section.setdefault("settings", {})
 
-    available_names = [core.modules.get_name(m) for m in instances]
-    for k in [k for k in settings if k not in available_names]:
-        del settings[k]
+    # 1. Remove settings for modules that are no longer on the filesystem
+    for name in list(settings.keys()):
+        if name not in available_names:
+            del settings[name]
 
+    # 2. For modules that ARE on disk, handle enabled vs disabled
     for inst in instances:
         name = core.modules.get_name(inst)
-        defaults = getattr(inst, 'settings', {})
-        if not isinstance(defaults, dict):
+        module_defaults = getattr(inst, 'settings', {})
+        if not isinstance(module_defaults, dict):
             continue
 
         if name in settings and isinstance(settings[name], dict):
-            curr = settings[name]
-            for k in [k for k in curr if k not in defaults]:
-                del curr[k]
-            for k, v in defaults.items():
-                if k not in curr:
-                    curr[k] = v
-            if not curr:
+            # Module is enabled and has existing settings: merge them
+            settings[name] = _merge_module_settings(settings[name], module_defaults)
+            if not settings[name]:
                 del settings[name]
-        elif defaults:
-            settings[name] = defaults.copy()
+        elif module_defaults:
+            # Module is enabled but has no existing settings: provide defaults
+            flat_defaults = _flatten_settings(module_defaults)
+            if flat_defaults:
+                settings[name] = flat_defaults
+
+    # Note: If a module is in available_names but NOT in instances,
+    # it is disabled and we leave its settings in 'settings' untouched.
+
 
 def load(file_path=None):
     """
-    Load config file. Modules are only imported if they're in the enabled list.
+    Load config file.
     """
     if file_path:
         filename = os.path.splitext(os.path.basename(file_path))[0]
@@ -297,7 +543,6 @@ def load(file_path=None):
     global _registry_cache
     _registry_cache = None
 
-    # load config from disk
     config = core.storage.StorageDict(filename, "yaml", path=dirname, autoreload=False)
     if not config:
         new_config = True
@@ -305,7 +550,6 @@ def load(file_path=None):
     if not new_config and core.storage.TEMPORARY:
         config.load()
 
-    # Read raw config to extract enabled lists BEFORE importing modules
     raw_config = dict(config) if config else {}
 
     enabled_channels = raw_config.get("channels", {}).get("enabled", [])
@@ -318,8 +562,10 @@ def load(file_path=None):
 
     enabled_user_modules = raw_config.get("user_modules", {}).get("enabled", [])
 
-    # Now build schema using ONLY enabled modules
-    schema = get_schema(enabled_channels, enabled_modules, enabled_user_modules)
+    # Use the new cached schema (contains all possible settings)
+    schema = get_schema()
+
+    # Registry only contains ENABLED instances and their available names
     registry = _get_registry_data(enabled_channels, enabled_modules, enabled_user_modules)
 
     if new_config:
@@ -329,9 +575,9 @@ def load(file_path=None):
 
     # Sync settings and reconcile lists
     for item in registry:
-        sync_module_settings(target, item['instances'], item['section_key'])
+        # Pass available_names so we know what to prune
+        sync_module_settings(target, item['instances'], item['section_key'], item['available_names'])
 
-        # Use available_names (filesystem discovered) instead of imported names
         state = reconcile_lists(
             item['available_names'],
             item['default_names'],
@@ -373,5 +619,3 @@ def get(*args, **kwargs):
         else:
             return default
     return value
-
-

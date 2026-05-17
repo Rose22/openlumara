@@ -15,7 +15,7 @@
     background: var(--bg-secondary);
     border-radius: var(--radius-xl);
     box-shadow: var(--shadow-strong);
-    transform: translate(-50%, -50%);
+    transform: translate(-50%, -50%) !important;
 }
 
 .global-search-modal.show {

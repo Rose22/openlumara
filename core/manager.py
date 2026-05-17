@@ -24,6 +24,7 @@ class Manager:
         self.channel = None # current active channel. gets dynamically switched around
         self.modules = {}
         self.tools = []
+        self.tool_names = []
         self.pure_mode = False
         self.coding_mode = False
 
@@ -74,7 +75,7 @@ class Manager:
 
         core.log("core", "Loading channels")
         import channels
-        for channel in core.modules.load(channels, core.channel.Channel, filter=enabled_channels):
+        for channel in core.modules.load(channels, core.channel.Channel, filter=enabled_channels, reload=True):
             # add an instance of the channel's class to self.channels
             channel_name = core.modules.get_name(channel)
             self.channels[channel_name] = channel(self)
@@ -82,6 +83,8 @@ class Manager:
         # start channels (execute their .run() method)
         for channel_name, channel in self.channels.items():
             self._async_tasks.add(asyncio.create_task(channel.run()))
+            # also start the message polling loop per channel
+            self._async_tasks.add(asyncio.create_task(channel._start_push_queue()))
             core.log("core", f"Started channel {channel_name}")
 
         if not self.channel:
@@ -95,7 +98,7 @@ class Manager:
 
             # load modules
             import modules
-            for module in core.modules.load(modules, core.module.Module, filter=enabled_modules):
+            for module in core.modules.load(modules, core.module.Module, filter=enabled_modules, reload=True):
                 try:
                     loaded_module = await self.add_module_class(module)
                     await loaded_module._start()
@@ -109,7 +112,7 @@ class Manager:
             # load user modules
             import user_modules
             core.log("core", "Loading user modules")
-            for module in core.modules.load(user_modules, core.module.Module, filter=enabled_user_modules):
+            for module in core.modules.load(user_modules, core.module.Module, filter=enabled_user_modules, reload=True):
                 try:
                     loaded_module = await self.add_module_class(module, is_user_module=True)
                     await loaded_module._start()
@@ -124,6 +127,11 @@ class Manager:
         else:
             core.log("core", "All modules are disabled")
 
+        # create an array of all enabled tools so that we can reference it in the future
+        for tool in self.tools:
+            tool_name = tool.get("function").get("name")
+            self.tool_names.append(tool_name)
+
         # Attempt API connection but don't fail if it doesn't work
         await self._initialize_api_connection()
 
@@ -131,10 +139,9 @@ class Manager:
         core.log("core", "Startup complete")
 
         if "webui" in enabled_channels:
-            host = core.config.get("channels").get("settings").get("webui").get("host")
-            port = core.config.get("channels").get("settings").get("webui").get("port")
+            webui_url = self.channels["webui"].url
             print(flush=True)
-            print(f"Please open the WebUI at http://{host}:{port}", flush=True)
+            print(f"Please open the WebUI at {webui_url}", flush=True)
 
         try:
             await asyncio.gather(*self._async_tasks, return_exceptions=should_swallow_exceptions)
@@ -177,7 +184,7 @@ class Manager:
                     else:
                         module.on_shutdown()
                 except Exception as e:
-                    core.log("warning", f"Error shutting down {module_name}: {e}")
+                    core.log_error(f"Error shutting down {module_name}", e)
 
         # shutdown channels
         for channel_name, channel in self.channels.items():
@@ -185,11 +192,13 @@ class Manager:
                 core.log("core", f"Shutting down channel {channel_name}")
                 try:
                     if asyncio.iscoroutinefunction(channel.on_shutdown):
+                        await channel._shutdown()
                         await channel.on_shutdown()
                     else:
+                        await channel._shutdown()
                         channel.on_shutdown()
                 except Exception as e:
-                    core.log("warning", f"Error shutting down {channel_name}: {e}")
+                    core.log_error(f"Error shutting down {channel_name}", e)
 
         # Cancel all running tasks so gather() returns
         for task in list(self._async_tasks):
@@ -205,6 +214,30 @@ class Manager:
         await asyncio.sleep(1)
 
         core.log("core", "Shutdown complete")
+
+    async def toggle_module(self, module_name: str, autorestart=True):
+        modules = core.config.config["modules"]
+        enabled = modules["enabled"]
+        disabled = modules["disabled"]
+
+        if module_name in enabled:
+            enabled.remove(module_name)
+            disabled.append(module_name)
+        elif module_name in disabled:
+            disabled.remove(module_name)
+            enabled.append(module_name)
+        else:
+            return False
+
+        core.config.config.save()
+
+        if autorestart:
+            if self.channel:
+                await self.channel.push("restarting to apply module change..")
+            await asyncio.sleep(0.1)
+            await self.channel.manager.restart()
+
+        return True
 
     async def _initialize_api_connection(self):
         """Initialize API connection with user-friendly error handling."""
@@ -263,9 +296,18 @@ class Manager:
                 # skip most prompts if tools are turned off
                 continue
 
-            if active_character and module_name != "characters" and "characters" in self.modules.keys():
+            char_modules_exempt = ["characters"]
+            if (
+                self.modules.get("writing_style") and
+                self.modules.get("characters") and
+                self.modules["characters"].config.get("use_writing_style")
+            ):
+                char_modules_exempt.append("writing_style")
+
+            if active_character and module_name not in char_modules_exempt and "characters" in self.modules.keys():
                 # if a character is currently active, display ONLY the character system prompt
                 char_disable_agent_prompts = self.modules["characters"].config.get("disable_agent_prompts_when_character_active")
+
                 if char_disable_agent_prompts:
                     continue
 
@@ -279,7 +321,7 @@ class Manager:
                     sysprompt_header = module._header
                 prompt_chunk = f"# {sysprompt_header}\n{str(module_sysprompt).strip()}"
 
-                if module_name in ("agent_framework_awareness", "identity", "memory"):
+                if module_name in ("agent_framework_awareness", "identity", "memory", "writing_style"):
                     sysprompt_top.append(prompt_chunk)
                 elif module_name in ("time", "system"):
                     sysprompt_bottom.append(prompt_chunk)
@@ -364,6 +406,16 @@ class Manager:
             status_list.append(ctx_string)
 
         return status_list
+
+    async def get_settings_structure(self):
+        if not self.modules:
+            return {}
+
+        settings_structure = {}
+        for name, module in self.modules.items():
+            settings_structure[name] = module.settings
+
+        return settings_structure
 
     # --- tools ---
     def parse_tool_docstring(self, docstring):

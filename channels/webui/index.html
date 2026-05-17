@@ -104,12 +104,7 @@
                         <div id="tag-dropdown" class="tag-dropdown hidden">
                             <div class="tag-dropdown-header">
                                 <span>Filter by Tag</span>
-                                <button id="clear-tag-filter" class="clear-filter-btn" title="Clear filter" style="display: none;">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                                    </svg>
-                                </button>
+                                <button id="clear-tag-filter" class="clear-filter-btn" title="Clear filter" style="display: none;" onclick="clearTagFilter()">✕</button>
                             </div>
                             <div id="tag-list" class="tag-list"></div>
                         </div>
@@ -222,7 +217,7 @@
                                 <polyline points="18 15 12 9 6 15"></polyline>
                             </svg>
                         </button>
-                        <span id="search-index" class="search-index"></span>
+                        <span id="search-index" class="search-index">0 / 0</span>
                         <button id="search-next"
                                 class="search-nav-btn"
                                 onclick="nextSearchResult()"
@@ -233,7 +228,6 @@
                                 <polyline points="6 9 12 15 18 9"></polyline>
                             </svg>
                         </button>
-                        <span id="search-count" class="search-count"></span>
                         <button class="search-close-btn" onclick="clearSearch()" aria-label="Close search">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -344,10 +338,6 @@
                             <div class="shortcut-item">
                                 <span class="shortcut-desc">Stop generation</span>
                                 <div class="shortcut-keys"><span class="shortcut-key">Escape</span></div>
-                            </div>
-                            <div class="shortcut-item">
-                                <span class="shortcut-desc">Clear chat</span>
-                                <div class="shortcut-keys"><span class="shortcut-key">Ctrl</span><span class="shortcut-key">L</span></div>
                             </div>
                         </div>
                     </div>

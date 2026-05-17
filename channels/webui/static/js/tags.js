@@ -101,16 +101,24 @@ function toggleTagFilter(tag) {
 
 function clearTagFilter() {
     activeTagFilter = null;
+    const clearBtn = document.getElementById('clear-tag-filter');
+    if (clearBtn) {
+        clearBtn.style.display = 'none';
+    }
     renderTagFilter();
     filterChatsByTag();
+    if (typeof updateTagsForCategory === 'function') {
+        updateTagsForCategory(activeCategory);
+    }
 }
 
 function filterChatsByTag() {
     // This function should filter the DOM elements, not re-render everything
     const items = document.querySelectorAll('.chat-item');
     items.forEach(item => {
-        const chatData = JSON.parse(item.dataset.chatData || '{}');
-        const tags = chatData.tags || [];
+        const chatId = item.dataset.chatId;
+        const chat = chatDataMap.get(chatId);
+        const tags = chat ? chat.tags : [];
 
         if (activeTagFilter && !tags.includes(activeTagFilter)) {
             item.classList.add('hidden-by-tag');

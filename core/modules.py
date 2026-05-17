@@ -5,7 +5,7 @@ import inspect
 # modules that should have their prompts inserted even when tools are off
 nonagentic = ("characters", "time")
 
-def load(package, base_class = None, filter: list = None):
+def load(package, base_class = None, filter: list = None, reload: bool = False):
     """
     loops through the specified package imported with `import whatever`, then checks inside those packages for any classes that derive from base_class, and return a tuple of those classes so we can use them as modules, channels etc
 
@@ -30,9 +30,11 @@ def load(package, base_class = None, filter: list = None):
             # Import the module relative to the package
             module = importlib.import_module(f"{package.__name__}.{modname}")
             
-            # Force reload to ensure we get the latest version of the module
-            # This is crucial for restarts where code might have been modified
-            importlib.reload(module)
+            # if the reload flag is true, force a reload of the module code so that new changes are applied
+            # NOTE: this is only intended to be used upon a total restart of openlumara.
+            # it can mess things up severely if modules/channels are still loaded
+            if reload:
+                importlib.reload(module)
 
             for attr_name in dir(module):
                 target_class = getattr(module, attr_name)
@@ -53,7 +55,10 @@ def load(package, base_class = None, filter: list = None):
                     continue
 
                 discovered.append(target_class)
-
+        except core.exceptions.DependencyMissing as e:
+            # silence these warnings for now
+            # need a better way to deal with missing dependencies
+            pass
         except Exception as e:
             # Catching Exception prevents the program from crashing on faulty modules.
             # We simply log the warning and continue to the next module.

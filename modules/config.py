@@ -3,14 +3,27 @@ import json
 import copy
 
 class Config(core.module.Module):
-    """Lets the AI manage the OpenLumara configuration/settings for you"""
+    """Makes your AI aware of your openlumara settings and optionally allows it to change them"""
 
-    unsafe = True
     _header = "OpenLumara config"
 
     settings = {
-        "put_config_in_system_prompt": True
+        "put_config_in_system_prompt": {
+            "description": "Makes your AI aware of all your settings. Redacts sensitive information before it ever reaches the AI, such as API keys, usernames and passwords""",
+            "default": False
+        },
+        "allow_ai_to_modify_config": {
+            "description": "Whether to let the AI modify your config for you. Convenient, but very unsafe!! Prompt injection  attacks can easily lead to your config getting messed up, though it still can't read your sensitive information.",
+            "unsafe": True,
+            "default": False
+        }
     }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if not self.config.get("allow_ai_to_modify_config"):
+            self.disabled_tools.append("set")
 
     def _redact_sensitive_info(self, data):
         """Recursively redacts sensitive information from a dictionary or list."""
@@ -46,6 +59,9 @@ class Config(core.module.Module):
             return None
 
     async def set(self, path: list, value: str):
+        if not self.config.get("allow_ai_to_modify_config"):
+            return self.result("Config modification tools disabled for security", success=False)
+
         if not path:
             return self.result("Path cannot be empty", False)
 
@@ -65,6 +81,9 @@ class Config(core.module.Module):
                 if key not in current or not isinstance(current[key], dict):
                     current[key] = {}
                 current = current[key]
+
+            if isinstance(current, dict):
+                return self.result("That is a settings group. Please list its keys.")
 
             # Set the final value
             current[path[-1]] = typed_value

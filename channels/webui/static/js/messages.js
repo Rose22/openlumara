@@ -194,18 +194,25 @@ function renderAssistantMessageParts(msg, toolResponseMap) {
  */
 function renderSingleMessage(msg, index, animate) {
     const role = msg.role || 'user';
+    const signal = msg.signal || false;
     const rawContent = msg.content || '';
     const reasoningContent = msg.reasoning_content || null;
     const toolCalls = msg.tool_calls || null;
     const toolCallId = msg.tool_call_id || null;
     const rawText = extractTextContent(rawContent);
+    const rawTextWithoutMultimodal = extractTextContent(rawContent, false);
     const parsed = parseMessageContent(rawContent);
 
     if (rawText === '[SYSTEM_TICK]' || rawText.startsWith('[AUTOMATED SYSTEM INSTRUCTION]')) return;
 
     let wrapperClass, msgClass;
 
-    if (parsed.isAnnouncement) {
+    if (signal) {
+        if (signal === "SUMMARIZATION_CUTOFF") {
+            wrapperClass = "signal";
+            msgClass = "summarization_cutoff";
+        }
+    } else if (parsed.isAnnouncement) {
         wrapperClass = 'announce';
         msgClass = `announce ${parsed.type}`;
     } else if (parsed.isCommandOutput) {
@@ -278,7 +285,7 @@ function renderSingleMessage(msg, index, animate) {
     wrapper.appendChild(msgDiv);
 
     if ((role === 'user' || role === 'assistant') && !(toolCalls && toolCalls.length > 0)) {
-        const actions = createActionButtons(role, index, rawText);
+        const actions = createActionButtons(role, index, rawTextWithoutMultimodal);
         wrapper.appendChild(actions);
     }
 
@@ -380,89 +387,6 @@ function renderToolCallsWithResponses(toolCallsData) {
     html += '</div>';
     return html;
 }
-
-// =============================================================================
-// Polling - Updated to use new turn-based rendering
-// =============================================================================
-
-async function pollMessages() {
-    if (!isConnected) return;
-    if (userIsEditing) return;
-    // Don't poll during active streaming to avoid race conditions with the streaming UI updates
-    if (isStreaming) return;
-
-    try {
-        const response = await fetch('/messages/since?index=' + lastMessageIndex, {
-            signal: AbortSignal.timeout(CONFIG.CONNECTION_TIMEOUT)
-        });
-
-        if (!response.ok) {
-            if (response.status >= 500) handleConnectionError();
-            return;
-        }
-
-        const data = await response.json();
-
-        // Check if backend switched chats
-        if (data.current_chat_id !== undefined) {
-            if (data.current_chat_id !== currentChatId) {
-                // Different chat - full reload
-                await restoreCurrentChat();
-                await loadChats();
-                return;
-            }
-
-            // Same chat but title/tags might have changed
-            if (data.current_chat_title !== undefined) {
-                updateChatTitleBar(
-                    data.current_chat_title,
-                    data.current_chat_tags || []
-                );
-            }
-        }
-
-        const messages = data.messages || [];
-
-        if (messages.length > 0) {
-            let i = 0;
-            while (i < messages.length) {
-                const msg = messages[i];
-                const msgIndex = msg.index;
-
-                // Skip if this specific message is already in the DOM
-                if (chat.querySelector(`[data-index="${msgIndex}"]`)) {
-                    i++;
-                    continue;
-                }
-
-                if (msg.role === 'assistant') {
-                    const turnInfo = collectAssistantTurn(messages, i);
-                    if (turnInfo.messages.length > 0) {
-                        // Check if the turn is already rendered by checking the wrapper's data-index (which stores endIndex)
-                        if (!chat.querySelector(`[data-index="${turnInfo.endIndex}"]`)) {
-                            renderAssistantTurn(turnInfo.messages, turnInfo.endIndex, true);
-                        }
-                        i = turnInfo.endIndex + 1;
-                    } else {
-                        // Empty turn (e.g., starts with announcement or command output) - render as single message
-                        renderSingleMessage(msg, i, true);
-                        i++;
-                    }
-                } else {
-                    renderSingleMessage(msg, msgIndex, true);
-                    i++;
-                }
-            }
-            lastMessageIndex = data.total;
-            scrollToBottom();
-            updateTokenUsage();
-        }
-    } catch (err) {
-        // Connection issues handled elsewhere
-    }
-}
-
-
 
 // =============================================================================
 // Content Helpers

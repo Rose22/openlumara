@@ -1,0 +1,39 @@
+.api-error-inline {
+    border: 1px solid rgba(248, 136, 136, 0.3);
+    background: rgba(248, 136, 136, 0.05);
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.api-error-footer {
+    margin-top: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    padding-top: 8px;
+}
+
+.api-error-action {
+    font-size: 0.85rem;
+    opacity: 0.8;
+    font-style: italic;
+}
+
+.retry-error-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: #f88;
+    color: white;
+    border: none;
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: background 0.2s;
+}
+
+.retry-error-btn:hover {
+    background: #ff5555;
+}

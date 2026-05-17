@@ -1,8 +1,51 @@
 // =============================================================================
 // Connection & API Status Management
 // =============================================================================
-let statusMessageElement = null;
+let statusMessageElement = null; // For Server connection
+let apiStatusMessageElement = null; // For API configuration/errors (The Singleton)
 let lastActiveChatId = null;
+
+/**
+ * Removes the existing API status message if it exists.
+ */
+function hideApiStatus() {
+    if (apiStatusMessageElement) {
+        apiStatusMessageElement.remove();
+        apiStatusMessageElement = null;
+    }
+}
+
+/**
+ * A simple, non-intrusive way to show success/info messages
+ * that replaces any existing error.
+ */
+function showApiStatusUpdate(type, message) {
+    hideApiStatus(); // Remove old error before showing success
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'message-wrapper announce';
+    const msgDiv = document.createElement('div');
+
+    // Use different styles based on type
+    if (type === 'success') {
+        msgDiv.className = 'message announce announce_info';
+    } else {
+        msgDiv.className = 'message announce announce_info';
+        msgDiv.style.borderLeft = '4px solid #FF0000;';
+    }
+
+    msgDiv.textContent = message;
+    wrapper.appendChild(msgDiv);
+
+    apiStatusMessageElement = wrapper;
+    chat.insertBefore(wrapper, typing);
+    scrollToBottom();
+
+    // Auto-hide success messages after 5 seconds so they don't clutter chat
+    if (type === 'success') {
+        setTimeout(hideApiStatus, 5000);
+    }
+}
 
 function showConnectionStatus(status) {
     hideConnectionStatus();
@@ -144,38 +187,20 @@ async function reconnectApi() {
             updateApiStatus({ connected: true });
             updateTokenUsage();
 
-            // Show success message
-            const wrapper = document.createElement('div');
-            wrapper.className = 'message-wrapper announce';
-            const msgDiv = document.createElement('div');
-            msgDiv.className = 'message announce announce_info';
-            msgDiv.textContent = 'API reconnected successfully.';
-            wrapper.appendChild(msgDiv);
-            chat.insertBefore(wrapper, typing);
-            scrollToBottom();
-
+            // Use the new unified updater instead of creating a new chat message
+            showApiStatusUpdate('success', 'API reconnected successfully.');
             return true;
         } else {
-            // Show error message
             const errorMsg = result.error || 'Failed to reconnect';
             const actionMsg = result.action || '';
 
-            const wrapper = document.createElement('div');
-            wrapper.className = 'message-wrapper announce';
-            const msgDiv = document.createElement('div');
-            msgDiv.className = 'message announce announce_error';
-            msgDiv.innerHTML = `Failed to reconnect: ${escapeHtml(errorMsg)}`;
-            if (actionMsg) {
-                msgDiv.innerHTML += `<br><small>${escapeHtml(actionMsg)}</small>`;
-            }
-            wrapper.appendChild(msgDiv);
-            chat.insertBefore(wrapper, typing);
-            scrollToBottom();
-
+            // Use the error function which handles the singleton logic
+            showApiConfigError(errorMsg, 'connection_failed', actionMsg);
             return false;
         }
     } catch (err) {
         console.error('Failed to reconnect API:', err);
+        showApiConfigError('Network error during reconnection attempt.', 'connection_failed');
         return false;
     }
 }
@@ -219,72 +244,82 @@ function scheduleReconnect() {
 
 /**
  * Display an API configuration error to the user.
+ * This replaces any existing API message instead of adding a new one.
  */
 function showApiConfigError(message, errorType = null, action = null) {
+    hideApiStatus(); // IMPORTANT: Remove the old error/message first
+
     const errorWrapper = document.createElement('div');
     errorWrapper.className = 'message-wrapper system';
 
-    // Determine header based on error type
     let header = 'API Error';
-    if (errorType === 'config_missing') {
-        header = 'API Configuration Required';
-    } else if (errorType === 'auth_failed') {
-        header = 'Authentication Failed';
-    } else if (errorType === 'connection_failed') {
-        header = 'Connection Failed';
+    let guidance = 'Please check your API settings.';
+    let buttons = [];
+
+    switch (errorType) {
+        case 'config_missing':
+            header = 'Setup Required';
+            guidance = 'Your API configuration is missing. Please provide a valid API URL and Key.';
+            buttons = [{ text: 'Open Settings', action: "toggleModal('settings')", style: 'primary' }];
+            break;
+        case 'auth_failed':
+            header = 'Authentication Failed';
+            guidance = 'The API key is invalid. Please verify your API Key in the settings.';
+            buttons = [{ text: 'Open Settings', action: "toggleModal('settings')", style: 'primary' }];
+            break;
+        case 'connection_failed':
+            header = 'Connection Failed';
+            guidance = 'Unable to reach the API server. Please verify your API URL is correct.';
+            buttons = [
+                { text: 'Retry Connection', action: 'reconnectApi()', style: 'secondary' },
+                { text: 'Open Settings', action: "toggleModal('settings')", style: 'primary' }
+            ];
+            break;
+        default:
+            header = 'API Error';
+            guidance = message || 'An unexpected error occurred.';
+            buttons = [{ text: 'Retry Connection', action: 'reconnectApi()', style: 'primary' }];
+            break;
     }
 
     let errorHtml = `
     <div class="message system-error" style="
-    background: linear-gradient(135deg, #2a1a1a, #3a2020);
+    background: #2a1a1a;
     border: 1px solid #5a3030;
-    border-radius: 8px;
+    border-radius: 12px;
     padding: 16px;
     margin: 8px 0;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     ">
-    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
     <span style="font-size: 1.2em;">⚠️</span>
-    <strong style="color: #f88;">${escapeHtml(header)}</strong>
+    <strong style="color: #ff8888; font-size: 1.1em;">${escapeHtml(header)}</strong>
     </div>
-    <p style="margin: 0 0 12px 0; color: #ccc;">${escapeHtml(message)}</p>
+    <p style="margin: 0 0 12px 0; color: #e0e0e0; font-size: 0.95em; line-height: 1.4;">${escapeHtml(guidance)}</p>
+    ${action ? `<p style="margin: 0 0 12px 0; color: #aaa; font-size: 0.85em; font-style: italic;">${escapeHtml(action)}</p>` : ''}
+    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
     `;
 
-    if (action) {
-        errorHtml += `<p style="margin: 0 0 12px 0; color: #aaa; font-size: 0.9em;">${escapeHtml(action)}</p>`;
-    }
-
-    // Add appropriate action button
-    if (errorType === 'auth_failed' || errorType === 'connection_failed' || errorType === 'unknown') {
-        errorHtml += `
-        <button onclick="reconnectApi()" style="
-        background: #4a6fa5;
-        color: white;
-        border: none;
-        padding: 8px 16px;
-        border-radius: 4px;
+    buttons.forEach(btn => {
+        const isPrimary = btn.style === 'primary';
+        const btnStyle = `
+        background: ${isPrimary ? '#4a6fa5' : 'transparent'};
+        color: ${isPrimary ? '#ffffff' : '#aaa'};
+        border: ${isPrimary ? 'none' : '1px solid #555'};
+        padding: 6px 14px;
+        border-radius: 6px;
         cursor: pointer;
-        font-size: 0.9em;
-        ">Retry Connection</button>
+        font-size: 0.85em;
+        font-weight: 500;
         `;
-    }
+        errorHtml += `<button onclick="${btn.action}" style="${btnStyle}">${escapeHtml(btn.text)}</button>`;
+    });
 
-    if (errorType === 'config_missing') {
-        errorHtml += `
-        <button onclick="toggleModal('settings')" style="
-        background: #4a6fa5;
-        color: white;
-        border: none;
-        padding: 8px 16px;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 0.9em;
-        ">Open Settings</button>
-        `;
-    }
-
-    errorHtml += `</div>`;
+    errorHtml += `</div></div>`;
     errorWrapper.innerHTML = errorHtml;
 
+    apiStatusMessageElement = errorWrapper; // Store reference to allow removal
     chat.insertBefore(errorWrapper, typing);
     scrollToBottom();
 }
+

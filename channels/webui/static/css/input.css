@@ -274,6 +274,7 @@ body.token-bar-hidden .input-area {
     text-align: right;
     margin-right: 15px;
     bottom: 0.45rem;
+    z-index: 1;
 }
 
 /* Warning state for high token usage */

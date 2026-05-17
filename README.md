@@ -1,6 +1,6 @@
 # OpenLumara
 
-OpenLumara is a modular, token-efficient AI agent framework written from scratch in Python. Unlike many other AI agents out there, this one is **local-first**, lightweight, modular, and very fast. The system prompt can be extremely small, as little as around 2000 tokens with normal use. This makes it very well-suited for local use, but it also results in drastically reduced token use when used with public API's.
+OpenLumara is a modular, token-efficient AI agent framework written from scratch in Python. Unlike many other AI agents out there, this one is **local-first**, lightweight, modular, and very fast. The system prompt can be extremely small, as little as around 4000 tokens with normal use. This makes it very well-suited for local use, but it also results in drastically reduced token use when used with public API's.
 
 It pairs well with `llamacpp` and `koboldcpp`.
 
@@ -23,10 +23,12 @@ https://github.com/user-attachments/assets/c6bde601-022b-44c4-80b7-16ed6c7f74eb
 
 <img width="1469" height="961" alt="Screenshot_20260501_131037" src="https://github.com/user-attachments/assets/f2b8eb91-2c0f-4243-aacc-c7a7b196685f" />
 
-<img height="480" alt="image" src="https://github.com/user-attachments/assets/f2b66d2f-1c8b-45ba-8109-36caa03afb3c" />  <img height="480" alt="image" src="https://github.com/user-attachments/assets/38aa9cbc-33a2-4b3f-a048-840e116f9c93" /> <img height="480" alt="image" src="https://github.com/user-attachments/assets/7a2cc2e9-731b-4043-8312-e3f0e78a5189" /> <img height="480" alt="image" src="https://github.com/user-attachments/assets/f82043b4-24b5-4321-89c0-941ab262e982" /> 
+<img width="480" alt="Screenshot_20260513_203346" src="https://github.com/user-attachments/assets/20566b93-e37f-4676-ae76-401d5a905d2a" />
+<img width="480" alt="Screenshot_20260513_203353" src="https://github.com/user-attachments/assets/c2677f62-e315-47b6-b65c-8a66fa6e35f1" />
+<img width="480" alt="Screenshot_20260513_203359" src="https://github.com/user-attachments/assets/45e9f7b8-7f5a-44e2-bdc4-e9ea3f54d422" />
 
 > [!TIP]
-> Not sure how to use OpenLumara? Just ask your AI running on OpenLumara! It knows everything needed to get started. Find the instructions annoying? Just ask your AI to turn off the `channel` module, or use `/module channel` to toggle it off manually.
+> Not sure how to use OpenLumara? Just ask your AI running on OpenLumara! It knows everything needed to get started.
 
 Features:
 - Connects to any OpenAI API-compatible backend. That includes local AI (llamacpp, ollama, koboldcpp, and so on) and many cloud AI providers.
@@ -68,7 +70,7 @@ If you're familiar with python, this'll be very easy for you:
 import core
 
 # extend the class from core.channel.Channel to get all the required functionality
-class ChannelExample(core.channel.Channel):
+class Example(core.channel.Channel):
     """
     To make a channel, subclass from `core.channel.Channel`.
     Make sure to `import core`
@@ -97,62 +99,21 @@ class ChannelExample(core.channel.Channel):
             response = await self.send("user", user_input)
             self.announce(response) # don't use _announce, use announce without the _
 
-    async def _announce(self, message: str):
+    async def on_push(self, message: dict):
         """
         This function will be called by other parts of the framework when the channel should push a message out to the user.
-        You can use it within tools, for example to send a notification or reminder to the user!
-
-        If you want to call it yourself, use .announce(), not ._announce(). Otherwise it won't properly insert the messages into context!
+        You can use it within tools, for example to send a notification or reminder to the user
+        
+        message is an openAI message dict, like so:
+        {
+            "role": "assistant",
+            "content": "hi i said something"
+        }
         """
-        core.log("example channel", message)
-```
-
-# How to create your own module
-Like channels, a module is just a simple class that you can extend/subclass from. It has a few special methods that can be used to talk to the rest of the framework!
-
-```python
-import core
-
-class MyModule(core.module.Module):
-    """
-    To make a module, subclass from `core.module.Module`
-    Make sure to `import core`
-
-    Modules can use self.manager to access the manager object, and self.manager.channel to access the current channel!
-
-    You can use all the channel's features from there, like send(), send_stream(), and announce(). See the channel example for details!
-    """
-
-    async def my_tool(self, some_text: str, a_number: int):
-        """
-        The docstrings contain instructions for the AI.
-        The AI will see them and use them to determine what to do!
-
-        It has a special section, Args. Use it to further instruct the AI on what each argument does. It automatically gets added to the argument list for the AI to look at.
-
-        Args:
-            some_text: just some text. put whatever you want here, AI!
-            a_number: put a random number here
-        """
-
-    async def on_system_prompt(self):
-        return "Hi! I'm a system prompt! I'll be inserted automatically into the system prompt (above conversation history)"
-
-    async def on_ready(self):
-        """This method will run once the module is ready to be used. Use it instead of __init__() if you can."""
-        self.manager.channel.announce("i'm up i swear!")
-
-    async def on_background(self):
-        """This method will be added as a background task that will run contineously in the background. Use it for things like schedulers, cronjobs, etc!"""
-        return False
-
-    @core.module.command("my_command", help={
-        "": "the command without any arguments",
-        "name": "perform this command on that name"
-    })
-    async def my_command(self, args: list):
-        """Lets you define custom commands! The args are the string provided to the command, split into words."""
-        return None
+        core.log("example", message)
+        
+        # optionally also add it to chat history so that the AI knows about it
+        await self.context.chat.add(message)
 ```
 
 ## ⛔⛔⛔ THIS IS A LOBSTER-FREE ZONE ⛔⛔⛔

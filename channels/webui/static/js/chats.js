@@ -6,6 +6,19 @@ let activeCategory = 'general'; // Default category
 // OPTIMIZATION: Global map for O(1) chat data lookups (prevents JSON parsing in loops)
 let chatDataMap = new Map();
 
+let chatSearchInitialized = false;
+
+function setupChatSearch() {
+    if (chatSearchInitialized) return;
+    const searchInput = document.getElementById('chat-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            filterChats(e.target.value);
+        });
+        chatSearchInitialized = true;
+    }
+}
+
 /**
  * Configuration for metadata-based grouping.
  * Maps a prefix used in the UI to the path of the property in the chat object.
@@ -106,8 +119,16 @@ function selectCategory(categoryKey) {
         item.classList.toggle('active', item.dataset.key === categoryKey);
     });
 
-    const filtered = filterChatsByCategory(allChats, categoryKey);
-    renderChatList(filtered);
+    const searchInput = document.getElementById('chat-search');
+    const query = searchInput ? searchInput.value.trim() : '';
+
+    if (query) {
+        filterChats(query);
+    } else {
+        const filtered = filterChatsByCategory(allChats, categoryKey);
+        renderChatList(filtered);
+    }
+    
     updateTagsForCategory(categoryKey);
 
     if (window.innerWidth <= 768) {
@@ -301,6 +322,17 @@ function parseCategory(categoryString) {
     };
 }
 
+function setupChatSearch() {
+    if (chatSearchInitialized) return;
+    const searchInput = document.getElementById('chat-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            filterChats(e.target.value);
+        });
+        chatSearchInitialized = true;
+    }
+}
+
 async function loadChats() {
     try {
         // OPTIMIZATION: Parallel fetch is good, ensure backend returns summary data only
@@ -339,6 +371,7 @@ async function loadChats() {
         renderCategoryList(Array.from(categories));
         selectCategory(activeCategory);
         scrollToActiveChat();
+        setupChatSearch();
 
     } catch (e) {
         console.error('Failed to load chats:', e);
@@ -693,6 +726,14 @@ function populateChatItem(item, chat) {
     }
 
     item.appendChild(title);
+
+    if (chat.snippet) {
+        const snippet = document.createElement('div');
+        snippet.className = 'chat-item-snippet';
+        snippet.textContent = chat.snippet;
+        item.appendChild(snippet);
+    }
+
     item.appendChild(meta);
 }
 
@@ -703,8 +744,6 @@ function renderChatList(chats) {
             console.warn('Chat list container not found');
             return;
         }
-        const searchInput = document.getElementById('chat-search');
-        const currentSearchQuery = searchInput ? searchInput.value : '';
 
         const fragment = document.createDocumentFragment();
 
@@ -732,7 +771,6 @@ function renderChatList(chats) {
 
         // Re-apply filters if active
         if (activeTagFilter) filterChatsByTag();
-        if (currentSearchQuery) filterChats(currentSearchQuery);
     } catch (err) {
         console.error('Failed to render chat list:', err);
     }
@@ -795,7 +833,7 @@ async function newChat() {
             // Force the sidebar to stay on the current active category 
             // in case loadChats() or selectCategory() reset it.
             selectCategory(activeCategory);
-            closeSidebar();
+            await loadChat(data.chat.id);
         }
     } catch (e) {
         console.error('Failed to create new chat:', e);
@@ -1299,59 +1337,70 @@ function toggleSearchMode() {
 // Chat Search/Filter (OPTIMIZED)
 // =============================================================================
 
+let searchDebounceTimer;
+
 function filterChats(query) {
     const searchQuery = (query || '').toLowerCase().trim();
-    const items = document.querySelectorAll('.chat-item');
+    const list = document.getElementById('chat-list');
 
-    items.forEach(item => {
-        const existingSnippet = item.querySelector('.chat-snippet');
-        if (existingSnippet) existingSnippet.remove();
-        item.classList.remove('hidden-by-search');
-    });
+    // Clear existing debounce timer
+    if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
 
     if (!searchQuery) {
+        // Reset the map to the original state (without snippets)
+        chatDataMap.clear();
+        allChats.forEach(chat => chatDataMap.set(chat.id, chat));
+
+        // If no query, just show the chats for the current category
+        const filtered = filterChatsByCategory(allChats, activeCategory);
+        renderChatList(filtered);
         filterTagsBySearch('');
         return;
     }
 
-    items.forEach(item => {
-        const titleText = item.querySelector('.chat-item-title')?.textContent.toLowerCase() || '';
-        const chatId = item.dataset.chatId;
+    // Debounce the backend search to avoid hammering the server
+    searchDebounceTimer = setTimeout(async () => {
+        try {
+            // Show a loading indicator in the list
+            if (list) {
+                list.innerHTML = '<div class="chat-empty" style="padding: 20px; text-align: center; color: var(--text-muted);">Searching...</div>';
+            }
 
-        // PERFORMANCE: Lookup data from Map instead of JSON.parse
-        const chatData = chatDataMap.get(chatId);
+            const response = await fetch('/api/search', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    query: searchQuery,
+                    search_in_content: typeof searchInContent !== 'undefined' ? searchInContent : false,
+                    category: activeCategory
+                })
+            });
 
-        let matchesTitle = titleText.includes(searchQuery);
-        let matchSnippet = null;
+            if (!response.ok) {
+                throw new Error('Search failed');
+            }
 
-        if (searchInContent && chatData && chatData.messages) {
-            for (const msg of chatData.messages) {
-                // FIX: Use extractTextContent to handle multimodal arrays
-                const content = extractTextContent(msg.content).toLowerCase();
-                if (content.includes(searchQuery)) {
-                    // Pass the extracted string to extractSnippet
-                    matchSnippet = extractSnippet(content, searchQuery, 60);
-                    break;
-                }
+            const data = await response.json();
+            const results = data.results.map(r => ({ ...r.chat, snippet: r.snippet }));
+
+            // Update chatDataMap so lazy-loading works with snippets
+            results.forEach(chat => {
+                chatDataMap.set(chat.id, chat);
+            });
+
+            // Re-render the list with search results
+            renderChatList(results);
+            
+            // Update tags based on the search query
+            filterTagsBySearch(searchQuery);
+
+        } catch (err) {
+            console.error('Search error:', err);
+            if (list) {
+                list.innerHTML = '<div class="chat-empty" style="padding: 20px; text-align: center; color: var(--text-muted);">Error performing search.</div>';
             }
         }
-
-        const isVisible = matchesTitle || matchSnippet;
-
-        if (!isVisible) {
-            item.classList.add('hidden-by-search');
-        } else if (matchSnippet && searchInContent) {
-            const metaEl = item.querySelector('.chat-item-meta');
-            if (metaEl && !item.querySelector('.chat-snippet')) {
-                const snippetEl = document.createElement('div');
-                snippetEl.className = 'chat-snippet';
-                snippetEl.innerHTML = matchSnippet;
-                metaEl.insertAdjacentElement('afterend', snippetEl);
-            }
-        }
-    });
-
-    filterTagsBySearch(query);
+    }, 300);
 }
 
 async function clearChat() {
@@ -1366,6 +1415,7 @@ async function clearChat() {
             // Reload
             if (currentChatId) {
                 await loadChat(currentChatId);
+                syncMessages();
             }
             await loadChats();
         }

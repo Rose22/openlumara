@@ -4,10 +4,14 @@ import core
 import ulid
 
 class Scheduler(core.module.Module):
-    """Lets your AI send you scheduled reminders and do things at specified times"""
+    """Lets your AI perform actions on your behalf at specified times! Supports recurring actions."""
 
     settings = {
-        "put_scheduled_jobs_in_system_prompt": True
+        "insert_system_prompt": {
+            "description": "Whether to insert a list of all currently scheduled jobs in the system prompt. This will make your AI aware of upcoming scheduled jobs at all times!",
+            "default": True
+        },
+        "allow_recurring_jobs": True
     }
 
     async def on_ready(self, *args, **kwargs):
@@ -142,14 +146,13 @@ class Scheduler(core.module.Module):
         action = job.get("action")
 
         event_message = {
-            "role": "user",
-            "content": f"""
-    [AUTOMATED SYSTEM INSTRUCTION]
-    Please follow these instructions:
-
-    {action}
-    Use tools if needed. For simple reminders, do not use tools.
-    """.strip()
+            "role": "developer" if job_channel.manager.API.supports_developer_role else "user",
+            "content": (
+                "[AUTOMATED SYSTEM INSTRUCTION]\n"
+                "Please follow these instructions:\n\n"
+                f"{action}\n"
+                "Use tools if needed. For simple reminders, do not use tools."
+            )
         }
 
         await job_channel.context.chat.add(event_message)
@@ -161,37 +164,49 @@ class Scheduler(core.module.Module):
         )
 
         # erase the automated instruction from history
-        await job_channel.context.chat.pop(-1)
+        for i, msg in enumerate(await job_channel.context.chat.get()):
+            if msg.get("content") == event_message["content"] and msg.get("role") == event_message["role"]:
+                await job_channel.context.chat.pop(i)
+                break
 
         if not response:
             return
 
-        final_content = ""
+        final_content = response.get("content", "")
         tool_calls = response.get("tool_calls")
 
         if tool_calls and job_channel:
-            # Use a local manager to avoid race conditions and ensure the correct channel is used
-            tc_manager = core.toolcalls.ToolcallManager(job_channel)
-
-            final_content_list = []
-            async for token in tc_manager.process(
-                tool_calls
+            tool_content_list = []
+            async for token in job_channel.tc_manager.process(
+                response,
+                push=True
             ):
                 if token.get("type") == "content":
-                    final_content_list.append(token.get("content", ""))
-            final_content = "".join(final_content_list)
+                    tool_content_list.append(token.get("content", ""))
+            tool_content = "".join(tool_content_list)
+            if tool_content:
+                if final_content:
+                    final_content += "\n" + tool_content
+                else:
+                    final_content = tool_content
         elif tool_calls:
             core.log("scheduler", f"error executing job {job_id}: tool calls found but job_channel is invalid")
             return
-        else:
-            final_content = response.get("content", "")
 
         if final_content:
             try:
                 if job_channel:
-                    await job_channel.announce(final_content, "schedule")
+                    # first push
+                    await job_channel.push(final_content)
+
+                    # then add to context
+                    await job_channel.context.chat.add({"role": "assistant", "content": final_content})
                 elif self.channel:
-                    await self.channel.announce(final_content, "schedule")
+                    # first push
+                    await self.channel.push(final_content)
+
+                    # then add to context
+                    await self.channel.context.chat.add({"role": "assistant", "content": final_content})
             except Exception as e:
                 core.log_error(f"[SCHEDULER] error announcing job {job_id} result", e)
 
@@ -336,7 +351,7 @@ class Scheduler(core.module.Module):
         return days[weekday] if 0 <= weekday < 7 else "Unknown"
 
     async def on_system_prompt(self) -> str:
-        if not self.config.get("put_scheduled_jobs_in_system_prompt", True):
+        if not self.config.get("insert_system_prompt", True):
             return None
 
         if self.schedule:
@@ -358,6 +373,9 @@ class Scheduler(core.module.Module):
         recurring: bool = False,
     ):
         """Adds a scheduled job. MODE 1 - RELATIVE TIME: Use relative_duration (e.g., '2d 4h 30m'). MODE 2 - SPECIFIC CLOCK TIME: Use target_time (e.g., '14:30'). Optionally set target_weekday (0=Monday) or weekdays_only=True. Action is what action should be performed at the scheduled time. Action is an instruction/prompt for the AI to follow, so write it in second person form."""
+        if recurring and not self.config.get("allow_recurring_jobs"):
+            return self.result("Error: Recurring scheduler jobs are disabled by security policy. Please inform the user.", success=False)
+
         import re
         
         weeks = days = hours = minutes = seconds = 0
@@ -450,6 +468,9 @@ class Scheduler(core.module.Module):
         weekdays_only: bool = False,
         recurring: bool = False
     ):
+        if recurring and not self.config.get("allow_recurring_jobs"):
+            return self.result("Error: Recurring scheduler jobs are disabled by security policy. Please inform the user.", success=False)
+
         index = self._get_index(id)
         if index == -1:
             return self.result("id does not exist", False)

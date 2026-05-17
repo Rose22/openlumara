@@ -87,6 +87,18 @@
     animation: settingsContentFadeIn 0.3s ease-out forwards;
 }
 
+.settings-content a {
+    color: var(--accent);
+    text-decoration: none;
+    transition: color 0.15s ease;
+    border-bottom: 1px solid transparent;
+}
+
+.settings-content a:hover {
+    text-decoration: underline;
+    color: var(--accent-light);
+}
+
 @keyframes settingsContentFadeIn {
     from {
         opacity: 0;
@@ -271,6 +283,46 @@
     min-height: 100px;
     resize: vertical;
     font-family: inherit;
+}
+
+/* ==========================================================================
+ *  Setting Descriptions (Hints)
+ *  ========================================================================== */
+
+/* Standard settings: appears below the input field */
+.setting-description {
+    margin: 4px 0 12px 0;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    color: var(--text-secondary);
+}
+
+/* Optional: Highlight the description when the input is focused
+ *  to guide the user's eye to the explanation */
+.setting-item:focus-within .setting-description {
+    color: var(--text-primary);
+    transition: all 0.2s ease;
+}
+
+/* Select description: appears below the select dropdown */
+.setting-select-description {
+    margin: 4px 0 12px 0;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    color: var(--text-secondary);
+}
+
+/* Module Card: appears inside the small card container */
+.toggle-list-item-description {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+    white-space: pre-wrap;
+
+    /* Keep it clean inside the card; no heavy borders needed here */
+    margin-top: 4px;
+    padding-left: 2px;
+    opacity: 0.85;
 }
 
 /* ==========================================================================
@@ -1868,6 +1920,67 @@
     background: color-mix(in srgb, var(--accent) 5%, var(--bg-tertiary));
 }
 
+.sound-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+}
+
+.sound-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    cursor: pointer;
+}
+
+.sound-toggle input[type="checkbox"] {
+    display: none;
+}
+
+.sound-toggle .toggle-slider {
+    position: relative;
+    width: 36px;
+    height: 20px;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    transition: all 0.2s ease;
+}
+
+.sound-toggle .toggle-slider::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    background-color: var(--text-muted);
+    border-radius: 50%;
+    transition: all 0.2s ease;
+}
+
+.sound-toggle:hover .toggle-slider {
+    border-color: var(--accent);
+}
+
+.sound-toggle input:checked + .toggle-slider {
+    background-color: var(--accent);
+    border-color: var(--accent);
+}
+
+.sound-toggle input:checked + .toggle-slider::before {
+    transform: translateX(16px);
+    background-color: white;
+}
+
+.sound-toggle .toggle-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    user-select: none;
+}
+
 .sound-icon {
     display: flex;
     align-items: center;
@@ -2193,6 +2306,30 @@
     filter: grayscale(0.2);
 }
 
+.setting-item-unsafe {
+    border-left: 3px solid #ef4444 !important; /* Red warning border */
+    padding: 4px;
+    background-color: rgba(239, 68, 68, 0.05); /* Very faint red background */
+    position: relative;
+}
+
+.setting-item-unsafe::after {
+    content: "⚠️ UNSAFE";
+    position: absolute;
+    right: 8px;
+    font-size: 10px;
+    font-weight: bold;
+    color: #ef4444;
+    opacity: 0.7;
+}
+
+/* the main setting that controls whether unsafe settings are visible */
+.toggle-unsafe {
+    background-color: rgba(239, 68, 68, 0.05);
+    border: none;
+    width: 80%;
+    margin: 0 auto;
+}
 
 /* ==========================================================================
  *  Utilities & Accessibility

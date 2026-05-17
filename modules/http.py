@@ -46,10 +46,22 @@ class Http(core.module.Module):
     }
 
     settings = {
-        "block_uncommon_ports": True,
-        "https_only": True,
-        "domain_whitelist": [],
-        "domain_blacklist": []
+        "block_uncommon_ports": {
+            "default": True,
+            "description": "Block dangerous ports, such as FTP, SSH, Telnet, SMTP, and so on"
+        },
+        "https_only": {
+            "default": True,
+            "description": "Allow only secure encrypted HTTPS requests, and disallow HTTP"
+        },
+        "domain_whitelist": {
+            "default": [],
+            "description": "Allow access to only these domains (a domain is the first part of a URL, such as youtube.com in https://youtube.com/watch?v=dQw4w9WgXcQ)"
+        },
+        "domain_blacklist": {
+            "default": [],
+            "description": "Forbid access to these domains"
+        }
     }
 
     def __init__(self, *args, **kwargs):

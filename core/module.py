@@ -4,6 +4,44 @@ import re
 import inspect
 import json
 import asyncio
+import copy
+
+class ModuleConfig:
+    def __init__(self, module_obj, settings_structure: dict, module_config):
+        self.module = module_obj
+
+        # the structure definition of the settings, defined in each module's settings dict
+        self.structure = settings_structure
+
+        # the live config, loaded from the config file
+        self.config = module_config
+
+    def get(self, *args, **kwargs):
+        default = kwargs.get("default", None)
+        if not args:
+            return default
+
+        keys = list(args)
+        # If the last argument is not a string, or is empty, treat it as an explicit default
+        if keys and not isinstance(keys[-1], str) or not keys[-1]:
+            default = keys.pop()
+
+        current = self.config.to_dict()
+
+        # traverse through the provided keys
+        for key in keys:
+            if isinstance(current, dict) and key in current:
+                current = current[key]
+            else:
+                return default
+
+        return current
+
+    def set(self, key: str, value):
+        if key not in self.config:
+            return None
+
+        self.config[key] = value
 
 class Module:
     """Base class for modules/plugins"""
@@ -11,16 +49,22 @@ class Module:
     # can be defined by modules, contains default settings that can be changed by the user
     settings = {}
 
+    # unsafe flag can mark a module as risky to enable in supported settings UI's
+    unsafe = False
+
     def __init__(self, manager, is_user_module=False, channel=None):
         self.manager = manager
         self.channel = channel # later set by the channel base class, _set_as_active_channel()
         self.name = core.modules.get_name(self) # shorthand alias
         self.disabled_tools = [] # gets scanned when adding tools from the module. you can alter this in a module's __init__() to selectively disable tools.
-        self.unsafe = False # unsafe flag for special display of unsafe modules in UI's
 
         # load module config
         config_target = "modules" if not is_user_module else "user_modules"
-        self.config = core.config.ConfigManager(core.config.config, [config_target, "settings", self.name])
+        self.config = ModuleConfig(
+            self,
+            self.settings,
+            core.config.ConfigManager(core.config.config, base_path=[config_target, "settings", self.name])
+        )
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -82,7 +126,7 @@ class Module:
 # Registry format: {"command_name": [(class_type, method), ...]}
 _command_registry = {}
 
-def command(name, help=None, temporary=False):
+def command(name, help=None, send_to_ai=False):
     """
     Decorator to register a method as a command handler.
     Accepts a string description or a dictionary for subcommand help.
@@ -90,7 +134,7 @@ def command(name, help=None, temporary=False):
     """
     def decorator(func):
         func._is_command = True
-        func._is_temporary = temporary
+        func._is_temporary = (not send_to_ai)
         func._command_name = name.lower().strip()
 
         desc = help

@@ -4,8 +4,18 @@ class Characters(core.module.Module):
     """Lets your AI embody different characters! inspired by characterAI, janitorAI, sillytavern, etc."""
 
     settings = {
-        "put_character_list_in_system_prompt": True,
-        "disable_agent_prompts_when_character_active": True
+        "insert_system_prompt": {
+            "default": True,
+            "description": "Put the list of stored characters into the system prompt so that the AI always knows what characters it can switch to"
+        },
+        "disable_agent_prompts_when_character_active": {
+            "default": True,
+            "description": "Automatically disables all prompts from other modules when a character is active, so that the only thing in the system prompt is the character definition. This can help a lot with making characters behave purely like characters, and less like, well, personal assistants."
+        },
+        "use_writing_style": {
+            "description": "Whether to use the writing style defined by the `writing style` module for characters. This will add that module's prompt to the character prompt even if agent prompts are disabled, making all your characters use your preferred writing style setup",
+            "default": True
+        }
     }
 
     def __init__(self, *args, **kwargs):
@@ -16,7 +26,7 @@ class Characters(core.module.Module):
 
         self._header = "Identity"
 
-        if self.config.get("put_character_list_in_system_prompt"):
+        if self.config.get("insert_system_prompt"):
             # disable character listing tool
             self.disabled_tools.append("get_all")
 
@@ -89,7 +99,7 @@ class Characters(core.module.Module):
 
         tool_text = f"Characters available to switch yourself to:\n{await self._list_characters()}" if (
             core.config.get("model", {}).get("use_tools") and
-            self.config.get("put_character_list_in_system_prompt") and
+            self.config.get("insert_system_prompt") and
             not curr_char
         ) else ""
 
@@ -99,13 +109,11 @@ class Characters(core.module.Module):
         char_name = await self.channel.context.chat.get_data("character")
         char_profile = self._rewrite_character(char_name, self.characters.get(char_name, {}).get("identity", ""))
         user_name = self.user_profile.get("name", "User")
-        user_prefs = self.user_profile.get("preferences", "")
 
         # all of this is stored as json strings, so newlines need to be restored
         char_profile = char_profile.replace("\\n", "\n")
-        user_prefs = user_prefs.replace("\\n", "\n")
 
-        char_text = f"You are {char_name}. You are talking to {user_name}.\n\n{char_profile}\n\n{user_prefs}\n{tool_text}"
+        char_text = f"You are {char_name}. You are talking to {user_name}.\n\n{char_profile}\n\n{tool_text}"
 
         return char_text
 
@@ -258,24 +266,6 @@ class Characters(core.module.Module):
         self.user_profile["preferences"] = preferences
         self.user_profile.save()
         return "Your name has been set!"
-
-    async def set_preferences(self, preferences: str):
-        """Sets any preferences the user has for the writing style and tone of the characters. e.g. "Write your replies in a short, easy to understand style, in at most 2 paragraphs."""
-        self.user_profile["preferences"] = preferences
-        self.user_profile.save()
-        return self.result("preferences set")
-
-    # command version
-    @core.module.command("charpref")
-    async def cmd_set_preferences(self, args: list):
-        """sets your preferred writing style for characters"""
-        if not args:
-            return self.user_profile.get("preferences", "no preferences have been configured yet")
-
-        pref = " ".join(args)
-        self.user_profile["preferences"] = pref
-        self.user_profile.save()
-        return "preferences set!"
 
     # async def list(self):
     #     """

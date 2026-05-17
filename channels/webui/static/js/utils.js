@@ -38,13 +38,23 @@ function scrollToBottomDelayed() {
 }
 
 function autoResize(textarea) {
-    if (!textarea.value || !textarea.value.includes('\n')) {
-        textarea.style.height = '48px';
-    } else {
-        textarea.style.height = 'auto';
-        textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
-    }
+    // 1. Reset height to 'auto' to allow the scrollHeight to be recalculated
+    // accurately (this allows the box to shrink when text is deleted)
+    textarea.style.height = 'auto';
+
+    // 2. Calculate the new height
+    // We want it to be at least 48px (min) and at most 200px (max)
+    const newHeight = Math.max(48, Math.min(textarea.scrollHeight, 200));
+
+    // 3. Apply the height
+    textarea.style.height = newHeight + 'px';
+
+    // 4. Handle the overflow
+    // If the content is taller than our max (200px), show a scrollbar.
+    // Otherwise, hide the overflow for a cleaner look.
+    textarea.style.overflowY = textarea.scrollHeight > 200 ? 'auto' : 'hidden';
 }
+
 
 function clearInput() {
     inputField.value = '';

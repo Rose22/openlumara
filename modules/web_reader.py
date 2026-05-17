@@ -61,6 +61,10 @@ class WebReader(modules.http.Http):
                 continue
             output[category] = self._remove_duplicates(output[category])
 
+        output["urls"] = self._remove_duplicates([a["href"] for a in soup.find_all("a", href=True)])
+        if not output["urls"]:
+            del output["urls"]
+
         if "headers" not in output and "paragraphs" not in output:
             output["classes"] = {}
             for class_name in ("content", "description", "title", "text", "article"):
@@ -77,10 +81,7 @@ class WebReader(modules.http.Http):
 
             if not output["classes"]:
                 del output["classes"]
-                output["urls"] = self._remove_duplicates([a["href"] for a in soup.find_all("a", href=True)])
-                if not output["urls"]:
-                    del output["urls"]
-                    output["message"] = "nothing could be scraped from the page!"
+                output["message"] = "nothing could be scraped from the page!"
 
         return output
 

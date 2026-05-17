@@ -1,9 +1,6 @@
 // =============================================================================
 // Polling - Backend is source of truth
 // =============================================================================
-
-
-
 async function syncMessages() {
     try {
         const response = await fetch('/messages');

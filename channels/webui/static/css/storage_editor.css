@@ -18,8 +18,8 @@
 }
 
 .storage-sidebar {
-    width: 240px;
-    min-width: 200px;
+    width: 300px;
+    min-width: 300px;
     border-right: 1px solid var(--border-color);
     display: flex;
     flex-direction: column;

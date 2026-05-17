@@ -38,7 +38,11 @@ class SandboxedFiles(core.module.Module):
     MAX_SEARCH_RESULTS = 50
 
     settings = {
-        "sandbox_folder": "~/sandbox"
+        "sandbox_folder": {
+            "default": "~/sandbox",
+            "type": "path",
+            "description": "The folder this module should be limited to. It can't access anything outside this folder"
+        }
     }
 
     def __init__(self, *args, **kwargs):

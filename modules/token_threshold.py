@@ -4,7 +4,10 @@ class TokenThreshold(core.module.Module):
     """Will make the AI warn you if you're approaching the token limit"""
 
     settings = {
-        "warning_threshold_percentage": 80
+        "warning_threshold": {
+            "default": 0.8,
+            "type": "percentage"
+        }
     }
 
     async def on_end_prompt(self):
@@ -28,11 +31,12 @@ class TokenThreshold(core.module.Module):
             
         used_percentage = (current / max_tokens) * 100
 
-        warning_threshold_percent = self.config.get("warning_threshold_percentage")
+        warning_threshold_percent = self.config.get("warning_threshold")
+        warning_threshold_percent = warning_threshold_percent * 100
 
         if used_percentage >= warning_threshold_percent:
             remaining_percentage = 100 - used_percentage
 
-            return f"WARNING: Approaching token limit! You have used {used_percentage:.1f}% of the allowed tokens. {remaining_percentage:.1f}% remaining. Warn the user!!"
+            return f"WARNING: Approaching token limit! You have used {used_percentage:.1f}% of the allowed tokens. {remaining_percentage:.1f}% remaining. Warn the user!! The user might want to use `/compress` to summarize the chat so far (the user won't lose chat history, but the AI won't see the messages anymore). Or the user can use `/new` to start a new chat."
         else:
             return None

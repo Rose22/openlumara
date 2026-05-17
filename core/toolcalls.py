@@ -69,7 +69,32 @@ class ToolcallManager:
             repaired_tool_calls.append(tool_call)
         return repaired_tool_calls
 
-    async def process(self, tool_calls, assistant_content="", assistant_reasoning=""):
+    async def _repair_toolcall_token(self, token):
+        repaired_tool_calls = []
+        tool_calls = token.get("tool_calls")
+
+        if tool_calls:
+            repaired_tool_calls = self._repair_tool_calls(tool_calls)
+            repaired_token = token.copy()
+            repaired_token["tool_calls"] = repaired_tool_calls
+            return repaired_token
+        else:
+            return token
+
+    async def _build_recursive_request(self, token, final_content = "", final_reasoning = ""):
+        repaired_token = await self._repair_toolcall_token(token)
+
+        toolcall_request = {"role": "assistant"}
+        if final_content:
+            toolcall_request["content"] = "".join(final_content)
+        if final_reasoning:
+            toolcall_request["reasoning_content"] = "".join(final_reasoning)
+
+        toolcall_request["tool_calls"] = repaired_token.get("tool_calls")
+
+        return toolcall_request
+
+    async def process(self, assistant_message, push=False, recursion_counter=0):
         """
         process tool calls from an API response..
         assistant_content is the "normal" non-toolcall content, the text that the AI wants to say that's not toolcalls
@@ -83,20 +108,17 @@ class ToolcallManager:
         # whatever. we deal with it as best we can here
 
         # fix broken JSON and convert things where needed
-        repaired_tool_calls = self._repair_tool_calls(tool_calls)
+        if not assistant_message.get("tool_calls"):
+            return
 
-        # build openAI-compliant assistant message
-        assistant_message = {
-            "role": "assistant",
-            "tool_calls": repaired_tool_calls
-        }
-        if assistant_content:
-            assistant_message["content"] = assistant_content
-        if assistant_reasoning:
-            assistant_message["reasoning_content"] = assistant_reasoning
+        repaired_tool_calls = self._repair_tool_calls(assistant_message["tool_calls"])
 
         # add it to context
         await self.channel.context.chat.add(assistant_message)
+
+        # push if needed
+        if push:
+            await self.channel.push(assistant_message)
 
         # execute each tool and add their responses
         for tool_call_dict in repaired_tool_calls:
@@ -118,6 +140,17 @@ class ToolcallManager:
                     break
 
             if module_instance:
+                if tool_name not in self.channel.manager.tool_names:
+                    # don't allow disabled tools to be called
+                    rejected_msg = json.dumps({"content": "That tool has been disabled by the user.", "status": "error"})
+                    await self.channel.context.chat.add({
+                        "role": "tool",
+                        "tool_call_id": tool_call_dict['id'],
+                        "content": rejected_msg
+                    })
+                    yield {"type": "tool", "tool_call_id": tool_call_dict['id'], "content": rejected_msg}
+                    continue
+
                 # remove the module name from the tool name
                 translated_tool_name = tool_name.replace(
                     f"{module_instance_display_name}_", ""
@@ -128,7 +161,7 @@ class ToolcallManager:
                 # build a fancy toolcall display string
                 tool_call_str = self.display_call(tool_call_dict)
 
-                # core.log("toolcall", tool_call_str)
+                core.log("toolcall", tool_call_str)
 
                 try:
                     # do the function call and get it's result
@@ -151,7 +184,10 @@ class ToolcallManager:
                     yield {"type": "tool", "tool_call_id": tool_call_dict['id'], "content": func_response_str}
 
                 except Exception as e:
-                    core.log_error("error", e)
+                    # Always log full traceback for easier debugging
+                    import traceback
+                    traceback.print_exc()
+                    core.log("error", f"Tool execution failed: {e}")
 
                     # build an openai-compliant tool error object
                     tool_response = {
@@ -165,6 +201,10 @@ class ToolcallManager:
 
                 # add the tool response to the context window
                 await self.channel.context.chat.add(tool_response)
+
+                # push it if needed
+                # if push:
+                #     await self.channel.push(tool_response)
             else:
                 core.log(
                     "toolcall",
@@ -179,11 +219,17 @@ class ToolcallManager:
         final_reasoning = []
         had_recursive_call = False
 
+        reasoning_push_buffer = ""
+
         try:
             async for token in self.channel.manager.API.send_stream(
                 await self.channel.context.get(system_prompt=True, end_prompt=False),
                 tools=self.channel.manager.tools
             ):
+                if self.channel.manager.API.cancel_request:
+                    await self.channel.announce("toolcalling chain cancelled", "info")
+                    return
+
                 token_type = token.get("type")
 
                 if token_type == "content":
@@ -192,7 +238,7 @@ class ToolcallManager:
                 elif token_type == "reasoning":
                     final_reasoning.append(token.get("content"))
                     yield token
-                elif token_type in ["tool_call_delta", "tool", "tool_calls"]:
+                elif token_type in ["tool_call_delta", "tool", "tool_calls", "prompt_progress", "timings"]:
                     yield token
 
                 if token_type == "token_usage":
@@ -208,23 +254,16 @@ class ToolcallManager:
 
                 if token_type == "tool_calls":
                     had_recursive_call = True
-                    tool_calls = token.get("content")
-                    repaired_tool_calls = []
-                    if tool_calls:
-                        repaired_tool_calls = self._repair_tool_calls(tool_calls)
-                        repaired_token = token.copy()
-                        repaired_token["content"] = repaired_tool_calls
-                        yield repaired_token
-                    else:
-                        yield token
+                    toolcall_request = await self._build_recursive_request(token, final_content, final_reasoning)
 
-                    # the AI has decided to call more tools, so we make a recursive call
-                    # Pass along the accumulated token usage
                     async for sub_token in self.process(
-                        repaired_tool_calls if tool_calls else [],
-                        assistant_content="".join(final_content),
-                        assistant_reasoning="".join(final_reasoning)
+                        toolcall_request,
+                        recursion_counter=recursion_counter,
+                        push=push
                     ):
+                        if self.channel.manager.API.cancel_request:
+                            await self.channel.announce("toolcalling chain cancelled", "info")
+                            return
                         yield sub_token
 
             # only add final message if we didn't make a recursive call
@@ -234,17 +273,19 @@ class ToolcallManager:
                 final_reasoning_str = "".join(final_reasoning)
 
                 if final_content_str or final_reasoning_str:
-                    final_msg = {
-                        "role": "assistant",
-                        "content": final_content_str
-                    }
+                    final_msg = {"role": "assistant"}
+
+                    if final_content_str:
+                        final_msg["content"] = final_content_str
                     if final_reasoning_str:
                         final_msg["reasoning_content"] = final_reasoning_str
 
                     await self.channel.context.chat.add(final_msg)
+                    if push:
+                        await self.channel.push(final_msg)
 
         except Exception as e:
-            core.log("error", f"Error while handling tool calls: {e}")
+            core.log_error(f"Error while handling tool calls", e)
             await self.channel.announce(
                 f"Error while handling tool calls: {e}",
                 "error"

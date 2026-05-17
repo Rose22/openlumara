@@ -69,6 +69,8 @@ class ToolCallRenderer:
             self.printed_values = {}
 
 class Cli(core.channel.Channel):
+    """Talk to your AI from the terminal! Auto-disables itself when ran as a background server."""
+
     running = True
 
     def _setup_style(self):
@@ -111,6 +113,11 @@ class Cli(core.channel.Channel):
         if not sys.stdin.isatty():
             return False
 
+        # auto-disabled full CLI if cli lite is enabled
+        if "cli_lite" in self.manager.channels:
+            core.log(self.name, "Full CLI disabled because CLI Lite is active")
+            return False
+
         self._setup_style()
         self._setup_history()
 
@@ -142,6 +149,10 @@ class Cli(core.channel.Channel):
                 await self._process_message(msg)
 
         return True
+
+    async def on_push(self, message: dict):
+        core.log("push", message.get("content").strip())
+        print(flush=True)
 
     async def _process_message(self, msg):
         message_state = None

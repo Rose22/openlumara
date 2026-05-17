@@ -83,18 +83,21 @@ async function saveEdit(index, newContent) {
         });
 
         if (response.ok) {
-            await syncMessages();
+            syncMessages();
         }
     } catch (err) {
         console.error('Failed to edit message:', err);
     }
 
     editingIndex = null;
+
+    // auto-regenerate from this point
+    await regenerateMessage(index);
 }
 
-function cancelEdit() {
+async function cancelEdit() {
     editingIndex = null;
-    syncMessages();
+    await syncMessages();
 }
 
 async function deleteMessage(index) {
@@ -108,7 +111,7 @@ async function deleteMessage(index) {
         });
 
         if (response.ok) {
-            await syncMessages();
+            syncMessages();
         }
     } catch (err) {
         console.error('Failed to delete message:', err);
@@ -219,7 +222,7 @@ async function regenerateMessage(targetIndex) {
             return;
         }
 
-        // Sync to update UI
+        // Sync messages to update indices and clear deleted content before regenerating
         await syncMessages();
 
         // Re-send the content

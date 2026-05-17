@@ -62,30 +62,6 @@ except Exception as e:
 class Coder(modules.sandboxed_files.SandboxedFiles):
     """Allows your AI to write, edit and test code for you."""
 
-    settings = {
-        "coding_style": "Write clean, well-commented code. Do not include your reasoning inside final code.",
-        "sandbox_folder": "~/coder",
-        "add_project_list_to_system_prompt": True,
-        "permissions": {
-            "create_project": True,
-            "add_functions": True,
-            "edit_functions": True,
-            "delete_functions": True,
-            "create_files": True,
-            "read_files": True,
-            "edit_files": True,
-            "overwrite_files": False,
-            "execute_code": False,
-        },
-        "limits": {
-            "folder_blacklist": ["venv"],
-            "max_file_size_mb": 10,
-            "max_read_lines": 1000,
-            "max_grep_results": 50,
-            "backup_retention_count": 5,
-        }
-    }
-
     # Language-specific formatting tools mapping
     FORMATTERS = {
         'python': ['black', 'autopep8', 'yapf'],
@@ -239,11 +215,77 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         }
     }
 
+    settings = {
+        "sandbox_folder": {
+            "default": "~/coder",
+            "description": "What folder the coder tools should have access to"
+        },
+        "reading_mode": {
+            "default": "symbols",
+            "type": "select",
+            "options": {
+                "none": "Prevent your AI from reading any files... if you need that for some reason",
+                "symbols": "The AI will target specific 'symbols' (functions/class methods) to read their code. Supports treesitter for greatly improved symbol targeting and syntax error detection. Treesitter support must be installed for it to work (requirements_coder.txt)",
+                "files": "The AI will read entire files, with a line and filesize limit",
+                "both": "The AI will be able to read using symbol tools and full file reading tools"
+            }
+        },
+        "writing_mode": {
+            "default": "symbols",
+            "type": "select",
+            "options": {
+                "read-only": "The AI will only be able to read your files, not write to them.",
+                "symbols": "The AI will edit code by targeting specific 'symbols' (functions/class methods)",
+                "full edits": "The AI will edit code by performing direct file edits and search/replace",
+                "both": "The AI will be able to edit using symbol tools and full file editing tools"
+            }
+        },
+        "allow_total_overwrites": {
+            "description": "Whether to allow the AI to fully overwrite files when writing mode is set to *full edits* or *both*. This is dangerous with some AI models because they can easily mess up your entire file, but is also sometimes needed for things like refactors.",
+            "default": False
+        },
+        "coding_style": {
+            "default": "Write clean, well-commented code. Do not include your reasoning inside final code.",
+            "description": "Use this to specify style guidelines for your AI to use while coding.",
+            "type": "long_text"
+        },
+        "add_project_list_to_system_prompt": {
+            "default": True,
+            "description": "Make your AI aware of all the folders in your sandbox folder, so you can simply say 'in my cute_website project, edit the buttons to be cuter'"
+        },
+        "limits": {
+            "folder_blacklist": {
+                "description": "Skip these folders when listing projects recursively. Helps not flood your context with hundreds of files, such as with python's `venv` and `__pycache__`",
+                "default": ["venv", "__pycache__"]
+            },
+            "max_file_size": {
+                "description": "Max file size (in MB) the coder should be able to read in one go",
+                "default": 10
+            },
+            "max_read_lines": {
+                "description": "Max amount of lines to read from any given file. Use this to prevent your context window from getting stuffed to the brim really fast!",
+                "default": 1000
+            },
+            "max_grep_results": 50,
+            "backup_retention_count": {
+                "description": "How many backups of each file to keep",
+                "default": 10
+            }
+        },
+        "allow_code_exection": {
+            "description": "Whether to allow the AI to execute the code it has written. **EXTREMELY DANGEROUS**! Recommend using the `sandboxed shell` module instead and pointing it at your coder sandbox folder.",
+            "unsafe": True,
+            "default": False
+        }
+    }
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.path = self.sandbox_path
+
         # Parser cache for performance - reuse Parser instances
         self._parser_cache = {}
+        self.enabled_tools = []
 
         if HAS_TREE_SITTER:
             if not loaded_languages:
@@ -253,26 +295,82 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         else:
             core.log("coder", f"Tree-sitter DISABLED. Reason: {disabled_reason}")
 
-        if not self.config.get("permissions", "add_functions"):
-            self.disabled_tools.extend(["add_symbol_before", "add_symbol_after"])
+        self.enabled_tools.extend([
+            "list_full_project_tree",
+            "list_project_folder"
+        ])
 
-        if not self.config.get("permissions", "edit_files"):
-            self.disabled_tools.extend(["edit_symbol", "edit"])
+        symbol_reading_tools = [
+            "get_outline",
+            "get_symbol",
+            "format_file"
+        ]
+        symbol_writing_tools = [
+            "create_project",
+            "create_file",
+            "edit_symbol",
+            "add_symbol_before",
+            "add_symbol_after",
+            "delete_symbol"
+        ]
 
-        if not self.config.get("permissions", "delete_functions"):
-            self.disabled_tools.append("delete_symbol")
+        file_reading_tools = [
+            "read_file",
+            "search_in_file",
+            "grep",
+            "find_files",
+            "format_file"
+        ]
+        file_writing_tools = [
+            "create_project",
+            "create_file",
+            "append_to_file",
+            "edit",
+            "search_replace",
+            "format_file"
+        ]
 
-        if not self.config.get("permissions", "create_project"):
-            self.disabled_tools.append("create_project")
+        match self.config.get("reading_mode"):
+            case "symbols":
+                self.enabled_tools.extend(symbol_reading_tools)
+            case "files":
+                self.enabled_tools.extend(file_reading_tools)
+            case "both":
+                self.enabled_tools.extend(symbol_reading_tools)
+                self.enabled_tools.extend(file_reading_tools)
 
-        if not self.config.get("permissions", "create_files"):
-            self.disabled_tools.extend(["create_file", "append_to_file"])
+        if self.config.get("writing_mode") != "read-only":
+            self.enabled_tools.extend([
+                "list_backups",
+                "restore_backup"
+            ])
 
-        if not self.config.get("permissions", "overwrite_files"):
-            self.disabled_tools.append("overwrite_file")
+        match self.config.get("writing_mode"):
+            case "symbols":
+                self.enabled_tools.extend(symbol_writing_tools)
+            case "full edits":
+                self.enabled_tools.extend(file_writing_tools)
+            case "both":
+                self.enabled_tools.extend(symbol_writing_tools)
+                self.enabled_tools.extend(file_writing_tools)
 
-        if not self.config.get("permissions", "execute_code"):
-            self.disabled_tools.append("execute")
+        if self.config.get("writing_mode") in ("full edits", "both") and self.config.get("allow_total_overwrites"):
+            self.enabled_tools.append("overwrite_file")
+
+        if self.config.get("allow_code_exection"):
+            self.enabled_tools.append("execute")
+
+        for prop_name in dir(self):
+            if prop_name.startswith("_"): continue
+
+            attr = getattr(self, prop_name)
+
+            # add all methods that are not marked as enabled to the disabled list
+            if callable(attr):
+                if prop_name not in self.enabled_tools:
+                    self.disabled_tools.append(prop_name)
+
+
 
     # ==================== Security & Path Helpers ====================
 
@@ -289,11 +387,11 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
     def _check_file_size(self, file_path: str) -> Tuple[bool, Optional[str]]:
         """Check if file size is within configured limits."""
-        max_size_bytes = self.config.get("max_file_size_mb", 10) * 1024 * 1024
+        max_size_bytes = self.config.get("max_file_size", 10) * 1024 * 1024
         try:
             size = os.path.getsize(file_path)
             if size > max_size_bytes:
-                return False, f"File size ({size / (1024*1024):.1f}MB) exceeds limit ({self.config.get('max_file_size_mb', 10)}MB)"
+                return False, f"File size ({size / (1024*1024):.1f}MB) exceeds limit ({self.config.get('max_file_size', 10)}MB)"
             return True, None
         except OSError:
             return True, None
@@ -1071,37 +1169,33 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
     async def list_full_project_tree(self, project_name: str, depth_limit: int = 5, max_files_per_folder: int = 50):
         """Returns a recursive tree representation of the project structure. Use this to understand the overall project layout before diving into specific files."""
         project_path = self._get_project_path(project_name)
+
         if not os.path.exists(project_path):
             return self.result("error: project does not exist", success=False)
 
         def _build_tree(path, current_depth):
-            if not os.path.isdir(path):
-                return {"files": [], "folders": {}}
-
-            files = []
-            folders = {}
+            tree = {}
             files_counter = 0
             try:
                 for entry in os.scandir(path):
                     if entry.is_file():
-                        if files_counter > max_files_per_folder:
-                            continue
-
-                        files.append(entry.name)
-                        files_counter += 1
+                        if files_counter < max_files_per_folder:
+                            tree[entry.name] = None
+                            files_counter += 1
                     elif entry.is_dir():
-                        if entry.name in self.config.get("limits", "folder_blacklist", []):
+                        if entry.name in self.config.get("limits", "folder_blacklist", default=[]):
                             continue
                         if entry.name.startswith('.'):
                             continue
+                        
+                        folder_key = f"{entry.name}/"
                         if current_depth < depth_limit:
-                            folders[entry.name] = _build_tree(entry.path, current_depth + 1)
+                            tree[folder_key] = _build_tree(entry.path, current_depth + 1)
                         else:
-                            folders[entry.name] = {"files": [], "folders": {}}
+                            tree[folder_key] = {}
             except Exception:
                 pass
-
-            return {"files": files, "folders": folders}
+            return tree
 
         try:
             tree = _build_tree(project_path, 0)
@@ -1110,7 +1204,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             return self.result(f"error: {e}", success=False)
 
     async def list_project_folder(self, project_name: str, sub_path: list = None):
-        """Lists the immediate contents of a specific path within a project (non-recursive)."""
+        """Lists the immediate contents of a specific path within a project (non-recursive). The path is a list of path elements, e.g. ['src', 'main.py'] translates to src/main.py"""
         sub_path = sub_path or []
         target_path = self._get_project_path(project_name)
         if sub_path:
@@ -1127,8 +1221,8 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             return self.result(f"error: {e}", success=False)
 
     async def create_project(self, project_name: str):
-        if not self.config.get("permissions", "create_project"):
-            return self.result("error: Project creation is disabled.", success=False)
+        if self.config.get("writing_mode") == "read-only":
+            return self.result("error: Coder is in read-only mode. File modification disabled.", success=False)
 
         base_path = self._get_project_path(project_name)
 
@@ -1144,8 +1238,8 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
     async def create_file(self, project_name: str, file_path: list, content: str):
         """Creates a file at specified path. Cannot overwrite existing files. Path will be recursively created if nonexistent. Provide path as a list representing a relative path. Example: ['src', 'main.py']"""
 
-        if not self.config.get("permissions", "create_files"):
-            return self.result("error: File creation is disabled", success=False)
+        if self.config.get("writing_mode") == "read-only":
+            return self.result("error: Coder is in read-only mode. File modification disabled.", success=False)
 
         file_path_str = self._get_file_path(project_name, file_path)
 
@@ -1170,14 +1264,13 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         except Exception as e:
             return self.result(f"error: {e}", False)
 
-    async def read_file(self, project_name: str, file_path: list, limit: int, offset: int = None):
+
+
+    async def read_file(self, project_name: str, file_path: list, limit: int = None, offset: int = None):
         """
         Reads a file with optional line offset and limit.
         Returns content as string, or error dict on failure.
         """
-        if not self.config.get("permissions", "read_files"):
-            return self.result("error: Full file reading is disabled. Use get_symbol!", success=False)
-
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
             return self.result("error: file does not exist!", success=False)
@@ -1192,7 +1285,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
                 lines = f.readlines()
 
             total_lines = len(lines)
-            max_lines = self.config.get("max_read_lines", 1000)
+            max_lines = self.config.get("limits", "max_read_lines", default=1000)
 
             # Apply offset (1-indexed)
             start_idx = 0
@@ -1205,23 +1298,34 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
                 end_idx = min(start_idx + limit, total_lines)
 
             # Enforce max lines
+            line_limit_reached = False
             if (end_idx - start_idx) > max_lines:
                 end_idx = start_idx + max_lines
+                line_limit_reached = True
 
             selected_lines = lines[start_idx:end_idx]
             result = "".join(selected_lines)
 
             # Truncate if too large (50KB)
-            max_bytes = 50 * 1024
-            truncated = False
+            size_limit_reached = False
+            max_bytes = self.config.get("limits", "max_file_size") * 1024 * 1024
             if len(result.encode('utf-8')) > max_bytes:
                 while len(result.encode('utf-8')) > max_bytes and result:
                     result = result[:-1]
-                truncated = True
+                size_limit_reached = True
+
+            if offset and not result:
+                return self.result("Offset was beyond file's ending, please use a lower offset", success=False)
 
             response = result
-            if truncated:
-                response += "\n\n[Output truncated - file has more content]"
+            if end_idx < total_lines:
+                reason = "line limit reached" if line_limit_reached else "limit reached"
+                remaining = total_lines - end_idx
+                next_offset = end_idx + 1
+                response += f"[Output truncated - {reason}. {remaining} lines remain starting from line {next_offset}]"
+            
+            if size_limit_reached:
+                response += "[Output truncated - file size limit reached]"
 
             return response
         except Exception as e:
@@ -1229,8 +1333,6 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
     async def overwrite_file(self, project_name: str, file_path: list, content: str):
         """Completely overwrites an existing file with new content."""
-        if not self.config.get("permissions", "overwrite_files"):
-            return self.result("error: File overwriting is disabled. Use edit_symbol!", success=False)
 
         file_path_str = self._get_file_path(project_name, file_path)
 
@@ -1255,9 +1357,6 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
     async def append_to_file(self, project_name: str, file_path: list, content: str):
         """Appends content to the end of a file. Creates the file if it doesn't exist."""
-
-        if not self.config.get("permissions", "edit_files"):
-            return self.result("error: File creation/editing is disabled", success=False)
 
         file_path_str = self._get_file_path(project_name, file_path)
         target_dir = os.path.dirname(file_path_str)
@@ -1432,9 +1531,6 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
     async def edit_symbol(self, project_name: str, file_path: list, symbol_name: str, new_content: str, language: str = None):
         """Replaces the content of a symbol with new content."""
 
-        if not self.config.get("permissions", "edit_functions"):
-            return self.result("error: Symbol editing is disabled.", success=False)
-
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
             return self.result("error: file does not exist", success=False)
@@ -1503,9 +1599,6 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             return self.result(f"error: {e}", success=False)
 
     async def add_symbol_before(self, project_name: str, file_path: list, target_symbol_name: str, name: str, content_body: str, language: str = None):
-        if not self.config.get("permissions", "add_functions"):
-            return self.result("error: Symbol adding is disabled.", success=False)
-
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
             return self.result("error: file does not exist", success=False)
@@ -1574,9 +1667,6 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             return self.result(f"error: {e}", success=False)
 
     async def add_symbol_after(self, project_name: str, file_path: list, target_symbol_name: str, name: str, content_body: str, language: str = None):
-        if not self.config.get("permissions", "add_functions"):
-            return self.result("error: Symbol adding is disabled.", success=False)
-
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
             return self.result("error: file does not exist", success=False)
@@ -1650,9 +1740,6 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             return self.result(f"error: {e}", success=False)
 
     async def delete_symbol(self, project_name: str, file_path: list, symbol_name: str, language: str = None):
-        if not self.config.get("permissions", "edit_functions"):
-            return self.result("error: Symbol deletion is disabled.", success=False)
-
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
             return self.result("error: file does not exist", success=False)
@@ -1711,7 +1798,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
     # ==================== Search Operations ====================
 
-    async def search(self, project_name: str, file_path: list, query: str, context_lines: int = 5, max_matches: int = 10, use_regex: bool = True):
+    async def search_in_file(self, project_name: str, file_path: list, query: str, context_lines: int = 5, max_matches: int = 10, use_regex: bool = True):
         """
         Search for text or regex pattern within a file.
         Returns snippets with line numbers and surrounding context.
@@ -1829,9 +1916,6 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         diff_str = "\n".join(diff)
 
     async def edit(self, project_name: str, file_path: list, old_text: str, new_text: str):
-        if not self.config.get("permissions", "edit_files"):
-            return self.result("error: Editing is disabled.", success=False)
-
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
             return self.result("error: file does not exist", success=False)
@@ -1965,9 +2049,6 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
     async def format_file(self, project_name: str, file_path: list, formatter: str = "auto") -> dict:
         """Formats code using appropriate formatter. Supports: auto, black, autopep8, prettier, gofmt, rustfmt, clang-format, etc."""
-        if not self.config.get("permissions", "edit_files"):
-            return self.result("error: Editing is disabled.", success=False)
-
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
             return self.result("error: file does not exist", success=False)
@@ -2048,48 +2129,16 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
     # ==================== System Prompt ====================
 
     async def on_system_prompt(self):
-        output = """## Code Editing Tool Usage
+        output = ""
 
-### Reading
-Use in this order:
-1. **get_outline** (first) - lists all symbols in a file.
-2. **get_symbol** (primary) - reads a symbol by name (e.g., "MyClass.my_method").
-3. **read_file** (offset/limit) - only if outline/symbol aren't enough.
-4. **read_file** (full) - LAST RESORT ONLY.
-
-### Editing
-Use in this order:
-1. **edit_symbol / add_symbol_before / add_symbol_after** (preferred) - for inserting/replacing specific symbols.
-2. **edit** - exact text replacement. Use to make granular edits that don't need entire symbol-level rewrites.
-3. **append_to_file** - adds content to end of file.
-
-### Backup & Rollback
-1. **list_backups** - see available versions.
-2. **restore_backup** - roll back using a version index.
-
-### Searching
-Use in this order:
-1. **grep** - regex/text across project files.
-2. **find_files** - glob patterns.
-3. **search** - text/regex within a single file.
-4. **list_full_project_tree** - overall project layout.
-
-### Content Format
-- All content params must be RAW source code.
-- Use actual newlines/quotes. Do NOT escape as `\\n` or `\\\"
-""".strip()
         coding_style = self.config.get("coding_style")
         if coding_style: output += f"\n## Coding Style\n{coding_style}\n"
 
         if self.config.get("add_project_list_to_system_prompt"):
             try:
                 projects = [f for f in os.listdir(self.sandbox_path) if os.path.isdir(os.path.join(self.sandbox_path, f))]
-                output += "## Projects in Sandbox\n" + ("\n".join(f"- {p}" for p in projects) if projects else "- No projects exist. Use `create_project` to create one.\n")
+                output += "\n## Projects in Sandbox\n" + ("\n".join(f"- {p}" for p in projects) if projects else "- No projects exist. Use `create_project` to create one.\n")
             except Exception as e:
                 output += f"Could not list projects: {e}\n"
 
-        if HAS_TREE_SITTER:
-            output += f"\n## Parser Support\nTree-sitter enabled for: {', '.join(loaded_languages)}"
-        else:
-            output += f"\n## Parser Support\nTree-sitter disabled: {disabled_reason}"
         return output

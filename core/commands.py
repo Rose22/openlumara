@@ -1,53 +1,85 @@
 import core
 import textwrap
 import asyncio
+import shlex
 
-def get_commands_help(modules_dict):
+CMD_PREFIX = core.config.get("core").get("cmd_prefix", "/")
+
+BUILTIN_COMMANDS = {
+    "core": {
+        "prompt": "show system prompt",
+        "prompt <module name>": "show system prompt for that module",
+        "history": "show full chat history",
+        "context": "show full context being sent to AI",
+        "status": "show status info",
+        "config": "Explore, view, and set config settings",
+        "restart": "restarts the server",
+        "stop": "stops the AI in it's tracks",
+        "connect": "attempt to connect to the API",
+        "disconnect": "disconnect from the API",
+        "reconnect": "reconnect to the API",
+        "ping": "test command that echoes \"Pong!\"",
+        "help": "this help",
+    },
+    "chats": {
+        "new": "starts a new chat",
+        "clear": "clear current chat history",
+        "chats": "list previous chats",
+        "chat <ID>": "load a chat by its ID",
+        "chat rename <name>": "rename current chat",
+        "chat category <category>": "put chat in that category",
+    },
+    "modules": {
+        "modules": "list modules",
+        "module": "enable/disable a module by name",
+        "tools": "list tools available to the AI"
+    }
+}
+
+# auto add cmd prefix to the builtin commands
+BUILTIN_COMMANDS = {
+    module: {f"{CMD_PREFIX}{cmd}": desc for cmd, desc in commands.items()}
+    for module, commands in BUILTIN_COMMANDS.items()
+}
+
+def get_commands(modules_dict: dict = None):
     """
-    Builds a help string grouped by module instance.
+    Return all available commands as a list of dicts (key=command, value=description)
     """
-    output = []
-    cmd_prefix = core.config.get("core").get("cmd_prefix", "/")
+    commands = {}
+    commands.update(BUILTIN_COMMANDS)
 
-    for module_name, instance in modules_dict.items():
-        module_cmds = []
+    if modules_dict:
+        for module_name, instance in modules_dict.items():
+            module_cmds = {}
 
-        # Scan the global registry for commands belonging to this instance's class
-        for cmd_name, handlers in core.module._command_registry.items():
-            for registered_cls, method in handlers:
-                if isinstance(instance, registered_cls):
-                    desc = method._command_description
+            # Scan the global registry for commands belonging to this instance's class
+            for cmd_name, handlers in core.module._command_registry.items():
+                for registered_cls, method in handlers:
+                    if isinstance(instance, registered_cls):
+                        desc = method._command_description
 
-                    # Handle dictionary help for subcommands
-                    if isinstance(desc, dict):
-                        for subcmd, subdesc in desc.items():
-                            # Concatenate base command with subcommand key
-                            # e.g. "identity" + " " + "set <text>" -> "identity set <text>"
-                            full_cmd = f"{cmd_name} {subcmd}".strip()
-                            module_cmds.append(f"{cmd_prefix}{full_cmd:<20} {subdesc}")
-                    else:
-                        # Handle standard string description
-                        module_cmds.append(f"{cmd_prefix}{cmd_name:<20} {desc}")
+                        # Handle dictionary help for subcommands
+                        if isinstance(desc, dict):
+                            for subcmd, subdesc in desc.items():
+                                # Concatenate base command with subcommand key
+                                # e.g. "identity" + " " + "set <text>" -> "identity set <text>"
+                                full_cmd = f"{cmd_name} {subcmd}".strip()
+                                module_cmds[f"{CMD_PREFIX}{full_cmd}"] = subdesc
+                        else:
+                            # Handle standard string description
+                            module_cmds[f"{CMD_PREFIX}{cmd_name}"] = desc
 
-                    break # Only take the first matching handler
 
-        # If this module has any commands, add them to the output
-        if module_cmds:
-            # Sort alphabetically
-            module_cmds.sort()
+            # If this module has any commands, add them to the output
+            if module_cmds and module_name:
+                if module_name not in commands:
+                    commands[module_name] = {}
 
-            # Retrieve class docstring
-            doc = instance.__class__.__doc__
+                # we use update() so that core command categories can be extended by modules
+                commands[module_name].update(module_cmds)
 
-            if doc:
-                clean_doc = textwrap.dedent(doc).strip()
-                section = f"== {module_name} ==\n{clean_doc}\n\n" + "\n".join(module_cmds)
-            else:
-                section = f"== {module_name} ==\n" + "\n".join(module_cmds)
-
-            output.append(section)
-
-    return "\n\n".join(output)
+    return commands
 
 def _convert_type(value: str):
     """
@@ -97,11 +129,12 @@ def _set_config_value(path: list, value: str):
         # Traverse the dictionary following the path
         current = target
         for i, key in enumerate(path[:-1]):
-            # If the key doesn't exist or the current level isn't a dictionary,
-            # create a new dictionary to allow for deep nesting.
-            if key not in current or not isinstance(current[key], dict):
-                current[key] = {}
             current = current[key]
+
+        # Check if the target key already exists and is a dictionary
+        # This prevents overwriting a settings group with a single value
+        if path[-1] in current and isinstance(current[path[-1]], dict):
+            return "That's a settings group! Check which settings are in it instead of trying to set its value"
 
         # Set the final value
         current[path[-1]] = typed_value
@@ -122,6 +155,8 @@ def _get_config_value(path: list):
     """
     try:
         # Use the shorthand get from the config module which handles the StorageDict
+        if not path:
+            return "Available settings: "+", ".join(core.config.config.keys())
         root_item = core.config.get(path[0])
         if root_item == None:
             return f"{path[0]} is not a valid settings category"
@@ -135,6 +170,42 @@ def _get_config_value(path: list):
             last_path_key = path_key
 
         if isinstance(sub_item, dict):
+            # NEW LOGIC: If we are looking at a specific module/channel/user_module's settings
+            # path format: [section, 'settings', name]
+            if len(path) == 3 and path[1] == "settings":
+                section = path[0] # 'modules', 'channels', or 'user_modules'
+                name = path[2]    # the module/channel name
+                
+                structure = core.config.get_module_structure()
+                if name in structure:
+                    mod_info = structure[name]
+                    schema = mod_info["settings"]
+                    lines = []
+                    for s_name, s_schema in schema.items():
+                        desc = ""
+                        if isinstance(s_schema, dict):
+                            desc = s_schema.get("description", "")
+                            unsafe = s_schema.get("unsafe", False)
+
+                            if unsafe:
+                                desc += "\n  !! UNSAFE SETTING - ENABLE AT YOUR OWN RISK !!"
+                            if "options" in s_schema and isinstance(s_schema["options"], dict):
+                                opts = s_schema["options"]
+                                opt_list = [f"{k}: {v}" for k, v in opts.items()]
+                                if opt_list:
+                                    desc += "\nYou can set this to one of:\n- " + "\n- ".join(opt_list)
+                        
+                        if desc:
+                            lines.append(f"{s_name}: {desc}")
+                        else:
+                            lines.append(f"{s_name}")
+                    
+                    if lines:
+                        return "\n\n".join(lines)
+                    else:
+                        return f"No settings found for {name}"
+
+            # Original behavior
             sub_keys = ", ".join(sub_item.keys())
             sub_item = f"Available settings in {last_path_key}: {sub_keys}"
 
@@ -144,67 +215,35 @@ def _get_config_value(path: list):
 
 class Commands:
     # delete these after they are shown to the user once
-    TEMPORARY = ("context", "prompt", "tools", "stop")
+    GHOST = ("help", "new", "clear", "context", "prompt", "tools", "stop")
 
     def __init__(self, channel):
         self.channel = channel
 
     async def _get_help(self):
+        # Get automated command help grouped by module
         output = []
 
-        help_text = """
-== built in commands ==
-chats:
-/new                        starts a new chat
-/clear                      clear current chat history
-/chats                      list previous chats
-/chat <ID>                  load a chat by its ID
-/chat rename <name>         rename current chat
-/chat category <category>   put chat in that category
+        cmd_help = core.commands.get_commands(self.channel.manager.modules)
+        if cmd_help:
+            for category, commands in cmd_help.items():
+                output.append(f"== {category} ==")
+                for command, desc in commands.items():
+                    output.append(f"{command:<30} {desc}")
+                output.append("") # newline
 
-modules:
-/modules                    list modules
-/module                     enable/disable a module by name
-/tools                      list tools available to the AI
-
-core:
-/prompt                     show system prompt
-/prompt <module name>       show system prompt for that module
-/history                    show full chat history
-/context full               show full context being sent to AI
-/context raw                show full context as raw JSON
-/status                     show status info
-/config set <path> <value>  Example: /config set api url http://localhost:5001/v1
-/config get <path>          Example: /config get api url
-/restart                    restarts the server
-/stop                       stops the AI in it's tracks
-/connect                    attempt to connect to the API
-/disconnect                 disconnect from the API
-/reconnect                  reconnect to the API
-/ping                       test command that echoes "Pong!"
-/help                       this help
-        """.strip()
-
-        output.append(help_text)
-
-        if self.channel.manager.modules:
-            # Get automated command help grouped by module
-            cmd_help = core.commands.get_commands_help(self.channel.manager.modules)
-            if cmd_help:
-                output.append(cmd_help)
-
-        return "\n\n".join(output)
+        return "\n".join(output)
 
     def _check_if_temporary(self, cmd: str):
-        # set temporary flag on temporary commands so that they disappear upon the next user message
+        # set ghost flag on temporary commands so that they emit as ghost messages (invisible to the AI)
         if (
-            # manually marked as temporary
-            cmd in self.TEMPORARY
+            # manually marked as ghost
+            cmd in self.GHOST
             or
-            # marked as temporary within the decorator (@core.module.command(name, temporary=True)
+            # marked as ghost within the decorator (@core.module.command(name, send_to_ai=False)
             core.module.command_is_temporary(cmd)
             or
-            # just make them all temporary if tool usage is turned off
+            # just make them all ghosted if tool usage is turned off
             not core.config.get("model").get("use_tools")
         ):
             return True
@@ -215,10 +254,14 @@ core:
         cmd_prefix = core.config.get("core").get("cmd_prefix", "/")
         cmd_prefix_index = message_content.lower().find(cmd_prefix.lower())+len(cmd_prefix)
 
-        cmd = message_content[cmd_prefix_index:].split()
-        args = cmd[1:]
-
-        return (cmd_prefix, cmd, args)
+        try:
+            cmd = shlex.split(message_content[cmd_prefix_index:])
+            args = cmd[1:]
+            return (cmd_prefix, cmd, args)
+        except ValueError as e:
+            # Handle malformed shell syntax gracefully
+            core.log_error("Command parsing error", e)
+            return None, None, []
 
     async def process_input(self, message: dict):
         """wrapper around the real _process_input, handles insertion of context"""
@@ -236,12 +279,12 @@ core:
         if args:
             args_display += " "
             args_display += " ".join(args)
-        await self.channel.context.chat.add({"role": "user", "content": f"{cmd_prefix}{cmd[0]}{args_display}"}, temporary=use_temporary)
+        await self.channel.context.chat.add({"role": "user", "content": f"{cmd_prefix}{cmd[0]}{args_display}"}, ghost=use_temporary)
 
         result = await self._process_input(message)
 
         # insert command result into context, flagging as temporary if needed
-        await self.channel.context.chat.add({"role": "assistant", "content": f"[Command Output]:\n{result}"}, temporary=use_temporary)
+        await self.channel.context.chat.add({"role": "assistant", "content": f"[Command Output]:\n{result}"}, ghost=use_temporary)
 
         return result
 
@@ -386,23 +429,14 @@ core:
                 if not args:
                     return "please provide a name of the module to toggle"
 
-                import modules
-                module_manager = modules.modules.Modules(self.channel.manager)
-                found = False
-                for module in modules.get_all(respect_config=False):
-                    module_name = core.modules.get_name(module)
-                    if args[0].lower().strip() == module_name:
-                        found = True
+                module_name = args[0]
+                all_modules = core.config.get("modules", "enabled", default=[]) + core.config.get("modules", "disabled", default=[])
 
-                if not found:
+                if module_name not in all_modules:
                     return "module with that name doesn't exist"
 
-                await module_manager.toggle(args[0])
-                await self.channel.announce("module toggled")
-                await self.channel.announce("restarting to apply module change..", "error")
-                await asyncio.sleep(0.2)
-                await self.channel.manager.restart()
-                return
+                await self.channel.manager.toggle_module(module_name)
+                return "module toggled"
             case "tools":
                 if not core.config.get("model").get("use_tools", False):
                     return "tools are turned off"
@@ -426,31 +460,49 @@ core:
                 return "\n\n".join(tool_map_display)
             case "config":
                 if not args:
-                    return "Usage: /config <set|get> <path> [value]"
+                    return str(_get_config_value([]))
 
-                subcommand = args[0].lower()
+                # Determine if it's a SET or a GET using type detection during traversal
+                is_set = False
+                path_to_use = args
+                value_to_use = None
 
-                if subcommand == "set":
-                    # Expected: ['set', 'key1', 'key2', 'value']
-                    if len(args) < 3:
-                        return "Usage: /config set <key1> <key2> ... <value>"
+                if len(args) >= 1:
+                    if args[0].strip() in ("modules", "user_modules", "channels"):
+                        # automatically alias to `/config modules settings`
+                        args.insert(1, "settings")
 
-                    path = args[1:-1]
-                    value = args[-1]
-                    return str(_set_config_value(path, value))
-
-                elif subcommand == "get":
-                    # Expected: ['get', 'key1', 'key2']
-                    if len(args) < 2:
-                        return "Usage: /config get <key1> <key2> ..."
-
-                    path = args[1:]
-                    return str(_get_config_value(path))
-
+                current = core.config.config
+                for i, arg in enumerate(args):
+                    if arg in current:
+                        if isinstance(current[arg], dict):
+                            # It's a group. Continue traversing.
+                            current = current[arg]
+                        else:
+                            # It's a value.
+                            if i < len(args) - 1:
+                                # We hit a value but there are more args.
+                                # This means the user is trying to SET the value of this key.
+                                is_set = True
+                                path_to_use = args[:-1]
+                                value_to_use = args[-1]
+                                break
+                            else:
+                                # We reached the end of args and it's a value. This is a GET.
+                                break
+                    else:
+                        # Key not found. This must be a SET for a new key.
+                        is_set = True
+                        path_to_use = args[:-1]
+                        value_to_use = args[-1]
+                        break
+                
+                if is_set:
+                    return str(_set_config_value(path_to_use, value_to_use))
                 else:
-                    return f"Unknown subcommand '{subcommand}'. Use 'set' or 'get'."
+                    return str(_get_config_value(path_to_use))
 
-            case "context":
+            case "history":
                 """shows current context window"""
 
                 if not core.config.get("api").get("context_window", True):
@@ -462,19 +514,15 @@ core:
                 if not context:
                     return "BLANK"
 
-                if len(args) and args[0] == "raw":
-                    import json
-                    return json.dumps(context, indent=2)
-
                 context_display = []
 
                 for message in context:
-                    content = message.get("content")
-                    if not content:
-                        if message.get("tool_calls"):
-                            content = str(message.get("tool_calls"))
+                    if message.get("role") in ("tool", "developer"): continue
 
-                    context_display.append(f"== {message.get('role')} ==\n{content}")
+                    message_formatted = self.channel.format_message(message)
+
+                    content = message_formatted.get("content")
+                    context_display.append(f"== {message_formatted.get('role')} ==\n{content}")
 
                 context_display.append("---")
 
@@ -490,6 +538,11 @@ core:
                 context_display.append(f"== context size ==\n{ctx_string}")
 
                 return "\n\n".join(context_display)
+
+            case "context":
+                context = await self.channel.context.get(system_prompt=True)
+                import json
+                return json.dumps(context, indent=2)
 
             case "prompt":
                 """shows only the system prompt"""

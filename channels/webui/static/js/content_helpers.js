@@ -5,19 +5,37 @@
 /**
  * Extracts plain text from a message content payload.
  * Content can be a string or an array of objects (multimodal).
+ * @param {string|Array} content - The message content.
+ * @param {boolean} [multimodal=true] - If false, strips file/image markers and their content.
+ * @returns {string}
  */
-function extractTextContent(content) {
-    if (typeof content === 'string') return content;
+function extractTextContent(content, multimodal = true) {
+    if (typeof content === 'string') {
+        if (!multimodal) {
+            // Strip [File: name]
+            return content.replace(/^\[(File|Image): (.*?)\](([\s\S]*))?$/gm, '').trim();
+        }
+        return content;
+    }
     if (Array.isArray(content)) {
         return content
         .map(part => {
-            if (part.type === 'text') return part.text;
-            if (part.type === 'file') return `File: ${part.filename}`;
-            if (part.type === 'image_url') return `[Image]`;
+            if (part.type === 'text') {
+                const filePattern = /^\[(File|Image): (.*?)\](([\s\S]*))?$/;
+                    const match = part.text.match(filePattern);
+
+                    if (match) {
+                        if (!multimodal) return ''; // Skip file/image text parts entirely
+                        return `[${match[1]}: ${match[2]}]`; // Keep marker for multimodal
+                    }
+                    return part.text;
+            }
+            if (part.type === 'image_url' && multimodal) return `[Image]`;
+            if (part.type === 'file' && multimodal) return `File: ${part.filename}`;
             return '';
         })
         .filter(t => t.trim() !== '')
-        .join('\n');
+        .join('');
     }
     return '';
 }

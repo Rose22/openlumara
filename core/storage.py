@@ -55,7 +55,9 @@ class StorageList(list):
     def _write(self, content):
         try:
             write_mode = "wb" if self.binary else "w"
-            with open(self.path, write_mode) as f:
+            encoding = "utf-8" if not self.binary else None
+
+            with open(self.path, write_mode, encoding=encoding) as f:
                 f.write(content)
         except Exception as e:
             core.log("error", f"error writing {self.name}: {e}")
@@ -66,7 +68,8 @@ class StorageList(list):
         try:
             result = None
             read_mode = "rb" if self.binary else "r"
-            with open(self.path, read_mode) as f:
+            encoding = "utf-8" if not self.binary else None
+            with open(self.path, read_mode, encoding=encoding) as f:
                 result = f.read()
             return result
         except Exception as e:
@@ -170,7 +173,8 @@ class StorageDict(dict):
     def _write(self, content):
         try:
             write_mode = "wb" if self.binary else "w"
-            with open(self.path, write_mode) as f:
+            encoding = "utf-8" if not self.binary else None
+            with open(self.path, write_mode, encoding=encoding) as f:
                 f.write(content)
         except Exception as e:
             core.log("error", f"error writing {self.name}: {e}")
@@ -182,7 +186,8 @@ class StorageDict(dict):
         try:
             result = None
             read_mode = "rb" if self.binary else "r"
-            with open(self.path, read_mode) as f:
+            encoding = "utf-8" if not self.binary else None
+            with open(self.path, read_mode, encoding=encoding) as f:
                 result = f.read()
             return result
         except Exception as e:
@@ -239,7 +244,7 @@ class StorageDict(dict):
                     if not os.path.exists(file_dir):
                         os.makedirs(file_dir, exist_ok=True)
 
-                    with open(name, "w") as f:
+                    with open(name, "w", encoding="utf-8") as f:
                         f.write(content)
 
                 # remove files that were deleted
@@ -288,7 +293,7 @@ class StorageDict(dict):
                             rel_path = os.path.relpath(full_path, self.path)
                             key = rel_path[:-3]  # remove .md extension
 
-                            with open(full_path, "r") as f:
+                            with open(full_path, "r", encoding="utf-8") as f:
                                 flat_dict[key] = str(f.read())
 
                 # convert flat path keys to nested dict structure
@@ -340,7 +345,7 @@ class StorageText:
 
     def load(self):
         try:
-            with open(self.path, "r") as f:
+            with open(self.path, "r", encoding="utf-8") as f:
                 self._data = f.read()
         except Exception as e:
             core.log("error", f"error while loading text storage: {e}")
@@ -350,7 +355,7 @@ class StorageText:
         if TEMPORARY:
             return self
 
-        with open(self.path, "w") as f:
+        with open(self.path, "w", encoding="utf-8") as f:
             f.write(self._data)
 
         return self

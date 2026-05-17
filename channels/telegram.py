@@ -9,17 +9,14 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from telegram.error import BadRequest
 
 class Telegram(core.channel.Channel):
-    """
-    A Telegram channel with live streaming, command pass-through,
-    and pretty-printed tool call visualization.
-
-    Commands are processed immediately to allow /stop to interrupt streams.
-    Normal messages are queued to ensure sequential processing.
-    """
+    """Talk to your AI over Telegram"""
     running = False
 
     settings =  {
         "token": "TOKEN_HERE",
+        "use_message_streaming": True,
+        "stream_tool_calls": False,
+        "show_reasoning": False,
         "announce_startup": False,
         "announce_shutdown": False
     }
@@ -153,11 +150,36 @@ class Telegram(core.channel.Channel):
                 # Wait for a message from the queue
                 update, context = await self.message_queue.get()
 
-                # Process the message (this waits for the stream to finish)
-                await self._process_stream(update, context)
+                chat_id = update.effective_chat.id
+                user_msg = update.message.text.strip()
 
-                # Mark the task as done
-                self.message_queue.task_done()
+                # Start typing indicator before generating response
+                typing_task = asyncio.create_task(self._keep_typing(chat_id))
+
+                try:
+                    if self.config.get("use_message_streaming"):
+                        # Process the message (this waits for the stream to finish)
+                        await self._process_stream(update, context)
+                    else:
+                        response = await self.send({"role": "user", "content": user_msg})
+                        if response:
+                            content = response.get("content")
+                            if content:
+                                # send message to telegram
+                                await self._send_chunked_message(context.bot, chat_id, content)
+                except Exception as e:
+                    core.log("telegram", f"Error in queue worker processing: {e}")
+                finally:
+                    # Stop typing indicator
+                    if not typing_task.done():
+                        typing_task.cancel()
+                        try:
+                            await typing_task
+                        except asyncio.CancelledError:
+                            pass
+                    # Mark the task as done
+                    self.message_queue.task_done()
+
             except asyncio.CancelledError:
                 break
             except Exception as e:
@@ -174,66 +196,71 @@ class Telegram(core.channel.Channel):
         # 1. Start Typing Indicator
         typing_task = asyncio.create_task(self._keep_typing(chat_id))
 
-        message = None
-        last_edit_time = 0
-        tool_calls_display = []
-        response_buffer = []
-        shown_reasoning_text = False
+        # Pre-send a message like Discord does
+        initial_msg = await context.bot.send_message(chat_id, "processing your request...")
+
+        class StreamState:
+            def __init__(self, initial_msg):
+                self.message_obj = initial_msg
+                self.full_content = ""
+                self.is_running = True
+
+        state = StreamState(initial_msg)
+        edit_lock = asyncio.Lock()
+        edit_interval = 1.5
+
+        async def periodic_editor():
+            while state.is_running:
+                await asyncio.sleep(edit_interval)
+                async with edit_lock:
+                    if state.message_obj and state.full_content:
+                        try:
+                            await state.message_obj.edit_text(state.full_content[:4000])
+                        except Exception:
+                            pass
+
+        editor_task = asyncio.create_task(periodic_editor())
 
         try:
             # 2. Consume the stream
-            async for token in self.send_stream({"role": "user", "content": user_msg}):
-                t_type = token.get("type")
+            # Use a chunk size similar to Discord's MAX_CHARS
+            stream = self.format_stream_for_text(
+                self.send_stream({"role": "user", "content": user_msg}), 
+                use_markdown=False,
+                chunk_size=1900
+            )
+
+            async for token in stream:
+                if token.get("type") == "new_chunk":
+                    async with edit_lock:
+                        # Finalize current message
+                        if state.message_obj:
+                            try:
+                                await state.message_obj.edit_text(state.full_content[:4000])
+                            except: pass
+                        
+                        # Start new message
+                        state.message_obj = await context.bot.send_message(chat_id, "...")
+                        state.full_content = ""
+                    continue
+
                 content = token.get("content", "")
-                visual_buffer = None
+                if not content:
+                    continue
 
-                if t_type == "tool_calls":
-                    if content:
-                        if isinstance(content, list):
-                            for tool in content:
-                                tool_calls_display.append(self.tc_manager.display_call(tool))
-                        else:
-                            tool_calls_display.append(self.tc_manager.display_call(content))
-                elif t_type == "reasoning":
-                    if not shown_reasoning_text:
-                        visual_buffer = "thinking.."
-                        shown_reasoning_text = True
-                    else:
-                        continue
-                elif t_type in ["content", "error"]:
-                    response_buffer.append(content)
+                async with edit_lock:
+                    state.full_content += content
 
-                # 3. Construct the visual message
-                tools_text = "\n".join(tool_calls_display)
-                text_part = "".join(response_buffer)
-
-                if not visual_buffer:
-                    if tools_text and text_part:
-                        visual_buffer = f"{tools_text}\n\n{text_part}"
-                    else:
-
-                        visual_buffer = tools_text + text_part
-
-                # 4. Throttled Editing
-                now = time.time()
-                if visual_buffer:
-                    if message is None:
-                        message = await context.bot.send_message(chat_id, visual_buffer)
-                        last_edit_time = now
-                    elif now - last_edit_time > 1.5:
-                        try:
-                            await message.edit_text(visual_buffer[:4000])
-                            last_edit_time = now
-                        except BadRequest:
-                            pass
-
-            # 5. Finalize
-            if message:
-                try:
-                    await message.edit_text(visual_buffer[:4000])
-                except: pass
-            elif visual_buffer:
-                await context.bot.send_message(chat_id, visual_buffer)
+            # 3. Finalize
+            async with edit_lock:
+                if state.message_obj:
+                    try:
+                        await state.message_obj.edit_text(state.full_content[:4000])
+                    except: pass
+                elif state.full_content:
+                    try:
+                        await context.bot.send_message(chat_id, state.full_content[:4000])
+                    except: pass
 
         except Exception as e:
             core.log("telegram", f"Error processing stream: {e}")
@@ -242,6 +269,12 @@ class Telegram(core.channel.Channel):
             except:
                 pass
         finally:
+            state.is_running = False
+            editor_task.cancel()
+            try:
+                await editor_task
+            except asyncio.CancelledError:
+                pass
             if not typing_task.done():
                 typing_task.cancel()
                 try:
@@ -262,28 +295,65 @@ class Telegram(core.channel.Channel):
     async def _send_telegram_message(self, text: str):
         if not self.authorized_chat_id or not self.app:
             return
-        try:
-            await self.app.bot.send_message(self.authorized_chat_id, text, parse_mode="Markdown")
-        except Exception:
+        await self._send_chunked_message(self.app.bot, self.authorized_chat_id, text)
+
+    async def _send_chunked_message(self, bot, chat_id, text):
+        """Sends a message to Telegram, splitting it into chunks if it's too long."""
+        if not text:
+            return
+
+        max_length = 4000
+        
+        if len(text) <= max_length:
             try:
-                await self.app.bot.send_message(self.authorized_chat_id, text)
-            except Exception as e:
-                core.log("telegram", f"Failed to send message: {e}")
+                await bot.send_message(chat_id, text, parse_mode="Markdown")
+            except Exception:
+                try:
+                    await bot.send_message(chat_id, text)
+                except Exception as e:
+                    core.log("telegram", f"Failed to send message: {e}")
+            return
 
-    async def _announce(self, message: str, type: str = None):
-        if not type:
-            type = "info"
+        chunks = []
+        while text:
+            if len(text) <= max_length:
+                chunks.append(text)
+                break
+            
+            # Try to split at a newline or space within the limit
+            split_idx = text.rfind('\n', 0, max_length)
+            if split_idx == -1:
+                split_idx = text.rfind(' ', 0, max_length)
+            if split_idx == -1:
+                split_idx = max_length
+            
+            chunks.append(text[:split_idx].strip())
+            text = text[split_idx:].strip()
 
-        core.log("telegram", f"[{type}] {message}")
+        for chunk in chunks:
+            if not chunk:
+                continue
+            try:
+                await bot.send_message(chat_id, chunk, parse_mode="Markdown")
+            except Exception:
+                try:
+                    await bot.send_message(chat_id, chunk)
+                except Exception as e:
+                    core.log("telegram", f"Failed to send chunk: {e}")
+
+    async def on_push(self, message: dict):
+        content = message.get("content")
+
+        core.log("telegram", content)
 
         if self.authorized_chat_id and self.app:
-            emoji_map = {
-                "error": "🚨",
-                "warning": "⚠️",
-                "status": "ℹ️",
-                "info": "💬"
-            }
-            emoji = emoji_map.get(type, "🔔")
-            safe_msg = message.replace("*", "").replace("_", "")
-            text = f"{emoji} *{type.upper()}:* {safe_msg}"
-            asyncio.create_task(self._send_telegram_message(text))
+            # emoji_map = {
+            #     "error": "🚨",
+            #     "warning": "⚠️",
+            #     "status": "ℹ️",
+            #     "info": "💬"
+            # }
+            # emoji = emoji_map.get(type, "🔔")
+            # safe_msg = content.replace("*", "").replace("_", "")
+            # text = f"{emoji} *{type.upper()}:* {safe_msg}"
+            asyncio.create_task(self._send_telegram_message(content))

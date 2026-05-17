@@ -3,6 +3,8 @@ import ulid
 import datetime
 import os
 
+import tiktoken
+
 class Chat:
     DEFAULT_DATA = {
         "title": "",
@@ -19,6 +21,8 @@ class Chat:
         self.current = None
         self.current_save_path = os.path.join(core.get_data_path(), f"{self.channel.name}_current_chat")
         self.using_api_token_data = False # gets instantly set to True upon first receive of token usage data
+        self.token_encoding = None
+        self.model_name = None
 
         for index in range(len(self.data) - 1, -1, -1):
             chat = self.data[index]
@@ -254,6 +258,7 @@ class Chat:
             return None
 
         return self.data[self.current].get("messages", [])
+
     async def get_id(self):
         if self.current is None:
             return None
@@ -269,130 +274,63 @@ class Chat:
         await self.save()
         return True
 
-    async def add(self, message: dict, temporary = False):
+    async def add(self, message: dict, ghost = False):
         """add message to current chat"""
         if self.current is None:
             await self.new()
 
+        # make a copy so we don't modify the original reference
+        new_message = message.copy()
+
+        # ensure message does not exceed token limits
+        max_tokens = int(core.config.get("api").get("max_context", 8192))
+        
+        # create a potential new message list to check token count
+        current_messages = self.data[self.current].get("messages", [])
+        potential_messages = list(current_messages)
+
+        potential_messages.append(new_message)
+        
+        # calculate tokens for this potential list
+        new_token_count = await self.count_tokens(messages=potential_messages)
+
+        if new_token_count > max_tokens:
+            await self.channel.push(f"Your request exceeds the token limit! It was {new_token_count} out of {max_tokens} tokens.")
+            return False
+
         if not self.data[self.current]["title"].strip():
             # auto-set title
-            msg_content = self.channel._extract_content(message)
+            msg_content = self.channel._extract_content(new_message)
             if isinstance(msg_content, str):
                 self.data[self.current]["title"] = msg_content[:100]+".." if len(msg_content) > 100 else msg_content
             else:
                 # this happens when the user uploads a media file. don't set that as a title, lol
                 pass
 
-        # if temporary, set the flag. gets handled in self.trim()
-        if temporary:
-            message["temporary"] = True
+        # if marked as a ghost message, set the flag. gets handled in self.trim()
+        # ghost messages are invisible to the AI
+        if ghost:
+            new_message["ghost"] = True
 
-        await self.trim() # automatically trim chat history
-        await self._insert_blank_user_msg(message)
-        self.data[self.current]["messages"].append(message)
+        self.data[self.current]["messages"].append(new_message)
+
         index = len(self.data[self.current]["messages"]) - 1
-
         await self.save()
-        return index
+        return True
 
     async def pop(self, index: int = None):
         """pop message from current chat"""
         if self.current is None:
             await self.new()
 
+        if index is None:
+            index = -1
+
         self.data[self.current]["messages"].pop(index)
         index = len(self.data[self.current]["messages"]) - 1
         await self.save()
+
         return index
-
-    async def trim(self, max_messages: int = None, max_tokens: int = None, num_tokens: int = None):
-        """trims chat history to keep token consumption low"""
-        if not max_messages:
-            max_messages = int(core.config.get("api").get("max_messages", 200))
-        if not max_tokens:
-            max_tokens = int(core.config.get("api").get("max_context", 8192))
-
-        messages = await self.get()
-        if not messages:
-            return True  # no messages to trim
-
-        # get rid of temporary messages first
-        for index, msg in enumerate(messages):
-            if msg.get("temporary"):
-                await self.pop(index)
-
-        # re-fetch messages after removing temporary ones
-        messages = await self.get()
-        if not messages:
-            return True
-
-        # Calculate current token count if not provided
-        if num_tokens is None:
-            num_tokens = await self.get_token_usage()
-
-        # Leave a small buffer (5%) to avoid hitting exact limit
-        token_buffer = max_tokens * 0.05
-        effective_max_tokens = max_tokens - token_buffer
-
-        # Check if we need to trim
-        needs_trimming = False
-        if len(messages) > max_messages:
-            needs_trimming = True
-        elif num_tokens > effective_max_tokens:
-            needs_trimming = True
-
-        if not needs_trimming:
-            return True
-
-        # Track if we had to trim due to token limit
-        trimmed_due_to_tokens = num_tokens > effective_max_tokens
-        trimmed_due_to_messages = len(messages) > max_messages
-
-        # Trim messages until we're under limits
-        while messages and (len(messages) > max_messages or num_tokens > effective_max_tokens):
-            # Remove the oldest message
-            await self.pop(0)
-
-            # Update messages and token count
-            messages = await self.get()
-            if not messages:
-                # All messages removed - this shouldn't happen unless single message exceeds limit
-                break
-
-            num_tokens = await self.count_tokens()
-
-        # Check if we still have a problem after trimming
-        if messages:
-            num_tokens = await self.count_tokens()
-            if num_tokens > max_tokens:
-                # Even after trimming all but current message, we're over limit
-                # This means the current message itself is too large
-                await self.channel.announce(
-                    "Your request exceeds the maximum token limit. Please send a smaller message!",
-                    "error"
-                )
-                return False
-
-        return True
-
-    async def _insert_blank_user_msg(self, message: dict):
-        messages = await self.get()
-
-        if (
-            # if we have anything at all in the messages array
-            messages and
-            # and the last message was an assistant message
-            messages[-1].get("role") == "assistant" and
-            # and the message we're about to post is an assistant message
-            message.get("role") == "assistant"
-        ):
-            # according to openAI spec, consecutive assistant messages
-            # are not allowed. so we enforce it here
-
-            # assistants are allowed to output after a tool role message
-            # but not after their own message..
-            await self.add({"role": "user", "content": "[SYSTEM_TICK]"})
-        return True
 
     async def get_token_usage(self):
         """
@@ -409,64 +347,73 @@ class Chat:
         self.data[self.current]["token_usage"] = usage
         self.data.save()
 
+    def _count_text_tokens(self, text: str) -> int:
+        """Helper to encode text using tiktoken or fallback to character heuristic"""
+        if not text:
+            return 0
+
+        if self.token_encoding:
+            try:
+                return len(self.token_encoding.encode(text))
+            except Exception:
+                # Fallback if encoding specifically fails
+                return len(text) // 4
+        else:
+            # Fallback: 1 token is roughly 4 characters for most English text
+            return len(text) // 4
+
     async def count_tokens(self, messages: list = None):
         """
-        Counts token usage locally using tiktoken
+        Counts token usage locally using tiktoken (with fallback)
         """
-
-        import tiktoken
-
-        # Get the model name from the API client
-        model_name = None
-        if hasattr(self.channel, 'manager') and hasattr(self.channel.manager, 'API'):
-            model_name = self.channel.manager.API._model
-
-        encoding = None
-        try:
-            # Try to get the specific tokenizer for the model (e.g. gpt-4)
-            if model_name:
-                encoding = tiktoken.encoding_for_model(model_name)
-        except (KeyError, ValueError):
-            # Fallback for unknown/custom models
-            pass
-
-        if not encoding:
-            # Final fallback to cl100k_base (used by GPT-4, Claude, etc.)
-            encoding = tiktoken.get_encoding("cl100k_base")
-
         num_tokens = 0
         _messages = messages or await self.channel.context.get(system_prompt=True, end_prompt=True)
         if not _messages:
             return 0
 
+        # only set the tiktoken encoder if the model changed
+        # model name changes when connecting for the first time
+        # or when swapping models
+        model_name = self.channel.manager.API.get_model()
+        if model_name != self.model_name:
+            self.model_name = model_name
+
+            try:
+                self.token_encoding = tiktoken.encoding_for_model(model_name)
+            except KeyError:
+                self.token_encoding = tiktoken.get_encoding("cl100k_base")
+            except Exception as e:
+                # If tiktoken fails to load (e.g. no internet and no cache), we set to None
+                # _count_text_tokens then uses a character-based fallback
+                self.token_encoding = None
+                core.log_error("[TIKTOKEN] Falling back on character-based token counting.", e)
+                pass
+
         for message in _messages:
             # Conservative token counting:
             # - 3 tokens for message overhead (OpenAI format: <im_start>role\ncontent<im_end>\n)
-            # - Role is counted as part of content
-            # - This is simpler and less likely to overcount than more complex formulas
-
             num_tokens += 3
 
             # Count content
             if "content" in message:
                 content = message["content"]
                 if isinstance(content, str):
-                    num_tokens += len(encoding.encode(content))
+                    num_tokens += self._count_text_tokens(content)
                 elif isinstance(content, list):
                     # if its multimodal, skip all non-text content because we filter that out when using context.get()
                     for part in content:
                         if isinstance(part, dict):
                             part_text = part.get("text")
                             if isinstance(part_text, str):
-                                num_tokens += len(encoding.encode(part_text))
+                                num_tokens += self._count_text_tokens(part_text)
 
             # If there's a name, add it (it's part of the message)
             if "name" in message and isinstance(message["name"], str):
-                num_tokens += len(encoding.encode(message["name"]))
+                num_tokens += self._count_text_tokens(message["name"])
 
             # Count reasoning content if present
             if "reasoning_content" in message and isinstance(message["reasoning_content"], str):
-                num_tokens += len(encoding.encode(message["reasoning_content"]))
+                num_tokens += self._count_text_tokens(message["reasoning_content"])
 
         # Add 1 token for final assistant priming (conservative)
         num_tokens += 1

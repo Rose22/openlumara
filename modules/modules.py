@@ -1,40 +1,50 @@
 import core
 
 class Modules(core.module.Module):
-    """Lets your AI turn modules on/off. Caution! This can be bad for security."""
+    """Helps your AI manage your modules"""
 
-    unsafe = True
+    settings = {
+        "insert_system_prompt": {
+            "description": "Whether to insert the list of enabled/disabled modules into the system prompt. Will make the AI aware of what modules are enabled/disabled at all times.",
+            "default": True
+        },
+        "allow_ai_to_toggle": {
+            "description": "Allow your AI to enable/disable modules for you. WARNING: very insecure and unsafe when used in public instances! Only use for private instances, and even then, keep the dangers of prompt injection in mind.",
+            "default": False,
+            "unsafe": True
+        }
+    }
+
+    async def on_startup(self):
+        if not self.config.get("allow_ai_to_toggle"):
+            self.disabled_tools.append("toggle")
 
     async def on_system_prompt(self):
         module_list = {
-            "enabled": ", ".join(core.config.get("modules", "enabled", [])),
-            "disabled": ", ".join(core.config.get("modules", "disabled", []))
+            "enabled": ", ".join(core.config.get("modules", "enabled", default=[])),
+            "disabled": ", ".join(core.config.get("modules", "disabled", default=[]))
         }
         return str(module_list)
 
     async def toggle(self, name: str):
-        if name.lower().strip() == "modules":
-            return "module manager can only be manually turned off by editing the config file. you need to know what you're doing!"
+        if not self.config.get("allow_ai_to_toggle"):
+            return self.result("Module toggling is disabled for security. Ask user to manually toggle the module via the web ui or `/config` or by editing the config file.")
 
         module_name = name.lower().strip()
+        if name == "modules":
+            return "module manager can only be manually turned off by using the settings dialog, the `/module` command, or editing the config file. user needs to know what you're doing!"
 
-        is_enabled = module_name in core.config.config.get("modules", "enabled", [])
-        is_disabled = module_name in core.config.config.get("modules", "disabled", [])
-
-        if not is_enabled and not is_disabled:
-            return "module not found"
-
-        if is_enabled:
-            core.config.config["modules"]["enabled"].remove(module_name)
-            core.config.config["modules"]["disabled"].append(module_name)
+        if await self.manager.toggle_module(name):
+            return self.result("Module has been toggled. Remind user to use `/restart` to apply changes")
         else:
-            core.config.config["modules"]["disabled"].remove(module_name)
-            core.config.config["modules"]["enabled"].append(module_name)
+            return self.result("That module does not exist!", success=false)
 
-        core.config.config.save()
+    async def get_help(self, module_name: str):
+        """Returns documentation for any given module. Use this if user wants to know how to set up or use a specific module. Prefer over docs_read() for module questions."""
 
-        if is_enabled:
-            return "module has been disabled. remind user to use /restart to apply changes."
-        else:
-            return "module has been enabled. remind user to use /restart to apply changes."
+        structure = core.config.get_module_structure()
 
+        if module_name not in structure:
+            return self.result("That module does not exist", success=False)
+
+        return structure.get(module_name)
