@@ -415,7 +415,6 @@ const TypewriterAudioManager = {
         }, 0);
     },
 
-
     playProcessingSound: function() {
         if (localStorage.getItem(`processingEnabled`) !== 'true') {
             return;
@@ -437,7 +436,7 @@ const TypewriterAudioManager = {
 
             this.processingSound = {
                 stop: () => {
-                    source.stop(); // Stop immediately
+                    try { source.stop(); } catch(e) {} // Stop immediately
                     this.processingSound = null;
                 }
             };
@@ -468,11 +467,23 @@ const TypewriterAudioManager = {
 
             // Single frequency
             const baseFrequency = 196.00;
+
+            // --- TRACK START TIME ---
+            this.processingStartTime = ctx.currentTime;
             let isPlaying = true;
 
             const playSoftTone = () => {
                 if (!isPlaying) return;
 
+                // Check if total processing time is less than 0.5s
+                const elapsed = ctx.currentTime - this.processingStartTime;
+                if (elapsed < 0.5) {
+                    // Wait and check again (prevents playing sound for very short requests)
+                    this.toneTimer = setTimeout(playSoftTone, 100);
+                    return;
+                }
+
+                // --- PLAY THE TONE ---
                 const osc = ctx.createOscillator();
                 const gain = ctx.createGain();
 
@@ -493,12 +504,12 @@ const TypewriterAudioManager = {
                 osc.start(now);
                 osc.stop(now + 1.5);
 
-                // Fixed 2 second delay
+                // Fixed 2 second delay for the next tone
                 const delay = 2000;
                 this.toneTimer = setTimeout(playSoftTone, delay);
             };
 
-            // Start the first tone
+            // Start the first tone (it will internally wait if < 0.2s elapsed)
             playSoftTone();
 
             // Cleanup function
@@ -509,10 +520,8 @@ const TypewriterAudioManager = {
                     this.processingSound = null;
                 }
             };
-
         }
     },
-
 
     stopProcessingSound: function() {
         if (this.processingSound) {
