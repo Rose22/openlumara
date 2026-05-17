@@ -336,6 +336,7 @@
     width: 44px;
     height: 24px;
     cursor: pointer;
+    flex-shrink: 0;
 }
 
 /* Hide the default checkbox */
@@ -397,6 +398,37 @@
     display: flex;
     gap: 12px;
     align-items: center;
+}
+
+/* Sound Toggle Wrapper - ensure proper alignment */
+.sound-footer .setting-toggle-wrapper {
+    gap: 10px;
+}
+
+.sound-footer .setting-toggle-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+/* Sound toggle - match module toggle sizing */
+.sound-footer .toggle-switch {
+    width: 36px;
+    height: 20px;
+}
+
+.sound-footer .toggle-slider {
+    border-radius: 20px;
+}
+
+.sound-footer .toggle-slider::before {
+    width: 14px;
+    height: 14px;
+    left: 3px;
+    bottom: 3px;
+}
+
+.sound-footer .toggle-switch input:checked + .toggle-slider::before {
+    transform: translateX(16px);
 }
 
 .setting-toggle-label {
@@ -1927,58 +1959,12 @@
     width: 100%;
 }
 
-.sound-toggle {
+/* Sound Footer - contains toggle and action buttons */
+.sound-footer {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin-left: auto;
-    cursor: pointer;
-}
-
-.sound-toggle input[type="checkbox"] {
-    display: none;
-}
-
-.sound-toggle .toggle-slider {
-    position: relative;
-    width: 36px;
-    height: 20px;
-    background-color: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 20px;
-    transition: all 0.2s ease;
-}
-
-.sound-toggle .toggle-slider::before {
-    content: '';
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    width: 14px;
-    height: 14px;
-    background-color: var(--text-muted);
-    border-radius: 50%;
-    transition: all 0.2s ease;
-}
-
-.sound-toggle:hover .toggle-slider {
-    border-color: var(--accent);
-}
-
-.sound-toggle input:checked + .toggle-slider {
-    background-color: var(--accent);
-    border-color: var(--accent);
-}
-
-.sound-toggle input:checked + .toggle-slider::before {
-    transform: translateX(16px);
-    background-color: white;
-}
-
-.sound-toggle .toggle-label {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    user-select: none;
+    justify-content: space-between;
+    gap: 12px;
 }
 
 .sound-icon {

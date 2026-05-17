@@ -285,7 +285,6 @@ async function send(providedContent = null) {
     isDataStreaming = true;
     currentController = new AbortController();
 
-    const soundEnabled = localStorage.getItem("streamingSoundEnabled") === 'true';
     let playedCompletionSound = false;
 
     // Play send message sound
@@ -482,8 +481,8 @@ async function send(providedContent = null) {
                             streamStarted = true;
 
                             // Play response start sound
-                            TypewriterAudioManager.stopProcessingSound();
                             TypewriterAudioManager.play('response_start');
+                            TypewriterAudioManager.stopProcessingSound();
 
                             // Hide fancy indicator and restore typing indicator
                             if (fancyProcessingIndicator) {
@@ -522,13 +521,14 @@ async function send(providedContent = null) {
                     if (data.type === 'reasoning') {
                         const token = data.content || '';
                         if (token) {
+                            TypewriterAudioManager.stopProcessingSound();
+
                             if (!streamStarted) {
                                 removePlaceholder();
                                 startStreamingUI(aiWrapper, typing);
                                 streamStarted = true;
 
                                 // Play response start sound
-                                TypewriterAudioManager.stopProcessingSound();
                                 TypewriterAudioManager.play('response_start');
 
                                 // Hide fancy indicator and restore typing indicator
@@ -568,17 +568,24 @@ async function send(providedContent = null) {
                         }
                         ensureToolCallsSegment();
                         handleToolCallDelta(data, aiMsgDiv, aiWrapper);
+
+                        // Play sound on every token if streaming sound is enabled AND typewriter mode is OFF
+                        if (!useTypewriter && token.trim() !== '') {
+                            TypewriterAudioManager.play('token');
+                        }
                     }
 
                     // Tool response
                     if (data.type === 'tool') {
                         handleToolResponse(data, aiMsgDiv);
+                        TypewriterAudioManager.playProcessingSound();
                     }
 
                     // Complete tool calls
                     if (data.type === 'tool_calls') {
                         const toolCalls = data.content || [];
                         finalizeStreamingToolCalls(toolCalls, aiMsgDiv);
+                        TypewriterAudioManager.stopProcessingSound();
                     }
 
                     // Token usage updates (from API)
@@ -1147,6 +1154,8 @@ async function stopGeneration(sent_from_command = false) {
 
     // Finalize all content segments so nothing is hidden
     finalizeAllContent();
+
+    TypewriterAudioManager.stopProcessingSound();
 
     // Sync UI
     await syncMessages();
