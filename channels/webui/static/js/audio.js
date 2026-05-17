@@ -2,6 +2,17 @@
 // Typewriter Audio Manager (IndexedDB + Web Audio API)
 // =============================================================================
 
+const SOUND_DEFAULTS = {
+    send_message: true,
+    response_start: true,
+    processing: false,
+    token: false,
+    typing: true,
+    reasoning_end: false,
+    completion: true,
+    typewriter: false
+};
+
 const TypewriterAudioManager = {
     db: null,
     audioContext: null,
@@ -9,6 +20,7 @@ const TypewriterAudioManager = {
     buffers: {
         send_message: null,
         response_start: null,
+        processing: null,
         typewriter: null,
         typing: null,
         token: null,
@@ -74,7 +86,11 @@ const TypewriterAudioManager = {
             });
         };
 
-        await Promise.all([load('send_message'), load('response_start'), load('typewriter'), load('typing'), load('token'), load('completion'), load('reasoning_end')]);
+        await Promise.all([
+            load('send_message'), load('response_start'), load('typewriter'),
+            load('typing'), load('token'), load('completion'), load('reasoning_end'),
+            load('processing')
+        ]);
     },
 
     getAudioContext: function() {
@@ -109,15 +125,18 @@ const TypewriterAudioManager = {
                 try {
                     const arrayBuffer = e.target.result;
 
-                    // 1. Save to IndexedDB
-                    const transaction = this.db.transaction(['sounds'], 'readwrite');
-                    const store = transaction.objectStore('sounds');
-                    store.put({ id: id, data: arrayBuffer });
+                    // Wait for the indexeddb save to actually complete
+                    const putPromise = new Promise((innerResolve, innerReject) => {
+                        const tx = this.db.transaction(['sounds'], 'readwrite');
+                        const store = tx.objectStore('sounds');
+                        const req = store.put({ id, data: arrayBuffer });
+                        req.onsuccess = () => innerResolve();
+                        req.onerror = () => innerReject(req.error);
+                    });
+                    await putPromise;
 
-                    // 2. Decode and cache in memory immediately
-                    const buffer = await this.getAudioContext().decodeAudioData(arrayBuffer);
-                    this.buffers[id] = buffer;
-
+                    // decodeaudiodata is synchronous, so no await needed
+                    this.buffers[id] = this.getAudioContext().decodeAudioData(arrayBuffer);
                     resolve(true);
                 } catch (err) {
                     console.error('Error saving audio file:', err);
@@ -127,6 +146,7 @@ const TypewriterAudioManager = {
             reader.readAsArrayBuffer(file);
         });
     },
+
 
     // Delete a file from IndexedDB
     deleteFile: function(id) {
@@ -160,12 +180,36 @@ const TypewriterAudioManager = {
         });
     },
 
+    // Resume the AudioContext immediately (fixes mobile autoplay policies)
+    resumeContext: function() {
+        const ctx = this.getAudioContext();
+        if (ctx && ctx.state === 'suspended') {
+            ctx.resume().catch(() => {});
+        }
+    },
+
     // Play the sound asynchronously to avoid UI blocking
     play: function(id) {
-        // Check if the specific sound type is NOT explicitly enabled
-        if (localStorage.getItem(`${id}Enabled`) !== 'true') {
-            return;
+        // ── Check Storage or Fallback to Built-in Defaults ──
+        let isEnabled = true;
+        try {
+            if (typeof localStorage !== 'undefined') {
+                const stored = localStorage.getItem(`${id}Enabled`);
+                if (stored !== null) {
+                    isEnabled = stored === 'true';
+                } else {
+                    // If storage is empty/failed, use the built-in default
+                    isEnabled = SOUND_DEFAULTS[id] !== false;
+                }
+            }
+        } catch (e) {
+            isEnabled = SOUND_DEFAULTS[id] !== false;
         }
+
+        if (!isEnabled) return;
+
+        // ── Critical: Resume context synchronously on user gesture ──
+        this.resumeContext();
 
         // ── Typing suppression during reasoning chime ──
         if ((id === 'typing' || id === 'typewriter') && this.isReasoningPlaying) {
@@ -177,7 +221,6 @@ const TypewriterAudioManager = {
 
         if (!buffer) {
             const ctx = this.getAudioContext();
-            if (ctx.state === 'suspended') ctx.resume().catch(() => {});
 
             const configs = {
                 send_message:    { freq: 220,  dur: 0.25 },
@@ -243,7 +286,8 @@ const TypewriterAudioManager = {
             };
 
             if (id === 'token') {
-                const tokenFreq = Number(localStorage.getItem('tokenFreq')) || 9000;
+                const tokenFreq = Number(localStorage.getItem('tokenFreq')) || 400;
+                const tokenVol = parseFloat(localStorage.getItem('tokenVolume')) || 0.6; // New independent volume setting
                 ctx.resume();
 
                 const osc1 = ctx.createOscillator();
@@ -255,11 +299,12 @@ const TypewriterAudioManager = {
                 osc1.frequency.value = tokenFreq * 0.83; // ~7500hz base
                 osc2.frequency.value = (tokenFreq * 0.83) * 1.02; // slightly detuned chime
 
-                // smooth exponential envelope with safe UI volume
+                // smooth exponential envelope with safe UI volume scaled by tokenVolume
+                const peakVol = 0.025 * tokenVol;
                 gain.gain.setValueAtTime(0, t);
-                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.003);
-                gain.gain.exponentialRampToValueAtTime(0.15, t + 0.005);   // peak volume
-                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.080);  // smooth fade out
+                gain.gain.exponentialRampToValueAtTime(0.0005, t + 0.003);
+                gain.gain.exponentialRampToValueAtTime(peakVol, t + 0.005);   // peak volume scaled by independent setting
+                gain.gain.exponentialRampToValueAtTime(0.0005, t + 0.080);  // smooth fade out
 
 
                 osc1.connect(gain);
@@ -351,15 +396,11 @@ const TypewriterAudioManager = {
 
         // Use setTimeout(..., 0) to push execution to the next event loop tick.
         // This ensures the audio logic does not block the typewriter animation frame.
+        // Note: ctx.resume() is handled synchronously at the top of this function
+        // and via global click listeners to comply with mobile browser autoplay policies.
         setTimeout(() => {
             try {
                 const ctx = this.getAudioContext();
-
-                // Resume context if suspended (browser autoplay policy)
-                if (ctx.state === 'suspended') {
-                    ctx.resume().catch(() => {});
-                }
-
                 const source = ctx.createBufferSource();
                 source.buffer = buffer;
 
@@ -372,10 +413,127 @@ const TypewriterAudioManager = {
                 console.warn('Error playing sound:', e);
             }
         }, 0);
-    }
+    },
+
+
+    playProcessingSound: function() {
+        if (localStorage.getItem(`processingEnabled`) !== 'true') {
+            return;
+        }
+
+        // Stop any sound currently playing immediately
+        if (this.processingSound) this.stopProcessingSound();
+
+        // Synchronously resume context for mobile compatibility
+        this.resumeContext();
+
+        if (this.buffers['processing']) {
+            // --- PLAY SOUND FILE ---
+            const ctx = this.getAudioContext();
+            const source = ctx.createBufferSource();
+            source.buffer = this.buffers['processing']; // Use your loaded file
+            source.connect(this.masterGainNode);
+            source.start();
+
+            this.processingSound = {
+                stop: () => {
+                    source.stop(); // Stop immediately
+                    this.processingSound = null;
+                }
+            };
+        } else {
+            // --- FALLBACK TO SYNTH (Optional) ---
+            // Plays soft, intermittent waiting tones
+            const ctx = this.getAudioContext();
+            const convolver = ctx.createConvolver();
+            const masterFilter = ctx.createBiquadFilter();
+
+            // Create atmospheric reverb
+            const rate = ctx.sampleRate;
+            const length = rate * 1.2;
+            const impulse = ctx.createBuffer(2, length, rate);
+            const dataL = impulse.getChannelData(0);
+            const dataR = impulse.getChannelData(1);
+            for (let i = 0; i < length; i++) {
+                const decay = Math.pow(1 - i / length, 2.5) * Math.sin((i / length) * Math.PI);
+                dataL[i] = (Math.random() * 2 - 1) * decay;
+                dataR[i] = (Math.random() * 2 - 1) * decay;
+            }
+            convolver.buffer = impulse;
+
+            // Filter to soften the tones
+            masterFilter.type = 'lowpass';
+            masterFilter.frequency.value = 1200;
+            masterFilter.Q.value = 0.5;
+
+            // Single frequency
+            const baseFrequency = 196.00;
+            let isPlaying = true;
+
+            const playSoftTone = () => {
+                if (!isPlaying) return;
+
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.value = baseFrequency;
+
+                // Soft attack and release (shorter than delay for clean separation)
+                const now = ctx.currentTime;
+                gain.gain.setValueAtTime(0, now);
+                gain.gain.linearRampToValueAtTime(0.12, now + 0.05);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
+
+                osc.connect(gain);
+                gain.connect(masterFilter);
+                masterFilter.connect(convolver);
+                convolver.connect(this.masterGainNode);
+
+                osc.start(now);
+                osc.stop(now + 1.5);
+
+                // Fixed 2 second delay
+                const delay = 2000;
+                this.toneTimer = setTimeout(playSoftTone, delay);
+            };
+
+            // Start the first tone
+            playSoftTone();
+
+            // Cleanup function
+            this.processingSound = {
+                stop: () => {
+                    isPlaying = false;
+                    if (this.toneTimer) clearTimeout(this.toneTimer);
+                    this.processingSound = null;
+                }
+            };
+
+        }
+    },
+
+
+    stopProcessingSound: function() {
+        if (this.processingSound) {
+            this.processingSound.stop();
+        }
+    },
 };
 
 // Initialize on load
 document.addEventListener('DOMContentLoaded', () => {
     TypewriterAudioManager.init().catch(e => console.warn('AudioManager failed to init', e));
 });
+
+// Global listeners to resume AudioContext on any user interaction (fixes mobile autoplay policies)
+// Attaching to window ensures they work even if user interacts before DOMContentLoaded
+(function attachGlobalListeners() {
+    const resumeAudio = () => {
+        if (window.TypewriterAudioManager) {
+            window.TypewriterAudioManager.resumeContext();
+        }
+    };
+    document.addEventListener('click', resumeAudio, true);
+    document.addEventListener('touchstart', resumeAudio, true);
+})();

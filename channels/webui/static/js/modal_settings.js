@@ -2614,6 +2614,51 @@ function createThemeSection() {
 
     audioControls.appendChild(volumeRow);
 
+    // === SEPARATE TOKEN GENERATION VOLUME SLIDER ===
+    const tokenVolumeRow = document.createElement('div');
+    tokenVolumeRow.className = 'slider-row';
+
+    const savedTokenVolume = Math.round((parseFloat(localStorage.getItem('tokenVolume') || '0.6')) * 100);
+
+    tokenVolumeRow.innerHTML = `
+    <div class="slider-header">
+    <span class="slider-label">Token Generation Volume</span>
+    <span class="slider-value" id="token-volume-value">${savedTokenVolume}%</span>
+    </div>
+    <div class="slider-track-wrapper">
+    <div class="slider-track">
+    <input type="range" class="slider-input" id="token-volume-slider"
+    min="0" max="100" value="${savedTokenVolume}">
+    <div class="slider-fill" id="token-volume-fill" style="width: ${savedTokenVolume}%"></div>
+    <div class="slider-handle" id="token-volume-handle" style="left: ${savedTokenVolume}%"></div>
+    </div>
+    <div class="slider-labels">
+    <span>Mute</span>
+    <span>Max</span>
+    </div>
+    </div>
+    `;
+
+    const tokenVolumeSlider = tokenVolumeRow.querySelector('#token-volume-slider');
+    const tokenVolumeDisplay = tokenVolumeRow.querySelector('#token-volume-value');
+    const tokenVolumeFill = tokenVolumeRow.querySelector('#token-volume-fill');
+    const tokenVolumeHandle = tokenVolumeRow.querySelector('#token-volume-handle');
+
+    tokenVolumeSlider.addEventListener('input', function() {
+        const val = parseInt(this.value);
+        tokenVolumeDisplay.textContent = `${val}%`;
+        tokenVolumeFill.style.width = `${val}%`;
+        tokenVolumeHandle.style.left = `${val}%`;
+        localStorage.setItem('tokenVolume', val / 100);
+        
+        // Update manager if it supports specific sound volume
+        if (typeof TypewriterAudioManager !== 'undefined' && TypewriterAudioManager.setTokenVolume) {
+            TypewriterAudioManager.setTokenVolume(val / 100);
+        }
+    });
+
+    audioControls.appendChild(tokenVolumeRow);
+
     // Sound File Inputs
     const soundContainer = document.createElement('div');
     soundContainer.className = 'sound-inputs-container';
@@ -2629,9 +2674,36 @@ function createThemeSection() {
     };
 
     const createSoundInput = (id, labelText, iconPath) => {
-        const savedName = localStorage.getItem(`${id}SoundName`);
-        const hasAudio = isAudioLoaded(id);
-        const isEnabled = localStorage.getItem(`${id}Enabled`) === 'true'; // Default to false
+        // ── Safe Defaults Check ──
+        let isEnabled = true;
+        try {
+            if (typeof localStorage !== 'undefined') {
+                const stored = localStorage.getItem(`${id}Enabled`);
+                if (stored !== null) {
+                    isEnabled = stored === 'true';
+                } else {
+                    // Fallback to built-in defaults if storage is missing
+                    isEnabled = (typeof SOUND_DEFAULTS !== 'undefined' && SOUND_DEFAULTS[id] !== false);
+                }
+            }
+        } catch (e) {
+            console.warn(`[Settings] Storage unavailable for ${id}, using defaults.`);
+        }
+
+        // ── Safe Audio Check ──
+        let hasAudio = false;
+        try {
+            if (typeof TypewriterAudioManager !== 'undefined') {
+                hasAudio = !!TypewriterAudioManager.buffers?.[id];
+                if (!hasAudio && typeof localStorage !== 'undefined') {
+                    hasAudio = !!localStorage.getItem(`${id}SoundData`);
+                }
+            }
+        } catch (e) {
+            console.warn(`[Settings] Audio manager unavailable.`);
+        }
+
+        const savedName = typeof localStorage !== 'undefined' ? localStorage.getItem(`${id}SoundName`) : null;
 
         const container = document.createElement('div');
         container.className = 'sound-input-card';
@@ -2648,11 +2720,14 @@ function createThemeSection() {
         <span class="sound-label">${labelText}</span>
         <span class="sound-filename ${hasAudio ? 'loaded' : ''}" id="${id}-filename">${savedName || 'Using generated sound'}</span>
         </div>
-        <label class="sound-toggle">
-        <span class="toggle-label">Enabled</span>
+        </div>
+        <div class="sound-footer">
+        <div class="setting-toggle-wrapper">
+        <label class="toggle-switch">
         <input type="checkbox" id="${id}-enabled-checkbox" ${isEnabled ? 'checked' : ''}>
         <span class="toggle-slider"></span>
         </label>
+        <span class="setting-toggle-label">Enabled</span>
         </div>
         <div class="sound-actions">
         <button type="button" class="sound-action-btn preview" id="${id}-preview-btn" title="Preview sound" ${!hasAudio ? 'disabled' : ''}>
@@ -2674,6 +2749,7 @@ function createThemeSection() {
         </svg>
         </button>
         </div>
+        </div>
         <input type="file" accept="audio/*" id="${id}-file-input" style="position: absolute; left: -9999px; top: auto; width: 1px; height: 1px; overflow: hidden;">
         `;
 
@@ -2683,38 +2759,22 @@ function createThemeSection() {
         const fileInput = container.querySelector(`#${id}-file-input`);
         const filenameDisplay = container.querySelector(`#${id}-filename`);
 
-        // Pre-load audio from localStorage if available
-        // FIX: Defer loading to prevent UI lag
-        if (hasAudio && !TypewriterAudioManager.buffers?.[id]) {
-            const savedData = localStorage.getItem(`${id}SoundData`);
-            if (savedData) {
-                // Defer to next tick to avoid blocking main thread
-                setTimeout(() => {
-                    try {
-                        TypewriterAudioManager.loadFromDataURL(id, savedData).catch(err => {
-                            console.warn('Failed to preload audio:', err);
-                        });
-                    } catch (err) {
-                        console.warn('Failed to preload audio:', err);
-                    }
-                }, 0);
-            }
-        }
-
+        // ── Safe Event Handlers ──
         uploadBtn.addEventListener('click', () => fileInput.click());
 
         fileInput.addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (!file) return;
-
             try {
-                await TypewriterAudioManager.saveFile(id, file);
-                localStorage.setItem(`${id}SoundName`, file.name);
-                filenameDisplay.textContent = file.name;
-                filenameDisplay.classList.add('loaded');
-                filenameDisplay.classList.remove('error');
-                previewBtn.disabled = false;
-                clearBtn.disabled = false;
+                if (typeof TypewriterAudioManager !== 'undefined' && typeof TypewriterAudioManager.saveFile === 'function') {
+                    await TypewriterAudioManager.saveFile(id, file);
+                    if (typeof localStorage !== 'undefined') localStorage.setItem(`${id}SoundName`, file.name);
+                    filenameDisplay.textContent = file.name;
+                    filenameDisplay.classList.add('loaded');
+                    filenameDisplay.classList.remove('error');
+                    previewBtn.disabled = false;
+                    clearBtn.disabled = false;
+                }
             } catch (err) {
                 console.error('Failed to load audio:', err);
                 filenameDisplay.textContent = 'Error loading file';
@@ -2728,30 +2788,43 @@ function createThemeSection() {
         });
 
         previewBtn.addEventListener('click', () => {
-            // Try to play the sound
-            TypewriterAudioManager.play(id);
-            previewBtn.classList.add('playing');
-            setTimeout(() => previewBtn.classList.remove('playing'), 500);
+            try {
+                if (typeof TypewriterAudioManager !== 'undefined' && typeof TypewriterAudioManager.play === 'function') {
+                    TypewriterAudioManager.play(id);
+                    previewBtn.classList.add('playing');
+                    setTimeout(() => previewBtn.classList.remove('playing'), 500);
+                }
+            } catch (e) { console.warn('Play failed:', e); }
         });
 
         clearBtn.addEventListener('click', () => {
-            TypewriterAudioManager.deleteFile(id);
-            localStorage.removeItem(`${id}SoundName`);
-            filenameDisplay.textContent = 'No file selected';
-            filenameDisplay.classList.remove('loaded');
-            previewBtn.disabled = true;
-            clearBtn.disabled = true;
-            fileInput.value = '';
+            try {
+                if (typeof TypewriterAudioManager !== 'undefined' && typeof TypewriterAudioManager.deleteFile === 'function') {
+                    TypewriterAudioManager.deleteFile(id);
+                }
+                if (typeof localStorage !== 'undefined') localStorage.removeItem(`${id}SoundName`);
+                filenameDisplay.textContent = 'No file selected';
+                filenameDisplay.classList.remove('loaded');
+                previewBtn.disabled = true;
+                clearBtn.disabled = true;
+                fileInput.value = '';
+            } catch (e) { console.warn('Clear failed:', e); }
         });
 
-        // Toggle event listener
-        const enabledCheckbox = container.querySelector(`#${id}-enabled-checkbox`);
+        enabledCheckbox = container.querySelector(`#${id}-enabled-checkbox`);
         enabledCheckbox.addEventListener('change', function() {
-            localStorage.setItem(`${id}Enabled`, this.checked ? 'true' : 'false');
+            const newState = this.checked;
+            try {
+                if (typeof localStorage !== 'undefined') {
+                    localStorage.setItem(`${id}Enabled`, String(newState));
+                }
+            } catch (e) { console.warn(`[Settings] Failed to save ${id}Enabled:`, e); }
         });
 
         return container;
     };
+
+
 
     const typewriterIcon = '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>';
     const completionIcon = '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>';
@@ -2769,6 +2842,13 @@ function createThemeSection() {
         typewriterIcon
     );
     soundContainer.appendChild(responseSoundInput);
+
+    const processingSoundInput = createSoundInput(
+        'processing',
+        'Prompt processing',
+        typewriterIcon
+    );
+    soundContainer.appendChild(processingSoundInput);
 
     const tokenSoundInput = createSoundInput(
         'token',
