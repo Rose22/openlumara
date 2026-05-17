@@ -443,55 +443,73 @@ const TypewriterAudioManager = {
             };
         } else {
             // --- FALLBACK TO SYNTH (Optional) ---
-            // Only runs if you haven't loaded a file yet
+            // Plays soft, intermittent waiting tones
             const ctx = this.getAudioContext();
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            const lpf = ctx.createBiquadFilter();
             const convolver = ctx.createConvolver();
-            const lfo = ctx.createOscillator();
-            const lfoGain = ctx.createGain();
+            const masterFilter = ctx.createBiquadFilter();
 
-            osc.type = 'sine';
-            osc.frequency.value = 120;
-            lpf.type = 'lowpass';
-            lpf.frequency.value = 900;
-
+            // Create atmospheric reverb
             const rate = ctx.sampleRate;
-            const length = rate * 1.5;
+            const length = rate * 1.2;
             const impulse = ctx.createBuffer(2, length, rate);
             const dataL = impulse.getChannelData(0);
             const dataR = impulse.getChannelData(1);
             for (let i = 0; i < length; i++) {
-                const decay = Math.pow(1 - i / length, 3);
+                const decay = Math.pow(1 - i / length, 2.5) * Math.sin((i / length) * Math.PI);
                 dataL[i] = (Math.random() * 2 - 1) * decay;
                 dataR[i] = (Math.random() * 2 - 1) * decay;
             }
             convolver.buffer = impulse;
 
-            gain.gain.value = 0;
-            gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 0.3);
+            // Filter to soften the tones
+            masterFilter.type = 'lowpass';
+            masterFilter.frequency.value = 1200;
+            masterFilter.Q.value = 0.5;
 
-            lfo.frequency.value = 0.4;
-            lfoGain.gain.value = 0.1;
+            // Single frequency
+            const baseFrequency = 196.00;
+            let isPlaying = true;
 
-            lfo.connect(lfoGain);
-            lfoGain.connect(gain.gain);
-            lfo.start();
+            const playSoftTone = () => {
+                if (!isPlaying) return;
 
-            osc.connect(lpf);
-            lpf.connect(convolver);
-            convolver.connect(gain);
-            gain.connect(this.masterGainNode);
-            osc.start();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
 
+                osc.type = 'sine';
+                osc.frequency.value = baseFrequency;
+
+                // Soft attack and release (shorter than delay for clean separation)
+                const now = ctx.currentTime;
+                gain.gain.setValueAtTime(0, now);
+                gain.gain.linearRampToValueAtTime(0.12, now + 0.05);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
+
+                osc.connect(gain);
+                gain.connect(masterFilter);
+                masterFilter.connect(convolver);
+                convolver.connect(this.masterGainNode);
+
+                osc.start(now);
+                osc.stop(now + 1.5);
+
+                // Fixed 2 second delay
+                const delay = 2000;
+                this.toneTimer = setTimeout(playSoftTone, delay);
+            };
+
+            // Start the first tone
+            playSoftTone();
+
+            // Cleanup function
             this.processingSound = {
                 stop: () => {
-                    gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.3);
-                    setTimeout(() => { osc.stop(); lfo.stop(); }, 300);
+                    isPlaying = false;
+                    if (this.toneTimer) clearTimeout(this.toneTimer);
                     this.processingSound = null;
                 }
             };
+
         }
     },
 
