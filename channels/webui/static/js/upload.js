@@ -227,6 +227,12 @@ async function handleFileUpload(event) {
 
         window.updateUploadQueueUI();
         scrollToBottom();
+
+        const fileInput = document.getElementById('file-input');
+        if (fileInput) {
+            fileInput.value = '';
+        }
+
         inputField.focus();
     } catch (err) {
         console.error('Failed to process uploaded files:', err);
