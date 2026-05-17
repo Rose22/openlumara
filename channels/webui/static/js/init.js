@@ -104,8 +104,11 @@ async function init() {
         function connectWebSocket() {
             // Determine protocol (ws:// or wss://)
             const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
-
+            const pathname = `${window.location.pathname || '/'}`;
+            const pathBase = pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
+            const wsPath = `${pathBase === '' ? '' : pathBase}/ws`;
+            const wsUrl = `${wsProtocol}//${window.location.host}${wsPath}`;
+            
             socket = new WebSocket(wsUrl);
             window.socket = socket; // Make socket globally accessible for send.js etc.
 
