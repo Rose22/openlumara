@@ -2,6 +2,8 @@ import datetime
 import asyncio
 import core
 import ulid
+import re
+
 
 class Scheduler(core.module.Module):
     """Lets your AI perform actions on your behalf at specified times! Supports recurring actions."""
@@ -11,70 +13,144 @@ class Scheduler(core.module.Module):
             "description": "Whether to insert a list of all currently scheduled jobs in the system prompt. This will make your AI aware of upcoming scheduled jobs at all times!",
             "default": True
         },
+        "prompt_strategy": {
+            "type": "select",
+            "default": "minimize tokens",
+            "options": {
+                "minimize tokens": "Token-efficient, sends only the scheduled instruction. Drastically reduces token use and cost, but may induce prompt reprocessing due to context switching.",
+                "send full context": "Sends the entire context window + the scheduled instruction. This makes many API's use the prompt cache to prevent reprocessing, but it will also send your entire history along with the scheduled instructions, which is a lot of tokens."
+            }
+        },
         "allow_recurring_jobs": True
     }
 
     async def on_ready(self, *args, **kwargs):
-        """Initialize storage, manager, and schedule existing jobs."""
+        """Initialize storage, start dispatcher, and schedule existing jobs."""
         self.schedule = core.storage.StorageList("schedule", type="json")
 
-        # Map of job_id -> asyncio.TimerHandle
-        self.scheduled_handles = {}
+        # Event used to signal the dispatcher that the schedule has changed
+        self._reschedule_event = asyncio.Event()
 
-        # Load persisted jobs and schedule them
-        for job in list(self.schedule):
-            self._schedule_job(job)
+        # The single dispatcher task
+        self._dispatcher_task = asyncio.create_task(self._dispatcher_loop())
 
-    # ---------------------------------------------------------
-    # Scheduling Logic
-    # ---------------------------------------------------------
-
-    def _schedule_job(self, job: dict) -> None:
-        """
-        Schedules a job to run at its trigger_time using asyncio.call_later.
-        If a handle already exists for this job, it is cancelled and replaced.
-        """
-        job_id = job.get("id")
-
-        # Cancel existing handle if present (prevents duplicates on edit/restart)
-        if job_id in self.scheduled_handles:
-            self.scheduled_handles[job_id].cancel()
-            del self.scheduled_handles[job_id]
-
-        try:
-            trigger_time = datetime.datetime.fromisoformat(job.get("trigger_time", ""))
-        except (ValueError, TypeError):
-            core.log("scheduler", f"invalid trigger_time for job {job_id}")
-            return
-
-        now = datetime.datetime.now()
-        delay = (trigger_time - now).total_seconds()
-
-        if delay <= 0:
-            # Run immediately if due
-            asyncio.create_task(self._job_wrapper(job))
-        else:
+    async def on_unload(self, *args, **kwargs):
+        """Clean up the dispatcher task on module unload."""
+        if hasattr(self, '_dispatcher_task') and self._dispatcher_task:
+            self._dispatcher_task.cancel()
             try:
-                loop = asyncio.get_running_loop()
-                handle = loop.call_later(delay, lambda: asyncio.create_task(self._job_wrapper(job)))
-                self.scheduled_handles[job_id] = handle
+                await self._dispatcher_task
+            except asyncio.CancelledError:
+                pass
+
+    # ---------------------------------------------------------
+    # Dispatcher (Single Task Architecture)
+    # ---------------------------------------------------------
+
+    async def _dispatcher_loop(self):
+        """Single loop that sleeps until the next job is due, then executes it."""
+        while True:
+            try:
+                next_job, delay = self._get_next_due_job()
+
+                if next_job is None:
+                    # No jobs scheduled; wait for a signal that the schedule changed
+                    self._reschedule_event.clear()
+                    await self._reschedule_event.wait()
+                    self._reschedule_event.clear()
+                    continue
+
+                if delay <= 0:
+                    # Job is overdue — handle it
+                    job_id = next_job.get("id")
+                    idx = self._get_index(job_id)
+                    if idx == -1:
+                        continue
+
+                    job = self.schedule[idx]
+
+                    if job.get("recurring"):
+                        # Advance recurring job to future without executing missed instances
+                        self._advance_recurring_to_future(job)
+                        core.log("scheduler", f"advanced missed recurring job {job_id} to next future time")
+                    else:
+                        # Overdue one-time job: execute immediately
+                        await self._job_wrapper(job)
+                    continue
+
+                # Wait until the job is due or until the schedule changes
+                self._reschedule_event.clear()
+                try:
+                    await asyncio.wait_for(
+                        self._reschedule_event.wait(),
+                        timeout=delay
+                    )
+                    # Event was set — schedule changed, restart loop
+                    self._reschedule_event.clear()
+                    continue
+                except asyncio.TimeoutError:
+                    # Timer expired — time to execute the job
+                    pass
+
+                # Re-fetch job from storage (might have been edited/removed)
+                job_id = next_job.get("id")
+                idx = self._get_index(job_id)
+                if idx == -1:
+                    continue
+
+                job = self.schedule[idx]
+                await self._job_wrapper(job)
+
+            except asyncio.CancelledError:
+                raise
             except Exception as e:
-                core.log_error(f"[SCHEDULER] error scheduling job {job_id}", e)
+                core.log_error("[SCHEDULER] error in dispatcher loop", e)
+                # Brief sleep to avoid tight error loops
+                await asyncio.sleep(5)
+
+    def _get_next_due_job(self):
+        """
+        Returns (job_dict, delay_seconds) for the job with the earliest trigger_time.
+        Returns (None, None) if no jobs are scheduled.
+        """
+        now = datetime.datetime.now()
+        earliest_job = None
+        earliest_delay = None
+
+        for job in self.schedule:
+            try:
+                trigger_time = datetime.datetime.fromisoformat(job.get("trigger_time", ""))
+            except (ValueError, TypeError):
+                continue
+
+            delay = (trigger_time - now).total_seconds()
+
+            if earliest_delay is None or delay < earliest_delay:
+                earliest_delay = delay
+                earliest_job = job
+
+        return earliest_job, earliest_delay
+
+    def _signal_reschedule(self):
+        """Signal the dispatcher to re-evaluate the schedule."""
+        self._reschedule_event.set()
+
+    # ---------------------------------------------------------
+    # Job Execution
+    # ---------------------------------------------------------
 
     async def _job_wrapper(self, job: dict) -> None:
         """Executes the job and handles cleanup or recurrence."""
         job_id = job.get("id")
-
-        # Clear the handle reference since it has fired
-        if job_id in self.scheduled_handles:
-            del self.scheduled_handles[job_id]
+        if not job_id:
+            return
 
         try:
             await self._execute_job(job)
 
-            # Check if the job still exists in storage before rescheduling.
-            # If remove_job was called during execution, this index will be -1.
-            if self._get_index(job_id) == -1:
+            # Check if the job still exists in storage (might have been removed during execution)
+            idx = self._get_index(job_id)
+            if idx == -1:
                 return
 
             if job.get("recurring"):
@@ -82,7 +158,7 @@ class Scheduler(core.module.Module):
                 idx = self._get_index(job_id)
                 if idx >= 0:
                     current_job = self.schedule[idx]
-                    self._reschedule_job(current_job)
+                    self._reschedule_recurring_job(current_job)
             else:
                 # One-time job: remove from storage
                 self._remove_job_from_storage(job_id)
@@ -90,22 +166,81 @@ class Scheduler(core.module.Module):
         except Exception as e:
             core.log_error(f"[SCHEDULER] error executing job {job_id}", e)
 
-    def _reschedule_job(self, job: dict) -> None:
-        """Updates a recurring job's time in-place and reschedules it."""
+    def _reschedule_recurring_job(self, job: dict) -> None:
+        """Updates a recurring job's trigger_time to the next future occurrence."""
         recur = job.get("recurs_in", {})
-        next_time = self._calculate_next_trigger(recur)
 
-        if next_time:
-            # Update the trigger time on the existing object
-            job["trigger_time"] = next_time.isoformat()
+        # Calculate next time based on the current trigger_time (not now)
+        # This preserves cadence
+        try:
+            current_trigger = datetime.datetime.fromisoformat(job.get("trigger_time", ""))
+        except (ValueError, TypeError):
+            current_trigger = datetime.datetime.now()
 
-            # Persist changes
+        next_time = self._calculate_next_from(current_trigger, recur)
+
+        if next_time is None:
+            core.log("scheduler", f"could not reschedule recurring job {job.get('id')}: invalid interval")
+            return
+
+        # If next_time is still in the past, advance until it's in the future
+        now = datetime.datetime.now()
+        max_iterations = 10000
+        iteration = 0
+        while next_time <= now and iteration < max_iterations:
+            next_time = self._calculate_next_from(next_time, recur)
+            if next_time is None:
+                core.log("scheduler", f"could not reschedule recurring job {job.get('id')}: invalid interval")
+                return
+            iteration += 1
+
+        if next_time <= now:
+            core.log("scheduler", f"could not advance job {job.get('id')} to future after {max_iterations} iterations")
+            return
+
+        # Update the trigger time in storage
+        idx = self._get_index(job.get("id"))
+        if idx >= 0:
+            self.schedule[idx]["trigger_time"] = next_time.isoformat()
             self.schedule.save()
 
-            # Re-schedule with asyncio
-            self._schedule_job(job)
-        else:
-            core.log("scheduler", f"could not reschedule recurring job {job.get('id')}: invalid interval")
+        # Signal dispatcher to pick up the new time
+        self._signal_reschedule()
+
+    def _advance_recurring_to_future(self, job: dict) -> None:
+        """Advance a recurring job's trigger_time until it's in the future (without executing)."""
+        recur = job.get("recurs_in", {})
+
+        try:
+            current_trigger = datetime.datetime.fromisoformat(job.get("trigger_time", ""))
+        except (ValueError, TypeError):
+            current_trigger = datetime.datetime.now()
+
+        now = datetime.datetime.now()
+        next_time = current_trigger
+        max_iterations = 10000
+        iteration = 0
+
+        while next_time <= now and iteration < max_iterations:
+            candidate = self._calculate_next_from(next_time, recur)
+            if candidate is None:
+                core.log("scheduler", f"could not advance job {job.get('id')}: invalid interval")
+                return
+            next_time = candidate
+            iteration += 1
+
+        if next_time <= now:
+            core.log("scheduler", f"could not advance job {job.get('id')} to future after {max_iterations} iterations")
+            return
+
+        # Update in storage
+        idx = self._get_index(job.get("id"))
+        if idx >= 0:
+            self.schedule[idx]["trigger_time"] = next_time.isoformat()
+            self.schedule.save()
+
+        # Signal dispatcher
+        self._signal_reschedule()
 
     def _remove_job_from_storage(self, job_id: str) -> None:
         """Removes a job from storage list."""
@@ -113,13 +248,14 @@ class Scheduler(core.module.Module):
         if idx >= 0:
             self.schedule.pop(idx)
             self.schedule.save()
+        self._signal_reschedule()
 
     # ---------------------------------------------------------
     # Execution
     # ---------------------------------------------------------
 
     async def _execute_job(self, job: dict) -> None:
-        """Performs the actual action of the job."""
+        """Performs the actual action of the job using a private context copy."""
         job_id = job.get("id")
 
         # Determine the target channel for this job
@@ -129,11 +265,10 @@ class Scheduler(core.module.Module):
             job_channel = self.channel
 
         if job_channel is None:
-            core.log("scheduler", f"error executing job {job_id}: no channel available for tool calls")
+            core.log("scheduler", f"error executing job {job_id}: no channel available")
             return
 
-        # Ensure context is available
-        if job_channel is None or not hasattr(job_channel, 'context') or job_channel.context is None:
+        if not hasattr(job_channel, 'context') or job_channel.context is None:
             core.log("scheduler", f"error executing job {job_id}: channel has no valid context")
             return
 
@@ -143,10 +278,18 @@ class Scheduler(core.module.Module):
             if not t.get("function", {}).get("name", "").startswith("scheduler_")
         ]
 
+        use_token_efficient = True
+        if self.config.get("prompt_strategy") == "send full context":
+            use_token_efficient = False
+
+        instr_role = "system"
+        if not use_token_efficient:
+            instr_role = "developer" if job_channel.manager.API.supports_developer_role else "user"
+
         action = job.get("action")
 
-        event_message = {
-            "role": "developer" if job_channel.manager.API.supports_developer_role else "user",
+        instruction_message = {
+            "role": instr_role,
             "content": (
                 "[AUTOMATED SYSTEM INSTRUCTION]\n"
                 "Please follow these instructions:\n\n"
@@ -155,77 +298,95 @@ class Scheduler(core.module.Module):
             )
         }
 
-        await job_channel.context.chat.add(event_message)
+        instruction_message_pure = {
+            "role": "system",
+            "content": action
+        }
 
-        response = await self.manager.API.send(
-            await job_channel.context.get(end_prompt=False),
-            use_tools=True,
-            tools=tools
-        )
+        # Retry loop with exponential backoff
+        max_retries = 10
+        base_delay = 5  # seconds
+        max_delay = 300  # 5 minutes cap
+        response = None
 
-        # erase the automated instruction from history
-        for i, msg in enumerate(await job_channel.context.chat.get()):
-            if msg.get("content") == event_message["content"] and msg.get("role") == event_message["role"]:
-                await job_channel.context.chat.pop(i)
-                break
+        while True:
+            try:
+                # Build a fresh private copy each attempt (context may have changed)
+                base_messages = await job_channel.context.get(end_prompt=False)
+                private_messages = list(base_messages) + [instruction_message]
 
-        if not response:
-            return
+                # allow a choice between sending full context or sending only the instruction
+                final_messages = [instruction_message_pure] if use_token_efficient else private_messages
 
+                response = await self.manager.API.send(
+                    final_messages,
+                    use_tools=True,
+                    tools=tools
+                )
+
+                if response:
+                    break  # Success
+
+                # response is None/empty — treat as transient failure
+                core.log("scheduler", f"job {job_id}: empty response on attempt {attempt + 1}/{max_retries}")
+
+            except Exception as e:
+                core.log("scheduler", f"job {job_id}: attempt {attempt + 1}/{max_retries} failed: {e}")
+
+            # Don't sleep after the last attempt
+            if attempt < max_retries - 1:
+                delay = min(base_delay * (2 ** attempt), max_delay)
+                core.log("scheduler", f"job {job_id}: retrying in {delay}s")
+                await asyncio.sleep(delay)
+
+        # Process response
         final_content = response.get("content", "")
         tool_calls = response.get("tool_calls")
 
         if tool_calls and job_channel:
             tool_content_list = []
-            async for token in job_channel.tc_manager.process(
-                response,
-                push=True
-            ):
+            async for token in job_channel.tc_manager.process(response, push=True):
                 if token.get("type") == "content":
                     tool_content_list.append(token.get("content", ""))
             tool_content = "".join(tool_content_list)
             if tool_content:
-                if final_content:
-                    final_content += "\n" + tool_content
-                else:
-                    final_content = tool_content
+                final_content = f"{final_content}\n{tool_content}".strip()
         elif tool_calls:
-            core.log("scheduler", f"error executing job {job_id}: tool calls found but job_channel is invalid")
+            core.log("scheduler", f"error executing job {job_id}: tool calls found but no valid channel")
             return
 
-        if final_content:
+        if final_content and job_channel:
             try:
-                if job_channel:
-                    # first push
-                    await job_channel.push(final_content)
-
-                    # then add to context
-                    await job_channel.context.chat.add({"role": "assistant", "content": final_content})
-                elif self.channel:
-                    # first push
-                    await self.channel.push(final_content)
-
-                    # then add to context
-                    await self.channel.context.chat.add({"role": "assistant", "content": final_content})
+                await job_channel.push(final_content)
+                await job_channel.context.chat.add({"role": "assistant", "content": final_content})
             except Exception as e:
                 core.log_error(f"[SCHEDULER] error announcing job {job_id} result", e)
-
 
     # ---------------------------------------------------------
     # Time Calculations
     # ---------------------------------------------------------
 
     def _calculate_next_trigger(self, recur: dict) -> datetime.datetime:
-        """Calculates the next trigger datetime based on recurrence dict."""
-        now = datetime.datetime.now()
+        """Calculates the next trigger datetime from now based on recurrence dict."""
+        return self._calculate_next_from(datetime.datetime.now(), recur)
 
-        # MODE 1: Specific Clock Time (e.g., "10am daily")
+    def _calculate_next_from(self, base: datetime.datetime, recur: dict) -> datetime.datetime:
+        """
+        Calculate the next trigger time strictly after `base`.
+        Supports two modes:
+          1. Specific clock time (target_hour set)
+          2. Relative delta (weeks/days/hours/minutes/seconds)
+        """
+        if recur is None:
+            return None
+
+        # MODE 1: Specific Clock Time
         if recur.get("target_hour") is not None:
             target_hour = recur["target_hour"]
             target_minute = recur.get("target_minute", 0)
             target_second = recur.get("target_second", 0)
 
-            candidate = now.replace(
+            candidate = base.replace(
                 hour=target_hour,
                 minute=target_minute,
                 second=target_second,
@@ -233,31 +394,26 @@ class Scheduler(core.module.Module):
             )
 
             if recur.get("target_weekday") is not None:
-                # Specific day of week (e.g., "Mondays")
                 target_weekday = recur["target_weekday"]
-                # Calculate days until target weekday
-                days_until = (target_weekday - now.weekday()) % 7
-                # If it's today but time has passed, go to next week
-                if days_until == 0 and candidate <= now:
+                days_until = (target_weekday - candidate.weekday()) % 7
+                if days_until == 0 and candidate <= base:
                     days_until = 7
                 candidate += datetime.timedelta(days=days_until)
 
             elif recur.get("weekdays_only"):
-                # Weekdays only (Mon-Fri)
-                # If candidate is on weekend OR time has passed today, advance to next weekday
-                if candidate.weekday() >= 5 or candidate <= now:
-                    candidate = self._advance_to_next_weekday(candidate)
+                if candidate <= base:
+                    candidate += datetime.timedelta(days=1)
+                while candidate.weekday() >= 5:
+                    candidate += datetime.timedelta(days=1)
 
             else:
-                # Daily interval
-                interval_days = recur.get("days", 1)
-                # If time has passed today, advance by interval
-                if candidate <= now:
+                interval_days = recur.get("days", 0) or 1
+                if candidate <= base:
                     candidate += datetime.timedelta(days=interval_days)
 
             return candidate
 
-        # MODE 2: Relative Delta (e.g., "in 5 minutes")
+        # MODE 2: Relative Delta
         delta = datetime.timedelta(
             weeks=recur.get("weeks", 0),
             days=recur.get("days", 0),
@@ -269,23 +425,18 @@ class Scheduler(core.module.Module):
         if delta.total_seconds() == 0:
             return None
 
-        return now + delta
-
-    def _advance_to_next_weekday(self, candidate: datetime.datetime) -> datetime.datetime:
-        """Advances datetime to next valid weekday (Mon-Fri)."""
-        candidate += datetime.timedelta(days=1)
-        while candidate.weekday() >= 5:
-            candidate += datetime.timedelta(days=1)
-        return candidate
+        return base + delta
 
     # ---------------------------------------------------------
     # Helpers
     # ---------------------------------------------------------
 
     def _get_index(self, job_id: str) -> int:
-        """Finds the index of a job by ID."""
+        """Finds the index of a job by ID. Returns -1 if not found."""
+        if job_id is None:
+            return -1
         for index, job in enumerate(self.schedule):
-            if job_id == str(job.get("id")):
+            if str(job.get("id", "")) == str(job_id):
                 return index
         return -1
 
@@ -312,7 +463,8 @@ class Scheduler(core.module.Module):
             minute = recur.get("target_minute", 0)
             period = "AM" if hour < 12 else "PM"
             h = hour if hour <= 12 else hour - 12
-            if hour == 0: h = 12
+            if hour == 0:
+                h = 12
             time_str = f"{h}:{minute:02d} {period}"
 
             if recur.get("target_weekday") is not None:
@@ -334,13 +486,19 @@ class Scheduler(core.module.Module):
             delta = trigger_dt - datetime.datetime.now()
             total_seconds = int(delta.total_seconds())
 
+            if total_seconds < 0:
+                return "one-time, overdue"
+
             h, rem = divmod(total_seconds, 3600)
             m, s = divmod(rem, 60)
 
             parts = []
-            if h > 0: parts.append(f"{h} hour{'s' if h != 1 else ''}")
-            if m > 0: parts.append(f"{m} minute{'s' if m != 1 else ''}")
-            if s > 0 or not parts: parts.append(f"{s} second{'s' if s != 1 else ''}")
+            if h > 0:
+                parts.append(f"{h} hour{'s' if h != 1 else ''}")
+            if m > 0:
+                parts.append(f"{m} minute{'s' if m != 1 else ''}")
+            if s > 0 or not parts:
+                parts.append(f"{s} second{'s' if s != 1 else ''}")
 
             return f"one-time, {', '.join(parts)} from now"
         except (ValueError, TypeError):
@@ -372,26 +530,32 @@ class Scheduler(core.module.Module):
         weekdays_only: bool = False,
         recurring: bool = False,
     ):
-        """Adds a scheduled job. MODE 1 - RELATIVE TIME: Use relative_duration (e.g., '2d 4h 30m'). MODE 2 - SPECIFIC CLOCK TIME: Use target_time (e.g., '14:30'). Optionally set target_weekday (0=Monday) or weekdays_only=True. Action is what action should be performed at the scheduled time. Action is an instruction/prompt for the AI to follow, so write it in second person form."""
+        """Adds a scheduled job. MODE 1 - RELATIVE TIME: Use relative_duration (e.g., '2d 4h 30m'). MODE 2 - SPECIFIC CLOCK TIME: Use target_time (e.g., '14:30'). Optionally set target_weekday (0=Monday) or weekdays_only=True. Action is what action should be performed at the scheduled time. Action is an instruction/prompt for the AI to follow, so write it in second person form. Use the word 'user' to refer to the user."""
         if recurring and not self.config.get("allow_recurring_jobs"):
-            return self.result("Error: Recurring scheduler jobs are disabled by security policy. Please inform the user.", success=False)
+            return self.result(
+                "Error: Recurring scheduler jobs are disabled by security policy. Please inform the user.",
+                success=False
+            )
 
-        import re
-        
         weeks = days = hours = minutes = seconds = 0
         target_hour = target_minute = target_second = None
-        
+
         # Parse relative_duration (e.g., "2d 4h")
         if relative_duration:
             pattern = r'(\d+)\s*([wdhms])'
             matches = re.findall(pattern, relative_duration)
             for val, unit in matches:
                 val = int(val)
-                if unit == 'w': weeks = val
-                elif unit == 'd': days = val
-                elif unit == 'h': hours = val
-                elif unit == 'm': minutes = val
-                elif unit == 's': seconds = val
+                if unit == 'w':
+                    weeks = val
+                elif unit == 'd':
+                    days = val
+                elif unit == 'h':
+                    hours = val
+                elif unit == 'm':
+                    minutes = val
+                elif unit == 's':
+                    seconds = val
 
         # Parse target_time (e.g., "14:30:00")
         if target_time:
@@ -402,28 +566,33 @@ class Scheduler(core.module.Module):
                     target_minute = int(parts[1])
                     if len(parts) == 3:
                         target_second = int(parts[2])
-                    
-                    # Validate time values
-                    if target_hour < 0 or target_hour > 23:
+
+                    if not (0 <= target_hour <= 23):
                         return self.result("error: hour must be between 0 and 23", False)
-                    if target_minute < 0 or target_minute > 59:
+                    if not (0 <= target_minute <= 59):
                         return self.result("error: minute must be between 0 and 59", False)
-                    if target_second is not None and (target_second < 0 or target_second > 59):
+                    if target_second is not None and not (0 <= target_second <= 59):
                         return self.result("error: second must be between 0 and 59", False)
                 except ValueError:
                     return self.result("error: invalid time format, use HH:MM or HH:MM:SS", False)
+            else:
+                return self.result("error: invalid time format, use HH:MM or HH:MM:SS", False)
 
         # Validate target_weekday
-        if target_weekday is not None and (target_weekday < 0 or target_weekday > 6):
+        if target_weekday is not None and not (0 <= target_weekday <= 6):
             return self.result("error: target_weekday must be between 0 (Monday) and 6 (Sunday)", False)
 
         try:
-            # Build recurrence dict - only include target_hour if it's not None
+            # Build recurrence dict
             recur = {
-                "weeks": weeks, "days": days, "hours": hours, "minutes": minutes, "seconds": seconds,
-                "target_weekday": target_weekday, "weekdays_only": weekdays_only
+                "weeks": weeks,
+                "days": days,
+                "hours": hours,
+                "minutes": minutes,
+                "seconds": seconds,
+                "target_weekday": target_weekday,
+                "weekdays_only": weekdays_only
             }
-            # Only add time fields if they have values
             if target_hour is not None:
                 recur["target_hour"] = target_hour
                 recur["target_minute"] = target_minute or 0
@@ -450,7 +619,9 @@ class Scheduler(core.module.Module):
 
             self.schedule.append(job)
             self.schedule.save()
-            self._schedule_job(job)
+
+            # Signal dispatcher to pick up the new job
+            self._signal_reschedule()
 
             return self.result(f"job added. ID: {job_id}")
 
@@ -465,38 +636,47 @@ class Scheduler(core.module.Module):
         relative_duration: str = None,
         target_time: str = None,
         target_weekday: int = None,
-        weekdays_only: bool = False,
-        recurring: bool = False
+        weekdays_only: bool = None,
+        recurring: bool = None,
     ):
-        if recurring and not self.config.get("allow_recurring_jobs"):
-            return self.result("Error: Recurring scheduler jobs are disabled by security policy. Please inform the user.", success=False)
-
+        """Edits an existing scheduled job. Only provided parameters will be changed. Use None/omit parameters to keep existing values."""
         index = self._get_index(id)
         if index == -1:
             return self.result("id does not exist", False)
 
         existing = self.schedule[index]
+        existing_recur = existing.get("recurs_in") or {}
+
+        # Resolve recurring flag
+        final_recurring = recurring if recurring is not None else existing.get("recurring", False)
+
+        if final_recurring and not self.config.get("allow_recurring_jobs"):
+            return self.result(
+                "Error: Recurring scheduler jobs are disabled by security policy. Please inform the user.",
+                success=False
+            )
 
         try:
-            import re
-            existing_recur = existing.get("recurs_in", {})
-            
             weeks = days = hours = minutes = seconds = None
             target_hour = target_minute = target_second = None
-            
+
             # Parse relative_duration if provided
             if relative_duration is not None:
                 pattern = r'(\d+)\s*([wdhms])'
                 matches = re.findall(pattern, relative_duration)
-                # Reset all to 0 first
                 weeks = days = hours = minutes = seconds = 0
                 for val, unit in matches:
                     val = int(val)
-                    if unit == 'w': weeks = val
-                    elif unit == 'd': days = val
-                    elif unit == 'h': hours = val
-                    elif unit == 'm': minutes = val
-                    elif unit == 's': seconds = val
+                    if unit == 'w':
+                        weeks = val
+                    elif unit == 'd':
+                        days = val
+                    elif unit == 'h':
+                        hours = val
+                    elif unit == 'm':
+                        minutes = val
+                    elif unit == 's':
+                        seconds = val
 
             # Parse target_time if provided
             if target_time is not None:
@@ -507,24 +687,25 @@ class Scheduler(core.module.Module):
                         target_minute = int(parts[1])
                         if len(parts) == 3:
                             target_second = int(parts[2])
-                        
-                        # Validate time values
-                        if target_hour < 0 or target_hour > 23:
+
+                        if not (0 <= target_hour <= 23):
                             return self.result("error: hour must be between 0 and 23", False)
-                        if target_minute < 0 or target_minute > 59:
+                        if not (0 <= target_minute <= 59):
                             return self.result("error: minute must be between 0 and 59", False)
-                        if target_second is not None and (target_second < 0 or target_second > 59):
+                        if target_second is not None and not (0 <= target_second <= 59):
                             return self.result("error: second must be between 0 and 59", False)
                     except ValueError:
                         return self.result("error: invalid time format, use HH:MM or HH:MM:SS", False)
+                else:
+                    return self.result("error: invalid time format, use HH:MM or HH:MM:SS", False)
 
             # Validate target_weekday if provided
-            if target_weekday is not None and (target_weekday < 0 or target_weekday > 6):
+            if target_weekday is not None and not (0 <= target_weekday <= 6):
                 return self.result("error: target_weekday must be between 0 (Monday) and 6 (Sunday)", False)
 
             # Build recurrence dict using provided values or existing ones
-            # For numeric fields: use provided value if not None, else existing
-            # For target_weekday: special handling since None is valid value (no specific weekday)
+            final_weekdays_only = weekdays_only if weekdays_only is not None else existing_recur.get("weekdays_only", False)
+
             recur = {
                 "weeks": weeks if weeks is not None else existing_recur.get("weeks", 0),
                 "days": days if days is not None else existing_recur.get("days", 0),
@@ -532,10 +713,9 @@ class Scheduler(core.module.Module):
                 "minutes": minutes if minutes is not None else existing_recur.get("minutes", 0),
                 "seconds": seconds if seconds is not None else existing_recur.get("seconds", 0),
                 "target_weekday": target_weekday if target_weekday is not None else existing_recur.get("target_weekday"),
-                # For booleans, use 'or' logic to preserve "don't change" behavior for False defaults
-                "weekdays_only": weekdays_only or existing_recur.get("weekdays_only", False)
+                "weekdays_only": final_weekdays_only
             }
-            
+
             # Handle time fields
             if target_hour is not None:
                 recur["target_hour"] = target_hour
@@ -543,25 +723,19 @@ class Scheduler(core.module.Module):
                 if target_second is not None:
                     recur["target_second"] = target_second
             elif "target_hour" in existing_recur:
-                # Keep existing time if not being changed
-                recur["target_hour"] = existing_recur.get("target_hour")
+                recur["target_hour"] = existing_recur["target_hour"]
                 recur["target_minute"] = existing_recur.get("target_minute", 0)
-                recur["target_second"] = existing_recur.get("target_second", 0)
+                if "target_second" in existing_recur:
+                    recur["target_second"] = existing_recur["target_second"]
 
-            # Calculate new trigger time if time-related parameters were changed
-            # We need to recalculate if any time parameter was provided
+            # Determine if we need to recalculate trigger_time
             time_params_changed = (
-                relative_duration is not None or 
-                target_time is not None or 
-                target_weekday is not None
-                # Note: weekdays_only is boolean with default False, can't reliably detect if changed
+                relative_duration is not None or
+                target_time is not None or
+                target_weekday is not None or
+                weekdays_only is not None
             )
-            
-            # Also recalculate if weekdays_only was explicitly set to True
-            # (Can't detect if explicitly set to False due to API limitation)
-            if weekdays_only:
-                time_params_changed = True
-            
+
             if time_params_changed:
                 new_trigger_time = self._calculate_next_trigger(recur)
                 if new_trigger_time is None:
@@ -570,22 +744,21 @@ class Scheduler(core.module.Module):
             else:
                 trigger_time_str = existing.get("trigger_time")
 
-            # Update in place
+            # Build updated job
             updated_job = {
                 "id": id,
-                "action": action or existing.get("action"),
-                "channel": channel or existing.get("channel"),
+                "action": action if action is not None else existing.get("action"),
+                "channel": channel if channel is not None else existing.get("channel"),
                 "trigger_time": trigger_time_str,
-                # For recurring, use 'or' logic to preserve "don't change" behavior for False default
-                "recurring": recurring or existing.get("recurring", False),
-                "recurs_in": recur if (recurring or existing.get("recurring", False)) else None
+                "recurring": final_recurring,
+                "recurs_in": recur if final_recurring else None
             }
 
             self.schedule[index] = updated_job
             self.schedule.save()
 
-            # Reschedule (cancels old timer, sets new one)
-            self._schedule_job(updated_job)
+            # Signal dispatcher to pick up changes
+            self._signal_reschedule()
 
             return self.result("job edited")
 
@@ -593,15 +766,15 @@ class Scheduler(core.module.Module):
             return self.result(f"error: {e}", False)
 
     async def remove_job(self, id: str):
+        """Removes a scheduled job by ID."""
         index = self._get_index(id)
         if index == -1:
             return self.result("id does not exist", False)
 
-        # Cancel timer if active
-        if id in self.scheduled_handles:
-            self.scheduled_handles[id].cancel()
-            del self.scheduled_handles[id]
-
         self.schedule.pop(index)
         self.schedule.save()
+
+        # Signal dispatcher to re-evaluate
+        self._signal_reschedule()
+
         return self.result("job deleted")

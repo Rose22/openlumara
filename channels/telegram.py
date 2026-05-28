@@ -51,7 +51,7 @@ class Telegram(core.channel.Channel):
         self.queue_task = None
 
         if not self.token:
-            await self._announce("Telegram channel failed: No API token provided.", "error")
+            await self.push("Telegram channel failed: No API token provided.")
             return False
 
         try:
@@ -69,7 +69,7 @@ class Telegram(core.channel.Channel):
             self.queue_task = asyncio.create_task(self._process_queue_worker())
 
             if self.config.get("announce_startup"):
-                await self._announce("Telegram channel connected.", "status")
+                await self.push("Telegram channel connected.")
 
             while self.running and not self._shutting_down:
                 await asyncio.sleep(1)
