@@ -160,7 +160,7 @@ const TypewriterAudioManager = {
 
     // Load and cache audio from a Data URL (base64)
     loadFromDataURL: function(id, dataUrl) {
-        return new Promise((resolve, reject) => {
+        return new Promise(async (resolve, reject) => {
             try {
                 // Strip data URI prefix if present (e.g., "data:audio/mp3;base64,")
                 const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
@@ -170,7 +170,7 @@ const TypewriterAudioManager = {
                 for (let i = 0; i < byteString.length; i++) {
                     ia[i] = byteString.charCodeAt(i);
                 }
-                const buffer = this.getAudioContext().decodeAudioData(ab);
+                const buffer = await this.getAudioContext().decodeAudioData(ab);
                 this.buffers[id] = buffer;
                 resolve(true);
             } catch (err) {

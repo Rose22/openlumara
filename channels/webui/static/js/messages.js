@@ -20,6 +20,18 @@ function renderAllMessages(messages, animate = false) {
     while (i < messages.length) {
         const msg = messages[i];
 
+        // Validate message has required fields
+        if (!msg || typeof msg !== 'object') {
+            console.warn('Invalid message at index', i, msg);
+            i++;
+            continue;
+        }
+
+        // Ensure message has an index
+        if (msg.index === undefined) {
+            msg.index = i;
+        }
+
         if (msg.role === 'assistant') {
             // Collect complete assistant turn (may span multiple messages due to tool calls)
             const turnInfo = collectAssistantTurn(messages, i);
@@ -38,7 +50,9 @@ function renderAllMessages(messages, animate = false) {
         }
     }
 
-    lastMessageIndex = messages.length;
+    // Set lastMessageIndex based on the last message's actual index
+    const lastMsg = messages[messages.length - 1];
+    lastMessageIndex = (lastMsg && lastMsg.index !== undefined) ? lastMsg.index + 1 : messages.length;
     scrollToBottom();
 }
 
@@ -211,6 +225,10 @@ function renderSingleMessage(msg, index, animate) {
         if (signal === "SUMMARIZATION_CUTOFF") {
             wrapperClass = "signal";
             msgClass = "summarization_cutoff";
+        } else {
+            // Unknown signal type, treat as system message
+            wrapperClass = "signal";
+            msgClass = "signal";
         }
     } else if (parsed.isAnnouncement) {
         wrapperClass = 'announce';
@@ -262,13 +280,26 @@ function renderSingleMessage(msg, index, animate) {
         messageHtml += escapeHtml(parsed.displayContent);
     } else if (parsed.isCommandOutput || wrapperClass === 'user_command') {
         messageHtml += `<pre>${escapeHtml(parsed.displayContent || rawText)}</pre>`;
+    } else if (role === 'tool' && toolCallId) {
+        // Tool response with ID - try to find existing tool call card and update it
+        const existingCard = findToolCallCard(toolCallId);
+        if (existingCard) {
+            updateToolCallCardWithResponse(existingCard, rawText);
+            // Don't render a separate wrapper for this tool response
+            wrapper.remove();
+            return;
+        }
+        // No existing card found, render as standalone
+        messageHtml += renderStandaloneToolResponse(rawText);
     } else if (role === 'tool' && !toolCallId) {
         messageHtml += renderStandaloneToolResponse(rawText);
     } else if (toolCalls && toolCalls.length > 0) {
         if (parsed.displayContent && parsed.displayContent.trim()) {
             messageHtml += `<div class="tool-decision-text">${renderMarkdown(parsed.displayContent)}</div>`;
         }
-        messageHtml += renderToolCalls(toolCalls);
+        // Render tool calls without responses (will be pending)
+        const toolCallsData = toolCalls.map(tc => ({ call: tc, response: null }));
+        messageHtml += renderToolCallsWithResponses(toolCallsData);
     } else if (role === 'schedule') {
         messageHtml += renderScheduleMessage(rawText);
     } else {
@@ -290,6 +321,50 @@ function renderSingleMessage(msg, index, animate) {
     }
 
     chat.insertBefore(wrapper, typing);
+}
+
+/**
+ * Find a tool call card by its ID (either data attribute)
+ */
+function findToolCallCard(toolCallId) {
+    // Try exact ID match first
+    let card = document.querySelector(`[data-tool-call-id="${toolCallId}"]`);
+    if (card) return card;
+    
+    // Try stream ID match
+    card = document.querySelector(`[data-stream-tc-id="${toolCallId}"]`);
+    if (card) return card;
+    
+    return null;
+}
+
+/**
+ * Update a tool call card with its response
+ */
+function updateToolCallCardWithResponse(cardEl, responseContent) {
+    const status = cardEl.querySelector('.tool-call-status');
+    if (status) {
+        status.classList.remove('streaming', 'pending');
+        status.classList.add('completed');
+        status.textContent = 'done';
+    }
+
+    cardEl.classList.add('collapsed');
+
+    const responseSection = cardEl.querySelector('.tool-response-section');
+    const responseContentEl = cardEl.querySelector('.tool-response-content');
+    if (responseSection && responseContentEl) {
+        responseSection.style.display = 'block';
+        responseContentEl.innerHTML = renderToolResponseContent(responseContent);
+    }
+
+    // Add processing indicator if not already present
+    // Note: addProcessingIndicator is defined in send.js
+    if (typeof addProcessingIndicator === 'function') {
+        addProcessingIndicator(cardEl);
+    }
+
+    scrollToBottom();
 }
 
 /**
@@ -494,9 +569,12 @@ function renderReasoningBlock(reasoningContent, isCollapsed = true, label = 'Thi
 
     const escaped = escapeHtml(reasoningContent);
     const collapsedClass = isCollapsed ? 'collapsed' : 'expanded';
+    
+    // Generate unique ID and attach it to the wrapper for tracking manual collapse state
+    const reasoningId = `reasoning-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     return `
-    <div class="reasoning-wrapper ${collapsedClass}">
+    <div class="reasoning-wrapper ${collapsedClass}" data-reasoning-id="${reasoningId}">
     <div class="reasoning-header" onclick="toggleReasoningBlock(this)">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="24" height="24">
     <path fill="currentColor" d="M256 448c141.4 0 256-93.1 256-208S397.4 32 256 32S0 125.1 0 240c0 45.1 17.7 86.8 47.7 120.9c-1.9 24.5-11.4 46.3-21.4 62.9c-5.5 9.2-11.1 16.6-15.2 21.6c-2.1 2.5-3.7 4.4-4.9 5.7c-.6 .6-1 1.1-1.3 1.4l-.3 .3c0 0 0 0 0 0c0 0 0 0 0 0s0 0 0 0s0 0 0 0c-4.6 4.6-5.9 11.4-3.4 17.4c2.5 6 8.3 9.9 14.8 9.9c28.7 0 57.6-8.9 81.6-19.3c22.9-10 42.4-21.9 54.3-30.6c31.8 11.5 67 17.9 104.1 17.9zM128 208a32 32 0 1 1 0 64 32 32 0 1 1 0-64zm128 0a32 32 0 1 1 0 64 32 32 0 1 1 0-64zm96 32a32 32 0 1 1 64 0 32 32 0 1 1 -64 0z"/>
@@ -800,4 +878,99 @@ function createActionButtons(role, index, content, disabled = false) {
     actions.appendChild(deleteBtn);
 
     return actions;
+}
+
+
+
+// =============================================================================
+// Missing Render Functions
+// =============================================================================
+
+/**
+ * Render a standalone tool response (when no associated tool call card exists)
+ */
+function renderStandaloneToolResponse(content) {
+    if (!content) return '';
+    
+    // Try to parse as JSON for better display
+    let displayContent = content;
+    try {
+        const parsed = JSON.parse(content);
+        displayContent = JSON.stringify(parsed, null, 2);
+    } catch (e) {
+        // Not JSON, use as-is
+    }
+    
+    return `
+    <div class="tool-response-standalone">
+        <div class="tool-response-header">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+            </svg>
+            <span>Tool Response</span>
+        </div>
+        <div class="tool-response-body">
+            <pre>${escapeHtml(displayContent)}</pre>
+        </div>
+    </div>`;
+}
+
+/**
+ * Render a schedule message
+ */
+function renderScheduleMessage(content) {
+    if (!content) return '';
+    
+    let scheduleData;
+    try {
+        scheduleData = JSON.parse(content);
+    } catch (e) {
+        // Not JSON, render as plain text
+        return `
+        <div class="schedule-message">
+            <div class="schedule-header">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                </svg>
+                <span>Scheduled Task</span>
+            </div>
+            <div class="schedule-body">
+                <pre>${escapeHtml(content)}</pre>
+            </div>
+        </div>`;
+    }
+    
+    // Parse schedule data
+    const taskName = scheduleData.name || scheduleData.task || 'Unnamed Task';
+    const trigger = scheduleData.trigger || scheduleData.time || scheduleData.cron || 'Unknown trigger';
+    const status = scheduleData.status || scheduleData.enabled !== false ? 'active' : 'disabled';
+    
+    return `
+    <div class="schedule-message">
+        <div class="schedule-header">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+            </svg>
+            <span class="schedule-name">${escapeHtml(taskName)}</span>
+            <span class="schedule-status ${status}">${status}</span>
+        </div>
+        <div class="schedule-body">
+            <div class="schedule-trigger">
+                <span class="schedule-label">Trigger:</span>
+                <span class="schedule-value">${escapeHtml(trigger)}</span>
+            </div>
+            ${scheduleData.command ? `
+            <div class="schedule-command">
+                <span class="schedule-label">Command:</span>
+                <code>${escapeHtml(scheduleData.command)}</code>
+            </div>
+            ` : ''}
+        </div>
+    </div>`;
 }

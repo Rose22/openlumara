@@ -2,7 +2,8 @@
 // State Variables
 // =============================================================================
 
-let isConnected = false;        // Server connection
+let isConnected = false;        // Server connection (HTTP)
+let isWsConnected = false;       // WebSocket connection
 let isApiConnected = false;     // API connection
 let apiError = null;            // Last API error message
 let apiErrorType = null;        // Type of API error (config_missing, auth_failed, etc.)
@@ -16,6 +17,8 @@ let currentTitleBarTags = [];
 
 // Stream state
 let isStreaming = false;
+let isDataStreaming = false;    // Track if backend is still sending data
+let promptProcessingReceived = false;  // Track if we received prompt_progress
 let streamFrozen = false;
 let currentController = null;
 let currentStreamId = null;

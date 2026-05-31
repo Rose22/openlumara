@@ -322,17 +322,6 @@ function parseCategory(categoryString) {
     };
 }
 
-function setupChatSearch() {
-    if (chatSearchInitialized) return;
-    const searchInput = document.getElementById('chat-search');
-    if (searchInput) {
-        searchInput.addEventListener('input', (e) => {
-            filterChats(e.target.value);
-        });
-        chatSearchInitialized = true;
-    }
-}
-
 async function loadChats() {
     try {
         // OPTIMIZATION: Parallel fetch is good, ensure backend returns summary data only

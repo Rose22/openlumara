@@ -52,19 +52,19 @@ class Context:
 
             # find the last occurence of it and return only the messages from that point onward
             for i in range(len(messages) - 1, -1, -1):
-                if messages[i].get("signal", "") == "SUMMARIZATION_CUTOFF":
-                    messages = [{"role": "user", "content": "Summarize our chat so far"}]+messages[i:]
+                if messages[i].get("signal") == "SUMMARIZATION_CUTOFF":
+                    messages = [{"role": "user", "content": "Summarize our chat so far."}] + messages[i + 1:]
                     break
 
-            # Remove ghost messages from history
-            messages = [msg for msg in messages if not msg.get("ghost")]
+            # Remove ghost messages and signal messages from history
+            messages = [msg for msg in messages if not msg.get("ghost") and not msg.get("signal")]
 
             # If disabled, remove reasoning from all prior messages
             if not core.config.get("model", "keep_reasoning_in_context"):
                 messages = [{k: v for k, v in m.items() if k != "reasoning_content"} for m in messages]
 
             # Apply max_messages limit to history first
-            if messages and len(messages) > max_messages:
+            if len(messages) > max_messages:
                 messages = messages[-max_messages:]
 
             # Strip multimodal data from all messages except the last one to save tokens
@@ -72,39 +72,45 @@ class Context:
                 for i in range(len(messages) - 1):
                     msg = messages[i]
                     if msg.get("role") in ("tool", "tool_calls"):
-                        # dont mess with toolcalls
+                        # Don't mess with tool calls
                         continue
 
                     content = msg.get("content")
                     if isinstance(content, list):
-                        # Keep only the parts of the message that are text
-                        msg["content"] = [
+                        # Keep only the text parts of the message
+                        text_parts = [
                             part for part in content
                             if isinstance(part, dict) and part.get("type") == "text"
                         ]
+                        # If stripping leaves nothing, convert to a placeholder string
+                        # to avoid sending an empty content list (which some APIs reject)
+                        if text_parts:
+                            msg["content"] = text_parts
+                        else:
+                            msg["content"] = "[multimedia content]"
                     elif isinstance(content, str):
                         pass
-                    else:
-                        # disallow non-string content
-                        continue
+                    # Non-string, non-list content is left as-is (don't silently drop messages)
 
             # enforce correct turn order
+            # system -> user -> assistant -> user -> assistant -> ...
+            # assistant -> tool -> assistant is VALID (tool use flow)
+            # assistant -> assistant is INVALID (needs spacer)
             if messages:
                 enforced_messages = []
                 for msg in messages:
-                    if (
-                        enforced_messages and
-                        enforced_messages[-1].get("role") == "assistant" and
-                        msg.get("role") == "assistant" and
-                        # IMPORTANT: Only inject if neither message is a tool call.
-                        # Assistant -> Tool -> Assistant is VALID.
-                        # Assistant -> Assistant is INVALID.
-                        not enforced_messages[-1].get("role") == "tool"
-                    ):
-                        # We inject a "spacer" user message.
-                        # Using a single space " " is less intrusive to the LLM
-                        # than "[SYSTEM_TICK]" and satisfies the API requirement.
-                        enforced_messages.append({"role": "user", "content": " "})
+                    if enforced_messages:
+                        last_role = enforced_messages[-1].get("role")
+                        current_role = msg.get("role")
+
+                        # Two consecutive assistant messages need a spacer user message,
+                        # BUT only if there's no tool message in between.
+                        # assistant -> tool -> assistant is valid (tool use flow).
+                        if last_role == "assistant" and current_role == "assistant":
+                            enforced_messages.append({"role": "user", "content": " "})
+                        # Two consecutive user messages also violate turn order
+                        elif last_role == "user" and current_role == "user":
+                            enforced_messages.append({"role": "assistant", "content": " "})
 
                     enforced_messages.append(msg)
 
@@ -124,22 +130,40 @@ class Context:
         current_tokens = await self.chat.count_tokens(full_context)
 
         # Leave a small buffer (5%) to avoid hitting exact limit
-        token_buffer = max_tokens * 0.05
-        effective_max_tokens = max_tokens - token_buffer
+        effective_max_tokens = int(max_tokens * 0.95)
 
-        # If we are over the limit, we trim the history (the middle part)
+        # If we are over the limit, trim the history (the middle part).
         # We don't trim the system prompt or the end prompt as they are essential.
-        while current_tokens > effective_max_tokens and messages:
-            messages.pop(0)
+        # Use binary search to find the optimal trim point efficiently.
+        if current_tokens > effective_max_tokens and messages:
+            # Binary search: find the minimum number of messages to remove from the front
+            lo, hi = 0, len(messages)
+            best_trim = len(messages)  # worst case: remove everything
+
+            while lo <= hi:
+                mid = (lo + hi) // 2
+                trimmed = messages[mid:]
+                candidate_context = system_msg + trimmed + end_msg
+                tokens = await self.chat.count_tokens(candidate_context)
+
+                if tokens <= effective_max_tokens:
+                    best_trim = mid
+                    hi = mid - 1
+                else:
+                    lo = mid + 1
+
+            messages = messages[best_trim:]
             full_context = system_msg + messages + end_msg
             current_tokens = await self.chat.count_tokens(full_context)
 
-        # If we are STILL over the limit even with empty history, it's a single massive message
-        if current_tokens > max_tokens and messages:
-             await self.channel.announce(
+        # If we are STILL over the limit even with empty history,
+        # the system prompt + end prompt alone exceed the limit, or a single message is too large.
+        if current_tokens > max_tokens:
+            await self.channel.announce(
                 "Your request exceeds the maximum token limit. Please send a smaller message!",
                 "error"
             )
+            return None
 
         return full_context
 

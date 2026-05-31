@@ -122,17 +122,30 @@ async def authenticate_websocket(websocket: WebSocket) -> Optional[str]:
     if not bool(channel_instance.config.get("require_login")):
         return "anonymous"
 
-    # Method 1: Check session (via cookies - works with browser clients)
-    session = getattr(websocket, 'session', None)
-    if session and session.get('username'):
-        return session.get('username')
+    # Method 1: Parse session cookie manually
+    # Starlette SessionMiddleware uses itsdangerous for cookie signing
+    session_cookie = websocket.cookies.get("webui_session")
+    if session_cookie:
+        try:
+            import itsdangerous
+            signer = itsdangerous.TimestampSigner(SECRET_KEY)
+            # Starlette session middleware uses base64 + signing
+            import base64
+            # The cookie format depends on Starlette version
+            # Try to decode it
+            data = signer.unsign(session_cookie)
+            session_data = json.loads(base64.b64decode(data))
+            if session_data.get('username'):
+                return session_data.get('username')
+        except Exception as e:
+            core.log("webui", f"WebSocket session auth failed: {e}")
 
     # Method 2: Check Bearer token in query parameters
     token = websocket.query_params.get('token')
     if token and token in ACTIVE_TOKENS:
         return "token_user"
 
-    # Method 3: Check Authorization header (some clients send headers)
+    # Method 3: Check Authorization header
     auth_header = websocket.headers.get('authorization', '')
     if auth_header.startswith('Bearer '):
         token = auth_header[7:]
@@ -575,10 +588,12 @@ async def stream_message(request: Request, user: str = Depends(require_auth)):
                 payload["_meta"] = {"type": "delta", "status": status_str}
                 yield f"data: {json.dumps(payload)}\n\n"
 
-            # Post-stream: Broadcast the new message
+            # Post-stream: Broadcast the new message with index
             messages = await channel_instance.context.chat.get() or []
             if messages:
                 last_msg = messages[-1]
+                # Add index for frontend compatibility
+                last_msg['index'] = len(messages) - 1
                 await manager.broadcast({
                     "type": "message_added",
                     "message": serialize_for_json(last_msg)

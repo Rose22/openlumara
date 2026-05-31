@@ -238,6 +238,10 @@ function handleClickOutside(e) {
 
 function highlightMatch(text, match) {
     if (!match) return text;
-    const regex = new RegExp(`(${escapeRegex(match)})`, 'gi');
+    // Fallback escapeRegex if not defined elsewhere
+    const escapeRegexFn = typeof escapeRegex === 'function' 
+        ? escapeRegex 
+        : (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(${escapeRegexFn(match)})`, 'gi');
     return text.replace(regex, '<mark>$1</mark>');
 }

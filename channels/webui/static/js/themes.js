@@ -273,7 +273,6 @@ const themes = {
             '--border-user': '#682e2e',
             '--border-sidebar': '#301414',
             '--text-primary': '#f0d8d8',
-            '--text-primary': '#f0d8d8',
             '--text-secondary': '#c08888',
             '--text-muted': '#785050',
             '--text-code': '#e8a8a8',

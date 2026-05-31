@@ -97,6 +97,13 @@ function updateConnectionStatus(status) {
         statusDot.className = 'status-dot ' + status;
         statusDot.setAttribute('aria-label', 'Server: ' + status);
     }
+    
+    // Update WebSocket-specific indicator if we have separate tracking
+    if (status === 'connected' && isWsConnected) {
+        statusDot.classList.add('ws-connected');
+    } else {
+        statusDot.classList.remove('ws-connected');
+    }
 }
 
 function updateApiStatus(status) {
@@ -322,4 +329,3 @@ function showApiConfigError(message, errorType = null, action = null) {
     chat.insertBefore(errorWrapper, typing);
     scrollToBottom();
 }
-

@@ -10,6 +10,7 @@ let toolCallsContainer = null;
 let placeholderUserWrapper = null;
 let manuallyCollapsedReasoning = new Set();
 let toolProcessingIndicatorElement = null;
+let fancyProcessingIndicator = null;
 
 function resetStreamState() {
     streamSegments = [];
@@ -220,7 +221,6 @@ async function send(providedContent = null) {
     if (!message && !isRegenerate) return;
 
     promptProcessingReceived = false;
-    let fancyProcessingIndicator = null;
     typewriterQueue = [];
     displayedContent = '';
     isTypewriterRunning = false;
@@ -250,9 +250,7 @@ async function send(providedContent = null) {
         const reconnected = await reconnectApi();
         if (!reconnected) {
             removePlaceholder();
-            if (!isRegenerate) {
-                showApiConfigError('API is not connected.', 'connection_failed');
-            }
+            showApiConfigError('API is not connected. Cannot regenerate response.', 'connection_failed');
             return;
         }
         isConnected = true;
@@ -319,6 +317,7 @@ async function send(providedContent = null) {
     const typewriterEnabled = localStorage.getItem("typewriterEnabled") === 'true';
     const typewriterSpeed = parseInt(localStorage.getItem("typewriterSpeed") ?? "30", 10);
     const useTypewriter = typewriterEnabled && typewriterSpeed > 0;
+    const useStreamingSound = localStorage.getItem("tokenEnabled") === 'true';
 
     let progressBarFill = null;
     let progressTextPercent = null;
@@ -511,7 +510,7 @@ async function send(providedContent = null) {
                             }
 
                             // Play sound on every token if streaming sound is enabled AND typewriter mode is OFF
-                            if (!useTypewriter && token.trim() !== '') {
+                            if (!useTypewriter && useStreamingSound && token.trim() != '') {
                                 TypewriterAudioManager.play('token');
                             }
                         }
@@ -546,7 +545,7 @@ async function send(providedContent = null) {
 
 
                             // Play sound on every token if streaming sound is enabled AND typewriter mode is OFF
-                            if (!useTypewriter && token.trim() !== '') {
+                            if (!useTypewriter && useStreamingSound) {
                                 TypewriterAudioManager.play('token');
                             }
                         }
@@ -570,7 +569,7 @@ async function send(providedContent = null) {
                         handleToolCallDelta(data, aiMsgDiv, aiWrapper);
 
                         // Play sound on every token if streaming sound is enabled AND typewriter mode is OFF
-                        if (!useTypewriter && token.trim() !== '') {
+                        if (!useTypewriter && useStreamingSound) {
                             TypewriterAudioManager.play('token');
                         }
                     }
@@ -597,8 +596,6 @@ async function send(providedContent = null) {
                     if (data.timings) {
                         updateTimingStats(data.timings);
                     }
-
-                    console.log(data);
                 } catch (e) {
                     console.error("Error parsing stream line:", e, line);
                 }
@@ -695,7 +692,27 @@ async function finalizeStreamingUI(aiWrapper, aiMsgDiv) {
     // Clear any remaining processing indicators
     clearProcessingIndicators();
 
-    // Enable buttons
+    // Sync to get proper indices
+    await syncIndicesOnly();
+
+    // Now update the action buttons with the correct index
+    const actualIndex = parseInt(aiWrapper.dataset.index);
+    if (!isNaN(actualIndex)) {
+        // Get the content for the copy button (rendered text)
+        const content = aiMsgDiv.textContent || '';
+
+        // Find the actions row and update the buttons inside it
+        const actionsRow = aiWrapper.querySelector('.actions-stats-row');
+        if (actionsRow) {
+            const oldActions = actionsRow.querySelector('.message-actions');
+            if (oldActions) {
+                const newActions = createActionButtons('assistant', actualIndex, content);
+                actionsRow.replaceChild(newActions, oldActions);
+            }
+        }
+    }
+
+    // Enable buttons and show wrapper
     aiWrapper.classList.remove('streaming', 'hidden');
     const actions = aiWrapper.querySelector('.message-actions');
     if (actions) {
@@ -717,32 +734,6 @@ async function finalizeStreamingUI(aiWrapper, aiMsgDiv) {
     displayedContent = '';
     isTypewriterRunning = false;
     inputField.focus();
-
-    // Sync to get proper indices, but don't re-render
-    await syncIndicesOnly();
-}
-
-/**
- * Sync only message indices without re-rendering content.
- */
-async function syncIndicesOnly() {
-    try {
-        const response = await fetch('/messages');
-        const data = await response.json();
-        const messages = data.messages || [];
-
-        lastMessageIndex = messages.length;
-
-        // Update indices on streaming wrappers
-        const streamingWrappers = chat.querySelectorAll('.message-wrapper[data-index="streaming"]');
-        streamingWrappers.forEach(wrapper => {
-            wrapper.dataset.index = lastMessageIndex - 1;
-        });
-
-        updateTokenUsage();
-    } catch (err) {
-        console.error('Index sync failed:', err);
-    }
 }
 
 function finishStream() {
@@ -1137,11 +1128,20 @@ async function stopGeneration(sent_from_command = false) {
         currentController = null;
     }
 
-    // Notify backend
+    // Notify backend via WebSocket
     if (currentStreamId) {
         try {
-            window.socket.send(JSON.stringify({ type: 'stop' }));
-            window.socket.send(JSON.stringify({ type: 'cancel', id: currentStreamId }));
+            if (window.socket && window.socket.readyState === WebSocket.OPEN) {
+                window.socket.send(JSON.stringify({ type: 'stop' }));
+                window.socket.send(JSON.stringify({ type: 'cancel', id: currentStreamId }));
+            } else {
+                // Fallback: use HTTP endpoint if WebSocket is unavailable
+                await fetch('/cancel', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: currentStreamId })
+                }).catch(() => {});
+            }
         } catch (e) {
             // Ignore network errors during cancellation
         }
@@ -1723,19 +1723,21 @@ function finalizeStreamingToolCalls(finalToolCalls, aiMsgDiv) {
 
     const cards = toolCallsContainer.querySelectorAll('.tool-call-card');
     cards.forEach(card => {
-        // FIX: Only reset cards that are currently in the 'streaming' state.
-        // If the card is already 'completed', leave it alone!
+        // FIX: Only update cards that are still in 'streaming' state
         if (card.classList.contains('streaming')) {
             card.classList.remove('streaming');
             const status = card.querySelector('.tool-call-status');
             if (status) {
                 status.classList.remove('streaming');
+                // Don't change to 'pending' - the tool call is complete, waiting for response
+                // Status will be updated to 'completed' or stay as 'pending' when response arrives
                 status.classList.add('pending');
                 status.textContent = 'calling...';
             }
         }
     });
 
+    // Update tool call IDs from final data
     finalToolCalls.forEach((tc) => {
         const finalId = tc.id || `tool-unknown`;
         const streamId = tc.id || (tc.index !== undefined ? `tc-stream-${tc.index}` : null);
@@ -1805,11 +1807,17 @@ function handleToolResponse(data, aiMsgDiv) {
  * Progress bar and percentage are hidden by default.
  */
 function addProcessingIndicator(cardEl) {
-    // Remove any existing processing indicator from the container first
-    if (toolCallsContainer) {
-        const existing = toolCallsContainer.querySelector('.tool-processing-indicator');
-        if (existing) existing.remove();
+    // Find the correct container for this tool call card
+    const container = cardEl ? cardEl.closest('.tool-calls-container, .tool-calls-streaming-container') : toolCallsContainer;
+    
+    if (!container) {
+        console.warn('Could not find tool calls container for processing indicator');
+        return;
     }
+    
+    // Remove any existing processing indicator from the container first
+    const existing = container.querySelector('.tool-processing-indicator');
+    if (existing) existing.remove();
 
     const indicator = document.createElement('div');
     indicator.className = 'tool-processing-indicator';
@@ -1840,20 +1848,20 @@ function addProcessingIndicator(cardEl) {
         percentText.textContent = `${percent}%`;
     };
 
-    // Always append to the very end of the tool calls container
-    if (toolCallsContainer) {
-        toolCallsContainer.appendChild(indicator);
-    }
+    // Append to the found container
+    container.appendChild(indicator);
 }
 
 /**
  * Remove all processing indicators from the streaming container.
  */
 function clearProcessingIndicators() {
-    if (!toolCallsContainer) return;
-
-    const indicators = toolCallsContainer.querySelectorAll('.tool-processing-indicator');
+    // Clear all processing indicators from any tool calls container
+    const indicators = document.querySelectorAll('.tool-processing-indicator');
     indicators.forEach(ind => ind.remove());
+    
+    // Also clear the global reference
+    toolProcessingIndicatorElement = null;
 }
 
 /**
