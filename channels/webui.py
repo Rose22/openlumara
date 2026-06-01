@@ -21,7 +21,7 @@ import uvicorn
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, Response, Depends, HTTPException, status, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import RedirectResponse, StreamingResponse, JSONResponse
+from fastapi.responses import RedirectResponse, StreamingResponse, JSONResponse, FileResponse
 from fastapi.middleware import Middleware
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.websockets import WebSocketState
@@ -1394,11 +1394,19 @@ async def service_worker():
     return Response(content=sw_code, media_type='application/javascript', headers={'Cache-Control': 'no-store'})
 
 @app.get('/icon-192.png')
+async def icon_192():
+    """Serve the 192x192 icon for PWA."""
+    return FileResponse(os.path.join(WEBUI_DIR, "icon-192.png"))
+
 @app.get('/icon-512.png')
-async def icon():
-    """Serve a placeholder icon for PWA."""
-    png_hex = "89504e470d0a1a0a0000000d494844520000000200000002080200000001f338dd0000000c4944415408d763f8ffffcf0001000100737a55b00000000049454e44ae426082"
-    return Response(content=bytes.fromhex(png_hex), media_type='image/png')
+async def icon_512():
+    """Serve the 512x512 icon for PWA."""
+    return FileResponse(os.path.join(WEBUI_DIR, "icon-512.png"))
+
+@app.get('/favicon.ico')
+async def favicon():
+    """Serve the favicon for the web interface."""
+    return FileResponse(os.path.join(WEBUI_DIR, "favicon.ico"))
 
 # =============================================================================
 # Channel Class

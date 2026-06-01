@@ -1,9 +1,16 @@
-const CACHE_NAME = 'openlumara-v4.7.2';
-const ASSETS = ['/', '/manifest.json'];
+const CACHE_NAME = 'openlumara-v4.7.3';
+const ASSETS = ['/', '/manifest.json', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', (e) => {
-    // Force the waiting service worker to become the active service worker.
-    self.skipWaiting();
+    // Precaching assets to ensure the browser recognizes this as an installable PWA
+    e.waitUntil(
+        caches.open(CACHE_NAME).then((cache) => {
+            return cache.addAll(ASSETS);
+        }).then(() => {
+            // Force the waiting service worker to become the active service worker.
+            return self.skipWaiting();
+        })
+    );
 });
 
 self.addEventListener('activate', (e) => {
