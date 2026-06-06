@@ -210,7 +210,7 @@ class SandboxedFiles(core.module.Module):
         except OSError as e:
             return self.result(f"Error creating file: {e}", False)
 
-        async with aiofiles.open(fd, 'w') as f:
+        async with aiofiles.open(fd, 'w', encoding='utf-8') as f:
             await f.write(body)
 
         return self.result(True)
@@ -228,7 +228,7 @@ class SandboxedFiles(core.module.Module):
                 flags |= os.O_NOFOLLOW
 
             fd = os.open(safe_path, flags)
-            async with aiofiles.open(fd, 'r') as f:
+            async with aiofiles.open(fd, 'r', encoding='utf-8') as f:
                 content = await f.read()
             return self.result(content)
         except Exception as e:
@@ -256,7 +256,7 @@ class SandboxedFiles(core.module.Module):
                 flags |= os.O_NOFOLLOW
 
             fd = os.open(safe_path, flags, mode=0o644)
-            async with aiofiles.open(fd, 'w') as f:
+            async with aiofiles.open(fd, 'w', encoding='utf-8') as f:
                 await f.write(body)
             return self.result(True)
         except OSError as e:
@@ -287,7 +287,7 @@ class SandboxedFiles(core.module.Module):
                 flags |= os.O_NOFOLLOW
 
             fd = os.open(safe_path, flags, mode=0o644)
-            async with aiofiles.open(fd, 'a') as f:
+            async with aiofiles.open(fd, 'a', encoding='utf-8') as f:
                 await f.write("\n" + body)
             return self.result(True)
         except Exception as e:
