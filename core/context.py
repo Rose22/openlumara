@@ -165,10 +165,13 @@ class Context:
         # If we are STILL over the limit even with empty history,
         # the system prompt + end prompt alone exceed the limit, or a single message is too large.
         if current_tokens > max_tokens:
-            await self.channel.announce(
-                "Your request exceeds the maximum token limit. Please send a smaller message!",
-                "error"
+            await self.channel.push(
+                f"Your system prompt of {current_tokens} tokens somehow exceeds the maximum context size of {max_tokens}! Please set a larger context size. Or disable some modules, disable system prompt insertion across modules, do whatever you can to reduce token size."
             )
+
+            # immediately disconnect so we don't spam the API
+            await self.channel.manager.API.disconnect()
+
             return None
 
         return full_context
