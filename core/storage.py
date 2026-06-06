@@ -252,7 +252,7 @@ class StorageDict(dict):
                     for filename in files:
                         if filename.endswith(".md"):
                             rel_path = os.path.relpath(os.path.join(root, filename), self.path)
-                            key = rel_path[:-3]  # remove .md extension
+                            key = rel_path.replace(os.sep, "/")[:-3]  # normalize separators, remove .md extension
                             if key not in flat_items:
                                 os.remove(os.path.join(root, filename))
 
