@@ -970,8 +970,7 @@ async def delete_chat(request: Request, user: str = Depends(require_auth)):
     if not channel_instance:
         raise HTTPException(status_code=500, detail="Channel not available")
 
-    data = await request.json()
-    conv_id = data.get('id')
+    conv_id = request.query_params.get('id')
 
     if not conv_id:
         raise HTTPException(status_code=400, detail="No chat ID provided")
