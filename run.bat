@@ -14,41 +14,17 @@ if %errorlevel% equ 0 (
     exit /b 1
 )
 
-:: 2. Set up virtual environment if needed
+:: 2. Set up/Update virtual environment
 if not exist "venv" (
     echo setting up virtual environment with %PYTHON_BIN%...
     %PYTHON_BIN% -m venv venv
-    venv\Scripts\pip install -r requirements.txt
+
+    :: since this is the first run, update openlumara and install all requirements
+    echo first run detected, triggering auto-update...
+    call update.bat
 )
 
-:: 3. Smart auto-update
-echo checking for updates...
-git fetch origin >nul 2>nul
-if %errorlevel% equ 0 (
-    :: Get local HEAD
-    for /f "tokens=*" %%i in ('git rev-parse HEAD') do set LOCAL=%%i
-    
-    :: Get remote HEAD (using @{u} for upstream)
-    set REMOTE=
-    for /f "tokens=*" %%i in ('git rev-parse @{u} 2^>nul') do set REMOTE=%%i
-
-    if "!REMOTE!"=="" (
-        echo no upstream configured, skipping update check.
-    ) else if "!LOCAL!" NEQ "!REMOTE!" (
-        echo updates available! pulling changes...
-        :: Stash local changes to tracked files to prevent pull conflicts.
-        :: config.yml and data/ are in .gitignore, so they remain untouched.
-        git stash
-        git pull
-        git stash pop || echo note: some local changes could not be automatically reapplied.
-    ) else (
-        echo already up to date.
-    )
-) else (
-    echo warning: git fetch failed. skipping update check.
-)
-
-:: 4. Run the app
+:: 3. Run the app
 echo starting openlumara...
 venv\Scripts\python main.py %*
 
