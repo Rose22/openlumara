@@ -27,7 +27,7 @@ class Chat:
         for index in range(len(self.data) - 1, -1, -1):
             chat = self.data[index]
             messages = chat.get("messages", [])
-            
+
             # find any blank chats and delete them
             if not messages:
                 self.data.pop(index)
@@ -55,9 +55,9 @@ class Chat:
         """Check if a messages array contains only user commands and command responses"""
         if not messages:
             return False
-        
+
         cmd_prefix = core.config.get("core").get("cmd_prefix", "/")
-        
+
         for msg in messages:
             role = msg.get("role")
             content = msg.get("content", "")
@@ -118,12 +118,12 @@ class Chat:
             return False
 
         self.data[self.current]["messages"] = []
-        
+
         # Reset token_usage since we're clearing the chat
         # API token usage is only valid for the exact context that was sent
         await self.set_token_usage(0)
         self.using_api_token_data = False
-        
+
         await self.save()
 
         return True
@@ -139,12 +139,13 @@ class Chat:
         self.data.save()
 
         # Adjust current index if needed
-        if self.current == index:
-            # Deleted the current chat - reset or move to previous
-            self._set_current(min(index, len(self.data) - 1) if self.data else None)
-        elif self.current > index:
-            # Current was after deleted item, shift down
-            self.current -= 1
+        if self.current:
+            if self.current == index:
+                # Deleted the current chat - reset or move to previous
+                self._set_current(min(index, len(self.data) - 1) if self.data else None)
+            elif self.current > index:
+                # Current was after deleted item, shift down
+                self.current -= 1
 
         return self.current
 
@@ -284,13 +285,13 @@ class Chat:
 
         # ensure message does not exceed token limits
         max_tokens = int(core.config.get("api").get("max_context", 8192))
-        
+
         # create a potential new message list to check token count
         current_messages = self.data[self.current].get("messages", [])
         potential_messages = list(current_messages)
 
         potential_messages.append(new_message)
-        
+
         # calculate tokens for this potential list
         new_token_count = await self.count_tokens(messages=potential_messages)
 
