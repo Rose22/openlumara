@@ -138,6 +138,13 @@ class Context:
         # Leave a small buffer (5%) to avoid hitting exact limit
         effective_max_tokens = int(max_tokens * 0.95)
 
+        if core.debug:
+            core.log(
+                "context",
+                f"built context: system={len(system_msg)} history={len(messages)} end={len(end_msg)} "
+                f"tokens={current_tokens} limit={max_tokens} trim_at={effective_max_tokens}"
+            )
+
         # If we are over the limit, trim the history (the middle part).
         # We don't trim the system prompt or the end prompt as they are essential.
         # Use binary search to find the optimal trim point efficiently.
@@ -162,9 +169,20 @@ class Context:
             full_context = system_msg + messages + end_msg
             current_tokens = await self.chat.count_tokens(full_context)
 
+            if core.debug:
+                core.log(
+                    "context",
+                    f"trimmed history to {len(messages)} messages; tokens now {current_tokens}"
+                )
+
         # If we are STILL over the limit even with empty history,
         # the system prompt + end prompt alone exceed the limit, or a single message is too large.
         if current_tokens > max_tokens:
+            if core.debug:
+                core.log(
+                    "context",
+                    f"context still exceeds hard limit after trimming: tokens={current_tokens} max={max_tokens}"
+                )
             await self.channel.push(
                 f"Your system prompt of {current_tokens} tokens somehow exceeds the maximum context size of {max_tokens}! Please set a larger context size. Or disable some modules, disable system prompt insertion across modules, do whatever you can to reduce token size."
             )

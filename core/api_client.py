@@ -215,6 +215,7 @@ class APIClient():
                 "return_progress": True
             }
         }
+        api_config = core.config.get("api", {})
 
         # add kwargs to the request
         for key, value in kwargs.items():
@@ -235,8 +236,43 @@ class APIClient():
             # request token usage from the API
             req["stream_options"] = {"include_usage": True}
 
-        # if core.debug:
-        #     core.log("debug:request", str(req))
+        if core.debug:
+            message_summary = []
+            for message in context:
+                summary = {
+                    "role": message.get("role"),
+                    "keys": sorted(list(message.keys())),
+                }
+
+                content = message.get("content")
+                if isinstance(content, str):
+                    summary["content_chars"] = len(content)
+                elif isinstance(content, list):
+                    summary["content_items"] = len(content)
+
+                if message.get("tool_calls"):
+                    summary["tool_calls"] = len(message.get("tool_calls") or [])
+
+                message_summary.append(summary)
+
+            tool_count = len(tools or [])
+            custom_field_keys = sorted(list(custom_fields.keys())) if isinstance(custom_fields, dict) else []
+            core.log(
+                "debug:request",
+                json.dumps({
+                    "base_url": api_config.get("url"),
+                    "model": self._model,
+                    "stream": stream,
+                    "use_thinking": use_thinking,
+                    "message_count": len(context),
+                    "tool_count": tool_count,
+                    "max_completion_tokens": req.get("max_completion_tokens"),
+                    "temperature": req.get("temperature"),
+                    "reasoning_effort": req.get("reasoning_effort"),
+                    "custom_field_keys": custom_field_keys,
+                    "messages": message_summary,
+                }, ensure_ascii=True, sort_keys=True)
+            )
 
         try:
             # check for cancellation before starting the request
