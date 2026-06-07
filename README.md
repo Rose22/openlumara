@@ -50,14 +50,13 @@ Run this command in a terminal or your command prompt:
 ```
 git clone https://github.com/Rose22/openlumara
 ```
-
-This will give you support for auto-updating via git.
-
-If you'd rather download the zip, you can, but be aware that it won't auto-update!
+Doing it this way will let update.sh (on linux) and update.bat (on windows) update your instance of openlumara easily. You can also choose to download the zip, but the update scripts won't work that way, because they use git.
 
 Once you have openlumara, run `run.sh` if you're on linux, `run.bat` if you're on windows!
 
 Once it's started up, open your browser and go to the url it displays. Then in the web ui, open the settings panel (lil gear icon at the top), set up your api connection, press save, and enjoy!
+
+Whenever you want to update openlumara, just run `update.sh` if you're on linux, or `update.bat` if you're on windows.
 
 # How to create your own channel
 
