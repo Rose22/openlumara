@@ -976,7 +976,7 @@ async def delete_chat(request: Request, user: str = Depends(require_auth)):
         raise HTTPException(status_code=400, detail="No chat ID provided")
 
     success = await channel_instance.context.chat.delete(conv_id)
-    if not success:
+    if success is False:
         raise HTTPException(status_code=404, detail="Chat not found")
 
     return {'success': True}

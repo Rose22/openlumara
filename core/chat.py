@@ -139,12 +139,13 @@ class Chat:
         self.data.save()
 
         # Adjust current index if needed
-        if self.current == index:
-            # Deleted the current chat - reset or move to previous
-            self._set_current(min(index, len(self.data) - 1) if self.data else None)
-        elif self.current > index:
-            # Current was after deleted item, shift down
-            self.current -= 1
+        if self.current:
+            if self.current == index:
+                # Deleted the current chat - reset or move to previous
+                self._set_current(min(index, len(self.data) - 1) if self.data else None)
+            elif self.current > index:
+                # Current was after deleted item, shift down
+                self.current -= 1
 
         return self.current
 
