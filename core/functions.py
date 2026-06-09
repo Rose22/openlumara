@@ -58,7 +58,7 @@ def get_path(path: str = ""):
 def get_data_path(subpath: str = ""):
     """get path to a file/folder within the data directory"""
     data_folder = core.config.get("core", {}).get("data_folder", "data")
-    data_dir = get_path(data_folder)
+    data_dir = data_folder
     
     if subpath:
         # Normalize subpath to catch traversal tricks
