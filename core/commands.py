@@ -129,6 +129,8 @@ def _set_config_value(path: list, value: str):
         # Traverse the dictionary following the path
         current = target
         for i, key in enumerate(path[:-1]):
+            if not isinstance(current, dict):
+                return f"Error: Path {path} is invalid. '{key}' is not a dictionary."
             current = current[key]
 
         # Check if the target key already exists and is a dictionary
@@ -137,6 +139,9 @@ def _set_config_value(path: list, value: str):
             return "That's a settings group! Check which settings are in it instead of trying to set its value"
 
         # Set the final value
+        if not isinstance(current, dict):
+            return f"Error: Path {path} is invalid. The parent of '{path[-1]}' is not a dictionary."
+        
         current[path[-1]] = typed_value
 
         # Persist changes to the YAML file
@@ -477,18 +482,15 @@ class Commands:
                                 # We hit a value but there are more args.
                                 # This means the user is trying to SET the value of this key.
                                 is_set = True
-                                path_to_use = args[:-1]
-                                value_to_use = args[-1]
+                                path_to_use = args[:i+1]
+                                value_to_use = " ".join(args[i+1:])
                                 break
                             else:
                                 # We reached the end of args and it's a value. This is a GET.
                                 break
                     else:
-                        # Key not found. This must be a SET for a new key.
-                        is_set = True
-                        path_to_use = args[:-1]
-                        value_to_use = args[-1]
-                        break
+                        # Key not found. Return an error instead of allowing a new key.
+                        return f"setting '{key}' does not exist at that path."
                 
                 if is_set:
                     return str(_set_config_value(path_to_use, value_to_use))
