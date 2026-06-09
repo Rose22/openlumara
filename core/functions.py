@@ -3,6 +3,7 @@ import os
 import sys
 import time
 import traceback
+import urllib.parse
 
 def log(category: str, msg: str):
     """simple console log"""
@@ -62,3 +63,67 @@ def remove_duplicates(lst: list):
         if item not in new_lst:
             new_lst.append(item)
     return new_lst
+
+def secure_path(base_path: str, requested_path: str) -> str:
+    """
+    protects against path traversal attacks and the like
+    """
+    path = requested_path
+
+    # remove path separator at the beginning and end
+    path = path.strip(os.path.sep)
+
+    # remove the base path from it in case the AI/user inserts it
+    prefix = base_path + os.sep
+    if path.startswith(prefix):
+        path = path[len(prefix):]
+    elif path == base_path:
+        path = ""
+
+    # basic path traversal prevention
+    decoded = path
+    for _ in range(3):  # Handle double/triple encoding
+        decoded = urllib.parse.unquote(decoded)
+
+    if ".." in decoded or "\x00" in decoded:
+        raise ValueError("Path traversal is not allowed")
+
+    # block symlink paths
+    if hasattr(os, 'O_NOFOLLOW'):
+        # check if any component is a symlink
+        parts = decoded.split(os.path.sep)
+        for i, part in enumerate(parts):
+            if i == 0:
+                continue  # Skip root
+            test_path = os.path.join(base_path, *parts[:i])
+            if os.path.islink(test_path):
+                raise ValueError("Symlinks are not allowed in the path")
+
+    if not path:
+        return base_path
+
+    # more path traversal protection
+    path_in_base = os.path.join(base_path, os.path.normpath(decoded))
+    
+    try:
+        real_path = os.path.realpath(path_in_base)
+    except (OSError, ValueError):
+        raise ValueError(f"Invalid path: {requested_path}")
+
+    if os.path.islink(path_in_base):
+        raise ValueError("Symlinks are not allowed in the requested path")
+
+    base_prefix = base_path + os.sep
+
+    if sys.platform == "win32":
+        check_path = real_path.lower()
+        check_prefix = base_prefix.lower()
+    else:
+        check_path = real_path
+        check_prefix = base_prefix
+
+    if check_path.startswith(check_prefix) or check_path == base_path:
+        return real_path
+    else:
+        raise ValueError("Access denied: target path is outside sandbox")
+
