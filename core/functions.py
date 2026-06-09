@@ -58,18 +58,32 @@ def get_path(path: str = ""):
 def get_data_path(subpath: str = ""):
     """get path to a file/folder within the data directory"""
     data_folder = core.config.get("core", {}).get("data_folder", "data")
-    data_dir = data_folder
     
+    # Resolve data folder path directly (allowing paths outside project root)
+    if os.path.isabs(data_folder):
+        data_dir = os.path.normpath(data_folder)
+    else:
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+        data_dir = os.path.normpath(os.path.join(base_dir, data_folder))
+    
+    # Ensure data_dir is resolved to its real path for consistent comparison
+    real_data_dir = os.path.realpath(data_dir)
+
     if subpath:
         # Normalize subpath to catch traversal tricks
         subpath = os.path.normpath(subpath)
         
+        # Resolve the full subpath
+        if os.path.isabs(subpath):
+            full_subpath = os.path.normpath(subpath)
+        else:
+            full_subpath = os.path.normpath(os.path.join(data_dir, subpath))
+        
         # Validate the subpath stays within the data directory
-        full_subpath = os.path.abspath(os.path.join(data_dir, subpath))
-        validated = validate_path_in_directory(data_dir, full_subpath)
+        validated = validate_path_in_directory(real_data_dir, full_subpath)
         if validated is None:
             raise ValueError(f"Path escapes data directory: {subpath}")
-        data_dir = full_subpath
+        data_dir = os.path.join(real_data_dir, validated)
 
     # create it if it doesn't exist
     if not os.path.exists(data_dir):
