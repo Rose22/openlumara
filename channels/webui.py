@@ -27,6 +27,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from starlette.websockets import WebSocketState
 
 import core
+from core.functions import validate_path_in_directory
 import msgpack
 import yaml
 import logging
@@ -1132,7 +1133,7 @@ async def load_storage_file(file: str, user: str = Depends(require_auth)):
         raise HTTPException(status_code=404, detail="File not found")
 
     # Security check - prevent path traversal
-    if not os.path.abspath(full_path).startswith(os.path.abspath(data_dir)):
+    if validate_path_in_directory(data_dir, full_path) is None:
         raise HTTPException(status_code=403, detail="Access denied")
 
     ext = os.path.splitext(file)[1].lower()
@@ -1189,7 +1190,7 @@ async def save_storage_file(request: Request, user: str = Depends(require_auth))
     full_path = os.path.join(data_dir, file_path)
 
     # Security check - prevent path traversal
-    if not os.path.abspath(full_path).startswith(os.path.abspath(data_dir)):
+    if validate_path_in_directory(data_dir, full_path) is None:
         raise HTTPException(status_code=403, detail="Access denied")
 
     ext = os.path.splitext(file_path)[1].lower()
@@ -1255,7 +1256,7 @@ async def delete_storage_key(request: Request, user: str = Depends(require_auth)
     full_path = os.path.join(data_dir, file_path)
 
     # Security check - prevent path traversal
-    if not os.path.abspath(full_path).startswith(os.path.abspath(data_dir)):
+    if validate_path_in_directory(data_dir, full_path) is None:
         raise HTTPException(status_code=403, detail="Access denied")
 
     ext = os.path.splitext(file_path)[1].lower()
@@ -1316,7 +1317,7 @@ async def add_storage_key(request: Request, user: str = Depends(require_auth)):
     full_path = os.path.join(data_dir, file_path)
 
     # Security check - prevent path traversal
-    if not os.path.abspath(full_path).startswith(os.path.abspath(data_dir)):
+    if validate_path_in_directory(data_dir, full_path) is None:
         raise HTTPException(status_code=403, detail="Access denied")
 
     ext = os.path.splitext(file_path)[1].lower()
