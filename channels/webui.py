@@ -39,7 +39,8 @@ JS_FILES = [
     "themes", "icons", "variables", "content_helpers", "markdown", "messages",
     "msg_actions", "sidebar", "utils", "notif", "status", "polling", "chats",
     "tags", "search", "export", "modals", "autocomplete", "input", "send", "upload", "theming",
-    "audio", "modal_settings", "storage_editor", "responsive", "init"
+    "audio", "modal_settings", "storage_editor", "responsive", "init",
+    "openrouter_ext" # openrouter-ext
 ]
 
 # same deal for css files
@@ -598,6 +599,9 @@ async def stream_message(request: Request, user: str = Depends(require_auth)):
                     "type": "message_added",
                     "message": serialize_for_json(last_msg)
                 })
+
+                if "_usage" in last_msg: # openrouter-ext
+                    yield f"data: {json.dumps({'_meta': {'type': 'usage'}, 'usage': last_msg['_usage']})}\n\n" # openrouter-ext
 
             # Commit phase
             serialized_history = [serialize_for_json(m) for m in messages]

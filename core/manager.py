@@ -21,6 +21,7 @@ class Manager:
         self.channel = None # current active channel. gets dynamically switched around
         self.modules = {}
         self.tools = []
+        self._completion_hooks = [] # openrouter-ext hook
         self.tool_names = []
         self.pure_mode = False
         self.coding_mode = False
@@ -31,6 +32,11 @@ class Manager:
     def _remove_async_task(self, task):
         self._async_tasks.discard(task)
         core.log("task", f"background task completed: {task.get_name()}")
+
+    # openrouter-ext hook
+    async def _on_completion(self, raw: dict, message: dict) -> None:
+        for cb in getattr(self, "_completion_hooks", []):
+            await cb(raw, message)
 
     async def run(self):
         """main loop"""

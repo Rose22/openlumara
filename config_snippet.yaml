@@ -1,0 +1,4 @@
+# openrouter-ext — remove this block if not using OpenRouter
+openrouter:
+  show_cost: true     # per-message USD cost in WebUI
+  show_tokens: true   # prompt/completion token counts
