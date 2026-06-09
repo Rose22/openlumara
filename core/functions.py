@@ -60,6 +60,24 @@ def remove_duplicates(lst: list):
             new_lst.append(item)
     return new_lst
 
+def validate_path_string(path: str) -> str:
+    """
+    validates a path string for traversal and encoding attacks.
+    """
+    # Strip path separators
+    path = path.strip(os.path.sep)
+
+    # Handle URL encoding (check for double/triple encoding)
+    decoded = path
+    for _ in range(3):
+        decoded = urllib.parse.unquote(decoded)
+
+    # Check for traversal and null bytes
+    if ".." in decoded or "\x00" in decoded:
+        raise ValueError("Path traversal is not allowed")
+
+    return decoded
+
 def sandbox_path(base_path: str, requested_path: str) -> str:
     """
     protects against path traversal attacks and the like
@@ -76,13 +94,7 @@ def sandbox_path(base_path: str, requested_path: str) -> str:
     elif path == base_path:
         path = ""
 
-    # basic path traversal prevention
-    decoded = path
-    for _ in range(3):  # Handle double/triple encoding
-        decoded = urllib.parse.unquote(decoded)
-
-    if ".." in decoded or "\x00" in decoded:
-        raise ValueError("Path traversal is not allowed")
+    decoded = validate_path_string(path)
 
     # block symlink paths
     if hasattr(os, 'O_NOFOLLOW'):

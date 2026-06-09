@@ -216,6 +216,8 @@ class StorageDict(dict):
                 result.update(self._flatten_nested_keys(value, full_key))
             else:
                 result[full_key] = value
+
+        print(result)
         return result
 
     def save(self):
@@ -238,7 +240,8 @@ class StorageDict(dict):
                 flat_items = self._flatten_nested_keys(dict(self))
 
                 for key, content in flat_items.items():
-                    name = os.path.join(self.path, f"{key}.md")
+                    # Use sandbox_path to safely resolve and validate the target path
+                    name = core.sandbox_path(self.path, f"{key}.md")
                     file_dir = os.path.dirname(name)
 
                     if not os.path.exists(file_dir):
@@ -289,8 +292,9 @@ class StorageDict(dict):
                 for root, dirs, files in os.walk(self.path):
                     for filename in files:
                         if filename.endswith(".md"):
-                            full_path = os.path.join(root, filename)
-                            rel_path = os.path.relpath(full_path, self.path)
+                            rel_path = os.path.relpath(os.path.join(root, filename), self.path)
+                            # Use sandbox_path to safely resolve and validate the target path
+                            full_path = core.sandbox_path(self.path, rel_path)
                             key = rel_path[:-3]  # remove .md extension
 
                             with open(full_path, "r", encoding="utf-8") as f:
