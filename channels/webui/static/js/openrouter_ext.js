@@ -69,48 +69,43 @@
         return response;
     };
 
-    // The easiest way to handle SSE `usage` event without rewriting fetch is listening to the custom event
-    // or modifying the fetch stream processing. But wait! `messages.js` handles `renderAssistantMessageParts`
-    // which is called by `renderAssistantTurn`, which is called by `renderAllMessages`.
-    // During stream, the message isn't fully re-rendered using `renderAssistantMessageParts`!
-    // It's manually appended to `aiMsgDiv.innerHTML`.
-    // So we can patch `finalizeStreamingUI` to append the usage stats if we can get them.
-    // But how to get the usage? The websocket broadcasts `message_added`!
-    // In `polling.js` or `websocket` handler:
-    // If we just listen to the websocket for `message_added`, we can append it there.
-
     // Let's patch JSON.parse temporarily during stream to catch our usage event?
     const originalParse = JSON.parse;
     window.JSON.parse = function(text, reviver) {
-        const data = originalParse(text, reviver);
-        if (data && data._meta && data._meta.type === 'usage' && data.usage) {
-            // We caught the usage event!
-            const u = data.usage;
-            let statText = `↑${u.prompt || 0} ↓${u.completion || 0} tok`;
-            if (u.cost !== undefined && u.cost !== null) {
-                let costStr = u.cost.toFixed(6).replace(/0+$/, '');
-                if (costStr.endsWith('.')) costStr += '00';
-                statText += ` · $${costStr}`;
-            }
-
-            // Find the last .message.ai element and append it
-            setTimeout(() => {
-                const aiMsgs = document.querySelectorAll('.message.ai');
-                if (aiMsgs.length > 0) {
-                    const lastAiMsg = aiMsgs[aiMsgs.length - 1];
-                    // don't append if it already has .or-stats
-                    if (!lastAiMsg.querySelector('.or-stats')) {
-                        const statDiv = document.createElement('div');
-                        statDiv.className = "msg-stats or-stats";
-                        statDiv.style = "opacity: 0.55; font-size: 0.78em; font-family: monospace; margin-top: 6px; text-align: right;";
-                        statDiv.textContent = statText;
-                        lastAiMsg.appendChild(statDiv);
-                    }
+        try {
+            const data = originalParse(text, reviver);
+            if (data && data._meta && data._meta.type === 'usage' && data.usage) {
+                // We caught the usage event!
+                const u = data.usage;
+                let statText = `↑${u.prompt || 0} ↓${u.completion || 0} tok`;
+                if (u.cost !== undefined && u.cost !== null) {
+                    let costStr = u.cost.toFixed(6).replace(/0+$/, '');
+                    if (costStr.endsWith('.')) costStr += '00';
+                    statText += ` · $${costStr}`;
                 }
-                updateSessionTotal(u.session_cost, u.session_tokens);
-            }, 100); // give it a little time to finish rendering
+
+                // Find the last .message.ai element and append it
+                setTimeout(() => {
+                    const aiMsgs = document.querySelectorAll('.message.ai');
+                    if (aiMsgs.length > 0) {
+                        const lastAiMsg = aiMsgs[aiMsgs.length - 1];
+                        // don't append if it already has .or-stats
+                        if (!lastAiMsg.querySelector('.or-stats')) {
+                            const statDiv = document.createElement('div');
+                            statDiv.className = "msg-stats or-stats";
+                            statDiv.style = "opacity: 0.55; font-size: 0.78em; font-family: monospace; margin-top: 6px; text-align: right;";
+                            statDiv.textContent = statText;
+                            lastAiMsg.appendChild(statDiv);
+                        }
+                    }
+                    updateSessionTotal(u.session_cost, u.session_tokens);
+                }, 100); // give it a little time to finish rendering
+            }
+            return data;
+        } catch (e) {
+            // If the original parse fails, throw the error as usual
+            throw e;
         }
-        return data;
     };
 
 })();
