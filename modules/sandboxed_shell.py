@@ -64,9 +64,12 @@ class SandboxedShell(core.module.Module):
         is_running = False
         check_cmd = [self.runtime, 'inspect', '-f', '{{.State.Running}}', self.container_name]
         try:
-            check_res = subprocess.run(check_cmd, capture_output=True, text=True)
+            check_res = subprocess.run(check_cmd, capture_output=True, text=True, timeout=10)
             if check_res.returncode == 0 and check_res.stdout.strip() == "true":
                 is_running = True
+        except subprocess.TimeoutExpired:
+            core.log("sandbox_shell", "Timeout checking container state. Socket might be hung.")
+            is_running = False
         except Exception:
             is_running = False
 

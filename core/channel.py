@@ -277,6 +277,9 @@ class Channel:
                 # push handles all the output
                 pass
 
+        # openrouter-ext hook
+        await self.manager._on_completion(response, assistant_message)
+
         # add to context
         if not tool_calls:
             await self.context.chat.add(assistant_message)
@@ -439,6 +442,8 @@ class Channel:
             if final_reasoning:
                 assistant_message["reasoning_content"] = "".join(final_reasoning)
 
+            # In stream, token usage is stored in chat, let's construct a synthetic raw dict
+            await self.manager._on_completion({"usage": {"total_tokens": token_usage}}, assistant_message) # openrouter-ext
             await self.context.chat.add(assistant_message)
 
             # run module event hooks
