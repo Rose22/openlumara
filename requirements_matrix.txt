@@ -1,2 +1,0 @@
-matrix-nio[e2e]
-simplematrixbotlib

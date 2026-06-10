@@ -18,16 +18,14 @@ if %errorlevel% equ 0 (
 if not exist "venv" (
     echo setting up virtual environment with %PYTHON_BIN%...
     %PYTHON_BIN% -m venv venv
-
-    :: since this is the first run, install all requirements
-    echo installing requirements...
-    venv\Scripts\python -m pip install -q --upgrade pip
-    venv\Scripts\python -m pip install -r requirements.txt
 )
+
+:: Install package in editable mode
+venv\Scripts\python -m pip install -e .
 
 :: 3. Run the app
 echo starting openlumara...
-venv\Scripts\python main.py %*
+venv\Scripts\openlumara %*
 
 if %errorlevel% neq 0 (
     echo.

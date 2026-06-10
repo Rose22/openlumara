@@ -15,9 +15,11 @@ if [ ! -d "venv" ]; then
     echo "setting up virtual environment with $PYTHON_BIN..."
     $PYTHON_BIN -m venv venv
     venv/bin/pip install --upgrade pip
-    venv/bin/pip install -r requirements.txt
 fi
+
+# install package in editable mode
+venv/bin/pip install -e .
 
 # aaand run!
 source venv/bin/activate
-python main.py "$@"
+openlumara "$@"
