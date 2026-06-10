@@ -1223,7 +1223,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         sub_path = sub_path or []
         target_path = self._get_project_path(project_name)
         if sub_path:
-            target_path = os.path.join(target_path, os.path.normpath(sub_path))
+            target_path = core.sandbox_path(target_path, os.path.normpath(os.path.join(*sub_path) if isinstance(sub_path, list) else sub_path))
 
         if not os.path.exists(target_path):
             return self.result("error: path does not exist", success=False)
@@ -1967,7 +1967,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
         search_dir = self._get_project_path(project_name)
         if path:
-            search_dir = os.path.join(search_dir, *path)
+            search_dir = core.sandbox_path(search_dir, os.path.join(*path))
 
         if not os.path.isdir(search_dir):
             return self.result("error: search directory does not exist", success=False)
@@ -2037,7 +2037,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         """Finds files matching a glob pattern in a project."""
         search_dir = self._get_project_path(project_name)
         if path:
-            search_dir = os.path.join(search_dir, *path)
+            search_dir = core.sandbox_path(search_dir, os.path.join(*path))
 
         if not os.path.exists(search_dir):
             return self.result("error: search directory does not exist", success=False)
