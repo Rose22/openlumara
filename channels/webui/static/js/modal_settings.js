@@ -9,6 +9,9 @@ let cachedModels = null;
 let modelsLoadError = null;
 let moduleInfoCache = {};
 let showUnsafeSettings = localStorage.getItem('showUnsafeSettings') === 'true';
+let activeModule = null; // Tracks the selected module for Desktop split view / Mobile drill-down
+let categories = {}; // Global reference to settings categories
+let modulesExpanded = { modules: false, user_modules: false }; // Tracks expansion state per category
 
 // Category icons
 const SETTINGS_ICONS = {
@@ -547,8 +550,9 @@ async function loadSettings() {
     }
 
     // 6. Render whatever we have (either the fresh data or the cached data)
-    const categories = organizeSettingsIntoCategories(settingsData, moduleInfoCache);
-    renderSettingsForm(categories);
+    categories = organizeSettingsIntoCategories(settingsData, moduleInfoCache);
+    const firstCategory = Object.keys(categories)[0];
+    renderSettingsForm(categories, firstCategory);
     renderSettingsNav(categories);
 
     loading.style.display = 'none';
@@ -576,16 +580,21 @@ function checkForModelField(data, prefix = '') {
 }
 
 // Render settings navigation
+// Track the currently active category for highlight persistence
+let activeSettingsCategory = null;
+
+// Render settings navigation
 function renderSettingsNav(categories) {
     const nav = document.getElementById('settings-nav');
     nav.innerHTML = '';
+    const isMobile = window.innerWidth <= 768;
 
     const sortedCats = Object.entries(categories)
     .sort(([a, catA], [b, catB]) => (catA.order || 0) - (catB.order || 0));
 
     sortedCats.forEach(([cat, data], index) => {
         const btn = document.createElement('button');
-        btn.className = 'settings-nav-item' + (index === 0 ? ' active' : '');
+        btn.className = 'settings-nav-item';
         btn.dataset.category = cat;
         btn.innerHTML = `
         ${SETTINGS_ICONS[cat] || SETTINGS_ICONS.other}
@@ -593,30 +602,130 @@ function renderSettingsNav(categories) {
         `;
         btn.onclick = () => switchSettingsCategory(cat);
         nav.appendChild(btn);
+
+        // Add module sub-list for Modules category on desktop only
+        if (!isMobile && (cat === 'modules' || cat === 'user_modules') && data.groups && data.groups.has('_direct_')) {
+            const directGroup = data.groups.get('_direct_');
+            if (directGroup && directGroup.items.length > 0) {
+                const moduleListData = directGroup.items[0].value;
+                const allModules = getAllToggleItems({ enabled: moduleListData.enabled, disabled: moduleListData.disabled });
+                const enabledSet = new Set(moduleListData.enabled);
+                
+                const subList = document.createElement('div');
+                subList.className = 'module-sub-list' + (modulesExpanded[cat] ? ' expanded' : '');
+                subList.style.display = modulesExpanded[cat] ? '' : 'none';
+
+                allModules.forEach(moduleName => {
+                    const isUnsafe = moduleListData.unsafeModules[moduleName];
+                    if (isUnsafe && !showUnsafeSettings) return;
+                    
+                    // Only show enabled modules in the sidebar
+                    if (!enabledSet.has(moduleName)) return;
+
+                    // Check if module has settings - only show modules with actual settings
+                    const moduleSettingsGroupKey = `${cat}.settings.${moduleName}`;
+                    const moduleGroup = data.groups?.get(moduleSettingsGroupKey);
+                    if (!moduleGroup || moduleGroup.items.length === 0) return;
+
+                    const subBtn = document.createElement('button');
+                    subBtn.textContent = formatLabel(moduleName);
+                    subBtn.dataset.module = moduleName;
+                    subBtn.classList.toggle('active', activeModule === moduleName);
+                    
+                    // Add visual indicator for active state
+                    const statusIcon = document.createElement('span');
+                    statusIcon.style.cssText = 'width: 6px; height: 6px; border-radius: 50%; margin-left: auto;';
+                    statusIcon.style.backgroundColor = activeModule === moduleName ? 'white' : 'transparent';
+                    subBtn.appendChild(statusIcon);
+
+                    subBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        selectModule(moduleName);
+                    };
+
+                    subList.appendChild(subBtn);
+                });
+
+                // Insert sub-list after the main button
+                btn.parentNode.insertBefore(subList, btn.nextSibling);
+            }
+        }
     });
+
+    // Restore active highlight after re-rendering
+    if (activeSettingsCategory) {
+        document.querySelectorAll('.settings-nav-item').forEach(item => {
+            item.classList.toggle('active', item.dataset.category === activeSettingsCategory);
+        });
+    }
 }
 
 // Switch active settings category
 function switchSettingsCategory(category) {
+    activeSettingsCategory = category;
+    
+    // Expand the clicked category's sub-list, collapse others
+    const isModules = category === 'modules' || category === 'user_modules';
+    for (const key in modulesExpanded) {
+        modulesExpanded[key] = (isModules && key === category);
+    }
+
     document.querySelectorAll('.settings-nav-item').forEach(item => {
         item.classList.toggle('active', item.dataset.category === category);
     });
 
-    document.querySelectorAll('.settings-section').forEach(section => {
-        section.classList.toggle('active', section.dataset.category === category);
-    });
+    // Reset active module when switching to Modules category
+    if (category === 'modules' || category === 'user_modules') {
+        activeModule = null;
+    }
+
+    renderSettingsForm(categories, category);
+    // Re-render nav to update sub-list active state and visibility
+    renderSettingsNav(categories);
 }
 
-function renderSettingsForm(categories) {
+// Handle module selection from sub-list
+// Handle module selection from sub-list
+function selectModule(moduleName) {
+    activeSettingsCategory = 'modules';
+    activeModule = moduleName;
+    renderSettingsForm(categories, 'modules');
+    renderSettingsNav(categories);
+}
+
+function renderSettingsForm(categories, activeSettingsCategory = null) {
     const form = document.getElementById('settings-form');
     form.innerHTML = '';
+
+    const isMobile = window.innerWidth <= 768;
+
+    // Mobile: Show category list if none selected
+    if (isMobile && !activeSettingsCategory) {
+        const list = document.createElement('div');
+        list.className = 'mobile-category-list';
+        list.style.cssText = 'display: flex; flex-direction: column; background: var(--bg-secondary); border-radius: 12px; overflow: hidden; margin-bottom: 16px;';
+        const sortedCats = Object.entries(categories).sort(([a, catA], [b, catB]) => (catA.order || 0) - (catB.order || 0));
+        sortedCats.forEach(([cat, data]) => {
+            const btn = document.createElement('button');
+            btn.className = 'mobile-category-btn';
+            btn.style.cssText = 'display: flex; align-items: center; gap: 14px; padding: 16px 20px; background: none; border: none; border-bottom: 1px solid var(--border-color); cursor: pointer; text-align: left; font-size: 0.95rem; color: var(--text-primary); transition: background 0.15s ease; width: 100%; margin: 0;';
+            btn.innerHTML = `${SETTINGS_ICONS[cat] || SETTINGS_ICONS.other} <span style="font-weight: 500; color: var(--text-primary);">${data.title}</span>`;
+            btn.onclick = () => {
+                activeSettingsCategory = cat;
+                renderSettingsForm(categories, cat);
+            };
+            list.appendChild(btn);
+        });
+        form.appendChild(list);
+        return;
+    }
 
     const sortedCats = Object.entries(categories)
     .sort(([a, catA], [b, catB]) => (catA.order || 0) - (catB.order || 0));
 
     for (const [cat, data] of sortedCats) {
         const section = document.createElement('div');
-        section.className = 'settings-section';
+        section.className = 'settings-section' + (cat === activeSettingsCategory ? ' active' : '');
         section.dataset.category = cat;
 
         section.innerHTML = `
@@ -640,77 +749,209 @@ function renderSettingsForm(categories) {
             }
         }
 
-        // Render groups - put direct items first
-        if (data.groups) {
-            // First render direct (ungrouped) items into the main vertical stack
-            const directGroup = data.groups.get('_direct_');
-            if (directGroup && directGroup.isDirect) {
-                directGroup.items.forEach(item => {
-                    const itemEl = createSettingItem(item);
-                    if (item.isModuleList) {
-                        itemEl.classList.add('full-width-item');
+        // Special handling for Modules category
+        if (cat === 'modules' || cat === 'user_modules') {
+            const directGroup = data.groups?.get('_direct_');
+            if (directGroup && directGroup.items.length > 0) {
+                const moduleListData = directGroup.items[0].value;
+                const allModules = getAllToggleItems({ enabled: moduleListData.enabled, disabled: moduleListData.disabled });
+                const enabledSet = new Set(moduleListData.enabled);
+
+                if (isMobile) {
+                    if (activeModule) {
+                        // Drill-down: Show settings for selected module
+                        const backBtn = document.createElement('button');
+                        backBtn.className = 'mobile-back-btn';
+                        backBtn.style.cssText = 'display: flex; align-items: center; gap: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); font-size: 0.9rem; font-weight: 600; cursor: pointer; padding: 12px 16px; width: 100%; margin-bottom: 12px; border-radius: 8px; transition: all 0.15s ease;';
+                        backBtn.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 12H5"></path>
+                        <path d="M12 19l-7-7 7-7"></path>
+                        </svg>
+                        <span>Back</span>
+                        `;
+                        backBtn.onmouseenter = () => { backBtn.style.background = 'var(--bg-secondary)'; backBtn.style.borderColor = 'var(--accent)'; };
+                        backBtn.onmouseleave = () => { backBtn.style.background = 'var(--bg-tertiary)'; backBtn.style.borderColor = 'var(--border-color)'; };
+                        backBtn.onclick = () => {
+                            activeModule = null;
+                            renderSettingsForm(categories, activeSettingsCategory);
+                        };
+                        itemsContainer.appendChild(backBtn);
+
+                        // Render settings for the active module
+                        const moduleSettingsGroupKey = `${cat}.settings.${activeModule}`;
+                        const moduleGroup = data.groups?.get(moduleSettingsGroupKey);
+                        if (moduleGroup) {
+                            const moduleContainer = document.createElement('div');
+                            moduleContainer.className = 'settings-group';
+                            moduleContainer.dataset.group = moduleSettingsGroupKey;
+
+                            const header = document.createElement('div');
+                            header.className = 'settings-group-header';
+                            header.innerHTML = `<span class="settings-group-title">${formatLabel(activeModule)}</span>`;
+                            
+                            const content = document.createElement('div');
+                            content.className = 'settings-group-content';
+
+                            moduleGroup.items.forEach(item => {
+                                const itemEl = createSettingItem(item);
+                                content.appendChild(itemEl);
+                            });
+
+                            moduleContainer.appendChild(header);
+                            moduleContainer.appendChild(content);
+                            itemsContainer.appendChild(moduleContainer);
+                        } else {
+                            // Fallback if no specific settings group exists
+                            const msg = document.createElement('div');
+                            msg.className = 'settings-section-desc';
+                            msg.textContent = `No specific settings configured for ${formatLabel(activeModule)}.`;
+                            itemsContainer.appendChild(msg);
+                        }
+                    } else {
+                        // Show module list (iOS drill style)
+                        const moduleListContainer = document.createElement('div');
+                        moduleListContainer.className = 'settings-group';
+                        const header = document.createElement('div');
+                        header.className = 'settings-group-header';
+                        header.innerHTML = `<span class="settings-group-title" style="font-weight: 500; color: var(--text-primary);">${data.title}</span>`;
+                        moduleListContainer.appendChild(header);
+                        
+                        const listContent = document.createElement('div');
+                        listContent.className = 'settings-group-content module-list-content';
+                        listContent.style.cssText = 'display: flex; flex-direction: column; background: transparent; border-radius: 0; overflow: visible; padding: 0; border: none;';
+                        
+                        allModules.forEach(moduleName => {
+                            if (!enabledSet.has(moduleName)) return;
+                            const moduleSettingsGroupKey = `${cat}.settings.${moduleName}`;
+                            const moduleGroup = data.groups?.get(moduleSettingsGroupKey);
+                            if (!moduleGroup || moduleGroup.items.length === 0) return;
+
+                            const btn = document.createElement('button');
+                            btn.className = 'setting-item module-list-item';
+                            btn.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; background: var(--bg-secondary); border: none; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.15s ease; margin: 0; width: 100%; text-align: left; color: var(--text-primary); font-weight: 500; font-size: 0.95rem;';
+                            btn.textContent = formatLabel(moduleName);
+                            btn.onclick = () => {
+                                activeModule = moduleName;
+                                renderSettingsForm(categories, cat);
+                            };
+                            listContent.appendChild(btn);
+                        });
+                        moduleListContainer.appendChild(listContent);
+                        itemsContainer.appendChild(moduleListContainer);
                     }
-                    itemsContainer.appendChild(itemEl);
-                });
+                } else {
+                    // Desktop: Show sidebar sub-list or module settings
+                    if (activeModule) {
+                        // Show settings for selected module
+                        const moduleSettingsGroupKey = `${cat}.settings.${activeModule}`;
+                        const moduleGroup = data.groups?.get(moduleSettingsGroupKey);
+                        if (moduleGroup) {
+                            const moduleContainer = document.createElement('div');
+                            moduleContainer.className = 'settings-group';
+                            moduleContainer.dataset.group = moduleSettingsGroupKey;
+
+                            const header = document.createElement('div');
+                            header.className = 'settings-group-header';
+                            header.innerHTML = `<span class="settings-group-title">${formatLabel(activeModule)}</span>`;
+
+                            const content = document.createElement('div');
+                            content.className = 'settings-group-content';
+
+                            moduleGroup.items.forEach(item => {
+                                const itemEl = createSettingItem(item);
+                                content.appendChild(itemEl);
+                            });
+
+                            moduleContainer.appendChild(header);
+                            moduleContainer.appendChild(content);
+                            itemsContainer.appendChild(moduleContainer);
+                        } else {
+                            // Fallback if no specific settings group exists
+                            const msg = document.createElement('div');
+                            msg.className = 'settings-section-desc';
+                            msg.textContent = `No specific settings configured for ${formatLabel(activeModule)}.`;
+                            itemsContainer.appendChild(msg);
+                        }
+                    } else {
+                        // Show the global toggle list (desktop)
+                        const itemEl = createSettingItem(directGroup.items[0]);
+                        itemEl.classList.add('full-width-item');
+                        itemsContainer.appendChild(itemEl);
+                    }
+                }
             }
+        }
+        
+        // Skip generic group rendering for modules/user_modules
+        if (cat !== 'modules' && cat !== 'user_modules') {
+            // Render groups - put direct items first
+            if (data.groups) {
+                // First render direct (ungrouped) items into the main vertical stack
+                const directGroup = data.groups.get('_direct_');
+                if (directGroup && directGroup.isDirect) {
+                    directGroup.items.forEach(item => {
+                        const itemEl = createSettingItem(item);
+                        if (item.isModuleList) {
+                            itemEl.classList.add('full-width-item');
+                        }
+                        itemsContainer.appendChild(itemEl);
+                    });
+                }
 
-            // Create the grid container for grouped items
-            const groupsGrid = document.createElement('div');
-            groupsGrid.className = 'settings-groups-grid';
+                // Create the grid container for grouped items
+                const groupsGrid = document.createElement('div');
+                groupsGrid.className = 'settings-groups-grid';
 
-            // --- START OF SORTING LOGIC ---
-            // 1. Convert Map to Array
-            // 2. Filter out the '_direct_' key
-            // 3. Sort the resulting array by the group's title
-            const sortedGroupEntries = Array.from(data.groups.entries())
-            .filter(([groupKey]) => groupKey !== '_direct_')
-            .sort((a, b) => {
-                const titleA = a[1].title || '';
-                const titleB = b[1].title || '';
-                return titleA.localeCompare(titleB);
-            });
-
-            // 4. Iterate over the sorted array instead of the Map
-            sortedGroupEntries.forEach(([groupKey, groupData]) => {
-                const groupContainer = document.createElement('div');
-                groupContainer.className = 'settings-group';
-                groupContainer.dataset.group = groupKey;
-
-                // Create header (clickable to collapse)
-                const header = document.createElement('div');
-                header.className = 'settings-group-header';
-                header.innerHTML = `
-                <span class="settings-group-title">
-                ${groupData.title}
-                </span>
-                `;
-
-                // Create content container
-                const content = document.createElement('div');
-                content.className = 'settings-group-content';
-
-                // Render items within the group
-                groupData.items.forEach(item => {
-                    const itemEl = createSettingItem(item);
-                    content.appendChild(itemEl);
+                // --- START OF SORTING LOGIC ---
+                // 1. Convert Map to Array
+                // 2. Filter out the '_direct_' key
+                // 3. Sort the resulting array by the group's title
+                const sortedGroupEntries = Array.from(data.groups.entries())
+                .filter(([groupKey]) => groupKey !== '_direct_')
+                .sort((a, b) => {
+                    const titleA = a[1].title || '';
+                    const titleB = b[1].title || '';
+                    return titleA.localeCompare(titleB);
                 });
 
-                groupContainer.appendChild(header);
-                groupContainer.appendChild(content);
-                groupsGrid.appendChild(groupContainer);
-            });
-            // --- END OF SORTING LOGIC ---
+                // 4. Iterate over the sorted array instead of the Map
+                sortedGroupEntries.forEach(([groupKey, groupData]) => {
+                    const groupContainer = document.createElement('div');
+                    groupContainer.className = 'settings-group';
+                    groupContainer.dataset.group = groupKey;
 
-            itemsContainer.appendChild(groupsGrid);
+                    // Create header (clickable to collapse)
+                    const header = document.createElement('div');
+                    header.className = 'settings-group-header';
+                    header.innerHTML = `
+                    <span class="settings-group-title">
+                    ${groupData.title}
+                    </span>
+                    `;
+
+                    // Create content container
+                    const content = document.createElement('div');
+                    content.className = 'settings-group-content';
+
+                    // Render items within the group
+                    groupData.items.forEach(item => {
+                        const itemEl = createSettingItem(item);
+                        content.appendChild(itemEl);
+                    });
+
+                    groupContainer.appendChild(header);
+                    groupContainer.appendChild(content);
+                    groupsGrid.appendChild(groupContainer);
+                });
+                // --- END OF SORTING LOGIC ---
+
+                itemsContainer.appendChild(groupsGrid);
+            }
         }
 
         section.appendChild(itemsContainer);
         form.appendChild(section);
-    }
-
-    const firstSection = form.querySelector('.settings-section');
-    if (firstSection) {
-        firstSection.classList.add('active');
     }
 }
 
@@ -1624,10 +1865,10 @@ function resetSettingsForm() {
 
 // Save settings to backend
 async function saveSettings() {
-    const activeCategory = document.querySelector('.settings-nav-item.active')?.dataset.category;
+    const activeSettingsCategory = document.querySelector('.settings-nav-item.active')?.dataset.category;
 
     // Appearance changes are local/immediate and don't trigger server saves here
-    if (activeCategory === 'appearance') {
+    if (activeSettingsCategory === 'appearance') {
         toggleModal('settings');
         return;
     }
