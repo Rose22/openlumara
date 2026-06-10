@@ -30,7 +30,7 @@ fi
 echo "ensuring dependencies are up to date..."
 source venv/bin/activate
 pip install -q --upgrade pip
-pip install -r requirements.txt
+pip install -e .
 
 echo
 echo "done!"

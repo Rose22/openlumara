@@ -38,7 +38,7 @@ if not exist "venv" (
 :: 2. Ensure dependencies are up to date
 echo ensuring dependencies are up to date...
 venv\Scripts\python -m pip install -q --upgrade pip
-venv\Scripts\python -m pip install -r requirements.txt
+venv\Scripts\python -m pip install -e .
 
 echo.
 echo done!

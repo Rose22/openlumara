@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openlumara"
+version = "1.0.0"
+description = "A modular, token-efficient AI agent framework"
+readme = "README.md"
+license = {text = "GPL-2.0-or-later"}
+authors = [
+    {name = "Rose22", email = "rose22@example.com"}
+]
+requires-python = ">=3.10"
+dependencies = [
+    "openai",
+    "tiktoken",
+    "prompt_toolkit",
+    "msgpack",
+    "pyyaml",
+    "json-repair",
+    "aiofiles",
+    "python-ulid",
+    "requests",
+    "jinja2",
+    "itsdangerous",
+    "starlette>=1.0.1",
+    "fastapi",
+    "uvicorn",
+    "websockets",
+    "python-multipart",
+    "beautifulsoup4",
+    "ddgs",
+    "discord.py",
+    "python-telegram-bot",
+    "tree-sitter",
+    "tree-sitter-python",
+    "tree-sitter-javascript",
+    "tree-sitter-typescript",
+    "tree-sitter-html",
+    "tree-sitter-css",
+    "tree-sitter-cpp",
+    "tree-sitter-c-sharp",
+    "tree-sitter-rust",
+    "tree-sitter-ruby",
+    "tree-sitter-go",
+    "tree-sitter-java",
+]
+
+[project.optional-dependencies]
+matrix = [
+    "matrix-nio[e2e]",
+    "simplematrixbotlib",
+]
+
+[project.scripts]
+openlumara = "openlumara.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
