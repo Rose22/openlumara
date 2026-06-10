@@ -39,7 +39,7 @@ class OpenRouterModels(core.module.Module):
                 headers={"User-Agent": "OpenLumara"}
             )
             try:
-                with urllib.request.urlopen(req) as response:
+                with urllib.request.urlopen(req, timeout=10) as response:
                     return json.loads(response.read().decode())
             except Exception as e:
                 core.log("openrouter_models", f"Failed to fetch models: {e}")
@@ -96,6 +96,7 @@ class OpenRouterModels(core.module.Module):
 
         return condensed
 
+    @core.module.tool("list_models", "Returns the list of available OpenRouter models as JSON")
     def list_openrouter_models(self):
         """Returns the full list of available OpenRouter models with their capabilities and pricing as JSON."""
         if not self.enabled:

@@ -55,19 +55,6 @@
     // Given we just need to append the stats to the DOM, let's observe the window object or replace JSON.parse locally if needed,
     // actually, `finalizeStreamingUI` or `renderAllMessages` gets called at the end of stream.
     // The SSE parser already handles unknown _meta events gracefully. It just ignores it unless we hook it.
-    // Let's hook `window.fetch` to wrap the reader to intercept "type": "usage".
-
-    const originalFetch = window.fetch;
-    window.fetch = async function(...args) {
-        const response = await originalFetch.apply(this, args);
-        if (args[0] === '/stream' || args[0] === '/send') {
-            // we could intercept the body but it's complex.
-            // But wait! at the end of stream, it fetches `/chat/current` or `/messages`?
-            // In webui.py, `message_added` is broadcast via websocket.
-            // Also, after `commit`, the frontend usually updates history.
-        }
-        return response;
-    };
 
     // Let's patch JSON.parse temporarily during stream to catch our usage event?
     const originalParse = JSON.parse;

@@ -277,9 +277,11 @@ class Channel:
                 # push handles all the output
                 pass
 
+        # openrouter-ext hook
+        await self.manager._on_completion(response, assistant_message)
+
         # add to context
         if not tool_calls:
-            await self.manager._on_completion(response, assistant_message) # openrouter-ext
             await self.context.chat.add(assistant_message)
 
         # run module event hooks
