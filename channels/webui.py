@@ -280,7 +280,7 @@ async def require_auth(request: Request):
 # Define paths that don't require authentication
 PUBLIC_PATHS = {
     '/login', '/api/login', '/api/health',
-    '/manifest.json', '/sw.js', '/icon-192.png', '/icon-512.png'
+    '/manifest.json', '/sw.js', '/icon-192.png', '/icon-512.png', '/themes.js'
 }
 
 @app.middleware("http")
