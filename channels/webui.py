@@ -591,7 +591,7 @@ async def stream_message(request: Request, user: str = Depends(require_auth)):
             # Initial connection signal
             yield f"data: {json.dumps({'_meta': {'type': 'connection', 'status': 'connected'}, 'id': stream_id})}\n\n"
 
-            async for token_data in channel_instance.send_stream(data):
+            async for token_data in channel_instance.send_stream(data, commands_authorized=True):
                 if stream_id in stream_cancellations:
                     stream_cancellations.discard(stream_id)
                     yield f"data: {json.dumps({'_meta': {'type': 'cancelled'}})}\n\n"
@@ -649,7 +649,7 @@ async def send_message(request: Request, user: str = Depends(require_auth)):
         raise HTTPException(status_code=503, detail=status)
 
     data = await request.json()
-    response = await channel_instance.send(data)
+    response = await channel_instance.send(data, commands_authorized=True)
 
     if isinstance(response, dict) and 'error' in response:
         raise HTTPException(status_code=500, detail=response)

@@ -17,6 +17,7 @@ import html as html_module
 import threading
 from datetime import datetime
 from urllib.parse import urlparse, unquote
+import urllib.request
 from collections import Counter
 
 import core
@@ -799,6 +800,14 @@ class Http(core.module.Module):
         self._last_request_time = 0
         self._lock = threading.Lock()
 
+        # fetch & cache our public IP so we can censor it
+        try:
+            self.server_ipv4 = urllib.request.urlopen("https://api.ipify.org").read().decode()
+            self.server_ipv6 = urllib.request.urlopen("https://api64.ipify.org").read().decode()
+        except:
+            self.server_ipv4 = None
+            self.server_ipv6 = None
+
     # ==================== Untrusted-content wrapper ====================
     # Based on Digital Applied's 12-layer framework: untrusted fencing + provenance
     # Based on OWASP LLM01:2025: content segregation with metadata tags
@@ -940,13 +949,8 @@ class Http(core.module.Module):
         if not isinstance(text, str):
             return text
 
-        # Regex for IPv4
-        ipv4_pattern = r'\b(?:\d{1,3}\.){3}\d{1,3}\b'
-        # Regex for IPv6 (simplified for common cases)
-        ipv6_pattern = r'(?:[0-9a-fA-F]{1,4}:){2,7}(?:[0-9a-fA-F]{1,4})'
-
-        text = re.sub(ipv4_pattern, '[CENSORED_IP]', text)
-        text = re.sub(ipv6_pattern, '[CENSORED_IP]', text)
+        text = text.replace(self.server_ipv4, "[CENSORED_IP]")
+        text = text.replace(self.server_ipv6, "[CENSORED_IP]")
         return text
 
     # ==================== SSRF Protection ====================

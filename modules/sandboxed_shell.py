@@ -38,13 +38,17 @@ class SandboxedShell(core.module.Module):
             "default": 30,
             "description": "Maximum amount of time a process inside the shell is allowed to run for"
         },
-        "image": "python:3.11-slim"
+        "image": "python:3.11-slim",
+        "run_as_user": {
+            "default": "65534",
+            "description": "UID to run the container processes as. Defaults to 65534 (nobody) for security."
+        }
     }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Resolve the host path and ensure it exists.
-        self.host_workspace = core.get_path(os.path.expanduser(self.config.get("sandbox_path", default="~/sandbox")))
+        self.host_workspace = os.path.expanduser(self.config.get("sandbox_path", default="~/sandbox"))
         if not os.path.exists(self.host_workspace):
             os.makedirs(self.host_workspace, exist_ok=True)
 
@@ -83,16 +87,18 @@ class SandboxedShell(core.module.Module):
             start_cmd = [
                 self.runtime, 'run', '-d',
                 '--name', self.container_name,
+                '--user', self.config.get("run_as_user", default="65534"),
                 '--cpus', str(self.config.get("cpu_limit", default=0.5)),
                 '--memory', self.config.get("memory_limit", default="256m"),
                 '--pids-limit', str(self.config.get("max_processes", default=50)),
-                '--network', 'bridge' if self.config.get("internet_access", default=False) else 'none'
+                '--network', 'bridge' if self.config.get("internet_access", default=False) else 'none',
+                '--rm',
             ]
 
             if self.config.get("persistent_data", default=True):
                 start_cmd.extend(['-v', f"{self.host_workspace}:/data:Z"])
             else:
-                start_cmd.extend(['--rm', '--tmpfs', '/data'])
+                start_cmd.extend(['--tmpfs', '/data'])
 
             # set working dir to /data
             start_cmd.extend(['-w', '/data'])

@@ -160,7 +160,7 @@ class Cli(core.channel.Channel):
         tool_renderer = ToolCallRenderer()
         currently_reasoning = False
 
-        async for token in self.send_stream({"role": "user", "content": msg}):
+        async for token in self.send_stream({"role": "user", "content": msg}, commands_authorized=True):
             token_type = token.get("type")
             content = token.get("content", "")
 

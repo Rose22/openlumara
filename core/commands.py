@@ -221,6 +221,7 @@ def _get_config_value(path: list):
 class Commands:
     # delete these after they are shown to the user once
     GHOST = ("help", "new", "clear", "context", "prompt", "tools", "stop")
+    PUBLIC_COMMANDS = ("new", "clear", "status", "stop")
 
     def __init__(self, channel):
         self.channel = channel
@@ -268,10 +269,16 @@ class Commands:
             core.log_error("Command parsing error", e)
             return None, None, []
 
-    async def process_input(self, message: dict):
+    async def process_input(self, message: dict, authorized=False):
         """wrapper around the real _process_input, handles insertion of context"""
         content = self.channel._extract_content(message)
         cmd_prefix, cmd, args = await self._extract_cmd(content)
+
+        if len(cmd) <= 0:
+            raise Exception("Command was somehow zero length. Aborting for security reasons.")
+
+        if not authorized and cmd[0] not in self.PUBLIC_COMMANDS:
+            raise Exception("You are not authorized to run admin commands.")
 
         # treat message as normal if it's not a command
         if cmd is None or not content.startswith(cmd_prefix):

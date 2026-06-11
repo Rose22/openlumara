@@ -7,8 +7,6 @@ import json_repair
 MAX_CHARS = 1900
 
 class Client(discord.Client):
-    public_commands = ("new", "clear", "status", "stop")
-
     def __init__(self, channel, **kwargs):
         super(Client, self).__init__(**kwargs)
         self.ai_channel = channel
@@ -101,6 +99,11 @@ class Client(discord.Client):
         if message.channel.id != int(self.ai_channel.config.get("target_channel_id")):
             return
 
+        commands_authorized = False
+        authorized_id = self.ai_channel.config.get("authorized_user_id")
+        if authorized_id and message.author.id == int(authorized_id):
+            commands_authorized = True
+
         if message.content:
             # only reply if mentioned
             mentioned = False
@@ -124,18 +127,14 @@ class Client(discord.Client):
                             content = content.replace("<@>", "")
                             content = content.strip()
 
-                        cmd_prefix = core.config.get("core").get("cmd_prefix", "/")
-                        is_cmd = content.lower().startswith(cmd_prefix.lower())
-                        try:
-                            cmd = content.split(cmd_prefix)[-1]
-                        except:
-                            return await message.channel.send("Error while splitting command prefix.. somehow")
+                        cmd_prefix, cmd, args = await self.ai_channel.commands._extract_cmd(content)
+                        is_cmd = content.lower().strip().startswith(cmd_prefix.lower())
 
                         if is_cmd:
-                            if cmd not in self.public_commands:
-                                authorised_id = self.ai_channel.config.get("authorised_user_id")
-                                if authorised_id and message.author.id != int(authorised_id):
-                                    return await message.channel.send("Only the bot owner is allowed to use commands!")
+                            # send the pure command to the AI
+                            # command authorization checks were moved to the core framework
+                            # so that it's much more secure
+                            content = f"{cmd_prefix}{' '.join(cmd)}"
                         else:
                             orig_content = str(content)
                             content = ""
@@ -154,7 +153,13 @@ class Client(discord.Client):
 
                             # if group chat is enabled, make the AI aware of who is speaking
                             if group_chat:
-                                content += f"{message.author.display_name} said: {orig_content}"
+                                # strip cmd prefix from author name for safety
+                                # extra layer of security on top of the fix further below in the code
+                                cmd_prefix_temp = str(core.config.get("core", "cmd_prefix", default="/"))
+                                author_name = str(message.author.display_name).lstrip(cmd_prefix_temp)
+                                del(cmd_prefix_temp)
+
+                                content += f"{author_name} said: {orig_content}"
                             else:
                                 content += orig_content
 
@@ -164,12 +169,15 @@ class Client(discord.Client):
                     try:
                         if self.ai_channel.config.get("use_message_streaming"):
                             response_obj = self.ai_channel.format_stream_for_text(
-                                self.ai_channel.send_stream({"role": "user", "content": content}),
+                                self.ai_channel.send_stream(
+                                    {"role": "user", "content": content},
+                                    commands_authorized=commands_authorized
+                                ),
                                 chunk_size=MAX_CHARS
                             )
                             await self._stream_to_discord(response_obj, message.channel)
                         else:
-                            response_obj = await self.ai_channel.send({"role": "user", "content": content})
+                            response_obj = await self.ai_channel.send({"role": "user", "content": content}, commands_authorized=commands_authorized)
 
                             if response_obj:
                                 response_content = response_obj.get("content")
@@ -192,7 +200,7 @@ class Discord(core.channel.Channel):
             "description": "Your discord token. Get it in the [Discord Developer Portal](https://discord.com/developers/applications)",
             "default": None
         },
-        "authorised_user_id": {
+        "authorized_user_id": {
             "description": "Your personal user ID. Get it by enabling *Developer Mode* in Discord (open Settings, then go to Developer, then toggle on Developer Mode), then right clicking your name and clicking/tapping *Copy ID*",
             "default": None
         },
