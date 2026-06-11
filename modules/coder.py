@@ -2062,91 +2062,92 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
     # ==================== Formatting & Imports ====================
 
-    async def format_file(self, project_name: str, file_path: str, formatter: str = "auto") -> dict:
-        """Formats code using appropriate formatter. Supports: auto, black, autopep8, prettier, gofmt, rustfmt, clang-format, etc."""
-        file_path_str = self._get_file_path(project_name, file_path)
-        if not os.path.exists(file_path_str):
-            return self.result("error: file does not exist", success=False)
-
-        await self._backup_file(file_path_str)
-
-        supported_formatters = []
-        for lang in self.FORMATTERS:
-            supported_formatters.extend(lang)
-
-        if formatter not in supported_formatters:
-            return self.result("error: unsupported formatter", success=False)
-
-        try:
-            lang = self._get_language_from_ext(file_path_str)
-            formatters = self.FORMATTERS.get(lang, [])
-
-            async def run_formatter(fmt_name, args):
-                """Run a formatter with given args, handling CLI differences."""
-                proc = await asyncio.create_subprocess_exec(
-                    fmt_name, *args,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE
-                )
-                try:
-                    stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
-                    return proc.returncode, stdout, stderr
-                except asyncio.TimeoutError:
-                    try:
-                        proc.kill()
-                        await proc.wait()
-                    except:
-                        pass
-                    return -1, b"", b"Timeout"
-
-            def try_format_with_inplace(fmt_name):
-                """Try formatting with -i flag, fallback to read/write if it fails."""
-                import subprocess as sp
-                try:
-                    # Try with -i first
-                    result = sp.run([fmt_name, "-i", file_path_str], 
-                                   capture_output=True, text=True, timeout=30)
-                    if result.returncode == 0:
-                        return True, fmt_name
-                except (FileNotFoundError, sp.TimeoutExpired):
-                    pass
-                
-                # Fallback: read, format, write
-                try:
-                    with open(file_path_str, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                    
-                    # Try running without -i (pipe mode)
-                    result = sp.run([fmt_name, '-'], 
-                                   input=content, capture_output=True, text=True, timeout=30)
-                    if result.returncode == 0:
-                        with open(file_path_str, 'w', encoding='utf-8') as f:
-                            f.write(result.stdout)
-                        return True, fmt_name
-                except (FileNotFoundError, sp.TimeoutExpired):
-                    pass
-                
-                return False, None
-
-            if formatter == "auto":
-                # Try each formatter until one succeeds
-                for fmt in formatters:
-                    success, used_fmt = try_format_with_inplace(fmt)
-                    if success:
-                        return self.result({"message": f"File formatted with {used_fmt}", "formatter": used_fmt}, success=True)
-                return self.result(f"error: No formatter found for {lang}. Tried: {formatters}", success=False)
-            else:
-                # Use specified formatter
-                if formatter not in formatters:
-                    return self.result(f"error: Formatter '{formatter}' not supported for {lang}. Supported: {formatters}", success=False)
-
-                success, used_fmt = try_format_with_inplace(formatter)
-                if success:
-                    return self.result({"message": f"File formatted with {used_fmt}", "formatter": used_fmt}, success=True)
-                
-                return self.result(f"error: Formatter '{formatter}' failed for {lang}.", success=False)
-        except Exception as e:
-            return self.result(f"error: {e}", success=False)
+    # temporarily disabled because of security risks
+#     async def format_file(self, project_name: str, file_path: str, formatter: str = "auto") -> dict:
+#         """Formats code using appropriate formatter. Supports: auto, black, autopep8, prettier, gofmt, rustfmt, clang-format, etc."""
+#         file_path_str = self._get_file_path(project_name, file_path)
+#         if not os.path.exists(file_path_str):
+#             return self.result("error: file does not exist", success=False)
+#
+#         await self._backup_file(file_path_str)
+#
+#         supported_formatters = []
+#         for lang in self.FORMATTERS:
+#             supported_formatters.extend(lang)
+#
+#         if formatter not in supported_formatters:
+#             return self.result("error: unsupported formatter", success=False)
+#
+#         try:
+#             lang = self._get_language_from_ext(file_path_str)
+#             formatters = self.FORMATTERS.get(lang, [])
+#
+#             async def run_formatter(fmt_name, args):
+#                 """Run a formatter with given args, handling CLI differences."""
+#                 proc = await asyncio.create_subprocess_exec(
+#                     fmt_name, *args,
+#                     stdout=asyncio.subprocess.PIPE,
+#                     stderr=asyncio.subprocess.PIPE
+#                 )
+#                 try:
+#                     stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
+#                     return proc.returncode, stdout, stderr
+#                 except asyncio.TimeoutError:
+#                     try:
+#                         proc.kill()
+#                         await proc.wait()
+#                     except:
+#                         pass
+#                     return -1, b"", b"Timeout"
+#
+#             def try_format_with_inplace(fmt_name):
+#                 """Try formatting with -i flag, fallback to read/write if it fails."""
+#                 import subprocess as sp
+#                 try:
+#                     # Try with -i first
+#                     result = sp.run([fmt_name, "-i", file_path_str],
+#                                    capture_output=True, text=True, timeout=30)
+#                     if result.returncode == 0:
+#                         return True, fmt_name
+#                 except (FileNotFoundError, sp.TimeoutExpired):
+#                     pass
+#
+#                 # Fallback: read, format, write
+#                 try:
+#                     with open(file_path_str, 'r', encoding='utf-8') as f:
+#                         content = f.read()
+#
+#                     # Try running without -i (pipe mode)
+#                     result = sp.run([fmt_name, '-'],
+#                                    input=content, capture_output=True, text=True, timeout=30)
+#                     if result.returncode == 0:
+#                         with open(file_path_str, 'w', encoding='utf-8') as f:
+#                             f.write(result.stdout)
+#                         return True, fmt_name
+#                 except (FileNotFoundError, sp.TimeoutExpired):
+#                     pass
+#
+#                 return False, None
+#
+#             if formatter == "auto":
+#                 # Try each formatter until one succeeds
+#                 for fmt in formatters:
+#                     success, used_fmt = try_format_with_inplace(fmt)
+#                     if success:
+#                         return self.result({"message": f"File formatted with {used_fmt}", "formatter": used_fmt}, success=True)
+#                 return self.result(f"error: No formatter found for {lang}. Tried: {formatters}", success=False)
+#             else:
+#                 # Use specified formatter
+#                 if formatter not in formatters:
+#                     return self.result(f"error: Formatter '{formatter}' not supported for {lang}. Supported: {formatters}", success=False)
+#
+#                 success, used_fmt = try_format_with_inplace(formatter)
+#                 if success:
+#                     return self.result({"message": f"File formatted with {used_fmt}", "formatter": used_fmt}, success=True)
+#
+#                 return self.result(f"error: Formatter '{formatter}' failed for {lang}.", success=False)
+#         except Exception as e:
+#             return self.result(f"error: {e}", success=False)
 
     # ==================== System Prompt ====================
 
