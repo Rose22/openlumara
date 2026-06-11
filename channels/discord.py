@@ -158,7 +158,7 @@ class Client(discord.Client):
                                 # strip cmd prefix from author name for safety
                                 # extra layer of security on top of the fix further below in the code
                                 cmd_prefix_temp = str(core.config.get("core", "cmd_prefix", default="/"))
-                                author_name = str(message.author.display_name).lstrip(cmd_prefix_temp)
+                                author_name = str(message.author.name).lstrip(cmd_prefix_temp)
                                 del(cmd_prefix_temp)
 
                                 content += f"{author_name} said: {orig_content}"
