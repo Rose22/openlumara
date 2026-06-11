@@ -77,7 +77,7 @@ class SandboxedShell(core.module.Module):
             return self.result("Docker or podman not available.", False)
 
         uid = self.config.get("run_as_user", default="65534")
-        timeout = self.config.get("execution_timeout", default=30)
+        timeout = self.config.get("execution_timeout", default=10)
         img = self.config.get("image", default="python:3.11-slim")
 
         # Generate unique container name

@@ -171,7 +171,7 @@ class ToolcallManager:
                         return await func_callable(**tool_args)
 
                     # add a timeout so that tools can't hang the application forever
-                    func_response = await asyncio.wait_for(_run_tool(), timeout=float(core.config.get("core", "tool_timeout", default=15.0)))
+                    func_response = await asyncio.wait_for(_run_tool(), timeout=float(core.config.get("core", "tool_timeout", default=10.0)))
 
                     # don't double-escape strings
                     if isinstance(func_response, str):
