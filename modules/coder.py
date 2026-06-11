@@ -1813,7 +1813,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
     # ==================== Search Operations ====================
 
-    async def search_in_file(self, project_name: str, file_path: str, query: str, context_lines: int = 5, max_matches: int = 10, use_regex: bool = True):
+    async def search_in_file(self, project_name: str, file_path: str, query: str, context_lines: int = 5, max_matches: int = 10):
         """
         Search for text or regex pattern within a file.
         Returns snippets with line numbers and surrounding context.
@@ -1829,13 +1829,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             matches = []
             num_lines = len(lines)
 
-            if use_regex:
-                try:
-                    pattern = re.compile(query, re.IGNORECASE)
-                except re.error as e:
-                    return self.result(f"error: Invalid regex pattern: {e}", success=False)
-            else:
-                query_lower = query.lower()
+            query_lower = query.lower()
 
             for i, line in enumerate(lines):
                 if len(matches) >= max_matches:
@@ -1844,12 +1838,8 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
                 line_num = i + 1
                 match_found = False
 
-                if use_regex:
-                    if pattern.search(line):
-                        match_found = True
-                else:
-                    if query_lower in line.lower():
-                        match_found = True
+                if query_lower in line.lower():
+                    match_found = True
 
                 if match_found:
                     snippet = [f"--- Match at line {line_num} ---"]
@@ -1877,7 +1867,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         except Exception as e:
             return self.result(f"error: {e}", success=False)
 
-    async def search_replace(self, project_name: str, file_path: str, query: str, replacement: str, use_regex: bool = True):
+    async def search_replace(self, project_name: str, file_path: str, query: str, replacement: str):
         """
         Replace all instances of a string or regex pattern across the entire file content.
         Replaces ALL OCCURENCES of the query string with the replacement string.
@@ -1890,15 +1880,8 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             with open(file_path_str, 'r', encoding='utf-8') as f:
                 content = f.read()
 
-            if use_regex:
-                try:
-                    pattern = re.compile(query, re.IGNORECASE)
-                    new_content, count = pattern.subn(replacement, content)
-                except re.error as e:
-                    return self.result(f"error: Invalid regex pattern: {e}", success=False)
-            else:
-                count = content.count(query)
-                new_content = content.replace(query, replacement)
+            count = content.count(query)
+            new_content = content.replace(query, replacement)
 
             if count > 0:
                 with open(file_path_str, 'w', encoding='utf-8') as f:
@@ -1961,8 +1944,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         except Exception as e:
             return self.result(f"error: {e}", success=False)
 
-    async def grep(self, project_name: str, path: list = None, pattern: str = "", use_regex: bool = True,
-                   case_sensitive: bool = False, max_results: int = None):
+    async def grep(self, project_name: str, path: list = None, pattern: str = "", case_sensitive: bool = False, max_results: int = None):
         """Search for a pattern across files in a project."""
 
         search_dir = self._get_project_path(project_name)
@@ -1975,14 +1957,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         max_results = max_results or self.config.get("max_grep_results", 50)
 
         try:
-            if use_regex:
-                flags = 0 if case_sensitive else re.IGNORECASE
-                try:
-                    compiled_pattern = re.compile(pattern, flags)
-                except re.error as e:
-                    return self.result(f"error: Invalid regex pattern: {e}", success=False)
-            else:
-                search_text = pattern if case_sensitive else pattern.lower()
+            search_text = pattern if case_sensitive else pattern.lower()
 
             results = []
             file_count = 0
@@ -2005,13 +1980,9 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
                         with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
                             for line_num, line in enumerate(f, 1):
                                 found = False
-                                if use_regex:
-                                    if compiled_pattern.search(line):
-                                        found = True
-                                else:
-                                    line_search = line.lower() if not case_sensitive else line
-                                    if search_text in line_search:
-                                        found = True
+                                line_search = line.lower() if not case_sensitive else line
+                                if search_text in line_search:
+                                    found = True
 
                                 if found:
                                     snippet = line.rstrip('\n')[:200]
