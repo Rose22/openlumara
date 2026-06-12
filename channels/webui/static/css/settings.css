@@ -2368,8 +2368,6 @@
         gap: 4px;
         padding: 8px 12px;
         overflow-x: auto;
-        /* Prevent mobile browsers from auto-scrolling clicked items into view */
-        touch-action: pan-y;
         scroll-behavior: smooth;
         -webkit-overflow-scrolling: touch;
     }
