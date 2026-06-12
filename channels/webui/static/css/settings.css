@@ -442,15 +442,12 @@
 
 
 .toggle-list {
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
     overflow: hidden;
 }
 
 .toggle-list-status {
-    padding: 10px 12px;
+    padding: 2px 0px;
     background: var(--bg-secondary);
-    border-bottom: 1px solid var(--border-color);
 }
 
 .toggle-count {
@@ -461,7 +458,7 @@
 .toggle-list-grid {
     display: grid;
     gap: 10px;
-    padding: 12px;
+    padding: 2px 0px;
     grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
 }
 
@@ -963,15 +960,12 @@
 
 /* Toggle List */
 .toggle-list {
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
     overflow: hidden;
 }
 
 .toggle-list-status {
-    padding: 10px 12px;
+    padding: 2px 0px;
     background: var(--bg-secondary);
-    border-bottom: 1px solid var(--border-color);
 }
 
 .toggle-count {
@@ -982,7 +976,7 @@
 .toggle-list-grid {
     display: grid;
     gap: 8px;
-    padding: 12px;
+    padding: 2px 0px;
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
 }
 
@@ -2615,5 +2609,127 @@
 
     .mobile-back-btn:active {
         opacity: 0.7;
+    }
+
+    /* ==========================================================================
+     *  Unified Module & Channel Lists (Mobile)
+     *  ========================================================================== */
+
+    .module-unified-list,
+    .channel-unified-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        background: var(--bg-secondary);
+        border-radius: var(--radius-sm);
+        overflow: hidden;
+        margin-bottom: 14px;
+    }
+
+    .module-unified-card,
+    .channel-unified-card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 20px;
+        background: var(--bg-secondary);
+        border: none;
+        border-bottom: 1px solid var(--border-color);
+        cursor: pointer;
+        transition: background 0.15s ease;
+        margin: 0;
+        width: 100%;
+        text-align: left;
+        color: var(--text-primary);
+    }
+
+    .module-unified-card:last-child,
+    .channel-unified-card:last-child {
+        border-bottom: none;
+    }
+
+    .module-unified-card:hover,
+    .channel-unified-card:hover {
+        background: var(--bg-tertiary);
+    }
+
+    .module-unified-card:active,
+    .channel-unified-card:active {
+        background: var(--bg-tertiary);
+        opacity: 0.8;
+    }
+
+    .module-unified-card.enabled,
+    .channel-unified-card.enabled {
+        background: rgba(var(--accent-rgb), 0.05);
+    }
+
+    .module-card-left,
+    .channel-card-left {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        flex: 1;
+        min-width: 0;
+    }
+
+    .module-card-name,
+    .channel-card-name {
+        font-weight: 500;
+        font-size: 0.95rem;
+        color: var(--text-primary);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .module-card-desc {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        line-height: 1.3;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .module-card-right,
+    .channel-card-right {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-shrink: 0;
+    }
+
+    .chevron {
+        color: var(--text-muted);
+        width: 18px;
+        height: 18px;
+        transition: transform 0.15s ease;
+    }
+
+    .module-unified-card:hover .chevron,
+    .channel-unified-card:hover .chevron {
+        color: var(--text-primary);
+    }
+
+    /* Toggle sizing for unified lists */
+    .module-unified-card .toggle-switch,
+    .channel-unified-card .toggle-switch {
+        width: 36px;
+        height: 20px;
+    }
+
+    .module-unified-card .toggle-slider::before,
+    .channel-unified-card .toggle-slider::before {
+        height: 14px;
+        width: 14px;
+        left: 3px;
+        bottom: 3px;
+    }
+
+    .module-unified-card .toggle-switch input:checked + .toggle-slider::before,
+    .channel-unified-card .toggle-switch input:checked + .toggle-slider::before {
+        transform: translateX(16px);
     }
 }

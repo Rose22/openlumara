@@ -84,6 +84,7 @@ function organizeSettingsIntoCategories(originalData, moduleInfo = {}) {
     };
 
     let order = 1;
+    const itemDescriptions = {};
 
     for (const [topKey, topValue] of Object.entries(originalData)) {
         if (topKey.toLowerCase() === 'theme' || topKey.toLowerCase() === 'theme_mode') {
@@ -117,7 +118,6 @@ function organizeSettingsIntoCategories(originalData, moduleInfo = {}) {
             const enabledItems = new Set(topValue.enabled || []);
             const allItems = hasToggleListStructure ? getAllToggleItems(topValue) : [];
 
-            const itemDescriptions = {};
             const unsafeModules = {};
             for (const itemName in moduleInfo) {
                 if (moduleInfo[itemName].description) {
@@ -866,32 +866,101 @@ function renderSettingsForm(categories, activeSettingsCategory = null) {
                             itemsContainer.appendChild(msg);
                         }
                     } else {
-                        // Show module list
-                        const listContent = document.createElement('div');
-                        listContent.className = 'settings-group-content module-list-content';
-                        listContent.style.cssText = 'display: flex; flex-direction: column; background: transparent; border-radius: var(--radius-sm); overflow: visible; padding: 0; border: 1px solid var(--border-color); margin-bottom: 14px;';
-                        
-                        allModules.forEach(moduleName => {
-                            if (!enabledSet.has(moduleName)) return;
+                        // Show unified module list with inline toggles
+                        const unifiedList = document.createElement('div');
+                        unifiedList.className = 'module-unified-list';
+                        unifiedList.style.cssText = 'display: flex; flex-direction: column; gap: 1px; background: var(--bg-secondary); border-radius: var(--radius-sm); overflow: hidden; margin-bottom: 14px;';
+
+                        // Capture the key from the toggle list item
+                        const toggleListKey = directGroup.items[0].key;
+
+                        // Filter and sort modules
+                        const filteredModules = allModules.filter(moduleName => {
+                            // Skip unsafe modules if not showing them
+                            if (moduleListData.unsafeModules[moduleName] && !showUnsafeSettings) return false;
+                            // Only show modules that have settings
                             const moduleSettingsGroupKey = `${cat}.settings.${moduleName}`;
                             const moduleGroup = data.groups?.get(moduleSettingsGroupKey);
-                            if (!moduleGroup || moduleGroup.items.length === 0) return;
-
-                            const btn = document.createElement('button');
-                            btn.className = 'setting-item module-list-item';
-                            btn.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; background: var(--bg-secondary); border: none; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.15s ease; margin: 0; width: 100%; text-align: left; color: var(--text-primary); font-weight: 500; font-size: 0.95rem;';
-                            btn.textContent = formatLabel(moduleName);
-                            btn.onclick = () => {
-                                activeModule = moduleName;
-                                renderSettingsForm(categories, cat);
-                            };
-                            listContent.appendChild(btn);
+                            return moduleGroup && moduleGroup.items.length > 0;
                         });
-                        itemsContainer.appendChild(listContent);
 
-                        // Show the global toggle list
-                        const itemEl = createSettingItem(directGroup.items[0]);
-                        itemsContainer.appendChild(itemEl);
+                        // Status bar for enabled count
+                        const statusDiv = document.createElement('div');
+                        statusDiv.className = 'toggle-list-status';
+                        statusDiv.style.cssText = 'padding: 10px 12px; background: var(--bg-secondary); margin-bottom: 1px;';
+                        statusDiv.innerHTML = `<span class="toggle-count">${enabledSet.size} of ${filteredModules.length} enabled</span>`;
+                        unifiedList.appendChild(statusDiv);
+
+                        if (filteredModules.length === 0) {
+                            const emptyMsg = document.createElement('div');
+                            emptyMsg.className = 'settings-section-desc';
+                            emptyMsg.style.cssText = 'padding: 20px; text-align: center; color: var(--text-muted);';
+                            emptyMsg.textContent = 'No modules with settings available.';
+                            unifiedList.appendChild(emptyMsg);
+                        } else {
+                            filteredModules.forEach(moduleName => {
+                                const isEnabled = enabledSet.has(moduleName);
+                                const isUnsafe = !!moduleListData.unsafeModules[moduleName];
+
+                                const card = document.createElement('button');
+                                card.className = 'module-unified-card' + (isEnabled ? ' enabled' : '');
+                                if (isUnsafe) card.classList.add('module-unsafe');
+                                card.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; background: var(--bg-secondary); border: 1px solid var(--border-color); margin-bottom: 1em; width: 100%; text-align: left; color: var(--text-primary);';
+
+                                card.innerHTML = `
+                                    <div class="module-card-left">
+                                        <span class="module-card-name">${formatLabel(moduleName)}${isUnsafe ? ' <span class="module-unsafe-badge" style="font-size: 0.7em; background: var(--warning); color: var(--warning-text); padding: 2px 6px; border-radius: 4px; margin-left: 8px;">UNSAFE</span>' : ''}</span>
+                                    </div>
+                                    <div class="module-card-right">
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" ${isEnabled ? 'checked' : ''} class="module-toggle">
+                                            <span class="toggle-slider"></span>
+                                        </label>
+                                        <svg class="chevron" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                                    </div>
+                                `;
+
+                                // Row tap → drill down (only if toggle wasn't clicked)
+                                card.addEventListener('click', (e) => {
+                                    if (!e.target.closest('.toggle-switch')) {
+                                        activeModule = moduleName;
+                                        renderSettingsForm(categories, cat);
+                                    }
+                                });
+
+                                // Toggle change → update state immediately
+                                const toggle = card.querySelector('.module-toggle');
+                                toggle.addEventListener('change', async () => {
+                                    const newState = toggle.checked;
+
+                                    if (newState && isUnsafe) {
+                                        const confirmed = await showConfirmDialog(
+                                            "You are about to activate an unsafe module. This module can perform actions that could potentially harm your system! Please be very sure of what you're doing. Proceed?"
+                                        );
+                                        if (!confirmed) {
+                                            toggle.checked = false;
+                                            return;
+                                        }
+                                    }
+
+                                    if (newState) {
+                                        enabledSet.add(moduleName);
+                                    } else {
+                                        enabledSet.delete(moduleName);
+                                    }
+
+                                    // Update UI
+                                    card.classList.toggle('enabled', newState);
+                                    statusDiv.querySelector('.toggle-count').textContent = `${enabledSet.size} of ${filteredModules.length} enabled`;
+
+                                    // Update data
+                                    updateToggleListData(toggleListKey, Array.from(enabledSet), filteredModules);
+                                });
+
+                                unifiedList.appendChild(card);
+                            });
+                        }
+                        itemsContainer.appendChild(unifiedList);
                     }
                 } else {
                     // Desktop: Show sidebar sub-list or module settings
@@ -956,36 +1025,83 @@ function renderSettingsForm(categories, activeSettingsCategory = null) {
                             itemsContainer.appendChild(msg);
                         }
                     } else {
-                        // Show channel list (iOS drill style)
-                        const channelListContainer = document.createElement('div');
-                        channelListContainer.className = 'settings-group';
-                        
-                        const listContent = document.createElement('div');
-                        listContent.className = 'settings-group-content module-list-content';
-                        listContent.style.cssText = 'display: flex; flex-direction: column; background: transparent; border-radius: 0; overflow: visible; padding: 0; border: none;';
-                        
-                        allChannels.forEach(channelName => {
-                            if (!enabledSet.has(channelName)) return;
+                        // Show unified channel list with inline toggles
+                        const unifiedList = document.createElement('div');
+                        unifiedList.className = 'channel-unified-list';
+                        unifiedList.style.cssText = 'display: flex; flex-direction: column; gap: 1px; background: var(--bg-secondary); border-radius: var(--radius-sm); overflow: hidden; margin-bottom: 14px;';
+
+                        // Filter channels that have settings
+                        const filteredChannels = allChannels.filter(channelName => {
                             const channelSettingsGroupKey = `${cat}.settings.${channelName}`;
                             const channelGroup = data.groups?.get(channelSettingsGroupKey);
-                            if (!channelGroup || channelGroup.items.length === 0) return;
-
-                            const btn = document.createElement('button');
-                            btn.className = 'setting-item module-list-item';
-                            btn.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; background: var(--bg-secondary); border: none; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.15s ease; margin: 0; width: 100%; text-align: left; color: var(--text-primary); font-weight: 500; font-size: 0.95rem;';
-                            btn.textContent = formatLabel(channelName);
-                            btn.onclick = () => {
-                                activeChannel = channelName;
-                                renderSettingsForm(categories, cat);
-                            };
-                            listContent.appendChild(btn);
+                            return channelGroup && channelGroup.items.length > 0;
                         });
-                        channelListContainer.appendChild(listContent);
-                        itemsContainer.appendChild(channelListContainer);
 
-                        // Show the global toggle list
-                        const itemEl = createSettingItem(directGroup.items[0]);
-                        itemsContainer.appendChild(itemEl);
+                        // Status bar for enabled count
+                        const statusDiv = document.createElement('div');
+                        statusDiv.className = 'toggle-list-status';
+                        statusDiv.style.cssText = 'padding: 10px 12px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-color); margin-bottom: 1px; border-radius: var(--radius-sm) var(--radius-sm) 0 0;';
+                        statusDiv.innerHTML = `<span class="toggle-count">${enabledSet.size} of ${filteredChannels.length} enabled</span>`;
+                        unifiedList.appendChild(statusDiv);
+
+                        if (filteredChannels.length === 0) {
+                            const emptyMsg = document.createElement('div');
+                            emptyMsg.className = 'settings-section-desc';
+                            emptyMsg.style.cssText = 'padding: 20px; text-align: center; color: var(--text-muted);';
+                            emptyMsg.textContent = 'No channels with settings available.';
+                            unifiedList.appendChild(emptyMsg);
+                        } else {
+                            filteredChannels.forEach(channelName => {
+                                const isEnabled = enabledSet.has(channelName);
+
+                                const card = document.createElement('button');
+                                card.className = 'channel-unified-card' + (isEnabled ? ' enabled' : '');
+                                card.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; background: var(--bg-secondary); border: none; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.15s ease; margin: 0; width: 100%; text-align: left; color: var(--text-primary);';
+
+                                card.innerHTML = `
+                                    <div class="channel-card-left">
+                                        <span class="channel-card-name">${formatLabel(channelName)}</span>
+                                    </div>
+                                    <div class="channel-card-right">
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" ${isEnabled ? 'checked' : ''} class="channel-toggle">
+                                            <span class="toggle-slider"></span>
+                                        </label>
+                                        <svg class="chevron" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                                    </div>
+                                `;
+
+                                // Row tap → drill down (only if toggle wasn't clicked)
+                                card.addEventListener('click', (e) => {
+                                    if (!e.target.closest('.toggle-switch')) {
+                                        activeChannel = channelName;
+                                        renderSettingsForm(categories, cat);
+                                    }
+                                });
+
+                                // Toggle change → update state immediately
+                                const toggle = card.querySelector('.channel-toggle');
+                                toggle.addEventListener('change', () => {
+                                    const newState = toggle.checked;
+
+                                    if (newState) {
+                                        enabledSet.add(channelName);
+                                    } else {
+                                        enabledSet.delete(channelName);
+                                    }
+
+                                    // Update UI
+                                    card.classList.toggle('enabled', newState);
+                                    statusDiv.querySelector('.toggle-count').textContent = `${enabledSet.size} of ${filteredChannels.length} enabled`;
+
+                                    // Update data
+                                    updateToggleListData(key, Array.from(enabledSet), filteredChannels);
+                                });
+
+                                unifiedList.appendChild(card);
+                            });
+                        }
+                        itemsContainer.appendChild(unifiedList);
                     }
                 } else {
                     // Desktop: Show sidebar sub-list or channel settings
