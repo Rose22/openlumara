@@ -2471,8 +2471,8 @@
 }
 
 .module-sub-list button.active {
-    background: var(--accent);
-    color: white;
+    background: var(--bg-tertiary);
+    color: var(--accent);
     font-weight: 600;
 }
 

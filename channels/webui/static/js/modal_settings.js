@@ -636,12 +636,6 @@ function renderSettingsNav(categories) {
                     subBtn.textContent = formatLabel(moduleName);
                     subBtn.dataset.module = moduleName;
                     subBtn.classList.toggle('active', activeModule === moduleName);
-                    
-                    // Add visual indicator for active state
-                    const statusIcon = document.createElement('span');
-                    statusIcon.style.cssText = 'width: 6px; height: 6px; border-radius: 50%; margin-left: auto;';
-                    statusIcon.style.backgroundColor = activeModule === moduleName ? 'white' : 'transparent';
-                    subBtn.appendChild(statusIcon);
 
                     subBtn.onclick = (e) => {
                         e.stopPropagation();
