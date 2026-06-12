@@ -106,12 +106,13 @@ class SandboxedShell(core.module.Module):
         cmd.extend(['-w', '/data'])
         cmd.extend([img, 'sh', '-c', command])
 
+
         try:
             # Run the container with manual timeout handling
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
             stdout, stderr = process.communicate(timeout=timeout)
-            return self.result({
+            result = self.result({
                 "stdout": stdout.decode().strip(),
                 "stderr": stderr.decode().strip(),
                 "exit_code": process.returncode,
@@ -120,6 +121,15 @@ class SandboxedShell(core.module.Module):
         except subprocess.TimeoutExpired:
             # Timeout occurred
             process.kill()  # Kill the docker run process
+            result = self.result(f"Command timed out after {timeout}s", False)
+        finally:
+            try:
+                # Only kill if the process is still running
+                if process.returncode is None:
+                    process.kill()
+            except Exception:
+                pass  # Process is already dead or killed
+
             try:
                 # Explicitly kill the container
                 subprocess.run([self.runtime, 'kill', self.container_name], capture_output=True, timeout=5)
@@ -132,14 +142,7 @@ class SandboxedShell(core.module.Module):
             except Exception:
                 pass
 
-            return self.result(f"Command timed out after {timeout}s", False)
-
-        return self.result({
-            "stdout": result.stdout.decode().strip(),
-            "stderr": result.stderr.decode().strip(),
-            "exit_code": result.returncode,
-            "data_dir": "/data"
-        })
+            return result
 
     @core.module.command("shell", send_to_ai=True, help={
         "<cmd>": "runs a command in the sandboxed shell"
