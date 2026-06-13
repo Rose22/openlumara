@@ -9,12 +9,9 @@ from urllib.parse import urlparse
 class WebSearch(modules.http.Http):
     """
     Lets your AI search the web!
-    
-    Enhanced with multi-layer prompt injection defense based on:
-    - OWASP LLM01:2025 Prompt Injection Prevention
-    - Digital Applied's 12-Layer Framework
-    - Defense-in-depth: multiple overlapping controls
     """
+
+    dependencies = ["ddgs"]
 
     settings = {
         "max_results": {

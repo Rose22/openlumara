@@ -18,25 +18,3 @@ fastapi
 uvicorn
 websockets
 python-multipart
-
-# web scraping module requirements
-beautifulsoup4
-ddgs
-
-# channel requirements
-discord.py
-python-telegram-bot
-
-# coder module requirements (treesitter)
-tree-sitter
-tree-sitter-python
-tree-sitter-javascript
-tree-sitter-typescript
-tree-sitter-html
-tree-sitter-css
-tree-sitter-cpp
-tree-sitter-c-sharp
-tree-sitter-rust
-tree-sitter-ruby
-tree-sitter-go
-tree-sitter-java

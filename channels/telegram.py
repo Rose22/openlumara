@@ -12,6 +12,8 @@ class Telegram(core.channel.Channel):
     """Talk to your AI over Telegram"""
     running = False
 
+    dependencies = ["python-telegram-bot"]
+
     settings =  {
         "token": "TOKEN_HERE",
         "use_message_streaming": True,

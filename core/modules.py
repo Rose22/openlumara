@@ -8,6 +8,9 @@ import ast
 # modules that should have their prompts inserted even when tools are off
 nonagentic = ("characters", "time")
 
+# --------------------------------------
+# dependency auto-installer/uninstaller
+# --------------------------------------
 def _extract_deps_from_file(file_path):
     """extract dependencies list from module file without importing it"""
     try:
@@ -33,7 +36,7 @@ def _install_deps(module_name, packages):
     """install pip packages"""
     if not packages:
         return
-    core.log(module_name, f"installing dependencies: {packages}")
+    core.log(module_name, f"installing dependencies: {', '.join(packages)}")
     try:
         subprocess.check_call(
             [sys.executable, "-m", "pip", "install", "--quiet"] + packages,
@@ -47,14 +50,13 @@ def _uninstall_deps(module_name, packages):
     """uninstall pip packages"""
     if not packages:
         return
-    core.log(module_name, f"uninstalling dependencies: {packages}")
+    core.log(module_name, f"uninstalling dependencies: {', '.join(packages)}")
     try:
         subprocess.check_call(
             [sys.executable, "-m", "pip", "uninstall", "-y", "--quiet"] + packages,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL
         )
-        core.log(module_name, f"uninstalled: {packages}")
     except subprocess.CalledProcessError as e:
         core.log_error("dependency uninstall failed", e)
 
@@ -67,24 +69,66 @@ def _get_module_file_path(package, module_name):
         return spec.origin
     return None
 
-def uninstall_module_deps(module_name, is_user_module=False):
-    """uninstall dependencies for a disabled module"""
-    import modules
-    import user_modules
-    
-    package = user_modules if is_user_module else modules
-    
+def _check_missing_deps(deps):
+    """return list of dependencies that are not installed"""
+    missing = []
+    for dep in deps:
+        dep_name = dep.split('>=')[0].split('==')[0].split('<')[0].split('>')[0]
+        try:
+            __import__(dep_name)
+        except ImportError:
+            missing.append(dep)
+    return missing
+
+def _is_package_installed(package_name):
+    """check if a package is actually installed via pip"""
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "pip", "show", package_name],
+            capture_output=True,
+            text=True
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
+def install_module_deps(package, module_name):
+    """install dependencies for a module if missing"""
     file_path = _get_module_file_path(package, module_name)
     if not file_path:
-        core.log("warning", f"could not find file for module {module_name}")
         return
-    
-    deps = _extract_deps_from_file(file_path)
-    if deps:
-        _uninstall_deps(module_name, deps)
-    else:
-        core.log(module_name, "no dependencies to uninstall")
 
+    deps = _extract_deps_from_file(file_path)
+    if not deps:
+        return
+
+    missing = _check_missing_deps(deps)
+    if missing:
+        _install_deps(module_name, missing)
+
+def uninstall_module_deps(package, module_name):
+    """uninstall dependencies for a module (only if still installed)"""
+    file_path = _get_module_file_path(package, module_name)
+    if not file_path:
+        return
+
+    deps = _extract_deps_from_file(file_path)
+    if not deps:
+        return
+
+    # only uninstall packages that are actually installed
+    installed = []
+    for dep in deps:
+        dep_name = dep.split('>=')[0].split('==')[0].split('<')[0].split('>')[0]
+        if _is_package_installed(dep_name):
+            installed.append(dep)
+
+    if installed:
+        _uninstall_deps(module_name, installed)
+
+# --------------------------
+# module loading
+# --------------------------
 def load(package, base_class = None, filter: list = None, reload: bool = False):
     """
     loops through the specified package imported with `import whatever`, then checks inside those packages for any classes that derive from base_class, and return a tuple of those classes so we can use them as modules, channels etc
@@ -106,22 +150,14 @@ def load(package, base_class = None, filter: list = None, reload: bool = False):
             # dont even import unloaded modules
             continue
 
-        # get file path to the module
+        # check if dependencies are installed before trying to import
         module_file_path = _get_module_file_path(package, modname)
-
-        # extract and install dependencies
-        deps = _extract_deps_from_file(module_file_path)
-        if deps:
-            # check which are actually missing
-            missing = []
-            for dep in deps:
-                dep_name = dep.split('>=')[0].split('==')[0].split('<')[0].split('>')[0]
-                try:
-                    __import__(dep_name)
-                except ImportError:
-                    missing.append(dep)
-            if missing:
-                _install_deps(modname, missing)
+        if module_file_path:
+            deps = _extract_deps_from_file(module_file_path)
+            if deps:
+                missing = _check_missing_deps(deps)
+                if missing:
+                    continue
 
         try:
             # Import the module relative to the package

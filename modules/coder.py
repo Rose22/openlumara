@@ -58,6 +58,21 @@ except Exception as e:
 class Coder(core.module.Module):
     """Allows your AI to write, edit and test code for you."""
 
+    dependencies = [
+        "tree-sitter",
+        "tree-sitter-python",
+        "tree-sitter-javascript",
+        "tree-sitter-typescript",
+        "tree-sitter-html",
+        "tree-sitter-css",
+        "tree-sitter-cpp",
+        "tree-sitter-c-sharp",
+        "tree-sitter-rust",
+        "tree-sitter-ruby",
+        "tree-sitter-go",
+        "tree-sitter-java"
+    ]
+
     # Language-specific formatting tools
     FORMATTERS = {
         'python': ['black', 'autopep8', 'yapf'],

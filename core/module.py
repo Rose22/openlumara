@@ -52,6 +52,9 @@ class Module:
     # unsafe flag can mark a module as risky to enable in supported settings UI's
     unsafe = False
 
+    # list of python dependencies that need to be installed for the module to work
+    dependencies = []
+
     def __init__(self, manager, is_user_module=False, channel=None):
         self.manager = manager
         self.channel = channel # later set by the channel base class, _set_as_active_channel()

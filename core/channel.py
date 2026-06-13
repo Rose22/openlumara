@@ -15,6 +15,10 @@ class Channel:
         # base settings here lol
     }
 
+    # just like with modules, channels can define python dependencies
+    # for the framework to automatically install/uninstall
+    dependencies = []
+
     def __init__(self, manager):
         self.manager = manager
         self.name = core.modules.get_name(self) # shorthand alias

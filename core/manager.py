@@ -72,6 +72,10 @@ class Manager:
 
         core.log("core", "Loading channels")
         import channels
+        # install dependencies
+        for chan_name in enabled_channels:
+            core.modules.install_module_deps(channels, chan_name)
+
         for channel in core.modules.load(channels, core.channel.Channel, filter=enabled_channels, reload=True):
             # add an instance of the channel's class to self.channels
             channel_name = core.modules.get_name(channel)
@@ -92,9 +96,13 @@ class Manager:
 
         if enabled_modules:
             core.log("core", "Loading core modules")
-
-            # load modules
             import modules
+
+            # install dependencies
+            for mod_name in enabled_modules:
+                core.modules.install_module_deps(modules, mod_name)
+
+            # import/load only the enabled modules
             for module in core.modules.load(modules, core.module.Module, filter=enabled_modules, reload=True):
                 try:
                     loaded_module = await self.add_module_class(module)
@@ -106,9 +114,13 @@ class Manager:
                     core.log_error(f"could not load module {module.__name__}", e)
 
         if enabled_user_modules:
-            # load user modules
-            import user_modules
             core.log("core", "Loading user modules")
+            import user_modules
+
+            # install dependencies
+            for mod_name in enabled_user_modules:
+                core.modules.install_module_deps(user_modules, mod_name)
+
             for module in core.modules.load(user_modules, core.module.Module, filter=enabled_user_modules, reload=True):
                 try:
                     loaded_module = await self.add_module_class(module, is_user_module=True)
@@ -123,6 +135,20 @@ class Manager:
             core.log("core", f"Modules loaded: {', '.join(loaded_module_names)}")
         else:
             core.log("core", "All modules are disabled")
+
+        # uninstall dependencies for disabled modules (only if deps are still installed)
+        disabled_channels = core.config.get("channels", "disabled", [])
+        disabled_modules = core.config.get("modules", "disabled", [])
+        disabled_user_modules = core.config.get("user_modules", "disabled", [])
+
+        for chan_name in disabled_channels:
+            core.modules.uninstall_module_deps(channels, mod_name)
+
+        for mod_name in disabled_modules:
+            core.modules.uninstall_module_deps(modules, mod_name)
+
+        for mod_name in disabled_user_modules:
+            core.modules.uninstall_module_deps(user_modules, mod_name)
 
         # create an array of all enabled tools so that we can reference it in the future
         for tool in self.tools:

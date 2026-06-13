@@ -197,6 +197,8 @@ class Client(discord.Client):
 class Discord(core.channel.Channel):
     """Talk to your AI over Discord"""
 
+    dependencies = ["discord.py"]
+
     settings =  {
         "token": {
             "description": "Your discord token. Get it in the [Discord Developer Portal](https://discord.com/developers/applications)",
