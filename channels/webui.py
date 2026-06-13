@@ -21,7 +21,7 @@ import uvicorn
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, Response, Depends, HTTPException, status, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import RedirectResponse, StreamingResponse, JSONResponse
+from fastapi.responses import RedirectResponse, StreamingResponse, JSONResponse, FileResponse
 from fastapi.middleware import Middleware
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.websockets import WebSocketState
@@ -36,7 +36,7 @@ WEBUI_DIR = core.get_path("channels/webui")
 
 # ordered list of javascript files, to load in this exact order
 JS_FILES = [
-    "themes", "icons", "variables", "content_helpers", "markdown", "messages",
+    "icons", "variables", "content_helpers", "markdown", "messages",
     "msg_actions", "sidebar", "utils", "notif", "status", "polling", "chats",
     "tags", "search", "export", "modals", "autocomplete", "input", "send", "upload", "theming",
     "audio", "modal_settings", "storage_editor", "responsive", "init"
@@ -122,17 +122,30 @@ async def authenticate_websocket(websocket: WebSocket) -> Optional[str]:
     if not bool(channel_instance.config.get("require_login")):
         return "anonymous"
 
-    # Method 1: Check session (via cookies - works with browser clients)
-    session = getattr(websocket, 'session', None)
-    if session and session.get('username'):
-        return session.get('username')
+    # Method 1: Parse session cookie manually
+    # Starlette SessionMiddleware uses itsdangerous for cookie signing
+    session_cookie = websocket.cookies.get("webui_session")
+    if session_cookie:
+        try:
+            import itsdangerous
+            signer = itsdangerous.TimestampSigner(SECRET_KEY)
+            # Starlette session middleware uses base64 + signing
+            import base64
+            # The cookie format depends on Starlette version
+            # Try to decode it
+            data = signer.unsign(session_cookie)
+            session_data = json.loads(base64.b64decode(data))
+            if session_data.get('username'):
+                return session_data.get('username')
+        except Exception as e:
+            core.log("webui", f"WebSocket session auth failed: {e}")
 
     # Method 2: Check Bearer token in query parameters
     token = websocket.query_params.get('token')
     if token and token in ACTIVE_TOKENS:
         return "token_user"
 
-    # Method 3: Check Authorization header (some clients send headers)
+    # Method 3: Check Authorization header
     auth_header = websocket.headers.get('authorization', '')
     if auth_header.startswith('Bearer '):
         token = auth_header[7:]
@@ -410,6 +423,28 @@ async def index(request: Request):
         }
     )
 
+@app.get("/themes.js")
+async def generate_themes_file(request: Request):
+    # get themes
+    themes_dir = os.path.join(WEBUI_DIR, "themes")
+    all_themes = {}
+
+    for f in os.listdir(themes_dir):
+        if f.endswith('.json'):
+            filepath = os.path.join(themes_dir, f)
+            with open(filepath, 'r', encoding='utf-8') as fh:
+                # Use filename (without .json) as the key
+                all_themes[f[:-5]] = json.load(fh)
+
+    js_parts = []
+    for key in sorted(all_themes.keys()):
+        # json.dumps converts the Python dict to a valid JS object string
+        js_parts.append(f"'{key}': {json.dumps(all_themes[key])}")
+
+    themes_script = f"window.themes = {{ {', '.join(js_parts)} }};"
+
+    return Response(themes_script, media_type="application/javascript")
+
 @app.get("/api/health")
 async def health_check():
     """Public health check endpoint - no auth required."""
@@ -554,7 +589,7 @@ async def stream_message(request: Request, user: str = Depends(require_auth)):
             # Initial connection signal
             yield f"data: {json.dumps({'_meta': {'type': 'connection', 'status': 'connected'}, 'id': stream_id})}\n\n"
 
-            async for token_data in channel_instance.send_stream(data):
+            async for token_data in channel_instance.send_stream(data, commands_authorized=True):
                 if stream_id in stream_cancellations:
                     stream_cancellations.discard(stream_id)
                     yield f"data: {json.dumps({'_meta': {'type': 'cancelled'}})}\n\n"
@@ -575,10 +610,12 @@ async def stream_message(request: Request, user: str = Depends(require_auth)):
                 payload["_meta"] = {"type": "delta", "status": status_str}
                 yield f"data: {json.dumps(payload)}\n\n"
 
-            # Post-stream: Broadcast the new message
+            # Post-stream: Broadcast the new message with index
             messages = await channel_instance.context.chat.get() or []
             if messages:
                 last_msg = messages[-1]
+                # Add index for frontend compatibility
+                last_msg['index'] = len(messages) - 1
                 await manager.broadcast({
                     "type": "message_added",
                     "message": serialize_for_json(last_msg)
@@ -607,7 +644,7 @@ async def send_message(request: Request, user: str = Depends(require_auth)):
         raise HTTPException(status_code=503, detail=status)
 
     data = await request.json()
-    response = await channel_instance.send(data)
+    response = await channel_instance.send(data, commands_authorized=True)
 
     if isinstance(response, dict) and 'error' in response:
         raise HTTPException(status_code=500, detail=response)
@@ -955,14 +992,13 @@ async def delete_chat(request: Request, user: str = Depends(require_auth)):
     if not channel_instance:
         raise HTTPException(status_code=500, detail="Channel not available")
 
-    data = await request.json()
-    conv_id = data.get('id')
+    conv_id = request.query_params.get('id')
 
     if not conv_id:
         raise HTTPException(status_code=400, detail="No chat ID provided")
 
     success = await channel_instance.context.chat.delete(conv_id)
-    if not success:
+    if success is False:
         raise HTTPException(status_code=404, detail="Chat not found")
 
     return {'success': True}
@@ -1379,11 +1415,19 @@ async def service_worker():
     return Response(content=sw_code, media_type='application/javascript', headers={'Cache-Control': 'no-store'})
 
 @app.get('/icon-192.png')
+async def icon_192():
+    """Serve the 192x192 icon for PWA."""
+    return FileResponse(os.path.join(WEBUI_DIR, "icon-192.png"))
+
 @app.get('/icon-512.png')
-async def icon():
-    """Serve a placeholder icon for PWA."""
-    png_hex = "89504e470d0a1a0a0000000d494844520000000200000002080200000001f338dd0000000c4944415408d763f8ffffcf0001000100737a55b00000000049454e44ae426082"
-    return Response(content=bytes.fromhex(png_hex), media_type='image/png')
+async def icon_512():
+    """Serve the 512x512 icon for PWA."""
+    return FileResponse(os.path.join(WEBUI_DIR, "icon-512.png"))
+
+@app.get('/favicon.ico')
+async def favicon():
+    """Serve the favicon for the web interface."""
+    return FileResponse(os.path.join(WEBUI_DIR, "favicon.ico"))
 
 # =============================================================================
 # Channel Class

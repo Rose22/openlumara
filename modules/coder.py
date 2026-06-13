@@ -848,7 +848,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         except Exception as e:
             core.log("coder", f"Backup cleanup failed: {e}")
 
-    async def restore_backup(self, project_name: str, file_path: list, version_index: int = 0) -> dict:
+    async def restore_backup(self, project_name: str, file_path: str, version_index: int = 0) -> dict:
         """Restores a file from backup. 
         If version_index is 0, restores from the most recent backup. 
         Otherwise, restores the backup at the specified index (from the list provided by list_backups).
@@ -884,7 +884,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             }
         except Exception as e:
             return {"success": False, "error": f"Restore failed: {e}"}
-    async def list_backups(self, project_name: str, file_path: list) -> dict:
+    async def list_backups(self, project_name: str, file_path: str) -> dict:
         """Lists available backups for a file, ordered from newest to oldest."""
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
@@ -1160,9 +1160,24 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
     def _get_project_path(self, name: str) -> str:
         return self._get_sandbox_path(name)
 
-    def _get_file_path(self, project_name: str, file_path: list) -> str:
-        rel_path = os.path.join(project_name, *file_path)
-        return self._get_sandbox_path(rel_path)
+    def _get_file_path(self, project_name: str, file_path: str) -> str:
+        """
+        Resolves a file path within the sandbox.
+        Accepts a single string (e.g., 'src/components/button.py').
+
+        This method is OS-agnostic
+        """
+        # 1. Normalize the user input immediately.
+        # This converts 'folder/file.py' to 'folder\\file.py' on Windows
+        # and cleans up any '..' or '//' the user might have typed.
+        normalized_input = os.path.normpath(file_path)
+
+        # 2. Combine the project name with the normalized path.
+        # This creates a single path string relative to the sandbox root.
+        # e.g., 'my_project/src/main.py'
+        combined_rel_path = os.path.join(project_name, normalized_input)
+
+        return self._get_sandbox_path(combined_rel_path)
 
     # ==================== File Operations ====================
 
@@ -1203,12 +1218,12 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         except Exception as e:
             return self.result(f"error: {e}", success=False)
 
-    async def list_project_folder(self, project_name: str, sub_path: list = None):
+    async def list_project_folder(self, project_name: str, sub_path: str = None):
         """Lists the immediate contents of a specific path within a project (non-recursive). The path is a list of path elements, e.g. ['src', 'main.py'] translates to src/main.py"""
         sub_path = sub_path or []
         target_path = self._get_project_path(project_name)
         if sub_path:
-            target_path = os.path.join(target_path, *sub_path)
+            target_path = core.sandbox_path(target_path, os.path.normpath(os.path.join(*sub_path) if isinstance(sub_path, list) else sub_path))
 
         if not os.path.exists(target_path):
             return self.result("error: path does not exist", success=False)
@@ -1235,8 +1250,8 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         except OSError as e:
             return self.result(f"error: Error creating project: {e}", success=False)
 
-    async def create_file(self, project_name: str, file_path: list, content: str):
-        """Creates a file at specified path. Cannot overwrite existing files. Path will be recursively created if nonexistent. Provide path as a list representing a relative path. Example: ['src', 'main.py']"""
+    async def create_file(self, project_name: str, file_path: str, content: str):
+        """Creates a file at specified path. Cannot overwrite existing files. Path will be recursively created if nonexistent."""
 
         if self.config.get("writing_mode") == "read-only":
             return self.result("error: Coder is in read-only mode. File modification disabled.", success=False)
@@ -1266,7 +1281,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
 
 
-    async def read_file(self, project_name: str, file_path: list, limit: int = None, offset: int = None):
+    async def read_file(self, project_name: str, file_path: str, limit: int = None, offset: int = None):
         """
         Reads a file with optional line offset and limit.
         Returns content as string, or error dict on failure.
@@ -1331,7 +1346,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         except Exception as e:
             return self.result(f"error: error reading file: {e}", success=False)
 
-    async def overwrite_file(self, project_name: str, file_path: list, content: str):
+    async def overwrite_file(self, project_name: str, file_path: str, content: str):
         """Completely overwrites an existing file with new content."""
 
         file_path_str = self._get_file_path(project_name, file_path)
@@ -1355,7 +1370,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         except Exception as e:
             return self.result(f"error: {e}", success=False)
 
-    async def append_to_file(self, project_name: str, file_path: list, content: str):
+    async def append_to_file(self, project_name: str, file_path: str, content: str):
         """Appends content to the end of a file. Creates the file if it doesn't exist."""
 
         file_path_str = self._get_file_path(project_name, file_path)
@@ -1385,7 +1400,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
     # ==================== Code Execution ====================
 
-    async def execute(self, project_name: str, file_path: list, timeout: int = 30):
+    async def execute(self, project_name: str, file_path: str, timeout: int = 30):
         if not self.config.get("permissions", "execute_code"):
             return self.result("error: Code execution is disabled for security.", success=False)
 
@@ -1423,7 +1438,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
     # ==================== Symbol Operations ====================
 
-    async def get_outline(self, project_name: str, file_path: list, language: str = None):
+    async def get_outline(self, project_name: str, file_path: str, language: str = None):
         """
         Returns a list of symbols (classes, functions, etc.) in a file.
         USE THIS FIRST to understand what's in a file before reading specific symbols.
@@ -1470,7 +1485,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         except Exception as e:
             return self.result(f"error: {e}", success=False)
 
-    async def get_symbol(self, project_name: str, file_path: list, symbol_name: str, language: str = None):
+    async def get_symbol(self, project_name: str, file_path: str, symbol_name: str, language: str = None):
         """
         Returns the code block for a symbol by name.
         THIS IS THE PREFERRED WAY TO READ CODE.
@@ -1528,7 +1543,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         except Exception as e:
             return self.result(f"error: {e}", success=False)
 
-    async def edit_symbol(self, project_name: str, file_path: list, symbol_name: str, new_content: str, language: str = None):
+    async def edit_symbol(self, project_name: str, file_path: str, symbol_name: str, new_content: str, language: str = None):
         """Replaces the content of a symbol with new content."""
 
         file_path_str = self._get_file_path(project_name, file_path)
@@ -1598,7 +1613,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         except Exception as e:
             return self.result(f"error: {e}", success=False)
 
-    async def add_symbol_before(self, project_name: str, file_path: list, target_symbol_name: str, name: str, content_body: str, language: str = None):
+    async def add_symbol_before(self, project_name: str, file_path: str, target_symbol_name: str, name: str, content_body: str, language: str = None):
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
             return self.result("error: file does not exist", success=False)
@@ -1666,7 +1681,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         except Exception as e:
             return self.result(f"error: {e}", success=False)
 
-    async def add_symbol_after(self, project_name: str, file_path: list, target_symbol_name: str, name: str, content_body: str, language: str = None):
+    async def add_symbol_after(self, project_name: str, file_path: str, target_symbol_name: str, name: str, content_body: str, language: str = None):
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
             return self.result("error: file does not exist", success=False)
@@ -1739,7 +1754,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         except Exception as e:
             return self.result(f"error: {e}", success=False)
 
-    async def delete_symbol(self, project_name: str, file_path: list, symbol_name: str, language: str = None):
+    async def delete_symbol(self, project_name: str, file_path: str, symbol_name: str, language: str = None):
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
             return self.result("error: file does not exist", success=False)
@@ -1798,7 +1813,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
     # ==================== Search Operations ====================
 
-    async def search_in_file(self, project_name: str, file_path: list, query: str, context_lines: int = 5, max_matches: int = 10, use_regex: bool = True):
+    async def search_in_file(self, project_name: str, file_path: str, query: str, context_lines: int = 5, max_matches: int = 10):
         """
         Search for text or regex pattern within a file.
         Returns snippets with line numbers and surrounding context.
@@ -1814,13 +1829,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             matches = []
             num_lines = len(lines)
 
-            if use_regex:
-                try:
-                    pattern = re.compile(query, re.IGNORECASE)
-                except re.error as e:
-                    return self.result(f"error: Invalid regex pattern: {e}", success=False)
-            else:
-                query_lower = query.lower()
+            query_lower = query.lower()
 
             for i, line in enumerate(lines):
                 if len(matches) >= max_matches:
@@ -1829,12 +1838,8 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
                 line_num = i + 1
                 match_found = False
 
-                if use_regex:
-                    if pattern.search(line):
-                        match_found = True
-                else:
-                    if query_lower in line.lower():
-                        match_found = True
+                if query_lower in line.lower():
+                    match_found = True
 
                 if match_found:
                     snippet = [f"--- Match at line {line_num} ---"]
@@ -1862,9 +1867,9 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         except Exception as e:
             return self.result(f"error: {e}", success=False)
 
-    async def search_replace(self, project_name: str, file_path: list, query: str, replacement: str, use_regex: bool = True):
+    async def search_replace(self, project_name: str, file_path: str, query: str, replacement: str):
         """
-        Replace all instances of a string or regex pattern across the entire file content.
+        Replace all instances of a string across the entire file content.
         Replaces ALL OCCURENCES of the query string with the replacement string.
         """
         file_path_str = self._get_file_path(project_name, file_path)
@@ -1875,15 +1880,8 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
             with open(file_path_str, 'r', encoding='utf-8') as f:
                 content = f.read()
 
-            if use_regex:
-                try:
-                    pattern = re.compile(query, re.IGNORECASE)
-                    new_content, count = pattern.subn(replacement, content)
-                except re.error as e:
-                    return self.result(f"error: Invalid regex pattern: {e}", success=False)
-            else:
-                count = content.count(query)
-                new_content = content.replace(query, replacement)
+            count = content.count(query)
+            new_content = content.replace(query, replacement)
 
             if count > 0:
                 with open(file_path_str, 'w', encoding='utf-8') as f:
@@ -1915,7 +1913,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         )
         diff_str = "\n".join(diff)
 
-    async def edit(self, project_name: str, file_path: list, old_text: str, new_text: str):
+    async def edit(self, project_name: str, file_path: str, old_text: str, new_text: str):
         file_path_str = self._get_file_path(project_name, file_path)
         if not os.path.exists(file_path_str):
             return self.result("error: file does not exist", success=False)
@@ -1946,13 +1944,12 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         except Exception as e:
             return self.result(f"error: {e}", success=False)
 
-    async def grep(self, project_name: str, path: list = None, pattern: str = "", use_regex: bool = True,
-                   case_sensitive: bool = False, max_results: int = None):
-        """Search for a pattern across files in a project."""
+    async def grep(self, project_name: str, path: list = None, pattern: str = "", case_sensitive: bool = False, max_results: int = None):
+        """Search for a pattern across files in a project. does not support regex patterns."""
 
         search_dir = self._get_project_path(project_name)
         if path:
-            search_dir = os.path.join(search_dir, *path)
+            search_dir = core.sandbox_path(search_dir, os.path.join(*path))
 
         if not os.path.isdir(search_dir):
             return self.result("error: search directory does not exist", success=False)
@@ -1960,14 +1957,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         max_results = max_results or self.config.get("max_grep_results", 50)
 
         try:
-            if use_regex:
-                flags = 0 if case_sensitive else re.IGNORECASE
-                try:
-                    compiled_pattern = re.compile(pattern, flags)
-                except re.error as e:
-                    return self.result(f"error: Invalid regex pattern: {e}", success=False)
-            else:
-                search_text = pattern if case_sensitive else pattern.lower()
+            search_text = pattern if case_sensitive else pattern.lower()
 
             results = []
             file_count = 0
@@ -1990,13 +1980,9 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
                         with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
                             for line_num, line in enumerate(f, 1):
                                 found = False
-                                if use_regex:
-                                    if compiled_pattern.search(line):
-                                        found = True
-                                else:
-                                    line_search = line.lower() if not case_sensitive else line
-                                    if search_text in line_search:
-                                        found = True
+                                line_search = line.lower() if not case_sensitive else line
+                                if search_text in line_search:
+                                    found = True
 
                                 if found:
                                     snippet = line.rstrip('\n')[:200]
@@ -2022,7 +2008,7 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
         """Finds files matching a glob pattern in a project."""
         search_dir = self._get_project_path(project_name)
         if path:
-            search_dir = os.path.join(search_dir, *path)
+            search_dir = core.sandbox_path(search_dir, os.path.join(*path))
 
         if not os.path.exists(search_dir):
             return self.result("error: search directory does not exist", success=False)
@@ -2047,84 +2033,92 @@ class Coder(modules.sandboxed_files.SandboxedFiles):
 
     # ==================== Formatting & Imports ====================
 
-    async def format_file(self, project_name: str, file_path: list, formatter: str = "auto") -> dict:
-        """Formats code using appropriate formatter. Supports: auto, black, autopep8, prettier, gofmt, rustfmt, clang-format, etc."""
-        file_path_str = self._get_file_path(project_name, file_path)
-        if not os.path.exists(file_path_str):
-            return self.result("error: file does not exist", success=False)
-
-        await self._backup_file(file_path_str)
-
-        try:
-            lang = self._get_language_from_ext(file_path_str)
-            formatters = self.FORMATTERS.get(lang, [])
-
-            async def run_formatter(fmt_name, args):
-                """Run a formatter with given args, handling CLI differences."""
-                proc = await asyncio.create_subprocess_exec(
-                    fmt_name, *args,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE
-                )
-                try:
-                    stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
-                    return proc.returncode, stdout, stderr
-                except asyncio.TimeoutError:
-                    try:
-                        proc.kill()
-                        await proc.wait()
-                    except:
-                        pass
-                    return -1, b"", b"Timeout"
-
-            def try_format_with_inplace(fmt_name):
-                """Try formatting with -i flag, fallback to read/write if it fails."""
-                import subprocess as sp
-                try:
-                    # Try with -i first
-                    result = sp.run([fmt_name, "-i", file_path_str], 
-                                   capture_output=True, text=True, timeout=30)
-                    if result.returncode == 0:
-                        return True, fmt_name
-                except (FileNotFoundError, sp.TimeoutExpired):
-                    pass
-                
-                # Fallback: read, format, write
-                try:
-                    with open(file_path_str, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                    
-                    # Try running without -i (pipe mode)
-                    result = sp.run([fmt_name, '-'], 
-                                   input=content, capture_output=True, text=True, timeout=30)
-                    if result.returncode == 0:
-                        with open(file_path_str, 'w', encoding='utf-8') as f:
-                            f.write(result.stdout)
-                        return True, fmt_name
-                except (FileNotFoundError, sp.TimeoutExpired):
-                    pass
-                
-                return False, None
-
-            if formatter == "auto":
-                # Try each formatter until one succeeds
-                for fmt in formatters:
-                    success, used_fmt = try_format_with_inplace(fmt)
-                    if success:
-                        return self.result({"message": f"File formatted with {used_fmt}", "formatter": used_fmt}, success=True)
-                return self.result(f"error: No formatter found for {lang}. Tried: {formatters}", success=False)
-            else:
-                # Use specified formatter
-                if formatter not in formatters:
-                    return self.result(f"error: Formatter '{formatter}' not supported for {lang}. Supported: {formatters}", success=False)
-
-                success, used_fmt = try_format_with_inplace(formatter)
-                if success:
-                    return self.result({"message": f"File formatted with {used_fmt}", "formatter": used_fmt}, success=True)
-                
-                return self.result(f"error: Formatter '{formatter}' failed for {lang}.", success=False)
-        except Exception as e:
-            return self.result(f"error: {e}", success=False)
+    # temporarily disabled because of security risks
+#     async def format_file(self, project_name: str, file_path: str, formatter: str = "auto") -> dict:
+#         """Formats code using appropriate formatter. Supports: auto, black, autopep8, prettier, gofmt, rustfmt, clang-format, etc."""
+#         file_path_str = self._get_file_path(project_name, file_path)
+#         if not os.path.exists(file_path_str):
+#             return self.result("error: file does not exist", success=False)
+#
+#         await self._backup_file(file_path_str)
+#
+#         supported_formatters = []
+#         for lang in self.FORMATTERS:
+#             supported_formatters.extend(lang)
+#
+#         if formatter not in supported_formatters:
+#             return self.result("error: unsupported formatter", success=False)
+#
+#         try:
+#             lang = self._get_language_from_ext(file_path_str)
+#             formatters = self.FORMATTERS.get(lang, [])
+#
+#             async def run_formatter(fmt_name, args):
+#                 """Run a formatter with given args, handling CLI differences."""
+#                 proc = await asyncio.create_subprocess_exec(
+#                     fmt_name, *args,
+#                     stdout=asyncio.subprocess.PIPE,
+#                     stderr=asyncio.subprocess.PIPE
+#                 )
+#                 try:
+#                     stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
+#                     return proc.returncode, stdout, stderr
+#                 except asyncio.TimeoutError:
+#                     try:
+#                         proc.kill()
+#                         await proc.wait()
+#                     except:
+#                         pass
+#                     return -1, b"", b"Timeout"
+#
+#             def try_format_with_inplace(fmt_name):
+#                 """Try formatting with -i flag, fallback to read/write if it fails."""
+#                 import subprocess as sp
+#                 try:
+#                     # Try with -i first
+#                     result = sp.run([fmt_name, "-i", file_path_str],
+#                                    capture_output=True, text=True, timeout=30)
+#                     if result.returncode == 0:
+#                         return True, fmt_name
+#                 except (FileNotFoundError, sp.TimeoutExpired):
+#                     pass
+#
+#                 # Fallback: read, format, write
+#                 try:
+#                     with open(file_path_str, 'r', encoding='utf-8') as f:
+#                         content = f.read()
+#
+#                     # Try running without -i (pipe mode)
+#                     result = sp.run([fmt_name, '-'],
+#                                    input=content, capture_output=True, text=True, timeout=30)
+#                     if result.returncode == 0:
+#                         with open(file_path_str, 'w', encoding='utf-8') as f:
+#                             f.write(result.stdout)
+#                         return True, fmt_name
+#                 except (FileNotFoundError, sp.TimeoutExpired):
+#                     pass
+#
+#                 return False, None
+#
+#             if formatter == "auto":
+#                 # Try each formatter until one succeeds
+#                 for fmt in formatters:
+#                     success, used_fmt = try_format_with_inplace(fmt)
+#                     if success:
+#                         return self.result({"message": f"File formatted with {used_fmt}", "formatter": used_fmt}, success=True)
+#                 return self.result(f"error: No formatter found for {lang}. Tried: {formatters}", success=False)
+#             else:
+#                 # Use specified formatter
+#                 if formatter not in formatters:
+#                     return self.result(f"error: Formatter '{formatter}' not supported for {lang}. Supported: {formatters}", success=False)
+#
+#                 success, used_fmt = try_format_with_inplace(formatter)
+#                 if success:
+#                     return self.result({"message": f"File formatted with {used_fmt}", "formatter": used_fmt}, success=True)
+#
+#                 return self.result(f"error: Formatter '{formatter}' failed for {lang}.", success=False)
+#         except Exception as e:
+#             return self.result(f"error: {e}", success=False)
 
     # ==================== System Prompt ====================
 

@@ -1,3 +1,4 @@
+# base requirements
 openai
 tiktoken
 prompt_toolkit
@@ -6,16 +7,27 @@ pyyaml
 json-repair
 aiofiles
 python-ulid
+
+# webUI stuff
 requests
 jinja2
 itsdangerous
+# older starlette versions have a critical security vulnerability
+starlette >= 1.0.1
 fastapi
 uvicorn
 websockets
 python-multipart
+
+# web scraping module requirements
 beautifulsoup4
+ddgs
+
+# channel requirements
 discord.py
 python-telegram-bot
+
+# coder module requirements (treesitter)
 tree-sitter
 tree-sitter-python
 tree-sitter-javascript

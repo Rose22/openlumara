@@ -97,6 +97,13 @@ function updateConnectionStatus(status) {
         statusDot.className = 'status-dot ' + status;
         statusDot.setAttribute('aria-label', 'Server: ' + status);
     }
+    
+    // Update WebSocket-specific indicator if we have separate tracking
+    if (status === 'connected' && isWsConnected) {
+        statusDot.classList.add('ws-connected');
+    } else {
+        statusDot.classList.remove('ws-connected');
+    }
 }
 
 function updateApiStatus(status) {
@@ -246,7 +253,7 @@ function scheduleReconnect() {
  * Display an API configuration error to the user.
  * This replaces any existing API message instead of adding a new one.
  */
-function showApiConfigError(message, errorType = null, action = null) {
+function showApiConfigError(message, errorType = null, action = null, rawError = null) {
     hideApiStatus(); // IMPORTANT: Remove the old error/message first
 
     const errorWrapper = document.createElement('div');
@@ -277,10 +284,13 @@ function showApiConfigError(message, errorType = null, action = null) {
             break;
         default:
             header = 'API Error';
-            guidance = message || 'An unexpected error occurred.';
+            guidance = 'An unexpected error occurred.';
             buttons = [{ text: 'Retry Connection', action: 'reconnectApi()', style: 'primary' }];
             break;
     }
+
+    // Use the provided message if it's meaningful (not just the generic guidance)
+    const displayMessage = message && message !== guidance ? message : guidance;
 
     let errorHtml = `
     <div class="message system-error" style="
@@ -295,8 +305,9 @@ function showApiConfigError(message, errorType = null, action = null) {
     <span style="font-size: 1.2em;">⚠️</span>
     <strong style="color: #ff8888; font-size: 1.1em;">${escapeHtml(header)}</strong>
     </div>
-    <p style="margin: 0 0 12px 0; color: #e0e0e0; font-size: 0.95em; line-height: 1.4;">${escapeHtml(guidance)}</p>
-    ${action ? `<p style="margin: 0 0 12px 0; color: #aaa; font-size: 0.85em; font-style: italic;">${escapeHtml(action)}</p>` : ''}
+    <p style="margin: 0 0 12px 0; color: #e0e0e0; font-size: 0.95em; line-height: 1.4; white-space: pre-wrap;">${escapeHtml(displayMessage)}</p>
+    ${rawError ? `<details style="margin: 0 0 12px 0; color: #aaa; font-size: 0.85em;"><summary style="cursor: pointer; color: #888; margin-bottom: 4px;">Technical details</summary><pre style="margin: 8px 0 0 0; padding: 8px; background: #1a1a1a; border-radius: 4px; overflow-x: auto; white-space: pre-wrap; word-break: break-all;">${escapeHtml(rawError)}</pre></details>` : ''}
+    ${action && !rawError ? `<p style="margin: 0 0 12px 0; color: #aaa; font-size: 0.85em; font-style: italic;">${escapeHtml(action)}</p>` : ''}
     <div style="display: flex; gap: 8px; flex-wrap: wrap;">
     `;
 
@@ -322,4 +333,3 @@ function showApiConfigError(message, errorType = null, action = null) {
     chat.insertBefore(errorWrapper, typing);
     scrollToBottom();
 }
-

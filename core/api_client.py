@@ -33,6 +33,7 @@ class APIClient():
     def _get_user_friendly_message(self, error_type, exception=None):
         """
         Maps technical error types to polite, actionable messages for end-users.
+        Returns a dict with both a friendly message and the raw error details.
         """
 
         model_msg = f"Model {self._model} not found" if self._model else "You have no model set"
@@ -53,11 +54,13 @@ class APIClient():
         # Fallback to a generic message if the key isn't found
         base_msg = messages.get(error_type, messages["unknown"])
 
-        # If we are in debug mode, append the technical detail for developers
-        if core.debug and exception:
-            return f"{base_msg} (Technical detail: {str(exception)})"
+        result = {"message": base_msg}
+        
+        # Always include raw error details if available - the frontend can decide how to display
+        if exception:
+            result["raw_error"] = str(exception)
 
-        return base_msg
+        return result
 
     async def connect(self):
         if self.connected:
@@ -85,26 +88,29 @@ class APIClient():
             error_str = str(e).lower()
             if "model" in error_str and ("not found" in error_str or "missing" in error_str):
                 core.log_error("Model not found (400)", e)
-                return {"error": "model_not_found", "message": self._get_user_friendly_message("model_not_found", e)}
+                return {"error": "model_not_found", **self._get_user_friendly_message("model_not_found", e)}
             else:
                 # It's a different kind of 400 error (e.g., invalid parameters)
                 core.log_error("Bad request (400)", e)
-                return {"error": "api_error", "message": self._get_user_friendly_message("api_error", e)}
+                return {"error": "api_error", **self._get_user_friendly_message("api_error", e)}
 
         except openai.AuthenticationError as e:
             await self.disconnect()
-            self._connection_error = self._get_user_friendly_message("auth_failed", e)
+            error_info = self._get_user_friendly_message("auth_failed", e)
+            self._connection_error = error_info["message"]
             core.log("API", f"Authentication failed: {e}")
             return False
 
         except openai.APIConnectionError as e:
             await self.disconnect()
-            self._connection_error = self._get_user_friendly_message("connection_lost", e)
+            error_info = self._get_user_friendly_message("connection_lost", e)
+            self._connection_error = error_info["message"]
             core.log("API", f"Connection failed: {e}")
             return False
         except Exception as e:
             await self.disconnect()
-            self._connection_error = self._get_user_friendly_message("unknown", e)
+            error_info = self._get_user_friendly_message("unknown", e)
+            self._connection_error = error_info["message"]
             core.log("API", f"Unexpected connection error: {e}")
             return False
 
@@ -235,7 +241,7 @@ class APIClient():
         try:
             # check for cancellation before starting the request
             if self.cancel_request:
-                return {"error": "cancelled", "message": self._get_user_friendly_message("cancelled")}
+                return {"error": "cancelled", **self._get_user_friendly_message("cancelled")}
 
             # wrap the request in a way that we can check for cancellation
             # since openai's async client doesn't natively support an abort signal
@@ -248,7 +254,7 @@ class APIClient():
             while not request_task.done():
                 if self.cancel_request:
                     request_task.cancel()
-                    return {"error": "cancelled", "message": self._get_user_friendly_message("cancelled")}
+                    return {"error": "cancelled", **self._get_user_friendly_message("cancelled")}
                 await asyncio.sleep(0.1)
 
             response = await request_task
@@ -258,44 +264,46 @@ class APIClient():
             error_str = str(e).lower()
             if "model" in error_str and ("not found" in error_str or "missing" in error_str):
                 core.log_error("Model not found (400)", e)
-                return {"error": "model_not_found", "message": self._get_user_friendly_message("model_not_found", e)}
+                return {"error": "model_not_found", **self._get_user_friendly_message("model_not_found", e)}
             else:
                 # It's a different kind of 400 error (e.g., invalid parameters)
                 core.log_error("Bad request (400)", e)
-                return {"error": "api_error", "message": self._get_user_friendly_message("api_error", e)}
+                return {"error": "api_error", **self._get_user_friendly_message("api_error", e)}
 
         except asyncio.CancelledError:
             core.log_error("request was cancelled", None)
-            return {"error": "cancelled", "message": self._get_user_friendly_message("cancelled")}
+            return {"error": "cancelled", **self._get_user_friendly_message("cancelled")}
 
         except openai.AuthenticationError as e:
             core.log_error("Authentication error", e)
             self.connected = False
-            self._connection_error = self._get_user_friendly_message("auth_failed", e)
-            return {"error": "auth_failed", "message": self._connection_error}
+            error_info = self._get_user_friendly_message("auth_failed", e)
+            self._connection_error = error_info["message"]
+            return {"error": "auth_failed", **error_info}
 
         except openai.APIConnectionError as e:
             core.log_error("Connection error", e)
             self.connected = False
-            self._connection_error = self._get_user_friendly_message("connection_lost", e)
-            return {"error": "connection_lost", "message": self._connection_error}
+            error_info = self._get_user_friendly_message("connection_lost", e)
+            self._connection_error = error_info["message"]
+            return {"error": "connection_lost", **error_info}
 
         except openai.NotFoundError as e:
             core.log_error("Model not found", e)
-            return {"error": "model_not_found", "message": self._get_user_friendly_message("model_not_found", e)}
+            return {"error": "model_not_found", **self._get_user_friendly_message("model_not_found", e)}
 
         except openai.RateLimitError as e:
             core.log_error("Rate limit exceeded", e)
-            return {"error": "rate_limit", "message": self._get_user_friendly_message("rate_limit", e)}
+            return {"error": "rate_limit", **self._get_user_friendly_message("rate_limit", e)}
 
         except openai.APIStatusError as e:
             core.log_error("API status error", e)
-            return {"error": "api_error", "message": self._get_user_friendly_message("api_error", e)}
+            return {"error": "api_error", **self._get_user_friendly_message("api_error", e)}
 
         except Exception as e:
             core.log_error("error while sending request to AI", e)
             self.connected = False
-            return {"error": "unknown", "message": self._get_user_friendly_message("unknown", e)}
+            return {"error": "unknown", **self._get_user_friendly_message("unknown", e)}
 
         return response
 
@@ -308,7 +316,7 @@ class APIClient():
         if not tools:
             tools = self.manager.tools
 
-        response = await self._request(context, tools=(tools if use_tools else None), use_thinking=use_thinking)
+        response = await self._request(context, tools=(tools if use_tools else None), use_thinking=use_thinking, **kwargs)
 
         # return errors if applicable
         if isinstance(response, dict) and "error" in response:
@@ -319,9 +327,9 @@ class APIClient():
             return result
         except Exception as e:
             core.log_error("error while processing response from AI", e)
-            return {"error": "processing_failed", "message": self._get_user_friendly_message("processing_failed", e)}
+            return {"error": "processing_failed", **self._get_user_friendly_message("processing_failed", e)}
 
-    async def send_stream(self, context: list, use_tools=True, tools=None, use_thinking=True):
+    async def send_stream(self, context: list, use_tools=True, tools=None, use_thinking=True, **kwargs):
         """send a message to the LLM. is an iterable async generator"""
 
         self.cancel_request = False
@@ -330,7 +338,7 @@ class APIClient():
         if not tools:
             tools = self.manager.tools
 
-        response = await self._request(context, tools=(tools if use_tools else None), stream=True, use_thinking=use_thinking)
+        response = await self._request(context, tools=(tools if use_tools else None), stream=True, use_thinking=use_thinking, **kwargs)
 
         # return errors if applicable
         if isinstance(response, dict) and "error" in response:
@@ -347,7 +355,7 @@ class APIClient():
                 yield token
         except Exception as e:
             core.log_error("error while sending request to AI", e)
-            yield {"type": "error", "content": {"error": "stream_failed", "message": self._get_user_friendly_message("processing_failed", e)}}
+            yield {"type": "error", "content": {"error": "stream_failed", **self._get_user_friendly_message("processing_failed", e)}}
 
     async def cancel(self):
         """cancel a request that's been sent to the AI"""

@@ -68,8 +68,6 @@ class Chats(core.module.Module):
             if chat.get("title", "").lower().strip().find(query.lower().strip()) != -1:
                 found = True
 
-            count = 0
-
             # search within content
             for message in chat.get("messages", []):
                 content = message.get("content", "")

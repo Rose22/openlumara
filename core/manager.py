@@ -2,14 +2,11 @@ import core
 import modules
 import os
 import sys
-import platform
 import datetime
 import asyncio
-import json
 import json_repair
 import inspect
 import re
-import subprocess
 
 class Manager:
     """the central class that manages everything"""
@@ -63,7 +60,6 @@ class Manager:
 
         if self.pure_mode:
             enabled_modules = []
-            enabled_user_modules = []
             enabled_user_modules = []
         elif self.coding_mode:
             enabled_modules = ["coder"]
@@ -190,12 +186,13 @@ class Manager:
         for channel_name, channel in self.channels.items():
             if hasattr(channel, "on_shutdown"):
                 core.log("core", f"Shutting down channel {channel_name}")
+
                 try:
+                    await channel._shutdown()
+
                     if asyncio.iscoroutinefunction(channel.on_shutdown):
-                        await channel._shutdown()
                         await channel.on_shutdown()
                     else:
-                        await channel._shutdown()
                         channel.on_shutdown()
                 except Exception as e:
                     core.log_error(f"Error shutting down {channel_name}", e)
@@ -391,8 +388,9 @@ class Manager:
                 status_list.append("  Warning: API key not configured")
 
         status_list.append("API server: " + str(core.config.get("api").get("url", "Not configured")))
-        if "webui" in core.config.get("channels").get("enabled"):
-            status_list.append(f"WebUI: {core.config.get('channels').get('settings').get('webui').get('host')}:{core.config.get('channels').get('settings').get('webui').get('port')}")
+        if "webui" in self.channels.keys():
+            webui_cfg = self.channels['webui'].config
+            status_list.append(f"WebUI: {webui_cfg.get('host')}:{webui_cfg.get('port')}")
         status_list.append("AI model: " + str(self.API.get_model() or "Not set"))
 
         if self.channel is not None:

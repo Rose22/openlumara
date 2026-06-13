@@ -28,11 +28,13 @@ class Models(core.module.Module):
             current_model = self.manager.API.get_model()
             output += f"Current model: {current_model}"
 
+        current_model = self.manager.API.get_model()
+        
         if self.config.get("insert_available_models_into_system_prompt"):
             if not self.models:
                 models = await self.manager.API.list_models()
                 if not models:
-                    return None
+                    return output if output else None
                 self.models = models
 
             if len(self.models) > 1:

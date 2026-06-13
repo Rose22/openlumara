@@ -238,10 +238,10 @@ function openGlobalSearch() {
 
     // Focus the input
     setTimeout(() => {
-        const input = document.getElementById('global-search-input');
-        if (input) {
-            input.focus();
-            input.select();
+        const searchInput = document.getElementById('global-search-input');
+        if (searchInput) {
+            searchInput.focus();
+            searchInput.select();
         }
     }, 100);
 
@@ -394,7 +394,7 @@ async function performGlobalSearch(query) {
             <span class="global-search-result-date">${date}</span>
             </div>
             ${result.snippet ? `
-                <div class="global-search-result-snippet">${DOMPurify.sanitize(result.snippet)}</div>
+                <div class="global-search-result-snippet">${typeof DOMPurify !== 'undefined' ? DOMPurify.sanitize(result.snippet) : escapeHtml(result.snippet)}</div>
                 ` : ''}
                 ${tags.length > 0 ? `
                     <div class="global-search-result-tags">

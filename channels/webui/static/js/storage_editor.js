@@ -973,10 +973,4 @@ function showNewFilePrompt() {
 // =============================================================================
 // Utilities
 // =============================================================================
-
-function escapeHtml(str) {
-    if (str === null || str === undefined) return '';
-    const div = document.createElement('div');
-    div.textContent = String(str);
-    return div.innerHTML;
-}
+// Note: escapeHtml is defined in markdown.js and available globally

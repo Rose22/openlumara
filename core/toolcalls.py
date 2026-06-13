@@ -1,6 +1,8 @@
 import core
 import json
 import json_repair
+import asyncio
+from concurrent.futures import ProcessPoolExecutor
 
 class ToolcallManager:
     def __init__(self, channel):
@@ -165,7 +167,11 @@ class ToolcallManager:
 
                 try:
                     # do the function call and get it's result
-                    func_response = await func_callable(**tool_args)
+                    async def _run_tool():
+                        return await func_callable(**tool_args)
+
+                    # add a timeout so that tools can't hang the application forever
+                    func_response = await asyncio.wait_for(_run_tool(), timeout=float(core.config.get("core", "tool_timeout", default=10.0)))
 
                     # don't double-escape strings
                     if isinstance(func_response, str):
@@ -184,16 +190,14 @@ class ToolcallManager:
                     yield {"type": "tool", "tool_call_id": tool_call_dict['id'], "content": func_response_str}
 
                 except Exception as e:
-                    # Always log full traceback for easier debugging
-                    import traceback
-                    traceback.print_exc()
-                    core.log("error", f"Tool execution failed: {e}")
+                    core.log_error("Tool execution failed", e)
+                    err_msg = core.detail_error(e) if core.debug else str(e)
 
                     # build an openai-compliant tool error object
                     tool_response = {
                         "role": "tool",
                         "tool_call_id": tool_call_dict['id'],
-                        "content": f"error: {str(e)}"
+                        "content": f"error: {err_msg}"
                     }
 
                     # yield it so it can be displayed immediately
@@ -273,10 +277,8 @@ class ToolcallManager:
                 final_reasoning_str = "".join(final_reasoning)
 
                 if final_content_str or final_reasoning_str:
-                    final_msg = {"role": "assistant"}
+                    final_msg = {"role": "assistant", "content": final_content_str}
 
-                    if final_content_str:
-                        final_msg["content"] = final_content_str
                     if final_reasoning_str:
                         final_msg["reasoning_content"] = final_reasoning_str
 

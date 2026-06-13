@@ -161,7 +161,7 @@ class Telegram(core.channel.Channel):
                         # Process the message (this waits for the stream to finish)
                         await self._process_stream(update, context)
                     else:
-                        response = await self.send({"role": "user", "content": user_msg})
+                        response = await self.send({"role": "user", "content": user_msg}, commands_authorized=True)
                         if response:
                             content = response.get("content")
                             if content:
@@ -225,10 +225,12 @@ class Telegram(core.channel.Channel):
             # 2. Consume the stream
             # Use a chunk size similar to Discord's MAX_CHARS
             stream = self.format_stream_for_text(
-                self.send_stream({"role": "user", "content": user_msg}), 
+                self.send_stream({"role": "user", "content": user_msg}, commands_authorized=True),
                 use_markdown=False,
                 chunk_size=1900
             )
+
+            # command authorization enabled by default for now. group chat support is coming later, the telegram channel is meant to be used in private DM's
 
             async for token in stream:
                 if token.get("type") == "new_chunk":

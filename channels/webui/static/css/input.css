@@ -199,9 +199,141 @@ body.token-bar-hidden .input-area {
     box-shadow: 0 0 15px rgba(248, 113, 113, 0.3);
 }
 
-#stop.show { 
-    display: inline-flex;
+#stop.show {
+    display: inline-flex !important;
     animation: buttonPopIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    min-width: 48px;
+    min-height: 48px;
+    overflow: visible;
+}
+
+/* Stop button content: "Stop" text visible by default, streaming icons hidden */
+#stop .stop-text {
+    display: block;
+    font-size: 0.95rem;
+    font-weight: 600;
+    line-height: 1;
+}
+
+/* Streaming icon - hidden by default */
+#stop .streaming-icon {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+#stop .streaming-icon svg {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    stroke: currentColor;
+    stroke-width: 2;
+    fill: none;
+}
+
+/* Streaming indicator - hidden by default (THIS WAS THE PROBLEM) */
+.streaming-indicator {
+    display: none;
+    align-items: center;
+}
+
+
+/* Hide all streaming sub-icons by default */
+#stop .streaming-icon .icon-streaming,
+#stop .streaming-icon .icon-typing,
+#stop .streaming-icon .icon-skip {
+    display: none;
+}
+
+/* Streaming states: hide "Stop" text, show streaming icon */
+#stop.streaming .stop-text {
+    display: none !important;
+}
+#stop.streaming .streaming-icon {
+    display: inline-flex !important;
+}
+
+/* Typing: both tokens + typewriter running - show typing icon ONLY */
+#stop.typing .streaming-icon .icon-typing {
+    display: block !important;
+}
+#stop.typing .streaming-icon .icon-streaming {
+    display: none !important;
+}
+#stop.typing .streaming-indicator {
+    display: inline-flex !important;
+}
+
+/* Skip: tokens done, typewriter still running - show skip icon ONLY */
+#stop.skip .streaming-icon .icon-skip {
+    display: block !important;
+}
+#stop.skip .streaming-icon .icon-streaming {
+    display: none !important;
+}
+
+/* Streaming only: tokens streaming, typewriter not started */
+#stop.streaming:not(.typing):not(.skip) .streaming-icon .icon-streaming {
+    display: block !important;
+}
+
+/* Ensure SVGs render on mobile */
+@media (max-width: 768px) {
+    #stop svg {
+        width: 20px !important;
+        height: 20px !important;
+        stroke: var(--error, #f87171) !important;
+        fill: none !important;
+    }
+}
+
+/* Streaming indicator dots */
+.streaming-indicator {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 6px;
+}
+/* Only position absolutely when actually visible (during streaming states) */
+#stop.streaming .streaming-indicator {
+    position: absolute;
+    bottom: 10px;
+    left: 2px;
+    right: 0;
+    margin: 0;
+    justify-content: center;
+}
+
+.indicator-dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--error);
+    margin-right: 3px;
+    animation: dotPulse 1.4s infinite ease-in-out;
+}
+
+.indicator-dot:nth-child(1) {
+    animation-delay: 0s;
+}
+
+.indicator-dot:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.indicator-dot:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes dotPulse {
+    0%, 80%, 100% {
+        opacity: 0.3;
+        transform: scale(0.8);
+    }
+    40% {
+        opacity: 1;
+        transform: scale(1.2);
+    }
 }
 
 @keyframes buttonPopIn {

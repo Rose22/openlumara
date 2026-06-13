@@ -8,7 +8,6 @@ let autocompleteVisible = false;
 let selectedIndex = -1;
 let currentItems = [];
 let autocompleteContainer = null;
-const msgInput = document.getElementById('message');
 
 // Initialize autocomplete on load
 document.addEventListener('DOMContentLoaded', () => {
@@ -50,9 +49,11 @@ async function initAutocomplete() {
         inputArea.parentNode.insertBefore(autocompleteContainer, inputArea);
     }
 
-    // Event listeners
-    msgInput.addEventListener('input', handleInput);
-    msgInput.addEventListener('keydown', handleKeydown);
+    // Event listeners (use global inputField from variables.js)
+    if (inputField) {
+        inputField.addEventListener('input', handleInput);
+        inputField.addEventListener('keydown', handleKeydown);
+    }
     document.addEventListener('click', handleClickOutside);
 }
 
@@ -217,27 +218,30 @@ function scrollToSelected(element) {
 }
 
 function selectCommand(cmd) {
-    const currentValue = msgInput.value;
+    if (!inputField) return;
+    
+    const currentValue = inputField.value;
     const prefixIndex = currentValue.indexOf(commandPrefix);
     const afterPrefix = currentValue.slice(prefixIndex + commandPrefix.length);
     
     // Replace everything after prefix with command name + space
     const newValue = cmd.name + ' ';
-    msgInput.value = newValue;
-    msgInput.focus();
+    inputField.value = newValue;
+    inputField.focus();
     
     hideAutocomplete();
-    autoResize(msgInput);
+    autoResize(inputField);
 }
 
 function handleClickOutside(e) {
-    if (autocompleteVisible && !autocompleteContainer.contains(e.target) && e.target !== msgInput) {
+    if (autocompleteVisible && autocompleteContainer && !autocompleteContainer.contains(e.target) && e.target !== inputField) {
         hideAutocomplete();
     }
 }
 
 function highlightMatch(text, match) {
     if (!match) return text;
+    // escapeRegex is defined in utils.js
     const regex = new RegExp(`(${escapeRegex(match)})`, 'gi');
     return text.replace(regex, '<mark>$1</mark>');
 }

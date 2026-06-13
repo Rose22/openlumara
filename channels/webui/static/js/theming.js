@@ -56,28 +56,33 @@ function loadGoogleFont(fontName, weights = [400, 600, 700]) {
 
 // Apply the current theme based on family and mode
 function applyTheme(family, mode) {
-    const themeId = buildThemeId(family, mode);
-    const theme = themes[themeId];
-
-    // If the specific variant doesn't exist, try the other mode
-    if (!theme) {
-        const alternateMode = mode === 'dark' ? 'light' : 'dark';
-        const alternateId = buildThemeId(family, alternateMode);
-        if (themes[alternateId]) {
-            // Theme exists in alternate mode only
-            currentThemeMode = alternateMode;
-            updateModeCheckbox();
-        }
-    }
-
-    const finalThemeId = buildThemeId(family, currentThemeMode);
-    const finalTheme = themes[finalThemeId];
-
-    if (!finalTheme) {
-        console.error('Theme not found:', finalThemeId);
+    // 1. Validate family exists
+    if (!window.themes || !window.themes[family]) {
+        console.error('Theme family not found:', family);
         return;
     }
 
+    const themeData = window.themes[family];
+
+    // 2. Validate mode exists
+    if (!themeData[mode]) {
+        // Fallback logic: try the other mode
+        const alternateMode = mode === 'dark' ? 'light' : 'dark';
+        if (themeData[alternateMode]) {
+            currentThemeMode = alternateMode;
+            updateModeCheckbox(); // Assuming this exists and works
+        } else {
+            // No valid mode found
+            currentThemeMode = 'dark'; // Default fallback
+            console.warn('No valid mode found for theme:', family);
+        }
+    } else {
+        currentThemeMode = mode;
+    }
+
+    const finalTheme = themeData[currentThemeMode];
+
+    // 3. Apply variables
     const root = document.documentElement;
 
     // === STEP 1: RESET TO DEFAULTS ===
@@ -87,11 +92,20 @@ function applyTheme(family, mode) {
     }
 
     // === STEP 2: APPLY NEW THEME VARIABLES ===
-    if (finalTheme.vars) {
-        for (const [varName, value] of Object.entries(finalTheme.vars)) {
-            root.style.setProperty(varName, value);
-        }
+    // In the new structure, the object itself IS the vars object.
+    // No .vars property.
+    for (const [varName, value] of Object.entries(finalTheme)) {
+        root.style.setProperty(varName, value);
     }
+
+    // === SWITCH CODE SYNTAX HIGHLIGHTING THEME BASED ON MODE ===
+    const codeThemeLink = document.getElementById('code-theme');
+    if (codeThemeLink) {
+        codeThemeLink.href = currentThemeMode === 'dark'
+        ? '/static/css/code-themes/github-dark.css'
+        : '/static/css/code-themes/github-light.css';
+    }
+
     // === LOAD CUSTOM FONT ===
     const savedFont = localStorage.getItem('fontFamily');
     if (savedFont && savedFont !== 'default') {
@@ -189,11 +203,13 @@ function loadTheme() {
     const savedFamily = localStorage.getItem('themeFamily') || 'monochrome';
     const savedMode = localStorage.getItem('themeMode') || 'dark';
 
-    // Verify the theme exists
-    const themeId = buildThemeId(savedFamily, savedMode);
-    if (!themes[themeId]) {
+    // Verify the theme exists in the new structure: window.themes[family][mode]
+    const themeData = window.themes?.[savedFamily];
+
+    if (!themeData || !themeData[savedMode]) {
         // Fall back to default dark
-        currentThemeFamily = 'monochrome';
+        console.warn('Saved theme not found, falling back to defaults.');
+        currentThemeFamily = 'monochrome'; // Ensure this family exists in your JSON files
         currentThemeMode = 'dark';
     } else {
         currentThemeFamily = savedFamily;
@@ -202,3 +218,4 @@ function loadTheme() {
 
     applyTheme(currentThemeFamily, currentThemeMode);
 }
+

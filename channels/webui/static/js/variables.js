@@ -2,7 +2,8 @@
 // State Variables
 // =============================================================================
 
-let isConnected = false;        // Server connection
+let isConnected = false;        // Server connection (HTTP)
+let isWsConnected = false;       // WebSocket connection
 let isApiConnected = false;     // API connection
 let apiError = null;            // Last API error message
 let apiErrorType = null;        // Type of API error (config_missing, auth_failed, etc.)
@@ -16,6 +17,8 @@ let currentTitleBarTags = [];
 
 // Stream state
 let isStreaming = false;
+let isDataStreaming = false;    // Track if backend is still sending data
+let promptProcessingReceived = false;  // Track if we received prompt_progress
 let streamFrozen = false;
 let currentController = null;
 let currentStreamId = null;
@@ -71,4 +74,20 @@ const CONFIG = {
     CONNECTION_TIMEOUT: 10000,
     POLL_INTERVAL: 1000,
     API_STATUS_INTERVAL: 10000  // Check API status every 10 seconds
+};
+
+// Default values for "standard" themes
+// If a theme doesn't specify a variable, it falls back to this.
+const BASE_THEME_VARS = {
+    // Shapes
+    '--radius-sm': '4px',
+    '--radius-md': '8px',
+    '--radius-lg': '12px',
+    '--radius-xl': '16px',
+
+    // Decorations (Reset these so patterns don't stick)
+    '--bg-pattern': 'none',
+    '--bg-pattern-size': '24px 24px',
+    '--message-decoration': 'none',
+    '--avatar-shape': '50%'
 };

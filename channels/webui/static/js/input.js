@@ -180,26 +180,33 @@ document.addEventListener('keydown', (event) => {
 });
 
 // Search input keyboard navigation (keep this separate)
-document.getElementById('search-input').addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') {
-        event.preventDefault();
-        if (event.shiftKey) {
-            prevSearchResult();
-        } else {
-            nextSearchResult();
+const searchInput = document.getElementById('search-input');
+if (searchInput) {
+    searchInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            if (event.shiftKey) {
+                prevSearchResult();
+            } else {
+                nextSearchResult();
+            }
+            return;
         }
-        return;
-    }
-    if (event.key === 'Escape') {
-        event.preventDefault();
-        clearSearch();
-        return;
-    }
-});
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            clearSearch();
+            return;
+        }
+    });
+}
 
-document.getElementById('message').addEventListener('input', function() {
-    autoResize(this);
-});
+// Input auto-resize (safe check for element existence)
+const messageInput = document.getElementById('message');
+if (messageInput) {
+    messageInput.addEventListener('input', function() {
+        autoResize(this);
+    });
+}
 
 // =============================================================================
 // Input Handling

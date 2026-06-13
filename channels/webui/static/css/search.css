@@ -13,7 +13,7 @@
     flex-direction: column;
     overflow: hidden;
     background: var(--bg-secondary);
-    border-radius: var(--radius-xl);
+    border-radius: var(--radius-sm);
     box-shadow: var(--shadow-strong);
     transform: translate(-50%, -50%) !important;
 }

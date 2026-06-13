@@ -10,6 +10,54 @@ let toolCallsContainer = null;
 let placeholderUserWrapper = null;
 let manuallyCollapsedReasoning = new Set();
 let toolProcessingIndicatorElement = null;
+let fancyProcessingIndicator = null;
+
+/**
+ * Updates the stop button icon and streaming indicator based on typewriter state.
+ * Shows typing icon with indicator when tokens are streaming and typewriter is active.
+ * Shows skip icon when tokens are done but typing is still in progress.
+ * Shows streaming icon when only tokens are streaming (no typewriter).
+ */
+function updateStopButtonState() {
+    const stopBtn = document.getElementById('stop');
+    if (!stopBtn) return;
+    
+    // Only update if button is visible (has 'show' class)
+    if (!stopBtn.classList.contains('show')) return;
+    
+    const typewriterEnabled = localStorage.getItem("typewriterEnabled") === 'true';
+    const typewriterSpeed = parseInt(localStorage.getItem("typewriterSpeed") ?? "30", 10);
+    const useTypewriter = typewriterEnabled && typewriterSpeed > 0;
+    
+    // Remove all state classes first
+    stopBtn.classList.remove('streaming', 'typing', 'skip', 'streaming-only', 'show-text');
+    
+    // When typewriter is OFF: just show "Stop" during streaming
+    if (!useTypewriter) {
+        stopBtn.style.paddingBottom = '0px';
+        return;
+    }
+    
+    // When typewriter is ON: track streaming/typing/skip states
+    const tokensStreaming = isDataStreaming === true;
+    const typewriterRunning = isTypewriterRunning === true;
+    
+    stopBtn.style.paddingBottom = '0px';
+    
+    // Both tokens and typewriter running
+    if (tokensStreaming && typewriterRunning) {
+        stopBtn.classList.add('streaming', 'typing');
+    }
+    // Tokens done but typewriter still running (skip state)
+    else if (!tokensStreaming && typewriterRunning) {
+        stopBtn.classList.add('streaming', 'skip');
+    }
+    // Only tokens streaming, typewriter not yet started
+    else if (tokensStreaming && !typewriterRunning) {
+        stopBtn.classList.add('streaming');
+    }
+    // Both done - no state classes
+}
 
 function resetStreamState() {
     streamSegments = [];
@@ -220,7 +268,6 @@ async function send(providedContent = null) {
     if (!message && !isRegenerate) return;
 
     promptProcessingReceived = false;
-    let fancyProcessingIndicator = null;
     typewriterQueue = [];
     displayedContent = '';
     isTypewriterRunning = false;
@@ -250,9 +297,7 @@ async function send(providedContent = null) {
         const reconnected = await reconnectApi();
         if (!reconnected) {
             removePlaceholder();
-            if (!isRegenerate) {
-                showApiConfigError('API is not connected.', 'connection_failed');
-            }
+            showApiConfigError('API is not connected. Cannot regenerate response.', 'connection_failed');
             return;
         }
         isConnected = true;
@@ -284,6 +329,9 @@ async function send(providedContent = null) {
     isStreaming = true;
     isDataStreaming = true;
     currentController = new AbortController();
+    
+    // Update stop button to show streaming indicator when tokens start
+    updateStopButtonState();
 
     let playedCompletionSound = false;
 
@@ -319,6 +367,7 @@ async function send(providedContent = null) {
     const typewriterEnabled = localStorage.getItem("typewriterEnabled") === 'true';
     const typewriterSpeed = parseInt(localStorage.getItem("typewriterSpeed") ?? "30", 10);
     const useTypewriter = typewriterEnabled && typewriterSpeed > 0;
+    const useStreamingSound = localStorage.getItem("tokenEnabled") === 'true';
 
     let progressBarFill = null;
     let progressTextPercent = null;
@@ -443,6 +492,8 @@ async function send(providedContent = null) {
                         if (metaType === 'commit') {
                             // Signal that data streaming is complete so the typewriter can finish
                             isDataStreaming = false;
+                            // Update stop button state to show "Skip" if typewriter is still running
+                            updateStopButtonState();
                             // Wait for typewriter to finish before finalizing
                             if (isTypewriterRunning) {
                                 await waitForTypewriter();
@@ -511,7 +562,7 @@ async function send(providedContent = null) {
                             }
 
                             // Play sound on every token if streaming sound is enabled AND typewriter mode is OFF
-                            if (!useTypewriter && token.trim() !== '') {
+                            if (!useTypewriter && useStreamingSound && token.trim() != '') {
                                 TypewriterAudioManager.play('token');
                             }
                         }
@@ -545,8 +596,8 @@ async function send(providedContent = null) {
                             renderStreamSegments(aiMsgDiv);
 
 
-                            // Play sound on every token if streaming sound is enabled AND typewriter mode is OFF
-                            if (!useTypewriter && token.trim() !== '') {
+                            // Play sound on every token if streaming sound is enabled
+                            if (useStreamingSound) {
                                 TypewriterAudioManager.play('token');
                             }
                         }
@@ -569,8 +620,8 @@ async function send(providedContent = null) {
                         ensureToolCallsSegment();
                         handleToolCallDelta(data, aiMsgDiv, aiWrapper);
 
-                        // Play sound on every token if streaming sound is enabled AND typewriter mode is OFF
-                        if (!useTypewriter && token.trim() !== '') {
+                        // Play sound on every token if streaming sound is enabled
+                        if (useStreamingSound) {
                             TypewriterAudioManager.play('token');
                         }
                     }
@@ -597,8 +648,6 @@ async function send(providedContent = null) {
                     if (data.timings) {
                         updateTimingStats(data.timings);
                     }
-
-                    console.log(data);
                 } catch (e) {
                     console.error("Error parsing stream line:", e, line);
                 }
@@ -613,6 +662,8 @@ async function send(providedContent = null) {
         }
     } finally {
         isDataStreaming = false;
+        // Update stop button state to show "Skip" if typewriter is still running
+        updateStopButtonState();
 
         if (window.upload_queue && window.upload_queue.files.length > 0) {
             window.upload_queue.wrappers.forEach(w => w.remove());
@@ -695,7 +746,27 @@ async function finalizeStreamingUI(aiWrapper, aiMsgDiv) {
     // Clear any remaining processing indicators
     clearProcessingIndicators();
 
-    // Enable buttons
+    // Sync to get proper indices
+    await syncIndicesOnly();
+
+    // Now update the action buttons with the correct index
+    const actualIndex = parseInt(aiWrapper.dataset.index);
+    if (!isNaN(actualIndex)) {
+        // Get the content for the copy button (rendered text)
+        const content = aiMsgDiv.textContent || '';
+
+        // Find the actions row and update the buttons inside it
+        const actionsRow = aiWrapper.querySelector('.actions-stats-row');
+        if (actionsRow) {
+            const oldActions = actionsRow.querySelector('.message-actions');
+            if (oldActions) {
+                const newActions = createActionButtons('assistant', actualIndex, content);
+                actionsRow.replaceChild(newActions, oldActions);
+            }
+        }
+    }
+
+    // Enable buttons and show wrapper
     aiWrapper.classList.remove('streaming', 'hidden');
     const actions = aiWrapper.querySelector('.message-actions');
     if (actions) {
@@ -717,32 +788,6 @@ async function finalizeStreamingUI(aiWrapper, aiMsgDiv) {
     displayedContent = '';
     isTypewriterRunning = false;
     inputField.focus();
-
-    // Sync to get proper indices, but don't re-render
-    await syncIndicesOnly();
-}
-
-/**
- * Sync only message indices without re-rendering content.
- */
-async function syncIndicesOnly() {
-    try {
-        const response = await fetch('/messages');
-        const data = await response.json();
-        const messages = data.messages || [];
-
-        lastMessageIndex = messages.length;
-
-        // Update indices on streaming wrappers
-        const streamingWrappers = chat.querySelectorAll('.message-wrapper[data-index="streaming"]');
-        streamingWrappers.forEach(wrapper => {
-            wrapper.dataset.index = lastMessageIndex - 1;
-        });
-
-        updateTokenUsage();
-    } catch (err) {
-        console.error('Index sync failed:', err);
-    }
 }
 
 function finishStream() {
@@ -850,6 +895,8 @@ let isTypewriterRunning = false;
 
 async function startTypewriterProcessSegments(msgDiv) {
     isTypewriterRunning = true;
+    // Update button state now that typewriter has started
+    updateStopButtonState();
 
     const typewriterEnabled = localStorage.getItem("typewriterEnabled") !== 'false';
     if (!typewriterEnabled) {
@@ -883,6 +930,8 @@ async function startTypewriterProcessSegments(msgDiv) {
 
     TypewriterAudioManager.play('completion');
     isTypewriterRunning = false;
+    // Update stop button state back to "Stop" when typewriter finishes
+    updateStopButtonState();
 }
 
 function waitForTypewriter() {
@@ -1017,17 +1066,53 @@ function getErrorIcon(type) {
 
 
 /**
+ * Extracts a user-friendly message from a raw error string.
+ * Parses JSON error responses to extract the 'message' field if present.
+ */
+function extractErrorMessage(rawError) {
+    if (!rawError) return null;
+    
+    // Try to parse as JSON to extract the message field
+    try {
+        // Handle "Error code: 402 - {...}" format
+        const jsonMatch = rawError.match(/Error code: \d+ - (\{[\s\S]*\})/);
+        const jsonStr = jsonMatch ? jsonMatch[1] : rawError;
+        
+        const parsed = JSON.parse(jsonStr);
+        
+        // Navigate common error structures
+        if (parsed.error?.message) return parsed.error.message;
+        if (parsed.message) return parsed.message;
+        if (parsed.error?.error?.message) return parsed.error.error.message;
+        if (typeof parsed.error === 'string') return parsed.error;
+    } catch (e) {
+        // Not JSON, check for common patterns
+    }
+    
+    // Try to extract message from string format like "{'error': {'message': '...'}}"
+    const messageMatch = rawError.match(/'message':\s*'([^']+)'/);
+    if (messageMatch) return messageMatch[1];
+    
+    const messageMatch2 = rawError.match(/"message":\s*"([^"]+)"/);
+    if (messageMatch2) return messageMatch2[1];
+    
+    return null;
+}
+
+/**
  * Handles HTTP error responses (4xx, 5xx)
  */
 async function handleServerError(response, aiWrapper) {
     let errorType = 'server_error';
     let customMessage = '';
+    let rawError = '';
 
     try {
         const errorData = await response.json();
         // Use the error_type provided by backend, or fallback to the error message
         errorType = errorData.error_type || errorData.error || 'server_error';
-        customMessage = errorData.error || errorData.message || '';
+        customMessage = errorData.message || '';
+        rawError = errorData.raw_error || '';
     } catch (e) {
         // Fallback if JSON parsing fails
         if (response.status === 401 || response.status === 403) errorType = 'auth_failed';
@@ -1037,10 +1122,14 @@ async function handleServerError(response, aiWrapper) {
 
     const info = ERROR_MAP[errorType] || ERROR_MAP['default'];
 
-    // If the backend gave us a specific message, prioritize it over our generic one
-    const displayMsg = customMessage ? `${customMessage} (${info.message})` : info.message;
+    // Try to extract a meaningful message from raw error
+    const extractedMessage = extractErrorMessage(rawError);
+    
+    // Use extracted message, then custom message, then generic message
+    const displayMsg = extractedMessage || customMessage || info.message;
 
-    showApiConfigError(displayMsg, errorType, info.action);
+    // Pass both the display message and raw error
+    showApiConfigError(displayMsg, errorType, info.action, rawError);
     removePlaceholder();
 
     if (aiWrapper && aiWrapper.parentNode) {
@@ -1060,8 +1149,18 @@ function handleInlineError(data, aiMsgDiv, aiWrapper, streamStarted) {
     const type = errorDetails.error || 'api_error';
     const info = ERROR_MAP[type] || ERROR_MAP['default'];
 
-    // If the backend provides a specific error message, use it
-    const userMessage = errorDetails.message || info.message;
+    // Try to extract a meaningful message from raw error
+    const rawError = errorDetails.raw_error || '';
+    const extractedMessage = extractErrorMessage(rawError);
+    
+    // Use extracted message, then backend message, then generic message
+    const userMessage = extractedMessage || errorDetails.message || info.message;
+
+    // Build the error display - show message prominently, raw error in details
+    let errorContent = escapeHtml(userMessage);
+    if (rawError) {
+        errorContent += `<details class="api-error-details"><summary>Technical details</summary><pre>${escapeHtml(rawError)}</pre></details>`;
+    }
 
     aiMsgDiv.innerHTML = `
     <div class="api-error-inline">
@@ -1071,13 +1170,9 @@ function handleInlineError(data, aiMsgDiv, aiWrapper, streamStarted) {
     </svg>
     <span class="api-error-title">${escapeHtml(info.title)}</span>
     </div>
-    <div class="api-error-message">${escapeHtml(userMessage)}</div>
+    <div class="api-error-message">${errorContent}</div>
     <div class="api-error-footer">
     <div class="api-error-action">${escapeHtml(info.action)}</div>
-    <button class="retry-error-btn" onclick="retryLastMessage()">
-    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M20 8h-8a4 4 0 0 0 0 8h8"/></svg>
-    Retry
-    </button>
     </div>
     </div>`;
 }
@@ -1105,26 +1200,9 @@ function handleCatchError(err, aiMsgDiv, aiWrapper, streamStarted) {
     <div class="api-error-message">${escapeHtml(err.message)}</div>
     <div class="api-error-footer">
     <div class="api-error-action">${escapeHtml(info.action)}</div>
-    <button class="retry-error-btn" onclick="retryLastMessage()">Retry</button>
     </div>
     </div>`;
 }
-
-/**
- * Global helper to facilitate the "Retry" button functionality
- */
-window.retryLastMessage = async function() {
-    // Find the last user message in the chat
-    const userMessages = chat.querySelectorAll('.message-wrapper.user');
-    if (userMessages.length > 0) {
-        const lastUserMsg = userMessages[userMessages.length - 1];
-        const text = lastUserMsg.querySelector('.message-content-container').textContent;
-
-        // Clear the error UI and re-run send
-        finishStream();
-        await send(text);
-    }
-};
 
 // =============================================================================
 // Stop Generation
@@ -1137,11 +1215,20 @@ async function stopGeneration(sent_from_command = false) {
         currentController = null;
     }
 
-    // Notify backend
+    // Notify backend via WebSocket
     if (currentStreamId) {
         try {
-            window.socket.send(JSON.stringify({ type: 'stop' }));
-            window.socket.send(JSON.stringify({ type: 'cancel', id: currentStreamId }));
+            if (window.socket && window.socket.readyState === WebSocket.OPEN) {
+                window.socket.send(JSON.stringify({ type: 'stop' }));
+                window.socket.send(JSON.stringify({ type: 'cancel', id: currentStreamId }));
+            } else {
+                // Fallback: use HTTP endpoint if WebSocket is unavailable
+                await fetch('/cancel', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: currentStreamId })
+                }).catch(() => {});
+            }
         } catch (e) {
             // Ignore network errors during cancellation
         }
@@ -1723,19 +1810,21 @@ function finalizeStreamingToolCalls(finalToolCalls, aiMsgDiv) {
 
     const cards = toolCallsContainer.querySelectorAll('.tool-call-card');
     cards.forEach(card => {
-        // FIX: Only reset cards that are currently in the 'streaming' state.
-        // If the card is already 'completed', leave it alone!
+        // FIX: Only update cards that are still in 'streaming' state
         if (card.classList.contains('streaming')) {
             card.classList.remove('streaming');
             const status = card.querySelector('.tool-call-status');
             if (status) {
                 status.classList.remove('streaming');
+                // Don't change to 'pending' - the tool call is complete, waiting for response
+                // Status will be updated to 'completed' or stay as 'pending' when response arrives
                 status.classList.add('pending');
                 status.textContent = 'calling...';
             }
         }
     });
 
+    // Update tool call IDs from final data
     finalToolCalls.forEach((tc) => {
         const finalId = tc.id || `tool-unknown`;
         const streamId = tc.id || (tc.index !== undefined ? `tc-stream-${tc.index}` : null);
@@ -1805,11 +1894,17 @@ function handleToolResponse(data, aiMsgDiv) {
  * Progress bar and percentage are hidden by default.
  */
 function addProcessingIndicator(cardEl) {
-    // Remove any existing processing indicator from the container first
-    if (toolCallsContainer) {
-        const existing = toolCallsContainer.querySelector('.tool-processing-indicator');
-        if (existing) existing.remove();
+    // Find the correct container for this tool call card
+    const container = cardEl ? cardEl.closest('.tool-calls-container, .tool-calls-streaming-container') : toolCallsContainer;
+    
+    if (!container) {
+        console.warn('Could not find tool calls container for processing indicator');
+        return;
     }
+    
+    // Remove any existing processing indicator from the container first
+    const existing = container.querySelector('.tool-processing-indicator');
+    if (existing) existing.remove();
 
     const indicator = document.createElement('div');
     indicator.className = 'tool-processing-indicator';
@@ -1840,20 +1935,20 @@ function addProcessingIndicator(cardEl) {
         percentText.textContent = `${percent}%`;
     };
 
-    // Always append to the very end of the tool calls container
-    if (toolCallsContainer) {
-        toolCallsContainer.appendChild(indicator);
-    }
+    // Append to the found container
+    container.appendChild(indicator);
 }
 
 /**
  * Remove all processing indicators from the streaming container.
  */
 function clearProcessingIndicators() {
-    if (!toolCallsContainer) return;
-
-    const indicators = toolCallsContainer.querySelectorAll('.tool-processing-indicator');
+    // Clear all processing indicators from any tool calls container
+    const indicators = document.querySelectorAll('.tool-processing-indicator');
     indicators.forEach(ind => ind.remove());
+    
+    // Also clear the global reference
+    toolProcessingIndicatorElement = null;
 }
 
 /**

@@ -37,7 +37,7 @@ class Modules(core.module.Module):
         if await self.manager.toggle_module(name):
             return self.result("Module has been toggled. Remind user to use `/restart` to apply changes")
         else:
-            return self.result("That module does not exist!", success=false)
+            return self.result("That module does not exist!", success=False)
 
     async def get_help(self, module_name: str):
         """Returns documentation for any given module. Use this if user wants to know how to set up or use a specific module. Prefer over docs_read() for module questions."""

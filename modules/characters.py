@@ -238,7 +238,7 @@ class Characters(core.module.Module):
         if not name:
             return self.result("character doesn't exist!", False)
 
-        if not None and len(character) > 0:
+        if character and len(character) > 0:
             self.characters[name]["identity"] = character
         if category:
             self.characters[name]["category"] = category.lower()
@@ -263,7 +263,7 @@ class Characters(core.module.Module):
     @core.module.command("username")
     async def cmd_set_user_name(self, args: list):
         name = " ".join(args)
-        self.user_profile["preferences"] = preferences
+        self.user_profile["name"] = name
         self.user_profile.save()
         return "Your name has been set!"
 

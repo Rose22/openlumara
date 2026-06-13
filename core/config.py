@@ -19,7 +19,8 @@ default_config = {
     "core": {
         "data_folder": "data",
         "auto_resume_chats": True,
-        "cmd_prefix": "/"
+        "cmd_prefix": "/",
+        "tool_timeout": 15
     },
     "api": {
         "url": "http://localhost:5001/v1",
@@ -68,12 +69,13 @@ DEFAULT_MODULES = (
     "memory",
     "notes",
     "lists",
-    "system",
     "scheduler",
     "calendar",
     "calculator",
     "token_threshold",
-    "time"
+    "time",
+    "web_search",
+    "web_reader"
 )
 
 DEFAULT_CHANNELS = ["webui"] # "cli" is disabled for Esobold
@@ -543,7 +545,7 @@ def load(file_path=None):
     global _registry_cache
     _registry_cache = None
 
-    config = core.storage.StorageDict(filename, "yaml", path=dirname, autoreload=False)
+    config = core.storage.StorageDict(filename, "yaml", path=dirname)
     if not config:
         new_config = True
 

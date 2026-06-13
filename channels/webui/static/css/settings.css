@@ -5,7 +5,7 @@
 .settings-modal {
     display: flex;
     flex-direction: column;
-    width: 95vw;
+    width: 60vw;
     height: 85vh;
     padding: 0;
     max-width: 1200px;
@@ -442,15 +442,12 @@
 
 
 .toggle-list {
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
     overflow: hidden;
 }
 
 .toggle-list-status {
-    padding: 10px 12px;
+    padding: 2px 0px;
     background: var(--bg-secondary);
-    border-bottom: 1px solid var(--border-color);
 }
 
 .toggle-count {
@@ -461,7 +458,7 @@
 .toggle-list-grid {
     display: grid;
     gap: 10px;
-    padding: 12px;
+    padding: 2px 0px;
     grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
 }
 
@@ -963,15 +960,12 @@
 
 /* Toggle List */
 .toggle-list {
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
     overflow: hidden;
 }
 
 .toggle-list-status {
-    padding: 10px 12px;
+    padding: 2px 0px;
     background: var(--bg-secondary);
-    border-bottom: 1px solid var(--border-color);
 }
 
 .toggle-count {
@@ -982,7 +976,7 @@
 .toggle-list-grid {
     display: grid;
     gap: 8px;
-    padding: 12px;
+    padding: 2px 0px;
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
 }
 
@@ -2368,6 +2362,11 @@
         gap: 4px;
         padding: 8px 12px;
         overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .settings-nav::-webkit-scrollbar {
+        display: none;
     }
 
     .settings-nav-item {
@@ -2384,7 +2383,11 @@
     }
 }
 
-
+@media (min-width: 768px) {
+    .settings-content {
+        padding: 24px 40px;
+    }
+}
 
 /* Reasoning Effort Slider */
 .setting-slider-container {
@@ -2436,4 +2439,301 @@
     font-weight: 600;
     color: var(--accent);
     font-variant-numeric: tabular-nums;
+}
+
+/* ==========================================================================
+ *  Modules Layout (Desktop & Mobile)
+ * ========================================================================== */
+
+/* Desktop: Nested Sidebar List */
+.module-sub-list {
+    margin-top: 8px;
+    padding-left: 20px;
+    border-left: 1px solid var(--border-color);
+}
+
+.module-sub-list button {
+    width: 100%;
+    text-align: left;
+    padding: 6px 12px;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: 4px;
+    margin-bottom: 2px;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.module-sub-list button:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.module-sub-list button.active {
+    background: var(--bg-tertiary);
+    color: var(--accent);
+    font-weight: 600;
+}
+
+/* Mobile: Embedded Toggle List */
+@media (max-width: 768px) {
+    /* iOS-style Category List */
+    .mobile-category-list {
+        display: flex;
+        flex-direction: column;
+        background: var(--bg-secondary);
+        border-radius: 12px;
+        overflow: hidden;
+        margin-bottom: 16px;
+    }
+
+    .mobile-category-btn {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 16px 20px;
+        background: none;
+        border: none;
+        border-bottom: 1px solid var(--border-color);
+        cursor: pointer;
+        text-align: left;
+        font-size: 0.95rem;
+        color: var(--text-primary);
+        transition: background 0.15s ease;
+        width: 100%;
+        margin: 0;
+    }
+
+    .mobile-category-btn:last-child {
+        border-bottom: none;
+    }
+
+    .mobile-category-btn:hover {
+        background: var(--bg-tertiary);
+    }
+
+    .mobile-category-btn:active {
+        background: var(--bg-tertiary);
+        opacity: 0.8;
+    }
+
+    .mobile-category-btn svg {
+        width: 20px;
+        height: 20px;
+        color: var(--accent);
+        flex-shrink: 0;
+    }
+
+    .mobile-category-btn span {
+        font-weight: 500;
+    }
+
+    .mobile-module-list {
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-sm);
+        padding: 7px;
+        display: flex;
+        flex-direction: column;
+        background: transparent;
+        overflow: visible;
+    }
+
+    /* iOS-style Module List Items */
+    .module-list-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 20px;
+        background: var(--bg-secondary);
+        border: none;
+        border-bottom: 1px solid var(--border-color);
+        cursor: pointer;
+        transition: background 0.15s ease;
+        margin: 0;
+        width: 100%;
+        text-align: left;
+        color: var(--text-primary);
+        font-weight: 500;
+        font-size: 0.95rem;
+    }
+
+    .module-list-item:last-child {
+        border-bottom: none;
+    }
+
+    .module-list-item:hover {
+        background: var(--bg-tertiary);
+    }
+
+    .module-list-item:active {
+        background: var(--bg-tertiary);
+        opacity: 0.8;
+    }
+
+    .module-list-item .module-name {
+        font-weight: 500;
+        color: var(--text-primary);
+        font-size: 0.95rem;
+        margin: 0;
+    }
+
+    .module-list-item .chevron {
+        width: 16px;
+        height: 16px;
+        color: var(--text-muted);
+        flex-shrink: 0;
+        margin-left: 8px;
+    }
+
+    /* Back Button for Mobile Drill-Down */
+    .mobile-back-btn {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: none;
+        border: none;
+        color: var(--accent);
+        font-size: 0.9rem;
+        font-weight: 600;
+        cursor: pointer;
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--border-color);
+        width: 100%;
+        margin-bottom: 8px;
+    }
+
+    .mobile-back-btn svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .mobile-back-btn:active {
+        opacity: 0.7;
+    }
+
+    /* ==========================================================================
+     *  Unified Module & Channel Lists (Mobile)
+     *  ========================================================================== */
+
+    .module-unified-list,
+    .channel-unified-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        background: var(--bg-secondary);
+        border-radius: var(--radius-sm);
+        overflow: hidden;
+        margin-bottom: 14px;
+    }
+
+    .module-unified-card,
+    .channel-unified-card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 20px;
+        background: var(--bg-secondary);
+        border: none;
+        border-bottom: 1px solid var(--border-color);
+        cursor: pointer;
+        transition: background 0.15s ease;
+        margin: 0;
+        width: 100%;
+        text-align: left;
+        color: var(--text-primary);
+    }
+
+    .module-unified-card:last-child,
+    .channel-unified-card:last-child {
+        border-bottom: none;
+    }
+
+    .module-unified-card:hover,
+    .channel-unified-card:hover {
+        background: var(--bg-tertiary);
+    }
+
+    .module-unified-card:active,
+    .channel-unified-card:active {
+        background: var(--bg-tertiary);
+        opacity: 0.8;
+    }
+
+    .module-unified-card.enabled,
+    .channel-unified-card.enabled {
+        background: rgba(var(--accent-rgb), 0.05);
+    }
+
+    .module-card-left,
+    .channel-card-left {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        flex: 1;
+        min-width: 0;
+    }
+
+    .module-card-name,
+    .channel-card-name {
+        font-weight: 500;
+        font-size: 0.95rem;
+        color: var(--text-primary);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .module-card-desc {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        line-height: 1.3;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .module-card-right,
+    .channel-card-right {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-shrink: 0;
+    }
+
+    .chevron {
+        color: var(--text-muted);
+        width: 18px;
+        height: 18px;
+        transition: transform 0.15s ease;
+    }
+
+    .module-unified-card:hover .chevron,
+    .channel-unified-card:hover .chevron {
+        color: var(--text-primary);
+    }
+
+    /* Toggle sizing for unified lists */
+    .module-unified-card .toggle-switch,
+    .channel-unified-card .toggle-switch {
+        width: 36px;
+        height: 20px;
+    }
+
+    .module-unified-card .toggle-slider::before,
+    .channel-unified-card .toggle-slider::before {
+        height: 14px;
+        width: 14px;
+        left: 3px;
+        bottom: 3px;
+    }
+
+    .module-unified-card .toggle-switch input:checked + .toggle-slider::before,
+    .channel-unified-card .toggle-switch input:checked + .toggle-slider::before {
+        transform: translateX(16px);
+    }
 }

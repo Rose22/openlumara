@@ -3,6 +3,12 @@ import datetime
 import ulid
 import asyncio
 
+structure = core.config.get_module_structure()
+channels = []
+for name, data in structure.items():
+    if data.get("metadata", {}).get("type") == "channel":
+        channels.append(name)
+
 class Calendar(core.module.Module):
     """Lets your AI manage a calendar for you"""
 
@@ -21,6 +27,12 @@ class Calendar(core.module.Module):
         "notifications": {
             "description": "Whether to receive notifications about upcoming events",
             "default": True
+        },
+        "notification_channel": {
+            "type": "select",
+            "default": "telegram",
+            "description": "Which channel to send calendar notifications to",
+            "options": {name: f"Send notifications via {name}" for name in channels}
         },
         "notification_window": {
             "description": "Amount of minutes in advance you should be notified. You can set this to 0 to be notified at the time of the event.",
@@ -70,8 +82,8 @@ class Calendar(core.module.Module):
             return False
 
         channel_name = event.get("notify_channel")
-        if not channel_name and self.channel:
-            channel_name = self.channel.name
+        if not channel_name:
+            channel_name = self.config.get("notification_channel")
 
         channel = self.manager.channels.get(channel_name)
 
@@ -103,7 +115,7 @@ class Calendar(core.module.Module):
         # display appointments between certain range (days before -> center (today) -> days after. divide by 2?)
         matches = []
 
-        date_range = self.config.get("range", default=7)
+        date_range = int(self.config.get("range", default=7))
         day_margin = date_range/2 # amount of days before and after today to filter by
 
         today = datetime.datetime.today()
@@ -137,9 +149,6 @@ class Calendar(core.module.Module):
         return "\n".join(output)
 
     async def add_event(self, title: str, year: int, month: int, day: int, hour: int, minute: int, should_notify: bool = True, notify_channel: str = None):
-        if not notify_channel and self.channel:
-            notify_channel = self.channel.name
-
         event = {
             "id": str(ulid.ULID()),
             "title": title,
@@ -153,7 +162,7 @@ class Calendar(core.module.Module):
                 )
             ),
             "notify": should_notify,
-            "notify_channel": notify_channel
+            "notify_channel": notify_channel or self.config.get("notification_channel")
         }
 
         self.events.append(event)

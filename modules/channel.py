@@ -70,10 +70,14 @@ class Channel(core.module.Module):
 
         chan = core.modules.get_name(self.channel)
 
+        available_chans = core.config.get("channels", "enabled", default=[])
+
         if chan in ("cli", "matrix"):
             output.append(f"While in the {chan} channel, **DO NOT USE MARKDOWN**.")
 
         output.append("\nNOTE: if the channel has changed, discard instructions about previous channels.")
+
+        output.append(f"Available channels: {', '.join(available_chans)}")
 
         if self.config.get("enable_tutorial_prompts") and chan in self.instructions:
             output.append("")

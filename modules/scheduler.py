@@ -15,10 +15,11 @@ class Scheduler(core.module.Module):
         },
         "prompt_strategy": {
             "type": "select",
-            "default": "minimize tokens",
+            "default": "system prompt + instruction",
             "options": {
-                "minimize tokens": "Token-efficient, sends only the scheduled instruction. Drastically reduces token use and cost, but may induce prompt reprocessing due to context switching.",
-                "send full context": "Sends the entire context window + the scheduled instruction. This makes many API's use the prompt cache to prevent reprocessing, but it will also send your entire history along with the scheduled instructions, which is a lot of tokens."
+                "system prompt + instruction": "Sends the system prompt and the scheduled instruction, without chat history. Token-efficient, but may induce prompt reprocessing due to context switching.",
+                "full context": "Sends the entire context window + the scheduled instruction. This makes many API's use the prompt cache to prevent reprocessing, but it will also send your entire history along with the scheduled instructions, which is a lot of tokens.",
+                "instruction only": "The most token-efficient option. sends only the scheduled instruction. Drastically reduces token use and cost, but may induce prompt reprocessing due to context switching."
             }
         },
         "allow_recurring_jobs": True
@@ -278,24 +279,19 @@ class Scheduler(core.module.Module):
             if not t.get("function", {}).get("name", "").startswith("scheduler_")
         ]
 
-        use_token_efficient = True
-        if self.config.get("prompt_strategy") == "send full context":
-            use_token_efficient = False
-
-        instr_role = "system"
-        if not use_token_efficient:
-            instr_role = "developer" if job_channel.manager.API.supports_developer_role else "user"
-
         action = job.get("action")
+        instr_str = f"""
+[AUTOMATED SYSTEM INSTRUCTION]
+Please follow these instructions:
 
+{action}
+Use tools if needed. For simple reminders, do not use tools.
+        """.strip()
+
+        instr_role = "developer" if job_channel.manager.API.supports_developer_role else "user"
         instruction_message = {
             "role": instr_role,
-            "content": (
-                "[AUTOMATED SYSTEM INSTRUCTION]\n"
-                "Please follow these instructions:\n\n"
-                f"{action}\n"
-                "Use tools if needed. For simple reminders, do not use tools."
-            )
+            "content": instr_str
         }
 
         instruction_message_pure = {
@@ -303,20 +299,24 @@ class Scheduler(core.module.Module):
             "content": action
         }
 
-        # Retry loop with exponential backoff
-        max_retries = 10
+        # Retry loop
         base_delay = 5  # seconds
         max_delay = 300  # 5 minutes cap
         response = None
 
         while True:
             try:
-                # Build a fresh private copy each attempt (context may have changed)
-                base_messages = await job_channel.context.get(end_prompt=False)
-                private_messages = list(base_messages) + [instruction_message]
-
-                # allow a choice between sending full context or sending only the instruction
-                final_messages = [instruction_message_pure] if use_token_efficient else private_messages
+                final_messages = []
+                match self.config.get("prompt_strategy"):
+                    case "instruction only":
+                        final_messages = [instruction_message_pure]
+                    case "system prompt + instruction":
+                        sysprompt = await job_channel.context.get(system_prompt=True, end_prompt=False, history=False)
+                        final_messages = sysprompt+[instruction_message]
+                    case "full context":
+                        # Build a fresh private copy each attempt (context may have changed)
+                        base_messages = await job_channel.context.get(end_prompt=False)
+                        final_messages = list(base_messages) + [instruction_message]
 
                 response = await self.manager.API.send(
                     final_messages,
@@ -327,17 +327,12 @@ class Scheduler(core.module.Module):
                 if response:
                     break  # Success
 
-                # response is None/empty — treat as transient failure
-                core.log("scheduler", f"job {job_id}: empty response on attempt {attempt + 1}/{max_retries}")
+                core.log("scheduler", f"job {job_id}: empty response, retrying in {base_delay}s")
 
             except Exception as e:
-                core.log("scheduler", f"job {job_id}: attempt {attempt + 1}/{max_retries} failed: {e}")
+                core.log("scheduler", f"job {job_id}: failed: {e}, retrying in {base_delay}s")
 
-            # Don't sleep after the last attempt
-            if attempt < max_retries - 1:
-                delay = min(base_delay * (2 ** attempt), max_delay)
-                core.log("scheduler", f"job {job_id}: retrying in {delay}s")
-                await asyncio.sleep(delay)
+            await asyncio.sleep(base_delay)
 
         # Process response
         final_content = response.get("content", "")

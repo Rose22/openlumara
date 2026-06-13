@@ -1,11 +1,15 @@
+import asyncio
 import core
-import subprocess
 import shutil
 import os
+import uuid
+import time
 
 class SandboxedShell(core.module.Module):
     """
-    Lets your AI safely run shell commands in a docker/podman sandbox.
+    Lets your AI safely run shell commands in a disposable sandboxed container.
+    Container is created, command runs, then container is immediately killed.
+    Runs asynchronously to prevent blocking the framework.
     """
 
     settings = {
@@ -21,6 +25,14 @@ class SandboxedShell(core.module.Module):
             "default": "~/sandbox",
             "description": "The path to the folder your shell will be limited to. It can't access anything outside this folder!"
         },
+        "execution_timeout": {
+            "default": 10,
+            "description": "Maximum amount of time (in seconds) a process inside the shell is allowed to run for"
+        },
+        "output_limit": {
+            "default": 2000,
+            "description": "Maximum amount of characters before output gets truncated. Prevents resource exhaustion attacks that overflow the application using too much output"
+        },
         "cpu_limit": {
             "default": 0.5,
             "type": "percentage",
@@ -34,20 +46,23 @@ class SandboxedShell(core.module.Module):
             "default": 10,
             "description": "Maximum amount of processes to allow"
         },
-        "execution_timeout": {
-            "default": 30,
-            "description": "Maximum amount of time a process inside the shell is allowed to run for"
+        "temporary_filesystem_size_limit": {
+            "default": "512m",
+            "description": "Maximum size for the temporary sandbox disk (e.g., 512m, 2g). Only works when persistent_data is off."
         },
-        "image": "python:3.11-slim"
+        "read_only": {
+            "default": True,
+            "description": "Whether the container filesystem is read-only. If enabled, /tmp is mounted as tmpfs for temporary writes."
+        },
+        "image": "python:3.11-slim",
+        "run_as_user": {
+            "default": "65534",
+            "description": "User ID to run the container processes as. Defaults to 65534 (nobody) for security."
+        }
     }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Resolve the host path and ensure it exists.
-        self.host_workspace = core.get_path(os.path.expanduser(self.config.get("sandbox_path", default="~/sandbox")))
-        if not os.path.exists(self.host_workspace):
-            os.makedirs(self.host_workspace, exist_ok=True)
-
         self.runtime = None
         if shutil.which("podman"):
             self.runtime = "podman"
@@ -55,87 +70,110 @@ class SandboxedShell(core.module.Module):
             self.runtime = "docker"
 
         if not self.runtime:
-            core.log("sandbox_shell", "Neither docker nor podman are available, sandbox shell not started. Please set up either docker or podman to use the sandboxed shell!")
+            core.log("sandbox_shell", "Neither docker nor podman are available!")
             return False
 
-        self.container_name = "openlumara_shell"
+        self.host_workspace = os.path.expanduser(self.config.get("sandbox_path", default="~/sandbox"))
+        os.makedirs(self.host_workspace, exist_ok=True)
 
-        # 1. Check if the container is already running
-        is_running = False
-        check_cmd = [self.runtime, 'inspect', '-f', '{{.State.Running}}', self.container_name]
+        # Check for gVisor (runsc) availability
+        if shutil.which("runsc"):
+            self.use_gvisor = True
+            core.log("sandbox_shell", "gVisor (runsc) detected. Sandbox will use gVisor for enhanced security.")
+        else:
+            self.use_gvisor = False
+            core.log("sandbox_shell", "Warning: gVisor (runsc) not found. Sandbox is running with standard isolation. To install gVisor for better security, see: https://gvisor.dev/docs/user_guide/install/")
+
+    def _get_unique_name(self):
+        """Generate a unique container name to avoid collisions"""
+        return f"ol_{uuid.uuid4().hex[:8]}_{int(time.time()*1000)}"
+
+    async def _run_async_cmd(self, cmd_args, timeout=None):
+        """Helper method to run a command asynchronously"""
+        process = await asyncio.create_subprocess_exec(
+            *cmd_args,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
         try:
-            check_res = subprocess.run(check_cmd, capture_output=True, text=True)
-            if check_res.returncode == 0 and check_res.stdout.strip() == "true":
-                is_running = True
-        except Exception:
-            is_running = False
-
-        # 2. If not running, start a long-lived background container
-        if not is_running:
-            # remove a lingering container if it's present
-            subprocess.run([self.runtime, 'rm', '-f', self.container_name], capture_output=True)
-
-            core.log("sandbox_shell", "Starting container..")
-
-            start_cmd = [
-                self.runtime, 'run', '-d',
-                '--name', self.container_name,
-                '--cpus', str(self.config.get("cpu_limit", default=0.5)),
-                '--memory', self.config.get("memory_limit", default="256m"),
-                '--pids-limit', str(self.config.get("max_processes", default=50)),
-                '--network', 'bridge' if self.config.get("internet_access", default=False) else 'none'
-            ]
-
-            if self.config.get("persistent_data", default=True):
-                start_cmd.extend(['-v', f"{self.host_workspace}:/data:Z"])
-            else:
-                start_cmd.extend(['--rm', '--tmpfs', '/data'])
-
-            # set working dir to /data
-            start_cmd.extend(['-w', '/data'])
-
-            start_cmd.extend([
-                self.config.get("image", default="python:3.11-slim"),
-                'tail', '-f', '/dev/null'  # Keep it alive
-            ])
-
-            try:
-                subprocess.run(start_cmd, check=True, capture_output=True)
-            except subprocess.CalledProcessError as e:
-                return core.log("sandbox_shell", f"Failed to start container: {e.stderr.decode()}")
-
-            core.log("sandbox_shell", "Container started")
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout)
+            return stdout, stderr, process.returncode
+        except asyncio.TimeoutError:
+            process.kill()
+            await process.wait()
+            return None, None, -1
 
     async def run(self, command: str):
-        """Runs a command in the sandboxed Docker/Podman environment."""
+        """Runs a command in a sandboxed container asynchronously."""
         if not self.runtime:
-            return self.result(f"Docker or podman are not installed or available.", False)
+            return self.result("Docker or podman not available.", False)
 
-        # Execute the command via 'exec'
-        exec_cmd = [
-            self.runtime, 'exec',
-            self.container_name,
-            'sh', '-c', command
-        ]
+        uid = self.config.get("run_as_user", default="65534")
+        timeout = self.config.get("execution_timeout", default=10)
+        img = self.config.get("image", default="python:3.11-slim")
+
+        # Generate unique container name
+        self.container_name = self._get_unique_name()
+
+        # Build container run command with strict security settings
+        # We run in the foreground to capture stdout/stderr directly and reliably
+        cmd = [self.runtime, 'run', '--name', self.container_name]
+
+        # Use gvisor runtime if available
+        if self.use_gvisor:
+            cmd.extend(['--runtime', 'runsc'])
+            if self.runtime == "podman":
+                cmd.extend(["--runtime-flag", "ignore-cgroups"])
+
+        cmd.extend([
+            '--user', uid,
+            '--cpus', str(self.config.get("cpu_limit", default=0.5)),
+            '--memory', self.config.get("memory_limit", default="256m"),
+            '--pids-limit', str(self.config.get("max_processes", default=10)),
+            '--network', 'bridge' if self.config.get("internet_access", default=False) else 'none',
+            '--stop-timeout', '1'
+        ])
+
+        if self.config.get("read_only", default=True):
+            cmd.extend(['--read-only', '--tmpfs', '/tmp'])
+
+        if self.config.get("persistent_data", default=True):
+            cmd.extend(['-v', f"{self.host_workspace}:/data:Z"])
+        else:
+            limit = self.config.get("temporary_filesystem_size_limit", default="512m")
+            cmd.extend(['--tmpfs', f"/data:size={limit}"])
+
+        cmd.extend(['-w', '/data', img, 'sh', '-c', command])
+
+        output_limit = self.config.get("output_limit")
 
         try:
-            result = subprocess.run(
-                exec_cmd,
-                capture_output=True,
-                timeout=self.config.get("execution_timeout", default=30)
-            )
+            # Run the command in the foreground and capture output directly
+            stdout, stderr, exit_code = await self._run_async_cmd(cmd, timeout=timeout)
+            
+            if stdout is None: # This happens on TimeoutError in _run_async_cmd
+                return self.result(f"Command timed out after {timeout}s", False)
+
+            stdout_text = stdout.decode().strip()[:output_limit] if stdout else ""
+            stderr_text = stderr.decode().strip()[:output_limit] if stderr else ""
 
             return self.result({
-                "stdout": result.stdout.decode().strip(),
-                "stderr": result.stderr.decode().strip(),
-                "exit_code": result.returncode,
-                "data_dir": "/data"
+                "stdout": stdout_text,
+                "stderr": stderr_text,
+                "exit_code": exit_code
             })
 
-        except subprocess.TimeoutExpired:
-            return self.result("Command timed out.", False)
         except Exception as e:
-            return self.result(f"Module Error: {str(e)}", False)
+            return self.result(f"Error running command: {e}", False)
+        finally:
+            # Always clean up the container
+            try:
+                await asyncio.wait_for(
+                    self._run_async_cmd([self.runtime, 'rm', '-f', self.container_name], timeout=5),
+                    timeout=5
+                )
+            except Exception:
+                pass  # Container cleanup failed, but don't fail the whole operation
 
     @core.module.command("shell", send_to_ai=True, help={
         "<cmd>": "runs a command in the sandboxed shell"
@@ -146,54 +184,33 @@ class SandboxedShell(core.module.Module):
 
         try:
             result = await self.run(" ".join(args))
-
             content = result.get("content")
+
             if not isinstance(content, dict):
                 return content
 
-            stdout = content.get("stdout") if content else ""
-            stderr = content.get("stderr") if content else ""
+            stdout = content.get("stdout", "")
+            stderr = content.get("stderr", "")
+            exit_code = content.get("exit_code", 0)
 
-            output = ""
-            if stdout:
-                output += stdout
+            output = stdout
             if stderr:
                 output += "\n" + stderr
 
-            return output if output else "BLANK"
+            if exit_code != 0:
+                return output if output else f"Command failed with exit code {exit_code}"
+            
+            return output if output else "NO OUTPUT"
         except Exception as e:
             return f"error while running sandboxed shell command: {e}"
 
     @core.module.command("shell_setup", send_to_ai=True)
     async def cmd_setup(self, args):
         """shows details about your sandbox setup"""
-
-        conf = (
+        return (
             f"Runtime: {self.runtime}\n"
             f"Container Name: {self.container_name}\n"
             f"Image: {self.config.get('image')}\n"
             f"Persistent Data: {self.config.get('persistent_data')}\n"
             f"Internet enabled: {self.config.get('internet_access')}"
         )
-        return conf
-
-    async def on_shutdown(self):
-        """
-        Triggered when OpenLumara shuts down.
-        Stops and removes the persistent container to keep the host clean.
-        """
-        if not self.runtime:
-            return
-
-        stop_cmd = [self.runtime, 'kill', self.container_name]
-        rm_cmd = [self.runtime, 'rm', self.container_name]
-
-        core.log("sandbox_shell", "shutting down container")
-
-        try:
-            # We attempt to stop and remove, but ignore errors if the container
-            # doesn't exist or wasn't running.
-            subprocess.run(stop_cmd, capture_output=True)
-            subprocess.run(rm_cmd, capture_output=True)
-        except Exception:
-            pass

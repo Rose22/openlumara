@@ -5,8 +5,6 @@ import datetime
 import re
 import ulid
 
-cached_mem = None
-
 class Memory(core.module.Module):
     """Gives your AI a persistent memory system"""
 

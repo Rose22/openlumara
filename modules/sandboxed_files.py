@@ -19,7 +19,7 @@ async def get_dir_size(start_path, channel):
             fp = os.path.join(dirpath, f)
             # skip if it is symbolic link
             if not os.path.islink(fp):
-                total_size += await asyncio.os.path.getsize(fp)
+                total_size += os.path.getsize(fp)
 
     return total_size
 
@@ -59,77 +59,25 @@ class SandboxedFiles(core.module.Module):
         """
         Validate that an absolute path is within the sandbox.
         Returns the relative path if valid, None if invalid.
-        Reuses the same validation logic as _get_sandbox_path.
         """
         try:
-            real_path = os.path.realpath(abs_path)
-        except (OSError, ValueError):
-            return None
-
-        if os.path.islink(abs_path):
-            return None
-
-        sandbox_prefix = self.sandbox_path + os.path.sep
-
-        if sys.platform == "win32":
-            check_path = real_path.lower()
-            check_prefix = sandbox_prefix.lower()
-        else:
-            check_path = real_path
-            check_prefix = sandbox_prefix
-
-        if check_path.startswith(check_prefix) or check_path == self.sandbox_path:
+            real_path = core.sandbox_path(self.sandbox_path, abs_path)
             return self._strip_sandbox_path(real_path)
-
-        return None
+        except ValueError:
+            return None
 
     def _get_sandbox_path(self, target_path: str):
-        path = target_path
-
-        # remove path separator at the beginning and end
-        path = path.strip(os.path.sep)
-
-        # remove the sandbox path from it in case the AI inserts it
-        path = self._strip_sandbox_path(path)
-
-        # basic path traversal prevention
-        decoded = path
-        for _ in range(3):  # Handle double/triple encoding
-            decoded = urllib.parse.unquote(decoded)
-
-        if ".." in decoded or "\x00" in decoded:
-            raise ValueError("Path traversal is not allowed")
-
-        # block symlink paths
-        if hasattr(os, 'O_NOFOLLOW'):
-            # check if any component is a symlink
-            parts = path.split(os.path.sep)
-            for i, part in enumerate(parts):
-                if i == 0:
-                    continue  # Skip root
-                test_path = os.path.join(self.sandbox_path, *parts[:i])
-                if os.path.islink(test_path):
-                    raise ValueError("Symlinks are not allowed inside the sandbox")
-
-        if not path:
-            return self.sandbox_path
-
-        # more path traversal protection
-        path_in_sandbox = os.path.join(self.sandbox_path, os.path.normpath(path))
-        validated = self._validate_absolute_path(path_in_sandbox)
-
-        if validated is None:
-            raise ValueError("Access denied: target path is outside sandbox")
-
-        return os.path.join(self.sandbox_path, validated)
+        """Get the sandbox path for a target path using core functions."""
+        return core.sandbox_path(self.sandbox_path, target_path)
 
     def _strip_sandbox_path(self, path: str):
-        prefix = self.sandbox_path + os.sep
-        if path.startswith(prefix):
-            return path[len(prefix):]
-        elif path == self.sandbox_path:
-            return ""
-        return path
+        try:
+            rel = os.path.relpath(path, self.sandbox_path)
+            if rel.startswith('..'):
+                return None # Path escaped the sandbox
+            return rel
+        except (ValueError, OSError):
+            return None
 
     async def list_dir(self, path: str) -> dict:
         """List the files inside the sandbox. Use relative paths.
@@ -228,7 +176,7 @@ class SandboxedFiles(core.module.Module):
                 flags |= os.O_NOFOLLOW
 
             fd = os.open(safe_path, flags)
-            async with aiofiles.open(fd, 'r') as f:
+            async with aiofiles.open(fd, 'r', encoding='utf-8') as f:
                 content = await f.read()
             return self.result(content)
         except Exception as e:
@@ -256,7 +204,7 @@ class SandboxedFiles(core.module.Module):
                 flags |= os.O_NOFOLLOW
 
             fd = os.open(safe_path, flags, mode=0o644)
-            async with aiofiles.open(fd, 'w') as f:
+            async with aiofiles.open(fd, 'w', encoding='utf-8') as f:
                 await f.write(body)
             return self.result(True)
         except OSError as e:
@@ -287,7 +235,7 @@ class SandboxedFiles(core.module.Module):
                 flags |= os.O_NOFOLLOW
 
             fd = os.open(safe_path, flags, mode=0o644)
-            async with aiofiles.open(fd, 'a') as f:
+            async with aiofiles.open(fd, 'a', encoding='utf-8') as f:
                 await f.write("\n" + body)
             return self.result(True)
         except Exception as e:

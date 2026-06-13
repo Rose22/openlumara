@@ -9,7 +9,7 @@ class Config(core.module.Module):
 
     settings = {
         "put_config_in_system_prompt": {
-            "description": "Makes your AI aware of all your settings. Redacts sensitive information before it ever reaches the AI, such as API keys, usernames and passwords""",
+            "description": "Makes your AI aware of all your settings. Redacts sensitive information before it ever reaches the AI, such as API keys, usernames and passwords",
             "default": False
         },
         "allow_ai_to_modify_config": {

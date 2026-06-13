@@ -83,7 +83,7 @@ async function saveEdit(index, newContent) {
         });
 
         if (response.ok) {
-            syncMessages();
+            await syncMessages();
         }
     } catch (err) {
         console.error('Failed to edit message:', err);
@@ -92,7 +92,7 @@ async function saveEdit(index, newContent) {
     editingIndex = null;
 
     // auto-regenerate from this point
-    await regenerateMessage(index);
+    // await regenerateMessage(index);
 }
 
 async function cancelEdit() {
@@ -111,7 +111,7 @@ async function deleteMessage(index) {
         });
 
         if (response.ok) {
-            syncMessages();
+            await syncMessages();
         }
     } catch (err) {
         console.error('Failed to delete message:', err);
@@ -121,7 +121,7 @@ async function deleteMessage(index) {
 async function regenerateMessage(targetIndex) {
     // Validate index
     if (typeof targetIndex !== 'number' || targetIndex < 0) {
-        console.error('Invalid index for regeneration');
+        console.error('Invalid index for regeneration:', targetIndex, typeof targetIndex);
         return;
     }
 
@@ -136,12 +136,17 @@ async function regenerateMessage(targetIndex) {
         const data = await response.json();
         const messages = data.messages;
 
+        console.log('Regenerate request - targetIndex:', targetIndex, 'messages.length:', messages.length);
+
         if (targetIndex >= messages.length) {
-            console.error('Invalid index for regeneration');
+            console.error('Invalid index for regeneration: targetIndex >= messages.length');
+            console.error('targetIndex:', targetIndex, 'messages.length:', messages.length);
+            showApiConfigError(`Cannot regenerate: Message index ${targetIndex} is out of range (${messages.length} messages). Try refreshing the page.`, 'connection_failed');
             return;
         }
 
         const targetMsg = messages[targetIndex];
+        console.log('Target message:', targetMsg);
         
         // If it's an assistant message, find the last message in its turn group
         let effectiveIndex = targetIndex;
@@ -163,6 +168,8 @@ async function regenerateMessage(targetIndex) {
             }
         }
 
+        console.log('Effective index:', effectiveIndex);
+
         let contentToResend = '';
         let deleteIndex = -1;
 
@@ -177,6 +184,7 @@ async function regenerateMessage(targetIndex) {
 
             if (userMsgIndex < 0) {
                 console.error('No user message found before this AI message');
+                showApiConfigError('Cannot regenerate: No user message found before this AI response.', 'connection_failed');
                 return;
             }
 
@@ -193,6 +201,7 @@ async function regenerateMessage(targetIndex) {
 
             if (userMsgIndex < 0) {
                 console.error('No user message found before this tool message');
+                showApiConfigError('Cannot regenerate: No user message found before this tool message.', 'connection_failed');
                 return;
             }
 
@@ -210,6 +219,15 @@ async function regenerateMessage(targetIndex) {
             return;
         }
 
+        // Validate content to resend
+        if (contentToResend === undefined || contentToResend === null) {
+            console.error('Content to resend is undefined or null');
+            showApiConfigError('Cannot regenerate: Message content is empty.', 'connection_failed');
+            return;
+        }
+
+        console.log('Deleting from index:', deleteIndex, 'and resending content');
+
         // Execute deletion
         const deleteResponse = await fetch('/delete', {
             method: 'POST',
@@ -218,7 +236,16 @@ async function regenerateMessage(targetIndex) {
         });
 
         if (!deleteResponse.ok) {
-            console.error('Failed to delete messages for regeneration');
+            console.error('Failed to delete messages for regeneration: HTTP error');
+            showApiConfigError('Failed to delete messages. Please try again.', 'connection_failed');
+            return;
+        }
+
+        // Check if deletion was actually successful
+        const deleteResult = await deleteResponse.json();
+        if (!deleteResult.success) {
+            console.error('Failed to delete messages:', deleteResult.error);
+            showApiConfigError(`Failed to delete messages: ${deleteResult.error}`, 'connection_failed');
             return;
         }
 
@@ -230,6 +257,7 @@ async function regenerateMessage(targetIndex) {
 
     } catch (err) {
         console.error('Failed to regenerate message:', err);
+        showApiConfigError('Failed to regenerate message. Please try again.', 'connection_failed');
     }
 }
 

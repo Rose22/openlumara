@@ -37,3 +37,33 @@
 .retry-error-btn:hover {
     background: #ff5555;
 }
+
+
+/* Error details collapsible section */
+.api-error-details {
+    margin-top: 8px;
+    font-size: 0.85em;
+}
+
+.api-error-details summary {
+    cursor: pointer;
+    color: #888;
+    user-select: none;
+}
+
+.api-error-details summary:hover {
+    color: #aaa;
+}
+
+.api-error-details pre {
+    margin: 8px 0 0 0;
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 0.9em;
+    color: #ccc;
+}
