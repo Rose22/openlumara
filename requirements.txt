@@ -1,4 +1,3 @@
-# base requirements
 openai
 tiktoken
 msgpack
