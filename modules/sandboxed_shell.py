@@ -43,7 +43,7 @@ class SandboxedShell(core.module.Module):
             "description": "The percentage of CPU use to limit processes inside the sandbox to. They will be prevented from exceeding this limit"
         },
         "memory_limit": {
-            "default": "256m",
+            "default": "512m",
             "description": "Maximum amount of RAM use to allow (example: 150kb, 256m, 2gb)"
         },
         "max_processes": {
