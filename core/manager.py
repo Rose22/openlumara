@@ -76,14 +76,15 @@ class Manager:
 
         core.log("core", "Loading channels")
         # install dependencies
+        newly_installed_channels = []
         if not self.args.disable_auto_installer:
             system_changed = False
             for chan_name in enabled_channels:
-                installed = core.modules.install_module_deps(channels, chan_name)
-                if installed and not system_changed:
-                    system_changed = True
+                installed = await core.modules.install_module_deps(channels, chan_name)
+                if installed:
+                    newly_installed_channels.append(chan_name)
 
-            if system_changed:
+            if newly_installed_channels:
                 # reload config
                 core.config.load()
 
@@ -92,6 +93,11 @@ class Manager:
             channel_name = core.modules.get_name(channel)
             try:
                 self.channels[channel_name] = channel(self)
+
+                # run installation hook
+                if channel_name in newly_installed_channels:
+                    await self.channels[channel_name].on_install()
+
             except Exception as e:
                 core.log(channel_name, f"failed to load channel: {core.detail_error(e)}")
 
@@ -112,14 +118,14 @@ class Manager:
             core.log("core", "Loading core modules")
 
             # install dependencies
+            newly_installed_modules = []
             if not self.args.disable_auto_installer:
-                system_changed = False
                 for mod_name in enabled_modules:
-                    installed = core.modules.install_module_deps(modules, mod_name)
-                    if installed and not system_changed:
-                        system_changed = True
+                    installed = await core.modules.install_module_deps(modules, mod_name)
+                    if installed:
+                        newly_installed_modules.append(mod_name)
 
-                if system_changed:
+                if newly_installed_modules:
                     # reload config
                     core.config.load()
 
@@ -127,6 +133,11 @@ class Manager:
             for module in core.modules.load(modules, core.module.Module, filter=enabled_modules, reload=True):
                 try:
                     loaded_module = await self.add_module_class(module)
+
+                    # run installation hook
+                    if loaded_module.name in newly_installed_modules:
+                        await loaded_module.on_install()
+
                     await loaded_module._start()
 
                     self.modules[loaded_module.name] = loaded_module
@@ -138,20 +149,26 @@ class Manager:
             core.log("core", "Loading user modules")
 
             # install dependencies
+            newly_installed_user_modules = []
             if not self.args.disable_auto_installer:
                 for mod_name in enabled_user_modules:
-                    installed = core.modules.install_module_deps(user_modules, mod_name)
+                    installed = await core.modules.install_module_deps(user_modules, mod_name)
 
-                    if installed and not system_changed:
-                        system_changed = True
+                    if installed:
+                        newly_installed_user_modules.append(mod_name)
 
-                if system_changed:
+                if newly_installed_user_modules:
                     # reload config
                     core.config.load()
 
             for module in core.modules.load(user_modules, core.module.Module, filter=enabled_user_modules, reload=True):
                 try:
                     loaded_module = await self.add_module_class(module, is_user_module=True)
+
+                    # run installation hook
+                    if loaded_module.name in newly_installed_user_modules:
+                        await loaded_module.on_install()
+
                     await loaded_module._start()
 
                     self.modules[loaded_module.name] = loaded_module
@@ -172,17 +189,17 @@ class Manager:
 
             system_changed = False
             for chan_name in disabled_channels:
-                uninstalled = core.modules.uninstall_module_deps(channels, chan_name)
+                uninstalled = await core.modules.uninstall_module_deps(channels, chan_name, self)
                 if uninstalled and not system_changed:
                     system_changed = True
 
             for mod_name in disabled_modules:
-                uninstalled = core.modules.uninstall_module_deps(modules, mod_name)
+                uninstalled = await core.modules.uninstall_module_deps(modules, mod_name, self)
                 if uninstalled and not system_changed:
                     system_changed = True
 
             for mod_name in disabled_user_modules:
-                uninstalled = core.modules.uninstall_module_deps(user_modules, mod_name)
+                uninstalled = await core.modules.uninstall_module_deps(user_modules, mod_name, self)
                 if uninstalled and not system_changed:
                     system_changed = True
 

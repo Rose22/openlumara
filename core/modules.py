@@ -90,7 +90,7 @@ def _check_missing_deps(deps):
             missing.append(dep)
     return missing
 
-def install_module_deps(package, module_name):
+async def install_module_deps(package, module_name):
     """install dependencies for a module if missing"""
     file_path = _get_module_file_path(package, module_name)
     if not file_path:
@@ -107,7 +107,7 @@ def install_module_deps(package, module_name):
 
     return False
 
-def uninstall_module_deps(package, module_name):
+async def uninstall_module_deps(package, module_name, manager):
     """uninstall dependencies for a module (only if still installed)"""
     file_path = _get_module_file_path(package, module_name)
     if not file_path:
@@ -123,6 +123,39 @@ def uninstall_module_deps(package, module_name):
     installed = [dep for dep in deps if dep not in missing]
 
     if installed:
+        # re-import so we can find the uninstall hook
+        import importlib
+        mod = importlib.import_module(f"{package.__name__}.{module_name}")
+
+        # find the class
+        module_class = None
+        is_channel = False
+        is_module = False
+        for attr in dir(mod):
+            obj = getattr(mod, attr)
+            if issubclass(obj, core.module.Module):
+                is_module = True
+            elif issubclass(obj, core.channel.Channel):
+                is_channel = True
+            else:
+                continue
+
+            if (isinstance(obj, type) and obj is not core.module.Module):
+                module_class = obj
+                break
+
+        if module_class:
+            # create a temporary instance
+            is_user = package.__name__ == 'user_modules'
+            if is_module:
+                instance = module_class(manager, is_user_module=is_user)
+            elif is_channel:
+                instance = module_class(manager)
+
+            # run the uninstall hook
+            if hasattr(instance, 'on_uninstall'):
+                await instance.on_uninstall()
+
         _uninstall_deps(module_name, installed)
         return True
 

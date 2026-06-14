@@ -660,6 +660,10 @@ class Channel:
     async def on_push(self, message: dict):
         raise NotImplementedError
 
+    async def on_install(self):
+        """Overridable method that triggers when the auto-installer installs the dependencies for a channel"""
+        pass
+
     async def push(self, message):
         """
         push a message to the push queue, which will instantly display it in all channels

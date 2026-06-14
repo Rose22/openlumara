@@ -136,6 +136,13 @@ class Module:
         """Triggers when the assistant sends a message"""
         pass
 
+    async def on_install(self):
+        """Overridable method that triggers when the auto-installer installs the dependencies for a module"""
+        pass
+    async def on_uninstall(self):
+        """Overridable method that triggers when the auto-installer uninstalls the dependencies for a module"""
+        pass
+
 # --------------
 # command decorator (@core.module.command)
 # Registry format: {"command_name": [(class_type, method), ...]}
