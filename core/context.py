@@ -136,7 +136,7 @@ class Context:
         for message in messages:
             if message.get("injection"):
                 if message.get("role") == "user" and message.get("content"):
-                    message["content"] += f"\n\n{message['injection']}"
+                    message["content"] += f"\n\n[SYSTEM MESSAGES]\n{message['injection']}"
 
                 # remove the field so that it's clean for the API
                 del message["injection"]

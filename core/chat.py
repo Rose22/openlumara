@@ -314,14 +314,18 @@ class Chat:
             new_message["ghost"] = True
 
         # inject any special messages coming from on_message_inject() in modules, such as timestamps
+        injections = []
         for module_name, module in self.channel.manager.modules.items():
             if hasattr(module, 'on_message_inject'):
                 try:
                     injection = await module.on_message_inject()
                     if injection:
-                        new_message["injection"] = str(injection)
+                        injections.append(injection)
                 except Exception as e:
                     core.log("module error", f"{module.name}: in on_message_inject(): {core.detail_error(e)}")
+
+        if injections:
+            new_message["injection"] = "\n\n".join(injections)
 
         self.data[self.current]["messages"].append(new_message)
 
