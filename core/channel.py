@@ -176,7 +176,7 @@ class Channel:
         except Exception as e:
             print(f"[FATAL ERROR] failed to send log to channels ({e}): [{category.upper()}] {message}")
 
-    def log_error(msg: str, e: Exception):
+    def log_error(self, msg: str, e: Exception):
         """console log but with extra spice for errors"""
         if core.debug:
             self.log("error", f"{msg}: {detail_error(e)}")
