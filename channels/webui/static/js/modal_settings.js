@@ -613,6 +613,8 @@ function renderSettingsNav(categories) {
     const nav = document.getElementById('settings-nav');
     nav.innerHTML = '';
  
+    nav_top = document.createElement('div');
+    nav_top.className = 'settings-nav-top';
 
     const sortedCats = Object.entries(categories)
     .sort(([a, catA], [b, catB]) => (catA.order || 0) - (catB.order || 0));
@@ -626,7 +628,7 @@ function renderSettingsNav(categories) {
         <span>${data.title}</span>
         `;
         btn.onclick = () => switchSettingsCategory(cat);
-        nav.appendChild(btn);
+        nav_top.appendChild(btn);
 
         // Add module sub-list for Modules category on desktop only
         if (!isMobile && (cat === 'modules' || cat === 'user_modules') && data.groups && data.groups.has('_direct_')) {
@@ -712,10 +714,8 @@ function renderSettingsNav(categories) {
 
     // add special buttons
 
-    const divider = document.createElement('div')
-    divider.className = "settings-nav-divider";
-
-    nav.appendChild(divider);
+    nav_bottom = document.createElement('div');
+    nav_bottom.className = 'settings-nav-bottom';
 
     const logBtn = document.createElement('button');
     logBtn.className = 'settings-nav-item';
@@ -727,7 +727,7 @@ function renderSettingsNav(categories) {
     <span>System Logs</span>
     `;
     logBtn.onclick = () => toggleModal('log');
-    nav.appendChild(logBtn);
+    nav_bottom.appendChild(logBtn);
 
     const restartBtn = document.createElement('button');
     restartBtn.className = 'settings-nav-item restart-btn';
@@ -744,7 +744,15 @@ function renderSettingsNav(categories) {
             restartServer();
         }
     };
-    nav.appendChild(restartBtn);
+    nav_bottom.appendChild(restartBtn);
+
+    nav.appendChild(nav_top);
+
+    divider = document.createElement('div');
+    divider.className = 'settings-nav-divider';
+    nav.appendChild(divider);
+
+    nav.appendChild(nav_bottom);
 
     // Restore active highlight after re-rendering
     if (activeSettingsCategory) {

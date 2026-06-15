@@ -82,10 +82,15 @@
 @media (min-width: 768px) {
     .settings-nav-divider {
         border-top: 1px solid var(--border-color);
+        margin-top: 7px;
         margin-bottom: 7px;
     }
 }
 @media (max-width: 768px) {
+    .settings-nav-top, .settings-nav-bottom {
+        display: flex;
+    }
+
     .settings-nav-divider {
         border-left: 1px solid var(--border-color);
     }

@@ -242,11 +242,6 @@
 
 .log-entry {
     padding: 2px 0;
-    border-bottom: 1px solid rgba(128, 128, 128, 0.1);
-}
-
-.log-entry:last-child {
-    border-bottom: none;
 }
 
 .log-timestamp {
