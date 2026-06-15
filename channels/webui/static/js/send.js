@@ -263,6 +263,7 @@ async function send(providedContent = null) {
     const isRegenerate = providedContent !== null;
     const rawContent = providedContent !== null ? providedContent : inputField.value.trim();
     const message = typeof rawContent === 'string' ? rawContent : extractTextContent(rawContent);
+    
     if (!isRegenerate) {
         clearInput();
         if (message.trim().startsWith('/') || message.trim().startsWith("STOP")) {
@@ -273,41 +274,10 @@ async function send(providedContent = null) {
     if (isStreaming) return;
     if (!message && !isRegenerate) return;
 
-    promptProcessingReceived = false;
-    typewriterQueue = [];
-    displayedContent = '';
-    isTypewriterRunning = false;
-    resetStreamState();
-
-    if (!isRegenerate) {
-        placeholderUserWrapper = createPlaceholderUserMessage(message);
-        chat.insertBefore(placeholderUserWrapper, typing);
-        scrollToBottom();
-    }
-
-    // Check API status
-    let isConnected = false;
-    try {
-        const statusResponse = await fetch('/api/status', { signal: AbortSignal.timeout(5000) });
-        if (statusResponse.ok) {
-            const statusData = await statusResponse.json();
-            if (statusData.connected) {
-                isConnected = true;
-            }
-        }
-    } catch (err) {
-        console.error('Could not check API status:', err);
-    }
-
-    if (!isConnected) {
-        const reconnected = await reconnectApi();
-        if (!reconnected) {
-            removePlaceholder();
-            showApiConfigError('API is not connected. Cannot regenerate response.', 'connection_failed');
-            return;
-        }
-        isConnected = true;
-    }
+    // Prepare local UI to receive the stream (placeholder)
+    placeholderUserWrapper = createPlaceholderUserMessage(message);
+    chat.insertBefore(placeholderUserWrapper, typing);
+    scrollToBottom();
 
     // Build payload
     const hasFiles = window.upload_queue && window.upload_queue.files.length > 0;
@@ -331,119 +301,25 @@ async function send(providedContent = null) {
         payloadBody = { role: "user", content: contentPayload };
     }
 
-    setInputState(true, true, true);
+    // Set local streaming state so we don't double-send
     isStreaming = true;
     isDataStreaming = true;
-    currentController = new AbortController();
-    
     updateStopButtonState();
     TypewriterAudioManager.play('send_message');
 
-    const aiWrapper = document.createElement('div');
-    aiWrapper.className = 'message-wrapper ai hidden streaming';
-    aiWrapper.dataset.index = 'streaming';
-
-    const aiMsgDiv = document.createElement('div');
-    aiMsgDiv.className = 'message ai';
-    aiWrapper.appendChild(aiMsgDiv);
-
-    const aiActions = createActionButtons('assistant', 'streaming', '', true);
-    const statsDiv = document.createElement('div');
-    statsDiv.id = 'message-stats-container';
-    statsDiv.className = 'action-stats';
-    const actionsRow = document.createElement('div');
-    actionsRow.className = 'actions-stats-row';
-    actionsRow.appendChild(aiActions);
-    actionsRow.appendChild(statsDiv);
-    aiWrapper.appendChild(actionsRow);
-
-    const typewriterEnabled = localStorage.getItem("typewriterEnabled") === 'true';
-    const typewriterSpeed = parseInt(localStorage.getItem("typewriterSpeed") ?? "30", 10);
-    const useTypewriter = typewriterEnabled && typewriterSpeed > 0;
-    const useStreamingSound = localStorage.getItem("tokenEnabled") === 'true';
-
-    scrollToBottom();
-
-    try {
-        const response = await fetch('/stream', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payloadBody),
-            signal: currentController.signal
-        });
-
-        if (!response.ok) {
-            removePlaceholder();
-            return await handleServerError(response, aiWrapper);
-        }
-
-        await syncMessages();
-
-        if (window.upload_queue) {
-            window.upload_queue.wrappers.forEach(w => w.remove());
-            window.upload_queue.files = [];
-            window.upload_queue.wrappers = [];
-            window.updateUploadQueueUI();
-        }
-
-        // DO NOT insert aiWrapper yet - wait for first token
-
-        // Initialize streaming UI state
-        if (!window._streamInitialized) {
-            removePlaceholder();
-            startStreamingUI(aiWrapper, typing);
-            window._streamInitialized = true;
-            TypewriterAudioManager.play('response_start');
-            TypewriterAudioManager.stopProcessingSound();
-            if (fancyProcessingIndicator) {
-                fancyProcessingIndicator.remove();
-                fancyProcessingIndicator = null;
-            }
-            typing.style.display = '';
-        }
-
-        // Initialize progress indicator
-        if (typing && !fancyProcessingIndicator) {
-            fancyProcessingIndicator = document.createElement('div');
-            fancyProcessingIndicator.className = 'prompt-processing-indicator-wrapper tool-processing-content';
-            chat.insertBefore(fancyProcessingIndicator, typing);
-            typing.style.display = 'none';
-
-            fancyProcessingIndicator.innerHTML = `
-                <div class="prompt-processing-indicator">
-                    <div class="progress-header">
-                        <span class="prompt-processing-percent">0%</span>
-                        <span class="prompt-processing-eta" style="opacity: 0.7">(ETA: 0s)</span>
-                    </div>
-                    <div class="prompt-progress-bar">
-                        <div class="prompt-progress-bar-fill" style="width: 0%"></div>
-                    </div>
-                </div>
-            `;
-
-            progressBarFill = fancyProcessingIndicator.querySelector('.prompt-progress-bar-fill');
-            progressTextPercent = fancyProcessingIndicator.querySelector('.prompt-processing-percent');
-            progressTextETA = fancyProcessingIndicator.querySelector('.prompt-processing-eta');
-
-            TypewriterAudioManager.playProcessingSound();
-        }
-
-        // Pass references to global handlers so they can update this specific wrapper
-        window._currentAiWrapper = aiWrapper;
-        window._currentAiMsgDiv = aiMsgDiv;
-        window._currentUseTypewriter = useTypewriter;
-        window._currentUseStreamingSound = useStreamingSound;
-
-        // If WebSocket is not connected yet, fallback to polling or show placeholder
-        if (!isWsConnected) {
-            console.warn('WebSocket not connected, falling back to polling');
-        }
-
-    } catch (err) {
+    // Send via WebSocket
+    if (window.socket && window.socket.readyState === WebSocket.OPEN) {
+        console.log('[DEBUG] Sending user_message via WebSocket');
+        window.socket.send(JSON.stringify({
+            type: 'user_message',
+            content: payloadBody
+        }));
+    } else {
+        console.error('[DEBUG] WebSocket not open.');
+        isStreaming = false;
+        isDataStreaming = false;
+        setInputState(false, false, false);
         removePlaceholder();
-        if (err.name !== 'AbortError') {
-            handleCatchError(err, aiMsgDiv, aiWrapper, false);
-        }
     }
 }
 

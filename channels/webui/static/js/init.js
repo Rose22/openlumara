@@ -121,10 +121,53 @@ function handleWebSocketMessage(data) {
     }
     if (data.type === 'token') {
         // Real-time token broadcasting
-        if (!window._currentAiMsgDiv) return; // Wait for send() to set up UI
-        
-        // Insert AI wrapper if not already inserted
-        if (window._currentAiWrapper && !window._currentAiWrapper.parentNode) {
+        if (!window._currentAiMsgDiv) {
+            // If no AI message wrapper exists, it means a new stream has started.
+            // We create the streaming AI wrapper here.
+            console.log('[DEBUG] First token received. Creating streaming AI wrapper.');
+            
+            const aiWrapper = document.createElement('div');
+            aiWrapper.className = 'message-wrapper ai hidden streaming';
+            // Use lastMessageIndex because the user message was just broadcast with next_index
+            aiWrapper.dataset.index = lastMessageIndex; 
+
+            const aiMsgDiv = document.createElement('div');
+            aiMsgDiv.className = 'message ai';
+            aiWrapper.appendChild(aiMsgDiv);
+
+            const aiActions = createActionButtons('assistant', 'streaming', '', true);
+            const statsDiv = document.createElement('div');
+            statsDiv.id = 'message-stats-container';
+            statsDiv.className = 'action-stats';
+            const actionsRow = document.createElement('div');
+            actionsRow.className = 'actions-stats-row';
+            actionsRow.appendChild(aiActions);
+            actionsRow.appendChild(statsDiv);
+            aiWrapper.appendChild(actionsRow);
+
+            chat.insertBefore(aiWrapper, typing);
+            
+            // FIX: Make the wrapper visible immediately
+            aiWrapper.classList.remove('hidden');
+            
+            // Set globals for subsequent tokens in this stream
+            window._currentAiWrapper = aiWrapper;
+            window._currentAiMsgDiv = aiMsgDiv;
+            window._currentUseTypewriter = localStorage.getItem("typewriterEnabled") === 'true';
+            window._currentUseStreamingSound = localStorage.getItem("tokenEnabled") === 'true';
+
+            // Initialize local streaming state
+            isStreaming = true;
+            isDataStreaming = true;
+
+            // Remove progress indicator when first token arrives
+            if (fancyProcessingIndicator) {
+                fancyProcessingIndicator.remove();
+                fancyProcessingIndicator = null;
+                if (typing) typing.style.display = '';
+            }
+        } else if (window._currentAiWrapper && !window._currentAiWrapper.parentNode) {
+            // Fallback: Insert AI wrapper if it was created but not yet in the DOM
             chat.insertBefore(window._currentAiWrapper, typing);
         }
 
@@ -137,13 +180,6 @@ function handleWebSocketMessage(data) {
             tokenContent = data.message.content || '';
         } else if (data.content) {
             tokenContent = data.content;
-        }
-
-        // Remove progress indicator when first token arrives
-        if (fancyProcessingIndicator && (tokenType === 'content' || tokenType === 'reasoning')) {
-            fancyProcessingIndicator.remove();
-            fancyProcessingIndicator = null;
-            if (typing) typing.style.display = '';
         }
 
         // Handle prompt progress
@@ -229,6 +265,7 @@ function handleWebSocketMessage(data) {
     if (data.type === 'stream_complete') {
         // Signal end of streaming
         isDataStreaming = false; // Mark stream as complete
+        isStreaming = false; // Reset global flag
         updateStopButtonState(); // Update button state immediately
         
         // Wait for typewriter to finish if it's still running
@@ -290,13 +327,12 @@ function handleWebSocketMessage(data) {
         return;
     }
     // Legacy: handle raw message objects (for backwards compatibility)
-    // Add an index if missing to ensure proper handling
     if (data.role && data.content !== undefined) {
         if (data.index === undefined) {
             // Try to determine index from current state
             data.index = lastMessageIndex;
         }
-        handleNewMessage(data);
+        handleNewMessage(data.message);
     }
 }
 
@@ -321,6 +357,12 @@ function handleNewMessage(msg) {
     if (existingWrapper) {
         console.log('Message already exists at index:', msg.index);
         return;
+    }
+
+    // If this is a user message and we have a placeholder, remove it
+    if (msg.role === 'user' && typeof placeholderUserWrapper !== 'undefined' && placeholderUserWrapper.parentNode) {
+        console.log('[DEBUG] Removing user message placeholder');
+        placeholderUserWrapper.remove();
     }
 
     renderSingleMessage(msg, msg.index, true);

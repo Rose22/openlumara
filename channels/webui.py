@@ -337,6 +337,23 @@ async def websocket_endpoint(websocket: WebSocket):
                         "chat_id": new_id,
                         "buffer": []
                     })
+                
+                elif msg_type == "user_message":
+                    # Handle user message via WebSocket
+                    payload_body = data.get("content")
+                    if payload_body:
+                        try:
+                            chat_id = manager.active_chat_id or "default"
+                            print(f"[DEBUG] WebSocket: Received user_message. chat_id={chat_id}")
+                            await start_ai_stream_task(chat_id, payload_body)
+                        except Exception as e:
+                            print(f"[DEBUG] WebSocket: Error starting stream: {e}")
+                            await manager.broadcast({
+                                "type": "error",
+                                "error": str(e)
+                            })
+                    else:
+                        print("[DEBUG] WebSocket: Received user_message but no content")
 
             except json.JSONDecodeError:
                 pass
@@ -719,20 +736,37 @@ async def get_commands(user: str = Depends(require_auth)):
     return core.commands.get_commands(channel_instance.manager.modules)
 
 @app.post("/stream")
-async def stream_message(request: Request, user: str = Depends(require_auth)):
-    global channel_instance
+async def start_ai_stream_task(chat_id: str, payload_body: dict):
+    """
+    Starts an AI response stream for a given chat.
+    Broadcasts the user's message with the correct index first, then streams the AI response.
+    """
+    print(f"[DEBUG] start_ai_stream_task: chat_id={chat_id}, payload={payload_body}")
+    
+    # 1. Calculate the true next index before broadcasting anything
+    # This is crucial for synchronization across all clients
+    messages = await channel_instance.context.chat.get() or []
+    next_index = len(messages)
+    print(f"[DEBUG] Calculated next_index: {next_index}")
 
-    status = get_api_status()
-    if not status['connected']:
-        raise HTTPException(status_code=503, detail=status)
+    # 2. Broadcast the user message so all clients see it with the correct index
+    user_msg_payload = payload_body.copy()
+    if isinstance(user_msg_payload, dict):
+        user_msg_payload['index'] = next_index
+    
+    print(f"[DEBUG] Broadcasting user message with index: {user_msg_payload}")
+    await manager.broadcast({
+        "type": "message_added",
+        "message": user_msg_payload
+    })
 
-    data = await request.json()
+    # 3. Start the AI stream
     stream_id = str(uuid.uuid4())[:8]
+    print(f"[DEBUG] Starting AI stream: stream_id={stream_id}")
 
-    # Start the background stream
     async def generator():
         try:
-            async for token_data in channel_instance.send_stream(data, commands_authorized=True):
+            async for token_data in channel_instance.send_stream(payload_body, commands_authorized=True):
                 if stream_id in stream_cancellations:
                     stream_cancellations.discard(stream_id)
                     yield {'type': 'cancelled'}
@@ -744,9 +778,62 @@ async def stream_message(request: Request, user: str = Depends(require_auth)):
 
                 yield token_data
         except Exception as e:
+            print(f"[DEBUG] Generator error: {e}")
             yield {'type': 'error', 'content': core.detail_error(e) if core.debug else str(e)}
 
-    await manager.start_background_stream(manager.active_chat_id or "default", generator())
+    await manager.start_background_stream(chat_id, generator())
+    return stream_id
+
+async def start_ai_stream_task(chat_id: str, payload_body: dict):
+    """
+    Starts an AI response stream for a given chat.
+    Broadcasts the user's message first, then streams the AI response.
+    """
+    print(f"[DEBUG] start_ai_stream_task: chat_id={chat_id}, payload={payload_body}")
+    
+    # 1. Broadcast the user message so all clients see it
+    print(f"[DEBUG] Broadcasting user message: {payload_body}")
+    await manager.broadcast({
+        "type": "message_added",
+        "message": payload_body
+    })
+
+    # 2. Start the AI stream
+    stream_id = str(uuid.uuid4())[:8]
+    print(f"[DEBUG] Starting AI stream: stream_id={stream_id}")
+
+    async def generator():
+        try:
+            async for token_data in channel_instance.send_stream(payload_body, commands_authorized=True):
+                if stream_id in stream_cancellations:
+                    stream_cancellations.discard(stream_id)
+                    yield {'type': 'cancelled'}
+                    return
+
+                if isinstance(token_data, dict) and token_data.get('type') == 'error':
+                    yield token_data
+                    return
+
+                yield token_data
+        except Exception as e:
+            print(f"[DEBUG] Generator error: {e}")
+            yield {'type': 'error', 'content': core.detail_error(e) if core.debug else str(e)}
+
+    await manager.start_background_stream(chat_id, generator())
+    return stream_id
+
+async def stream_message(request: Request, user: str = Depends(require_auth)):
+    global channel_instance
+
+    status = get_api_status()
+    if not status['connected']:
+        raise HTTPException(status_code=503, detail=status)
+
+    data = await request.json()
+    chat_id = manager.active_chat_id or "default"
+    
+    # Use the unified task starter
+    stream_id = await start_ai_stream_task(chat_id, data)
 
     return JSONResponse({"status": "streaming", "id": stream_id})
 
