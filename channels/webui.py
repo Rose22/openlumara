@@ -122,15 +122,18 @@ class ConnectionManager:
             })
 
         # wait with sending the ready signal until the webui is fully started up
-        while not self.webui_ready:
-            await asyncio.sleep(0.1)
-
-        await self.broadcast({"type": "ready"})
+        asyncio.create_task(self.queue_ready_signal());
 
     def disconnect(self, websocket: WebSocket):
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
         self.connection_users.pop(websocket, None)
+
+    async def queue_ready_signal(self):
+        while not self.webui_ready:
+            await asyncio.sleep(0.1)
+
+        await self.broadcast({"type": "ready"})
 
     def send_ready_signal(self):
         self.webui_ready = True
