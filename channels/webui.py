@@ -31,8 +31,9 @@ import msgpack
 import yaml
 import logging
 import io
+import mimetypes
 
-WEBUI_DIR = core.get_path("channels/webui")
+WEBUI_DIR = core.get_path("channels/webui") 
 
 # ordered list of javascript files, to load in this exact order
 JS_FILES = [
@@ -68,7 +69,47 @@ SECRET_KEY = webui_config.get("secret_key", secrets.token_hex(32))
 app = FastAPI(docs_url=None, redoc_url=None)
 
 # Static files
-app.mount("/static", StaticFiles(directory=os.path.join(WEBUI_DIR, "static")), name="static")
+@app.get("/static/js/{file_path:path}")
+async def serve_static_js(file_path: str):
+    full_path = os.path.join(WEBUI_DIR, "static", "js", file_path)
+    full_path = os.path.abspath(full_path)
+    base_path = os.path.abspath(os.path.join(WEBUI_DIR, "static", "js"))
+
+    if not full_path.startswith(base_path):
+        raise HTTPException(status_code=403, detail="Access denied")
+    if not os.path.exists(full_path) or not os.path.isfile(full_path):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    return FileResponse(full_path, media_type="application/javascript")
+
+
+@app.get("/static/css/{file_path:path}")
+async def serve_static_css(file_path: str):
+    full_path = os.path.join(WEBUI_DIR, "static", "css", file_path)
+    full_path = os.path.abspath(full_path)
+    base_path = os.path.abspath(os.path.join(WEBUI_DIR, "static", "css"))
+
+    if not full_path.startswith(base_path):
+        raise HTTPException(status_code=403, detail="Access denied")
+    if not os.path.exists(full_path) or not os.path.isfile(full_path):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    return FileResponse(full_path, media_type="text/css")
+
+
+@app.get("/static/{file_path:path}")
+async def serve_static_misc(file_path: str):
+    full_path = os.path.join(WEBUI_DIR, "static", file_path)
+    full_path = os.path.abspath(full_path)
+    base_path = os.path.abspath(os.path.join(WEBUI_DIR, "static"))
+
+    if not full_path.startswith(base_path):
+        raise HTTPException(status_code=403, detail="Access denied")
+    if not os.path.exists(full_path) or not os.path.isfile(full_path):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    guessed_type, _ = mimetypes.guess_type(full_path)
+    return FileResponse(full_path, media_type=guessed_type or "application/octet-stream")
 
 # Templates
 templates = Jinja2Templates(directory=WEBUI_DIR)

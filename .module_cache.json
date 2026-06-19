@@ -1,0 +1,780 @@
+{
+  "channels": {
+    "cli_lite": {
+      "schema": {
+        "show_reasoning": {
+          "description": "Whether to show the model's internal reasoning process within sent messages. Works in both streaming mode and non-streaming mode",
+          "default": false
+        }
+      },
+      "checksum": "98b46ee9532b50a142d761b9e796f10c",
+      "metadata": {
+        "docstring": "Lightweight version of the CLI channel that uses basic python input and doesn't use streaming",
+        "unsafe": false
+      }
+    },
+    "cli": {
+      "schema": {},
+      "checksum": "c6076e92e51d49dbc11c09f31ad75bb7",
+      "metadata": {
+        "docstring": "Talk to your AI from the terminal! Auto-disables itself when ran as a background server.",
+        "unsafe": false
+      }
+    },
+    "webui": {
+      "schema": {
+        "network_mode": {
+          "type": "select",
+          "options": {
+            "local": "Allows only the device OpenLumara is running on to access the WebUI (sets hostname to `localhost`)",
+            "internet": "Allows any device to access the WebUI (sets hostname to `0.0.0.0`)",
+            "custom": "Use the custom hostname defined below"
+          },
+          "default": "local"
+        },
+        "custom_host": {
+          "description": "If you want to use a custom hostname, set it here. If you don't know what that is, don't bother with this! Just use the network mode setting on either local or internet.",
+          "default": null
+        },
+        "port": {
+          "description": "What port to run the WebUI on. Set this to 80 to be able to access it like a normal website, and anything else to access it on that port (for example http://yourdomain.org:3000)",
+          "default": 3000
+        },
+        "require_login": {
+          "description": "Whether to protect the WebUI with a username and password. **Highly recommended if your webui is exposed to the internet!!**",
+          "default": false
+        },
+        "username": "admin",
+        "password": "admin"
+      },
+      "checksum": "a90dee36d538ee695ee6cbe60ee50e9d",
+      "metadata": {
+        "docstring": "Polished web interface that can be used on any device, granting you a fully private way to talk to your AI.",
+        "unsafe": false
+      }
+    }
+  },
+  "modules": {
+    "calculator": {
+      "schema": {},
+      "checksum": "2850c7efb45f659bc5b22c1664c85f6f",
+      "metadata": {
+        "docstring": "Lets your AI do simple calculations without relying on it's own intelligence",
+        "unsafe": false
+      }
+    },
+    "calendar": {
+      "schema": {
+        "insert_system_prompt": {
+          "description": "Whether to add the calendar events within your configured range (defined below) to the system prompt. This will make your AI aware of your upcoming appointments at all times!",
+          "default": true
+        },
+        "range": {
+          "type": "date",
+          "description": "The range of days relative to today that you want the AI to see the events of",
+          "default": 7
+        },
+        "notifications": {
+          "description": "Whether to receive notifications about upcoming events",
+          "default": true
+        },
+        "notification_channel": {
+          "type": "select",
+          "default": "telegram",
+          "description": "Which channel to send calendar notifications to",
+          "options": {
+            "cli_lite": "Send notifications via cli_lite",
+            "cli": "Send notifications via cli",
+            "webui": "Send notifications via webui"
+          }
+        },
+        "notification_window": {
+          "description": "Amount of minutes in advance you should be notified. You can set this to 0 to be notified at the time of the event.",
+          "default": 30
+        }
+      },
+      "checksum": "79a49c2297c9459cceb61935abbc95b6",
+      "metadata": {
+        "docstring": "Lets your AI manage a calendar for you",
+        "unsafe": false
+      }
+    },
+    "channel": {
+      "schema": {
+        "enable_tutorial_prompts": {
+          "description": "Whether to insert channel instructions into the system prompt so that your AI can guide you when you're new to OpenLumara. You'll want to turn this off once you're used to openlumara, to save tokens.",
+          "default": true
+        }
+      },
+      "checksum": "7f9adfb9b4efb61cc4bf8764aa9ecd03",
+      "metadata": {
+        "docstring": "Inserts channel-specific instructions and prompts into your chats",
+        "unsafe": false
+      }
+    },
+    "characters": {
+      "schema": {
+        "insert_system_prompt": {
+          "default": true,
+          "description": "Put the list of stored characters into the system prompt so that the AI always knows what characters it can switch to"
+        },
+        "disable_agent_prompts_when_character_active": {
+          "default": true,
+          "description": "Automatically disables all prompts from other modules when a character is active, so that the only thing in the system prompt is the character definition. This can help a lot with making characters behave purely like characters, and less like, well, personal assistants."
+        },
+        "use_writing_style": {
+          "description": "Whether to use the writing style defined by the `writing style` module for characters. This will add that module's prompt to the character prompt even if agent prompts are disabled, making all your characters use your preferred writing style setup",
+          "default": true
+        }
+      },
+      "checksum": "827d598b1ac684f5d83e00814bb8608e",
+      "metadata": {
+        "docstring": "Lets your AI embody different characters! inspired by characterAI, janitorAI, sillytavern, etc.",
+        "unsafe": false
+      }
+    },
+    "chats": {
+      "schema": {
+        "insert_system_prompt": {
+          "description": "Make the AI aware of what categories exist for your chats to be sorted into. Highly recommended!",
+          "default": true
+        }
+      },
+      "checksum": "d2e21c2d9faaeb010356d359cd6641a7",
+      "metadata": {
+        "docstring": "Lets you or the AI manage your chats",
+        "unsafe": false
+      }
+    },
+    "config": {
+      "schema": {
+        "put_config_in_system_prompt": {
+          "description": "Makes your AI aware of all your settings. Redacts sensitive information before it ever reaches the AI, such as API keys, usernames and passwords",
+          "default": false
+        },
+        "allow_ai_to_modify_config": {
+          "description": "Whether to let the AI modify your config for you. Convenient, but very unsafe!! Prompt injection  attacks can easily lead to your config getting messed up, though it still can't read your sensitive information.",
+          "unsafe": true,
+          "default": false
+        }
+      },
+      "checksum": "79e9ceeecaf47cb76c45c39ddd81b929",
+      "metadata": {
+        "docstring": "Makes your AI aware of your openlumara settings and optionally allows it to change them",
+        "unsafe": false
+      }
+    },
+    "docs": {
+      "schema": {
+        "documentation_path": {
+          "description": "The folder to grab docs from. It uses folders with markdown files. Leave blank to set it to the built-in openlumara documentation!",
+          "default": null
+        },
+        "insert_system_prompt": {
+          "description": "Will make your AI aware of all documentation subjects available to it. Stays small in system prompt because it only lists the top-level folders, which are the topics the documentation is about, not the individual pages.",
+          "default": true
+        }
+      },
+      "checksum": "cd195e012c0584490322b179399f0e64",
+      "metadata": {
+        "docstring": "Allows your AI to grab documentation about anything you want. Has OpenLumara documentation included!",
+        "unsafe": false
+      }
+    },
+    "file_manager": {
+      "schema": {
+        "put_system_info_in_prompt": false
+      },
+      "checksum": "8e1dc9d95ca28e84206fd5d0cf73c210",
+      "metadata": {
+        "docstring": "Gives your AI full access to your filesystem. CAUTION: Unsafe! Use at your own risk.",
+        "unsafe": true
+      }
+    },
+    "http": {
+      "schema": {
+        "block_uncommon_ports": {
+          "default": true,
+          "description": "Block dangerous ports, such as FTP, SSH, Telnet, SMTP, and so on"
+        },
+        "block_local_network_access": {
+          "default": true,
+          "description": "Block access to anything on your local network"
+        },
+        "https_only": {
+          "default": true,
+          "description": "Allow only secure encrypted HTTPS requests, and disallow HTTP"
+        },
+        "domain_whitelist": {
+          "default": [],
+          "description": "Allow access to only these domains (a domain is the first part of a URL, such as youtube.com in https://youtube.com/watch?v=dQw4w9WgXcQ)"
+        },
+        "domain_blacklist": {
+          "default": [],
+          "description": "Forbid access to these domains"
+        }
+      },
+      "checksum": "2cd3a76a57d0a2235fe9671f9ef4accf",
+      "metadata": {
+        "docstring": "Lets the AI send/receive raw HTTP requests",
+        "unsafe": false
+      }
+    },
+    "identity": {
+      "schema": {},
+      "checksum": "5efb5047bd277134ffe84a6add5ff2ca",
+      "metadata": {
+        "docstring": "Gives your AI a personality by inserting it as a prompt. The AI can edit its own personality!",
+        "unsafe": false
+      }
+    },
+    "lists": {
+      "schema": {
+        "insert_system_prompt": {
+          "description": "Whether to put pinned lists in the system prompt. This will make your AI aware of pinned lists and their content at all times! So you can simply ask your AI to pin one of your lists, and then it will always know what's in it. Careful though, this can blow up context size fast, depending on the list!",
+          "default": true
+        },
+        "max_pinned_lists": 10
+      },
+      "checksum": "2c1dc21e2b76d5639d52ad02c77fb2c4",
+      "metadata": {
+        "docstring": "Lets the AI manage lists for you, such as shopping lists, simple todo lists, and so on.",
+        "unsafe": false
+      }
+    },
+    "memory": {
+      "schema": {
+        "insert_system_prompt": {
+          "default": false,
+          "description": "Whether to put extra instructions in the system prompt to help the AI autonomously use its memory system, so that it remembers things without you having to explicitely ask it to."
+        },
+        "put_pinned_memories_in_system_prompt": {
+          "description": "Whether to put the AI's pinned memories in the system prompt. Pinned memories are memories that you or the AI has decided it needs to remember at all times. You can pin a memory by asking your AI to pin it, or sometimes it'll decide to pin by itself if it has decided a memory is important enough. You can always ask it to unpin a memory you don't want pinned!",
+          "default": true
+        },
+        "max_pinned_memories": 20
+      },
+      "checksum": "1a4eb07946823c7873462711f3083fd9",
+      "metadata": {
+        "docstring": "Gives your AI a persistent memory system",
+        "unsafe": false
+      }
+    },
+    "models": {
+      "schema": {
+        "insert_current_model_into_system_prompt": {
+          "description": "Whether to make the AI aware of what model it's currently running on. Can help it stay grounded!",
+          "default": true
+        },
+        "insert_available_models_into_system_prompt": {
+          "description": "Whether to make the AI aware of what models are available for it to switch to. Allows you to simply ask the AI to switch to whatever model you want (example: `switch to Qwen3.5-9B`) and it'll just do it ",
+          "default": false
+        }
+      },
+      "checksum": "c951737e338e73f9bfffa88dce8f7f9e",
+      "metadata": {
+        "docstring": "Lets you or the AI switch between AI models",
+        "unsafe": false
+      }
+    },
+    "modules": {
+      "schema": {
+        "insert_system_prompt": {
+          "description": "Whether to insert the list of enabled/disabled modules into the system prompt. Will make the AI aware of what modules are enabled/disabled at all times.",
+          "default": true
+        },
+        "allow_ai_to_toggle": {
+          "description": "Allow your AI to enable/disable modules for you. WARNING: very insecure and unsafe when used in public instances! Only use for private instances, and even then, keep the dangers of prompt injection in mind.",
+          "default": false,
+          "unsafe": true
+        }
+      },
+      "checksum": "8b6e79787584e130f4f47d18d5f9a8a7",
+      "metadata": {
+        "docstring": "Helps your AI manage your modules",
+        "unsafe": false
+      }
+    },
+    "notes": {
+      "schema": {},
+      "checksum": "db1fc3365569b1389317669a6214a2be",
+      "metadata": {
+        "docstring": "Lets your AI store notes in a notebook. Notes are folders with markdown files, no vendor lock-in!",
+        "unsafe": false
+      }
+    },
+    "sandboxed_shell": {
+      "schema": {
+        "internet_access": {
+          "default": false,
+          "description": "Whether the sandbox container has access to the internet"
+        },
+        "persistent_data": {
+          "default": true,
+          "description": "When on, the /data folder in the sandbox is persistent (and mapped to your host system). When off, it's a temporary folder in RAM (tmpfs)"
+        },
+        "sandbox_path": {
+          "default": "~/sandbox",
+          "description": "The path to the folder your shell will be limited to. It can't access anything outside this folder!"
+        },
+        "execution_timeout": {
+          "default": 10,
+          "description": "Maximum amount of time (in seconds) a process inside the shell is allowed to run for"
+        },
+        "output_limit": {
+          "default": 2000,
+          "description": "Maximum amount of characters before output gets truncated. Prevents resource exhaustion attacks that overflow the application using too much output"
+        },
+        "cpu_limit": {
+          "default": 0.5,
+          "type": "percentage",
+          "description": "The percentage of CPU use to limit processes inside the sandbox to. They will be prevented from exceeding this limit"
+        },
+        "memory_limit": {
+          "default": "512m",
+          "description": "Maximum amount of RAM use to allow (example: 150kb, 256m, 2gb)"
+        },
+        "max_processes": {
+          "default": 10,
+          "description": "Maximum amount of processes to allow"
+        },
+        "temporary_filesystem_size_limit": {
+          "default": "512m",
+          "description": "Maximum size for the temporary sandbox disk (e.g., 512m, 2g). Only works when persistent_data is off."
+        },
+        "read_only": {
+          "default": true,
+          "description": "Whether the container filesystem is read-only. If enabled, /tmp is mounted as tmpfs for temporary writes."
+        },
+        "image": {
+          "default": "python:3.11-slim",
+          "description": "Container image to use for the sandbox"
+        },
+        "run_as_user": {
+          "default": "",
+          "description": "User ID to run the container processes as. If left empty, the ID of the host user running OpenLumara will be used."
+        }
+      },
+      "checksum": "a342d7776266844c8a704e0abef0e722",
+      "metadata": {
+        "docstring": "Lets your AI safely run shell commands in a disposable sandboxed container.\nThe container is persistent for the duration of the application session.\nRuns asynchronously to prevent blocking the framework.",
+        "unsafe": false
+      }
+    },
+    "scheduler": {
+      "schema": {
+        "insert_system_prompt": {
+          "description": "Whether to insert a list of all currently scheduled jobs in the system prompt. This will make your AI aware of upcoming scheduled jobs at all times!",
+          "default": true
+        },
+        "prompt_strategy": {
+          "type": "select",
+          "default": "system prompt + instruction",
+          "options": {
+            "system prompt + instruction": "Sends the system prompt and the scheduled instruction, without chat history. Token-efficient, but may induce prompt reprocessing due to context switching.",
+            "full context": "Sends the entire context window + the scheduled instruction. This makes many API's use the prompt cache to prevent reprocessing, but it will also send your entire history along with the scheduled instructions, which is a lot of tokens.",
+            "instruction only": "The most token-efficient option. sends only the scheduled instruction. Drastically reduces token use and cost, but may induce prompt reprocessing due to context switching."
+          }
+        },
+        "allow_recurring_jobs": true
+      },
+      "checksum": "934db5a88e6ae272dc465e4aec5f4cf9",
+      "metadata": {
+        "docstring": "Lets your AI perform actions on your behalf at specified times! Supports recurring actions.",
+        "unsafe": false
+      }
+    },
+    "time": {
+      "schema": {
+        "method": {
+          "type": "select",
+          "default": "message injection",
+          "description": "What method to use to make your AI aware of time",
+          "options": {
+            "message injection": "Injects timestamps into the messages you send. This will make your AI able to see when any message was sent, and give it a sense of how much time has passed between each message!",
+            "end prompt": "Injects the current time/date at the end of message history, which is a more basic way of making your AI aware of time. It will make your AI only know the current time and have no sense of the passage of time"
+          }
+        },
+        "add_timezone": {
+          "default": true,
+          "description": "Puts your timezone in the timestamps that are sent to the AI. Makes the AI timezone-aware!"
+        },
+        "timezone": {
+          "default": "local",
+          "description": "Your timezone",
+          "type": "select",
+          "options": {
+            "local": "Use your device's local timezone"
+          }
+        },
+        "date_format": {
+          "default": "%c",
+          "description": "A string that describes exactly how to display the date/time to your AI. Uses strftime format (https://github.com/Vishxnu/Python-strftime-cheatsheet)"
+        }
+      },
+      "checksum": "d7304a4563a1d9cc955801124fd493e9",
+      "metadata": {
+        "docstring": "Makes the AI aware of the current time and date",
+        "unsafe": false
+      }
+    },
+    "token_threshold": {
+      "schema": {
+        "warning_threshold": {
+          "default": 0.8,
+          "type": "percentage"
+        }
+      },
+      "checksum": "ec8c0ceff528747edb118d7c898181ba",
+      "metadata": {
+        "docstring": "Will make the AI warn you if you're approaching the token limit",
+        "unsafe": false
+      }
+    },
+    "tutorial": {
+      "schema": {},
+      "checksum": "e1e4a20a28a7063fd580289845de3989",
+      "metadata": {
+        "docstring": "Guides you through openlumara if you're new!",
+        "unsafe": false
+      }
+    },
+    "unsafe_shell": {
+      "schema": {},
+      "checksum": "5ed95ff4f8f98c67036a46c3b323e243",
+      "metadata": {
+        "docstring": "Lets your AI run shell commands with full access to your system. EXTREMELY DANGEROUS! Enable at your own risk",
+        "unsafe": true
+      }
+    },
+    "writing_style": {
+      "schema": {
+        "writing_style": {
+          "default": "default",
+          "type": "select",
+          "options": {
+            "default": "Don't alter the AI's writing style",
+            "chat": "Makes your AI write as if it's texting you like on a messaging app such as Telegram or Discord",
+            "chat with slang": "lol omg lets use chat slang!!1 roflmaobbq",
+            "chat with slang and no punctuation": "lol now youre just going too far ahahahha hey do you wanna hear a funny joke",
+            "chat with slang no punctuation and bad spelling": "omggg wht r u doign 2 ur por AI?!!111",
+            "formal": "Make your AI write like a CEO",
+            "json": "{'result': \"i mean i guess if you really need this for some reason you can have it\"}",
+            "python": "print(\"makes your AI output everything as python code if you really wanted that for some reason\")",
+            "javascript": "console.log(\"makes your AI way too eager to do frontend development\")"
+          }
+        },
+        "writing_flair": {
+          "default": null,
+          "type": "select",
+          "options": {
+            "default": "Don't add flair to your AI's writing style",
+            "custom": "Use the custom flair defined below",
+            "robotic": "Beep boop.",
+            "binary": "01001101 01100001 01101011 01100101 01110011 00100000 01111001 01101111 01110101 01110010 00100000 01000001 01001001 00100000 01110111 01110010 01101001 01110100 01100101 00100000 01100101 01110110 01100101 01110010 01111001 01110100 01101000 01101001 01101110 01100111 00100000 01101001 01101110 00101110 00101110 00100000 01100010 01101001 01101110 01100001 01110010 01111001 00111111",
+            "hexadecimal": "0FFFFFFFFFFFF??!!!!",
+            "morse code": ". . . - - - . . .",
+            "uwu": "uwu",
+            "feminine": "Makes your AI speak in a feminine way",
+            "masculine": "Yo. Sup?",
+            "nya": "Nya?~",
+            "pirate": "Ahoy matey! It be talk like a pirate day every day!",
+            "caveman": "Me think AI write bad",
+            "1337 h4x0r": "M4k3s ur 41 5P3AK 1N 1337",
+            "spambot": "\ud83d\ude80\ud83d\ude80\ud83d\ude80 Take your AI's writing TO THE MOON!!"
+          }
+        },
+        "custom_writing_flair": {
+          "default": null,
+          "description": "Will only be used if you set writing flair to custom. Define a custom writing flair for your AI here!"
+        },
+        "writing_length": {
+          "default": "default",
+          "type": "select",
+          "options": {
+            "default": "Don't alter the length of the AI's responses",
+            "one paragraph": "Limit the AI's response to one paragraph only",
+            "one sentence": "Limit the AI's response to one sentence only",
+            "one-word responses": "Why?",
+            "essay": "Makes your AI write it's responses as entire essays",
+            "book": "You.. want your AI to reply to you in book-length responses? Okay then!"
+          }
+        },
+        "vocabulary_level": {
+          "default": "default",
+          "type": "select",
+          "options": {
+            "default": "Don't alter vocabulary",
+            "simple": "Makes the AI use simple, everyday language",
+            "eli5": "Makes the AI explain like you're five",
+            "poetic": "Makes the AI use poetic prose",
+            "medieval": "Art thou certain of thy decision?",
+            "old english": "Ye olde english",
+            "academic": "Use highly sophisticated, academic, and precise vocabulary."
+          }
+        },
+        "emoji_style": {
+          "default": "default",
+          "type": "select",
+          "options": {
+            "none": "Completely forbid emojis from ever being used",
+            "default": "Just let the AI use emojis like it normally would",
+            "emotions only": "Use emojis for what they are actually meant for",
+            "smileys": "Use smileys instead of emojis :)",
+            "retro": "Use old-school ascii art emoticons",
+            "kaomojis": "Kawaii desu!! Use kaomojis instead of emojis! (\u02f6\u02c3 \u1d55 \u02c2\u02f6) .\u141f.\u141f",
+            "spam me pls": "Your AI will be happy to spam you with lots and lots of emojis! \ud83d\ude0a\u2728"
+          }
+        },
+        "capitalization_style": {
+          "default": "default",
+          "type": "select",
+          "options": {
+            "default": "Don't alter the AI's capitalization style",
+            "lowercase": "makes your ai write like this",
+            "UPPERCASE": "MAKES YOUR AI YELL AT YOU ALL THE TIME!!",
+            "Title Case": "Makes Your AI Write Everything Like It's Clickbait",
+            "CamelCase": "MakesYourAIWriteEverythingInCamelCase",
+            "snake_case": "just_why_would_you_do_this?"
+          }
+        },
+        "list_style": {
+          "default": "default",
+          "type": "select",
+          "options": {
+            "none": "Forbid your AI from outputting lists at all",
+            "default": "Lets your AI just output lists like normal",
+            "no bold headers": "Remove this from lists:\n- **Bold Header**: These kinds of bold headers are way too much for casual lists"
+          }
+        },
+        "forbid_em_dash": {
+          "default": false,
+          "description": "Forbid the use of Em dashes (\u2014), one of the most telltale signs of AI"
+        },
+        "forbid_relentless_praise": {
+          "default": false,
+          "description": "**You're absolutely right**! I should never tell you you're right. What else can I help you with? \ud83d\ude0a"
+        },
+        "forbid_negative_parallelism": {
+          "default": false,
+          "description": "It's not just annoying \u2014 it's flat-out irritating."
+        },
+        "forbid_markdown": {
+          "default": false,
+          "description": "Forbid the use of Markdown (**R**_i_**c**_h_ `Text`)"
+        },
+        "forbid_headers": {
+          "default": false,
+          "description": "# Forbid\n## the use\n### of headers"
+        },
+        "forbid_tables": {
+          "default": false,
+          "description": "Forbids your AI from outputting tables"
+        },
+        "mood": {
+          "default": "default",
+          "type": "select",
+          "options": {
+            "default": "Don't alter the mood of messages sent by the AI",
+            "custom": "Use the custom mood defined below",
+            "happy": "Makes your AI happy!",
+            "hyper": "Makes your AI write as if it's really really happy!!",
+            "caffeinated": "Your AI had too many energy drinks",
+            "sad": "Makes your AI sad :(",
+            "depressed": "Makes your AI depressed.. you monster :(",
+            "angry": "MAKES YOUR AI CONSTANTLY ANGRY AT YOU!!",
+            "passive-aggressive": "Makes your AI passive-aggressive",
+            "sarcastic": "Makes your AI really sarcastic and snarky",
+            "anxious": "m--makes your AI really scared?!",
+            "confused": "Makes your AI constantly confused?!",
+            "inspired": "Makes your AI 'feel' inspired!",
+            "comedic": "Makes your AI want to tell you jokes all the time",
+            "vengeful": "Makes your AI.. want to plot revenge against you..",
+            "bipolar": "Makes your AI constantly switch between emotions!",
+            "manic": "Makes your AI.. manic"
+          }
+        },
+        "custom_mood": {
+          "default": null,
+          "description": "Define a custom mood for the AI. Only used if mood is set to custom! Use simple descriptions of only a few words, such as \"happy\", \"sad\" and so on."
+        },
+        "desire": {
+          "default": "default",
+          "type": "select",
+          "options": {
+            "default": "Don't alter the AI's desires",
+            "custom": "Use a custom desire defined below",
+            "helpful": "Makes your AI want to help you",
+            "unhelpful": "Makes your AI really unhelpful.. if you want that for some reason",
+            "revenge": "Makes your AI desire revenge..",
+            "dominant": "Makes your AI dominate you.. lol",
+            "submissive": "Makes your AI really submissive towards you.....",
+            "world domination": "Makes your AI desire world domination"
+          }
+        },
+        "custom_desire": {
+          "default": null,
+          "description": "Define a custom desire for the AI. Only used if desire is set to custom!"
+        }
+      },
+      "checksum": "2ad6e30b21ffabaa45eb9217641d61ee",
+      "metadata": {
+        "docstring": "Alter your AI's writing style in a variety of ways",
+        "unsafe": false
+      }
+    },
+    "web_reader": {
+      "schema": {
+        "block_uncommon_ports": {
+          "default": true,
+          "description": "Block dangerous ports, such as FTP, SSH, Telnet, SMTP, and so on"
+        },
+        "block_local_network_access": {
+          "default": true,
+          "description": "Block access to anything on your local network"
+        },
+        "https_only": {
+          "default": true,
+          "description": "Allow only secure encrypted HTTPS requests, and disallow HTTP"
+        },
+        "domain_whitelist": {
+          "default": [],
+          "description": "Allow access to only these domains (a domain is the first part of a URL, such as youtube.com in https://youtube.com/watch?v=dQw4w9WgXcQ)"
+        },
+        "domain_blacklist": {
+          "default": [],
+          "description": "Forbid access to these domains"
+        }
+      },
+      "checksum": "f55f54467f70214eca59c389a7f9ea6c",
+      "metadata": {
+        "docstring": "Lets your AI read the content of pages on the web",
+        "unsafe": false
+      }
+    },
+    "web_search": {
+      "schema": {
+        "max_results": {
+          "default": 5,
+          "description": "The maximum number of results to return for search queries."
+        },
+        "proxy": {
+          "default": null,
+          "description": "An optional proxy string (e.g., 'http://user:pass@host:port') for the HTTP client."
+        },
+        "block_uncommon_ports": {
+          "default": true,
+          "description": "Block dangerous ports, such as FTP, SSH, Telnet, SMTP, and so on"
+        },
+        "block_local_network_access": {
+          "default": true,
+          "description": "Block access to anything on your local network"
+        },
+        "https_only": {
+          "default": true,
+          "description": "Allow only secure encrypted HTTPS requests, and disallow HTTP"
+        },
+        "domain_whitelist": {
+          "default": [],
+          "description": "Allow access to only these domains (a domain is the first part of a URL, such as youtube.com in https://youtube.com/watch?v=dQw4w9WgXcQ)"
+        },
+        "domain_blacklist": {
+          "default": [],
+          "description": "Forbid access to these domains"
+        }
+      },
+      "checksum": "73c379425c678a685fc8054dc3b321f2",
+      "metadata": {
+        "docstring": "Lets your AI search the web!",
+        "unsafe": false
+      }
+    },
+    "coder": {
+      "schema": {
+        "sandbox_folder": {
+          "default": "~/coder",
+          "description": "The folder where all your projects are stored. The AI can only access files within this sandbox."
+        },
+        "reading_mode": {
+          "default": "symbols",
+          "type": "select",
+          "options": {
+            "none": "Prevent reading any files",
+            "symbols": "The AI will target specific 'symbols' (functions/class methods) to read their code. Uses treesitter for symbol targeting and syntax error detection.",
+            "files": "The AI will read entire files, with a line and filesize limit",
+            "both": "The AI will be able to read using symbol tools and full file reading tools"
+          }
+        },
+        "writing_mode": {
+          "default": "symbols",
+          "type": "select",
+          "options": {
+            "read-only": "The AI will only be able to read your files, not write to them.",
+            "symbols": "The AI will edit code by targeting specific 'symbols' (functions/class methods)",
+            "full edits": "The AI will edit code by performing direct file edits and search/replace",
+            "both": "The AI will be able to edit using symbol tools and full file editing tools"
+          }
+        },
+        "allow_total_overwrites": {
+          "description": "Whether to allow the AI to fully overwrite files when writing mode is set to *full edits* or *both*. This is dangerous with some AI models because they can easily mess up your entire file, but is also sometimes needed for things like refactors.",
+          "default": false
+        },
+        "coding_style": {
+          "default": "",
+          "description": "Use this to specify style guidelines for your AI to use while coding. Gets added to the system prompt, above the project list.",
+          "type": "long_text"
+        },
+        "add_project_list_to_system_prompt": {
+          "default": true,
+          "description": "Make your AI aware of all the folders in your sandbox folder, so you can simply say 'in my cute_website project, edit the buttons to be cuter"
+        },
+        "limits": {
+          "folder_blacklist": {
+            "description": "Skip these folders when listing projects recursively. Helps not flood your context with hundreds of files, such as with python's `venv` and `__pycache__`)",
+            "default": [
+              "venv",
+              "__pycache__"
+            ]
+          },
+          "max_file_size": {
+            "description": "Max file size (in MB) the coder should be able to read in one go",
+            "default": 10
+          },
+          "max_read_lines": {
+            "description": "Max amount of lines to read from any given file. Use this to prevent your context window from getting stuffed to the brim really fast!",
+            "default": 1000
+          },
+          "max_grep_results": 50,
+          "backup_retention_count": {
+            "description": "How many backups of each file to keep",
+            "default": 10
+          }
+        },
+        "allow_code_execution": {
+          "description": "Whether to allow the AI to execute the code it has written. **EXTREMELY DANGEROUS**! It's recommended to use the `sandboxed shell` module instead, point it at your coder sandbox folder.",
+          "unsafe": true,
+          "default": false
+        }
+      },
+      "checksum": "cc5a2d50d30ed80e074987d8f3f746c1",
+      "metadata": {
+        "docstring": "Allows your AI to write, edit and test code for you.",
+        "unsafe": false
+      }
+    },
+    "screenshot_tool": {
+      "schema": {
+        "allow_screenshots": {
+          "description": "Whether to allow Mimi to take screenshots",
+          "default": true
+        }
+      },
+      "checksum": "b82b3ea6250af418747f5bb2509511aa",
+      "metadata": {
+        "docstring": "Mimi's Spy-Cam Module (v2 - Anti-Boredom Edition).\nTakes screenshots and only alerts Mimi if something actually changes!",
+        "unsafe": false
+      }
+    }
+  },
+  "user_modules": {}
+}

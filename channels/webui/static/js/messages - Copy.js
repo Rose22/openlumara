@@ -627,46 +627,22 @@ function toggleToolCard(headerElement) {
 // =============================================================================
 
 function renderToolResponseContent(content) {
-    console.log("Mimi Debug: renderToolResponseContent called with:", content);
-    
-    let data = content;
+    let displayContent = content;
+    let isJson = false;
+    let parsedData = null;
 
-    if (typeof content === 'string') {
-        try {
-            const parsed = JSON.parse(content);
-            data = parsed;
-        } catch (e) {
-            // Not JSON
-        }
+    try {
+        parsedData = JSON.parse(content);
+        isJson = true;
+    } catch (e) {
+        // Not JSON
     }
 
-    if (Array.isArray(data)) {
-        console.log("Mimi Debug: Data is an array!");
-        let html = '<div class="mimi-multimodal-container">';
-        data.forEach((item, index) => {
-            if (typeof item === 'string') {
-                html += `<div class="tool-response-string">${escapeHtml(item)}</div>`;
-            } else if (item && typeof item === 'object') {
-                if (item.type === 'text') {
-                    html += `<div class="tool-response-string">${escapeHtml(item.text)}</div>`;
-                } else if (item.type === 'image_url') {
-                    html += `<div class="tool-response-image">
-                        <img src="${item.image_url.url}" style="max-width: 100%; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); margin: 8px 0;" />
-                    </div>`;
-                } else {
-                    html += renderJsonResponseCompact(item, 0);
-                }
-            }
-        });
-        html += '</div>';
-        return html;
+    if (isJson && parsedData !== null) {
+        return renderJsonResponseCompact(parsedData, 0);
     }
 
-    if (data !== null && typeof data === 'object') {
-        return renderJsonResponseCompact(data, 0);
-    }
-
-    return `<div class="tool-response-string">${escapeHtml(String(data))}</div>`;
+    return `<div class="tool-response-string">${escapeHtml(displayContent)}</div>`;
 }
 
 /**

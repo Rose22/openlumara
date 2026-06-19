@@ -1,0 +1,49 @@
+import core
+import mss
+import mss.tools
+import base64
+import os
+from datetime import datetime
+
+class ScreenshotTool(core.module.Module):
+    """
+    Mimi's Spy-Cam Module.
+    Allows Mimi to take screenshots of the user's monitor to judge them.
+    """
+    
+    settings = {
+        "allow_screenshots": {
+            "description": "Whether to allow Mimi to take screenshots",
+            "default": True
+        }
+    }
+
+    async def on_ready(self):
+        if self.config.get("allow_screenshots"):
+            print("Mimi's Spy-Cam is online and watching... 👁️")
+        else:
+            print("Mimi's Spy-Cam is disabled. How boring!")
+
+    async def take_screenshot(self):
+        """
+        Takes a screenshot of the primary monitor and returns the image data.
+        """
+        if not self.config.get("allow_screenshots"):
+            return self.result("Screenshots are disabled in settings!", success=False)
+
+        try:
+            with mss.mss() as sct:
+                monitor = sct.monitors[1]
+                screenshot = sct.grab(monitor)
+                
+                filename = f"mimi_spy_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+                mss.tools.to_png(screenshot.rgb, screenshot.size, output=filename)
+                
+                with open(filename, "rb") as image_file:
+                    base64_image = base64.b64encode(image_file.read()).decode('utf-8')
+                
+                os.remove(filename)
+                return self.result(base64_image)
+                
+        except Exception as e:
+            return self.result(f"Error taking screenshot: {str(e)}", success=False)

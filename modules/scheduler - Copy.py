@@ -352,11 +352,7 @@ Use tools if needed. For simple reminders, do not use tools.
 
         if final_content and job_channel:
             try:
-                # Only push if there were no tool calls. 
-                # If there were tool calls, tc_manager.process(push=True) already pushed the results.
-                if not tool_calls:
-                    await job_channel.push(final_content)
-                
+                await job_channel.push(final_content)
                 await job_channel.context.chat.add({"role": "assistant", "content": final_content})
             except Exception as e:
                 core.log_error(f"[SCHEDULER] error announcing job {job_id} result", e)

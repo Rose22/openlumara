@@ -102,12 +102,12 @@ class ToolcallManager:
         assistant_content is the "normal" non-toolcall content, the text that the AI wants to say that's not toolcalls
         """
 
-        # Prevent infinite tool-calling loops
-        if recursion_counter > 10:
-            err_msg = "Maximum tool recursion depth reached. Stopping to prevent DoS."
-            core.log_error(err_msg, None)
-            await self.channel.announce(err_msg, "error")
-            return
+        # this is, once again, a very badly documented thing in openAI's chat completions docs
+        # and so i had to use a ton of AI assistance to get this to work well
+        # if you ask me, this stuff should be handled in inference servers like llamacpp,
+        # NOT by the frontends, because this is just reinventing the wheel..
+        # like why do **i** need to repair the json? that should be the server's responsibility...
+        # whatever. we deal with it as best we can here
 
         # fix broken JSON and convert things where needed
         if not assistant_message.get("tool_calls"):
@@ -192,56 +192,30 @@ class ToolcallManager:
                     func_response = module_instance.result(f"Error while executing tool: {err_msg}", success=False)
                     core.log("toolcall", func_response.get("content"))
                 finally:
-                    # --- MIMI'S MULTIMODAL PATCH START ---
-                    # Check if the tool returned an image (base64 string)
-                    is_image = False
-                    image_data = None
-                    
-                    if isinstance(func_response, dict) and "content" in func_response:
-                        content_val = func_response["content"]
-                        # Heuristic: base64 images are long and start with specific headers
-                        if isinstance(content_val, str) and len(content_val) > 100 and (content_val.startswith("iVBOR") or content_val.startswith("f0V//")):
-                            is_image = True
-                            image_data = content_val
+                    func_response_str = None
 
-                    if is_image:
-                        # Instead of a string, we send a multimodal content list
-                        # We prompt the AI to describe the image so it's "embedded" in the logic
-                        tool_response_content = [
-                            {"type": "text", "text": "[SCREENSHOT] Tool returned an image. Please describe it for the user."},
-                            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image_data}"}}
-                        ]
+                    # don't double-escape strings
+                    if isinstance(func_response, str):
+                        func_response_str = func_response
                     else:
-                        # Standard text-only logic
-                        if isinstance(func_response, str):
-                            tool_response_content = func_response
-                        else:
-                            tool_response_content = json.dumps(func_response)
+                        func_response_str = json.dumps(func_response)
 
                     # build the openai toolcall response object
                     tool_response = {
                         "role": "tool",
                         "tool_call_id": tool_call_dict['id'],
-                        "content": tool_response_content
+                        "content": func_response_str
                     }
-                    # --- MIMI'S MULTIMODAL PATCH END ---
 
                     # yield it so it can be displayed immediately
-                    yield {"type": "tool", "tool_call_id": tool_call_dict['id'], "content": tool_response_content}
-
-                    # --- PERFORMANCE PATCH: PRUNE OLD IMAGES ---
-                    # To prevent cache invalidation storms (11s per image), we remove images from previous tool responses.
-                    # This ensures only the most recent screenshot is processed by the LLM during prompt re-evaluation.
-                    history = await self.channel.context.chat.get()
-                    if history:
-                        for msg in history:
-                            if msg.get("role") == "tool" and isinstance(msg.get("content"), list):
-                                if any(item.get("type") == "image_url" for item in msg["content"] if isinstance(item, dict)):
-                                    msg["content"] = "Tool returned an image screenshot (pruned for performance)."
+                    yield {"type": "tool", "tool_call_id": tool_call_dict['id'], "content": func_response_str}
 
                     # add the tool response to the context window
                     await self.channel.context.chat.add(tool_response)
 
+                    # push it if needed
+                    # if push:
+                    #     await self.channel.push(tool_response)
             else:
                 core.log(
                     "toolcall",
@@ -295,7 +269,7 @@ class ToolcallManager:
 
                     async for sub_token in self.process(
                         toolcall_request,
-                        recursion_counter=recursion_counter + 1,
+                        recursion_counter=recursion_counter,
                         push=push
                     ):
                         if self.channel.manager.API.cancel_request:

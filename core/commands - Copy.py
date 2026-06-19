@@ -534,13 +534,25 @@ class Commands:
                 if disabled_prompts:
                     disabled_prompts_str = "\n".join([mod_name for mod_name in disabled_prompts])
                     context_display.append(f"== disabled prompts ==\n{disabled_prompts_str}")
-                endprompt = await self.channel.manager.get_end_prompt()
-                if endprompt:
-                    sysprompt += f"\n\n=== end prompts ===\n{endprompt}"
 
-                return "\n".join(context_display)
+                ctx_string = ""
+                context_size = await self.channel.context.get_size()
+                for key, value in context_size.items():
+                    ctx_string += f"{key}: {value}\n"
+                context_display.append(f"== context size ==\n{ctx_string}")
+
+                return "\n\n".join(context_display)
+
+            case "context":
+                context = await self.channel.context.get(system_prompt=True)
+                import json
+                return json.dumps(context, indent=2)
+
             case "prompt":
                 """shows only the system prompt"""
+
+                if not core.config.get("api").get("context_window", True):
+                    return "CONTEXT DISABLED"
 
                 if not len(args):
                     _sysprompt = await self.channel.manager.get_system_prompt()
@@ -566,6 +578,7 @@ class Commands:
                             return "module does not have a system prompt defined"
 
                     return "module not found"
+
             case "prompts":
                 """show which prompts are active"""
 
@@ -588,50 +601,6 @@ class Commands:
             case "stop":
                 await self.channel.manager.API.cancel()
                 return "stopped!"
-            case "purge":
-                """The Great Purge: Clean up base64 bloat from all chats"""
-                import json
-                import os
-                import base64
-                import hashlib
-                
-                chat_file = "data/webui_chats.json"
-                screenshot_dir = "data/screenshots"
-                if not os.path.exists(screenshot_dir):
-                    os.makedirs(screenshot_dir, exist_ok=True)
-                
-                if not os.path.exists(chat_file):
-                    return "Chat file not found."
-                
-                with open(chat_file, "r", encoding="utf-8") as f:
-                    try:
-                        data = json.load(f)
-                    except Exception as e:
-                        return f"Error reading JSON: {e}"
-                
-                count = 0
-                for chat_id, chat_obj in data.items():
-                    if "messages" in chat_obj and isinstance(chat_obj["messages"], list):
-                        for msg in chat_obj["messages"]:
-                            if isinstance(msg, dict) and "content" in msg:
-                                content = msg["content"]
-                                if isinstance(content, str) and len(content) > 1000:
-                                    try:
-                                        clean_content = content.split(",", 1)[1] if "," in content else content
-                                        decoded = base64.b64decode(clean_content, validate=True)
-                                        img_hash = hashlib.md5(decoded).hexdigest()
-                                        filename = f"{img_hash}.png"
-                                        with open(os.path.join(screenshot_dir, filename), "wb") as img_f:
-                                            img_f.write(decoded)
-                                        msg["content"] = f"[Image Asset: {filename}]"
-                                        count += 1
-                                    except Exception:
-                                        pass
-                
-                with open(chat_file, "w", encoding="utf-8") as f:
-                    json.dump(data, f, indent=2)
-                
-                return f"The Great Purge is complete! Extracted {count} images. Your JSON is now tiny and cute! Teehee! ❤️"
             case _:
                 # handle module commands by using their decorated methods
 
