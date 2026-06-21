@@ -181,6 +181,9 @@ class ToolcallManager:
 
                     # add a timeout so that tools can't hang the application forever
                     func_response = await asyncio.wait_for(_run_tool(), timeout=timeout_val)
+                    if func_response is None:
+                        # bypass the usual response flow and just abort the chain
+                        return
 
                 except asyncio.TimeoutError as e:
                     err_msg = core.detail_error(e) if core.debug else str(e)

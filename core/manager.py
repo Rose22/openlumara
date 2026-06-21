@@ -488,7 +488,7 @@ class Manager:
                 self.broken_modules.append(module_name)
                 continue
 
-            if module_sysprompt and (module_name not in core.config.get("modules").get("disabled_end_prompts", [])):
+            if module_sysprompt:
                 sysprompt_header = ' '.join(module_name.split('_')).capitalize()
                 if hasattr(module, "_header") and module._header:
                     # but allow overriding the header
