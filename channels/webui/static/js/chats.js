@@ -907,14 +907,14 @@ async function updateTokenUsage(token=null) {
     }
 }
 
-async function loadChat(chatId, onlyUpToUserMessage = false) {
+async function loadChat(chatId, onlyUpToUserMessage = false, overrideStreamBlock = false) {
     if (chatId === currentChatId) {
         closeSidebar();
         return;
     }
 
     // do not allow chat switching while streaming
-    if (isStreaming) {
+    if (isStreaming && !overrideStreamBlock) {
         return;
     }
 

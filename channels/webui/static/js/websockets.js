@@ -302,7 +302,7 @@ function handleWebSocketMessage(data) {
 
     if (data.type === 'chat_switched') {
         if (data.chat_id === currentChatId) return;
-        window.loadChat(data.chat_id, catchingUpFromBuffer);
+        window.loadChat(data.chat_id, catchingUpFromBuffer, true);
         return;
     }
 
