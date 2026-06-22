@@ -65,6 +65,13 @@ ACTIVE_TOKENS: Set[str] = set()
 webui_config = core.config.get("channels", {}).get("settings", {}).get("webui", {})
 SECRET_KEY = webui_config.get("secret_key", secrets.token_hex(32))
 
+
+# How long a login persists. None = browser-session cookie. 
+# Number of days is converted to seconds for the cookie max_age.
+_session_lifetime_days = webui_config.get("session_lifetime_days")
+SESSION_MAX_AGE = int(_session_lifetime_days * 86400) if _session_lifetime_days else None
+
+
 app = FastAPI(docs_url=None, redoc_url=None)
 
 # Static files
@@ -1713,6 +1720,10 @@ class Webui(core.channel.Channel):
             "description": "Whether to protect the WebUI with a username and password. **Highly recommended if your webui is exposed to the internet!!**",
             "default": False
         },
+        "session_lifetime_days": {
+            "description": "How many days to stay logged in before the WebUI asks you to sign in again. Leave empty (or 0) to be logged out whenever you close your browser.",
+            "default": None
+        },
         "username": "admin",
         "password": "admin"
     }
@@ -1790,7 +1801,7 @@ app.add_middleware(
     SessionMiddleware,
     secret_key=SECRET_KEY,
     session_cookie="webui_session",
-    max_age=None,  # Session cookie (deleted when browser closes)
+    max_age=SESSION_MAX_AGE,  # None = Session cookie (deleted when browser closes); else seconds (set via session_lifetime_days)
     same_site="lax",  # CSRF protection
     https_only=False  # Set to True in production with HTTPS
 )
