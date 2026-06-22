@@ -116,8 +116,29 @@ async def install_module_deps(package, module_name, manager):
 
     return False
 
-async def uninstall_module_deps(package, module_name, manager):
-    """uninstall dependencies for a module (only if still installed)"""
+async def uninstall_module_deps(package, module_name, manager, exclude=None):
+    """uninstall dependencies for a module (only if deps are still installed)"""
+    # figure out which dependencies are still required by enabled modules
+    if exclude is None:
+        exclude = set()
+        try:
+            import importlib
+            # gather deps from all enabled core & user modules
+            for mod_name in core.config.get("modules", "enabled", []):
+                deps = _extract_deps_from_file(_get_module_file_path(importlib.import_module("modules"), mod_name))
+                if deps:
+                    exclude.update(deps)
+            for mod_name in core.config.get("user_modules", "enabled", []):
+                deps = _extract_deps_from_file(_get_module_file_path(importlib.import_module("user_modules"), mod_name))
+                if deps:
+                    exclude.update(deps)
+            for mod_name in core.config.get("channels", "enabled", []):
+                deps = _extract_deps_from_file(_get_module_file_path(importlib.import_module("channels"), mod_name))
+                if deps:
+                    exclude.update(deps)
+        except Exception:
+            pass  # proceed without exclusion if config/package lookup fails
+
     file_path = _get_module_file_path(package, module_name)
     if not file_path:
         return False
@@ -130,6 +151,9 @@ async def uninstall_module_deps(package, module_name, manager):
     missing = _check_missing_deps(deps)
     # Installed = Total - Missing
     installed = [dep for dep in deps if dep not in missing]
+
+    # Filter out dependencies that are still required by enabled modules
+    installed = [dep for dep in installed if dep not in exclude]
 
     if installed:
         # re-import so we can find the uninstall hook
@@ -171,6 +195,7 @@ async def uninstall_module_deps(package, module_name, manager):
 
         _uninstall_deps(module_name, installed, manager)
         return True
+
 
 # --------------------------
 # module loading
