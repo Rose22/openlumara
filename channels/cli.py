@@ -129,6 +129,10 @@ class Cli(core.channel.Channel):
         print(flush=True)
 
     def on_log(self, category, message):
+        if category == "toolcall":
+            # SKIP
+            return
+
         print(f"[{category.upper()}] {message}")
 
     def on_shutdown(self):

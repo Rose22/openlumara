@@ -429,7 +429,7 @@ class Channel:
                 toolcall_request = await self.tc_manager._build_recursive_request(token, final_content, final_reasoning)
 
                 # we add the accumulated content tokens so far to the assistant_content argument
-                async for sub_token in self.tc_manager.process(toolcall_request):
+                async for sub_token in self.tc_manager.process(toolcall_request, push=False):
                     yield sub_token
                 # tc_manager.process() will loop until the AI no longer deems tool calls necessary
             elif token_type == "tool":
@@ -587,10 +587,10 @@ class Channel:
                 "thinking_newline": "\n"
             },
             "markdown": {
-                "thinking_header": "\n### Thinking\n> ",
-                "thinking_str": "*thinking..*\n",
-                "conclusion_header": "\n",
-                "processing_tool": "\n(processing results..)\n",
+                "thinking_header": "\n**Thinking**  \n> ",
+                "thinking_str": "*thinking..*  \n",
+                "conclusion_header": "\n**Conclusion**  \n",
+                "processing_tool": "  \n(processing results..)  \n",
                 "thinking_newline": "\n> "
             }
         }
@@ -648,10 +648,10 @@ class Channel:
                 currently_reasoning = False
 
             # show tool result text
-            if token_type == "tool":
-                tool_result_str = strings[string_type]["processing_tool"]
-                char_counter += len(tool_result_str)
-                yield text_to_token(tool_result_str)
+            # if token_type == "tool":
+            #     tool_result_str = strings[string_type]["processing_tool"]
+            #     char_counter += len(tool_result_str)
+            #     yield text_to_token(tool_result_str)
 
             if self.config.get("stream_tool_calls") and token_type == "tool_call_delta":
                 # Extract the accumulated tool call from the delta
@@ -669,9 +669,11 @@ class Channel:
             elif not self.config.get("stream_tool_calls") and token_type == "tool_calls":
                 tool_calls = token.get("tool_calls")
                 for tool_call in tool_calls:
-                    tool_str = "\n"+self.tc_manager.display_call(tool_call)
+                    tool_str = self.tc_manager.display_call(tool_call)+"\n"
                     char_counter += len(tool_str)
                     yield text_to_token(tool_str)
+                yield text_to_token("\n")
+                char_counter += len("\n")
 
             if token_type == "content":
                 yield text_to_token(content)

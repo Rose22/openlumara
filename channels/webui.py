@@ -1782,8 +1782,7 @@ class Webui(core.channel.Channel):
         await asyncio.sleep(1) # Allow grace period
 
     async def on_ready(self):
-        print(flush=True)
-        print(f"Please open the WebUI at {self.url}", flush=True)
+        self.log("webui", f"Please open the WebUI at {self.url}")
 
         # broadcast the signal that makes the page unlock and reconnect
         manager.send_ready_signal()
