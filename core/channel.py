@@ -197,29 +197,9 @@ class Channel:
         """
         pass
 
-    # async def _poll_loop(self):
-    #     """constantly polls the chat history to see if anything new arrived, and triggers on_message for every new message"""
-    #     if not hasattr(self, "on_message"):
-    #         return False
-    #
-    #     self.log(self.name, "started message polling loop")
-    #
-    #     while not getattr(self, "_shutting_down", False):
-    #         try:
-    #             # check for new messages
-    #             new_messages = await self.context.chat.get_new()
-    #
-    #             if new_messages:
-    #                 for message in new_messages:
-    #                     # trigger the event
-    #                     await self.on_message(self.format_message(message))
-    #
-    #             await asyncio.sleep(0.1)
-    #
-    #         except Exception as e:
-    #             self.log(self.name, f"error in poll loop: {str(e)}")
-    #             # if we hit an error, back off for a second so we don't spam the logs
-    #             await asyncio.sleep(1)
+    async def on_request_stalled(self):
+        """overridable method that triggers when a request is sent to the API while another one is still ongoing. use it to display a message to the user informing them about the wait."""
+        await self.push("Another request is currently being processed, please wait..")
 
     async def send(self, message: dict, commands_authorized=False):
         """sends a message to the AI from within the current channel"""
@@ -253,6 +233,11 @@ class Channel:
             reconnected = await self.manager.API.connect()
             if not reconnected:
                 return {"role": "assistant", "content": self._get_disconnection_message()}
+
+        # if waiting for another request to finish, run the hook
+        # so that the channel can display a user friendly message
+        if self.manager.API.request_lock.locked():
+            await self.on_request_stalled()
 
         # add sent message to context
         add_success = await self.context.chat.add(message)
@@ -364,6 +349,11 @@ class Channel:
             if not reconnected:
                 yield {"type": "content", "content": self._get_disconnection_message()}
                 return
+
+        # if waiting for another request to finish, run the hook
+        # so that the channel can display a user friendly message
+        if self.manager.API.request_lock.locked():
+            await self.on_request_stalled()
 
         # add user's message to context
         add_success = await self.context.chat.add(user_message)

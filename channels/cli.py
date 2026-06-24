@@ -118,11 +118,6 @@ class Cli(core.channel.Channel):
         if not sys.stdin.isatty():
             return False
 
-        # auto-disabled full CLI if cli lite is enabled
-        if "cli_lite" in self.manager.channels:
-            self.log(self.name, "Full CLI disabled because CLI Lite is active")
-            return False
-
         self._setup_style()
         self._setup_history()
 
@@ -154,6 +149,9 @@ class Cli(core.channel.Channel):
                 await self._process_message(msg)
 
         return True
+
+    async def on_request_stalled(self):
+        print("...please wait for other requests to finish...", flush=True)
 
     async def on_push(self, message: dict):
         self.log("push", message.get("content").strip())

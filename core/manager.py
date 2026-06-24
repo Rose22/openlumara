@@ -358,7 +358,7 @@ class Manager:
         module = self.modules[module_name]
         self.log("core", f"Reloading module: {module_name}")
         if self.channel:
-            self.channel.push(f"Reloading module: {module_name}")
+            await self.channel.push(f"Reloading module: {module_name}")
 
         # remove old tools for this module
         await self.unload_module_tools(module)

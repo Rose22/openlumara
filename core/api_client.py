@@ -6,6 +6,49 @@ import json
 import time
 import inspect
 
+class ReentrantAsyncLock:
+    """
+    A reentrant lock for asyncio that allows the same task to acquire it multiple times.
+    This enables recursive calls within the same task while still blocking other tasks.
+    (used for recursive toolcalling)
+    """
+
+    def __init__(self):
+        self._lock = asyncio.Lock()
+        self._owner = None
+        self._count = 0
+
+    async def acquire(self):
+        current_task = asyncio.current_task()
+        if self._owner == current_task:
+            # Same task re-entering: just increment the count
+            self._count += 1
+            return
+        # Different task: wait for the lock
+        await self._lock.acquire()
+        self._owner = current_task
+        self._count = 1
+
+    def release(self):
+        current_task = asyncio.current_task()
+        if self._owner != current_task:
+            raise RuntimeError("Cannot release a lock that's not owned by this task")
+        self._count -= 1
+        if self._count == 0:
+            self._owner = None
+            self._lock.release()
+
+    async def __aenter__(self):
+        await self.acquire()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        self.release()
+        return False
+
+    def locked(self):
+        return self._lock.locked()
+
 class APIClient():
     """
     wrapper around the openAI API to make sending/receiving messages easier to work with
@@ -30,6 +73,9 @@ class APIClient():
         self._httpx_client = None
 
         self.supports_developer_role = False
+
+        # gates requests so that only one can happen at a time
+        self.request_lock = ReentrantAsyncLock()
 
     def _get_user_friendly_message(self, error_type, exception=None):
         """
@@ -273,17 +319,17 @@ class APIClient():
             if self.cancel_request:
                 return {"error": "cancelled", **self._get_user_friendly_message("cancelled")}
 
-            # wrap the request in a way that we can check for cancellation
-            # since openai's async client doesn't natively support an abort signal
-            # easily through the high-level chat.completions.create, we use a task
-            # so we can actually cancel the task itself.
-
             request_task = asyncio.create_task(self._AI.chat.completions.create(**req))
 
             # monitor the task and the cancel_request flag
             while not request_task.done():
                 if self.cancel_request:
                     request_task.cancel()
+                    # Properly await the task to suppress CancelledError and clean up
+                    try:
+                        await request_task
+                    except asyncio.CancelledError:
+                        pass
                     return {"error": "cancelled", **self._get_user_friendly_message("cancelled")}
                 await asyncio.sleep(0.1)
 
@@ -343,55 +389,57 @@ class APIClient():
     async def send(self, context: list, system_prompt=True, use_tools=True, tools=None, use_thinking=True, **kwargs):
         """send a message to the LLM. returns a string or error dict"""
 
-        self.cancel_request = False
-
         # use default tools if not specified. allow overrides
         if not tools:
             tools = self.manager.tools
 
-        response = await self._request(context, tools=(tools if use_tools else None), use_thinking=use_thinking, **kwargs)
+        # use the lock so only one request can happen at a time
+        async with self.request_lock:
+            self.cancel_request = False
+            response = await self._request(context, tools=(tools if use_tools else None), use_thinking=use_thinking, **kwargs)
 
-        # return errors if applicable
-        if isinstance(response, dict) and "error" in response:
-            return response
+            # return errors if applicable
+            if isinstance(response, dict) and "error" in response:
+                return response
 
-        try:
-            result = await self._recv(response)
-            return result
-        except Exception as e:
-            self.manager.log_error("error while processing response from AI", e)
-            return {"error": "processing_failed", **self._get_user_friendly_message("processing_failed", e)}
+            try:
+                result = await self._recv(response)
+                return result
+            except Exception as e:
+                self.manager.log_error("error while processing response from AI", e)
+                return {"error": "processing_failed", **self._get_user_friendly_message("processing_failed", e)}
 
     async def send_stream(self, context: list, use_tools=True, tools=None, use_thinking=True, **kwargs):
         """send a message to the LLM. is an iterable async generator"""
 
-        self.cancel_request = False
-
         # use default tools if not specified. allow overrides
         if not tools:
             tools = self.manager.tools
 
-        response = await self._request(context, tools=(tools if use_tools else None), stream=True, use_thinking=use_thinking, **kwargs)
+        # use the lock so only one stream can happen at a time
+        async with self.request_lock:
+            self.cancel_request = False
+            response = await self._request(context, tools=(tools if use_tools else None), stream=True, use_thinking=use_thinking, **kwargs)
 
-        # return errors if applicable
-        if isinstance(response, dict) and "error" in response:
-            yield {"type": "error", "content": response}
-            return
+            # return errors if applicable
+            if isinstance(response, dict) and "error" in response:
+                yield {"type": "error", "content": response}
+                return
 
-        try:
-            async for token in self._recv_stream(response):
-                if self.cancel_request:
-                    # cancel the entire stream
-                    break
+            try:
+                async for token in self._recv_stream(response):
+                    if self.cancel_request:
+                        # cancel the entire stream
+                        break
 
-                if core.debug_stream:
-                    self.manager.log("debug:stream", json.dumps(token, ensure_ascii=True))
+                    if core.debug_stream:
+                        self.manager.log("debug:stream", json.dumps(token, ensure_ascii=True))
 
-                # let the channel calling send_stream() handle token processing
-                yield token
-        except Exception as e:
-            self.manager.log_error("error while sending request to AI", e)
-            yield {"type": "error", "content": {"error": "stream_failed", **self._get_user_friendly_message("processing_failed", e)}}
+                    # let the channel calling send_stream() handle token processing
+                    yield token
+            except Exception as e:
+                self.manager.log_error("error while sending request to AI", e)
+                yield {"type": "error", "content": {"error": "stream_failed", **self._get_user_friendly_message("processing_failed", e)}}
 
     async def cancel(self):
         """cancel a request that's been sent to the AI"""
