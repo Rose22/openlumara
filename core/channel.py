@@ -585,7 +585,8 @@ class Channel:
                     "thinking_str": "*thinking..*",
                     "conclusion_header": "**Conclusion**",
                     "processing_tool": "(processing results..)",
-                    "thinking_newline": "\n> "
+                    "newline": "  \n",
+                    "thinking_newline": "  \n> "
                 }
             else:
                 strings = {
@@ -593,6 +594,7 @@ class Channel:
                     "thinking_str": "thinking..",
                     "conclusion_header": "--- Conclusion ---",
                     "processing_tool": "\n(processing results..)",
+                    "newline": "\n",
                     "thinking_newline": "\n"
                 }
 
@@ -606,13 +608,13 @@ class Channel:
             try:
                 # format the reasoning to look all fancy
                 if show_reasoning:
-                    newline_str = "\n" if not currently_reasoning else strings["thinking_newline"]
+                    newline_str = strings["newline"] if not currently_reasoning else strings["thinking_newline"]
                 else:
-                    newline_str = "\n"
+                    newline_str = strings["newline"]
 
                 # collapse more than 2 newlines to just 2
                 content = re.sub(r'\n{3,}', '\n\n', content)
-                content = content.replace("\n", newline_str)
+                content = content.replace(strings["newline"], newline_str)
             except:
                 pass
 
@@ -638,17 +640,17 @@ class Channel:
                 char_counter += len(think_str)
                 yield text_to_token(think_str)
 
-                char_counter += len("\n")
-                yield text_to_token("\n")
+                char_counter += len(strings["newline"])
+                yield text_to_token(strings["newline"])
 
             # show conclusion header
             if token_type == "content" and show_reasoning and currently_reasoning:
-                header_str = "\n"+strings["conclusion_header"]
+                header_str = strings["newline"]+strings["conclusion_header"]
                 char_counter += len(header_str)
                 yield text_to_token(header_str)
 
-                char_counter += len("\n")
-                yield text_to_token("\n")
+                char_counter += len(strings["newline"])
+                yield text_to_token(strings["newline"])
 
             if token_type in ["content", "tool_calls", "tool"] and currently_reasoning:
                 # we can have multiple reasoning blocks
@@ -661,8 +663,8 @@ class Channel:
             #     yield text_to_token(tool_result_str)
 
             if self.config.get("stream_tool_calls") and token_type == "tool_call_delta":
-                char_counter += len("\n")
-                yield text_to_token("\n")
+                char_counter += len(strings["newline"])
+                yield text_to_token(strings["newline"])
 
                 # Extract the accumulated tool call from the delta
                 tc_list = token.get("tool_calls", [])
@@ -672,22 +674,22 @@ class Channel:
                     tool_delta_str = self._render_tool_token(tc.function.name, tc.function.arguments)
 
                     # fix fake newlines
-                    tool_delta_str = tool_delta_str.replace("\\n", "\n")
+                    tool_delta_str = tool_delta_str.replace("\\n", strings["newline"])
 
                     char_counter += len(tool_delta_str)
                     yield text_to_token(tool_delta_str)
             elif not self.config.get("stream_tool_calls") and token_type == "tool_calls":
-                char_counter += len("\n")
-                yield text_to_token("\n")
+                char_counter += len(strings["newline"])
+                yield text_to_token(strings["newline"])
 
                 tool_calls = token.get("tool_calls")
                 for tool_call in tool_calls:
-                    tool_str = self.tc_manager.display_call(tool_call)+"\n"
+                    tool_str = self.tc_manager.display_call(tool_call)+strings["newline"]
                     char_counter += len(tool_str)
                     yield text_to_token(tool_str)
 
-                yield text_to_token("\n")
-                char_counter += len("\n")
+                yield text_to_token(strings["newline"])
+                char_counter += len(strings["newline"])
 
             if token_type == "content":
                 yield text_to_token(content)
