@@ -580,9 +580,9 @@ class Channel:
 
         strings = {
             "no_markdown": {
-                "thinking_header": "\n------\nThinking:\n\n",
-                "thinking_str": "\nthinking..\n",
-                "conclusion_header": "\n\n------\nConclusion:\n\n",
+                "thinking_header": "--- Thinking ---\n",
+                "thinking_str": "thinking..\n",
+                "conclusion_header": "\n--- Conclusion ---\n",
                 "processing_tool": "\n(processing results..)\n",
                 "thinking_newline": "\n"
             },
