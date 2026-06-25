@@ -660,7 +660,7 @@ class Manager:
         return descriptions, clean_doc
 
     async def load_module_tools(self, module):
-        for func_name in dir(module):
+        for func_name in type(module).__dict__:
             if func_name.startswith("_"):
                 # skip private methods and other private properties
                 continue
