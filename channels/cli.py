@@ -31,7 +31,7 @@ class Cli(core.channel.Channel):
 
     def _setup_style(self):
         self.style = prompt_toolkit.styles.Style.from_dict({
-            "prompt": "ansicyan bold"
+            "prompt": "ansicyan bold",
             # "reasoning-label": "ansiyellow bold",
             # "conclusion-label": "ansimagenta bold",
             # "toolcall-response-label": "ansiblue bold",
