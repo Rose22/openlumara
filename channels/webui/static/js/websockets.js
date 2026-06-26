@@ -1,6 +1,7 @@
 let wsSocket = null;
 let fancyProcessingIndicatorCreated = false;
 let catchingUpFromBuffer = false;
+const BUFFER_BATCH_SIZE = 50; // Tokens per batch
 
 let sending_status = null;
 let wsReconnecting = false;
@@ -280,6 +281,37 @@ function processToken(msg, isSimulated = false) {
     }
 }
 
+function processBuffer(buffer) {
+    if (!buffer.length) return;
+
+    catchingUpFromBuffer = true;
+
+    function processNextBatch() {
+        let processed = 0;
+
+        while (processed < BUFFER_BATCH_SIZE && buffer.length > 0) {
+            const token = buffer.shift();
+            if (!token) break;
+
+            try {
+                processToken(token, true);
+                processed++;
+            } catch (error) {
+                console.error('Token processing error:', error);
+            }
+        }
+
+        if (buffer.length > 0) {
+            // Yield to keep UI responsive
+            requestAnimationFrame(processNextBatch);
+        } else {
+            catchingUpFromBuffer = false;
+        }
+    }
+
+    processNextBatch();
+}
+
 function handleWebSocketMessage(data) {
     // Handle typed messages from backend
     if (data.type === 'sync_state') {
@@ -290,8 +322,9 @@ function handleWebSocketMessage(data) {
             isStreaming = true;
             isDataStreaming = true;
             setInputState(true, false, true);
-            data.buffer.forEach(token => processToken(token, true));
-            clearProcessingIndicators();
+
+            // Use the batching function instead of direct iteration
+            processBuffer(data.buffer);
         } else {
             if (data.active_chat_id) {
                 loadChat(data.active_chat_id);
@@ -405,12 +438,14 @@ function handleWebSocketMessage(data) {
         try {
             renderAllMessages(data.messages, false);
 
-            // Clear streaming state - the chat structure has changed,
-            // so any existing wrapper references are stale.
-            // This ensures a new AI wrapper is created when streaming starts
-            // (e.g., during message regeneration).
-            window._currentAiWrapper = null;
-            window._currentAiMsgDiv = null;
+            if (!catchingUpFromBuffer) {
+                // Clear streaming state - the chat structure has changed,
+                // so any existing wrapper references are stale.
+                // This ensures a new AI wrapper is created when streaming starts
+                // (e.g., during message regeneration).
+                window._currentAiWrapper = null;
+                window._currentAiMsgDiv = null;
+            }
         } catch (e) {
             console.log(e);
         }
