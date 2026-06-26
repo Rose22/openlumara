@@ -405,12 +405,12 @@ function handleWebSocketMessage(data) {
         try {
             renderAllMessages(data.messages, false);
 
-            // get last ai wrapper by finding the last ai message
-            const lastAiMsg = data.messages.findLast(msg => msg.role === 'assistant' && !msg.tool_calls);
-            if (lastAiMsg) {
-                window._currentAiWrapper = chat.querySelector(`[data-index="${lastAiMsg.index}"]`);
-                window._currentAiMsgDiv = window._currentAiWrapper.querySelector('.message');
-            }
+            // Clear streaming state - the chat structure has changed,
+            // so any existing wrapper references are stale.
+            // This ensures a new AI wrapper is created when streaming starts
+            // (e.g., during message regeneration).
+            window._currentAiWrapper = null;
+            window._currentAiMsgDiv = null;
         } catch (e) {
             console.log(e);
         }
