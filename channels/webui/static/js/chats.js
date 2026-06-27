@@ -128,7 +128,7 @@ function selectCategory(categoryKey) {
         const filtered = filterChatsByCategory(allChats, categoryKey);
         renderChatList(filtered);
     }
-    
+
     updateTagsForCategory(categoryKey);
 
     if (window.innerWidth <= 768) {
@@ -346,7 +346,7 @@ async function loadChats() {
             if (chat.category && chat.category !== 'general') {
                 categories.add(chat.category);
             }
-            
+
             // 2. Metadata-driven groups (e.g. char:Bob, model:gpt-4)
             for (const [prefix, path] of Object.entries(METADATA_GROUP_CONFIG)) {
                 const val = getNestedValue(chat, path);
@@ -429,7 +429,7 @@ async function restoreCurrentChat() {
                     }
                 }
             }
-            
+
             activeCategory = chatCategory;
 
             // Ensure the chat list is actually loaded/rendered in the sidebar
@@ -793,7 +793,7 @@ async function newChat() {
     try {
         const [prefix, id] = activeCategory.split(':');
         const isMetadataGroup = prefix && METADATA_GROUP_CONFIG[prefix];
-        
+
         let category = activeCategory;
         let metadata = {};
 
@@ -808,8 +808,8 @@ async function newChat() {
         const response = await fetch('/chat/new', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                title: '', 
+            body: JSON.stringify({
+                title: '',
                 category: category,
                 metadata: metadata
             })
@@ -819,7 +819,7 @@ async function newChat() {
 
         if (data.success && data.chat) {
             await loadChats();
-            // Force the sidebar to stay on the current active category 
+            // Force the sidebar to stay on the current active category
             // in case loadChats() or selectCategory() reset it.
             selectCategory(activeCategory);
             await loadChat(data.chat.id);
@@ -992,11 +992,16 @@ async function saveCurrentChat() {
 async function deleteChat(chatId) {
     if (!confirm('Delete this chat?')) return;
 
+    const chatItem = document.querySelector(`[data-chat-id="${chatId}"]`);
+    if (chatItem) chatItem.remove();
+
     if (window.socket && window.socket.readyState === WebSocket.OPEN) {
         window.socket.send(JSON.stringify({
             type: 'chat_delete',
             chat_id: chatId
         }));
+
+        await loadChats();
     } else {
         showApiConfigError("Websocket connection is not ready. Please wait a bit and try again!", 'websocket_not_open');
     }
@@ -1390,7 +1395,7 @@ function filterChats(query) {
 
             // Re-render the list with search results
             renderChatList(results);
-            
+
             // Update tags based on the search query
             filterTagsBySearch(searchQuery);
 

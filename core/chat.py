@@ -256,7 +256,7 @@ class Chat:
     async def get(self, index = None):
         """get message history of current chat"""
         if self.current is None:
-            return await self.new()
+            await self.new()
 
         messages = self.data[self.current].get("messages", [])
         return messages
