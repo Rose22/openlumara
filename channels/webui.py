@@ -115,6 +115,7 @@ class ConnectionManager:
 
         # Send global state sync if active
         if current_chat_id:
+            channel_instance.log("debug", f"sending buffer: {self.stream_buffer}")
             await websocket.send_json({
                 "type": "sync_state",
                 "active_chat_id": current_chat_id,
@@ -139,14 +140,21 @@ class ConnectionManager:
         self.webui_ready = True
 
     async def broadcast(self, message: dict):
+        # print(f"broadcasting {message}")
+
         disconnected = []
-        for connection in self.active_connections:
+
+        async def send_to_conn(conn):
             try:
-                if connection.client_state == WebSocketState.CONNECTED:
-                    await connection.send_json(message)
+                if conn.client_state == WebSocketState.CONNECTED:
+                    await conn.send_json(message)
             except Exception:
-                disconnected.append(connection)
-        
+                disconnected.append(conn)
+
+        # Create tasks for all connections
+        tasks = [send_to_conn(conn) for conn in self.active_connections]
+        await asyncio.gather(*tasks, return_exceptions=True)
+
         # Clean up any dead connections
         for conn in disconnected:
             self.disconnect(conn)
@@ -216,8 +224,19 @@ class ConnectionManager:
             except asyncio.CancelledError:
                 pass
             except Exception as e:
-                # Log the error but don't broadcast it as it might confuse the UI
+                # Log the error and broadcast to frontend so it doesn't hang
                 channel_instance.log("webui", f"Background stream error: {core.detail_error(e)}")
+                # Broadcast error so frontend knows something went wrong
+                await self.broadcast({
+                    "type": "error",
+                    "error": core.detail_error(e)
+                })
+                # Always send stream_complete so frontend cleans up properly
+                await self.broadcast({
+                    "type": "stream_complete",
+                    "buffer": self.stream_buffer,
+                    "index": next_index
+                })
                 self.stream_buffer = []
                 self.active_chat_id = None
 
