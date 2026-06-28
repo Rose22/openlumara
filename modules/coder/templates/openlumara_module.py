@@ -46,6 +46,8 @@ class ExampleModule(core.module.Module):
     #   EVENT HANDLERS
     # -------------------------
 
+    # any function starting with `on_` is an event handler and is called by the framework at various points. they do not get added to the AI's available tools.
+
     async def on_ready(self):
         """
         ALWAYS use this instead of the class constructor (__init__) as it runs at the right time during the framework's startup sequence.
@@ -105,6 +107,40 @@ class ExampleModule(core.module.Module):
         """
         # always return results using self.result, which standardizes the json output emitted by toolcalls
         return self.result(f"Pong! latency: {latency}", success=True)
+
+    async def demonstration(self):
+        # this tool definition is a guide for you, the AI (or human) reading this template, to know what you can do with the framework API
+        # do not copy this section verbatim - use only what you need for your module
+
+        # use this to get the value of a setting (as defined in the `settings` class property)
+        my_value = self.config.get("example_setting")
+
+        # use this in order to make calls to the AI model
+        ai_response = await self.channel.send({"role": "user", "content": "This message will be sent to the AI. THe response of it will be the AI's response as a string")
+
+        # use this to push a message out to the user
+        # this message will appear without the user having to send a message first
+        # it is handled by the active channel's on_push() method
+        await self.channel.push(ai_response)
+
+        # use this for persistent data
+        # StorageDict is a python dict that automatically stores its data on-disk when you call .save() on it
+        # valid types are: json, yaml, msgpack, text, and markdown
+        # there is also StorageList, which is the python list equivalent of StorageDict
+        persistent_data = core.storage.StorageDict("name_of_file", type="json")
+        persistent_data["example"] = {
+            "description": "this is an example entry"
+        }
+        persistent_data.save()
+
+        # use this to log messages to the console
+        # first param is the message category, second param is the message itself
+        # self.name refers to the module's snake_case name
+        self.channel.log(self.name, "whatever message you want")
+
+    async def _private_method(self):
+        # private methods are not added as tools, and are invisible to the AI. use for helper methods and the like.
+        pass
 
     # -------------------------
     #   USER-FACING COMMANDS
