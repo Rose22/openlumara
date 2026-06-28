@@ -1,6 +1,7 @@
 let wsSocket = null;
 let fancyProcessingIndicatorCreated = false;
 let responseStartSoundPlayed = false;
+let reasoningDoneSoundPlayed = false;
 let catchingUpFromBuffer = false;
 const BUFFER_BATCH_SIZE = 50; // Tokens per batch
 
@@ -215,6 +216,11 @@ function processToken(msg, isSimulated = false) {
         if (fancyProcessingIndicator) {
             fancyProcessingIndicator.remove();
         }
+
+        if (reasoningDoneSoundPlayed) {
+            reasoningDoneSoundPlayed = false;
+        }
+
         appendStreamText(type, content, false);
         renderStreamSegments(window._currentAiMsgDiv);
         if (!isSimulated && window._currentUseStreamingSound) {
@@ -230,6 +236,12 @@ function processToken(msg, isSimulated = false) {
         if (fancyProcessingIndicator) {
             fancyProcessingIndicator.remove();
         }
+
+        if (!reasoningDoneSoundPlayed) {
+            TypewriterAudioManager.play('reasoning_end');
+            reasoningDoneSoundPlayed = true;
+        }
+
         appendStreamText(type, content, window._currentUseTypewriter);
 
         if (window._currentUseTypewriter) {
