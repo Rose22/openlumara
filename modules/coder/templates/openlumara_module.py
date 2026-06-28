@@ -18,13 +18,13 @@ class ExampleModule(core.module.Module):
     # settings defined here will show up in all channels that support it (such as the webUI)
     # for the user to change as they see fit
     settings = {
-        "enable_system_prompt": {
-            "description": "Whether to inject a custom system prompt defined by this module",
+        "example_setting": {
+            "description": "This is an example setting. Settings default to type boolean when a type is not specified.",
             "default": False
         },
-        "sysprompt_style": {
+        "example_select": {
             "type": "select",
-            "description": "What system prompt to inject",
+            "description": "This is an example setting of type `select`. It allows the user to choose from a list of options.",
             "default": "standard",
             "options": {
                 "standard": "Just your run-of-the-mill system prompt",
@@ -47,51 +47,39 @@ class ExampleModule(core.module.Module):
     # -------------------------
 
     async def on_ready(self):
-        """ALWAYS use this instead of the class constructor (__init__) as it runs at the right time during the framework's startup sequence."""
-
-        await self.channel.push("Example Module is online!")
-
-        self.user_msg_counter = 0
-
-        if not self.config.get("allow_ping"):
-            # disabled_tools is a special list that tells the framework to disable that tool
-            self.disabled_tools.append("ping")
+        """
+        ALWAYS use this instead of the class constructor (__init__) as it runs at the right time during the framework's startup sequence.
+        Initialize instance variables here.
+        """
+        pass
 
     async def on_shutdown(self):
         """Runs when the framework shuts down or restarts, or the module is reloaded. Use to clean up anything the module may have set up"""
-        self.disabled_tools = []
+        pass
 
     async def on_background(self):
         """If this is present, the framework will auto-start this function as an asyncio task to run in the background. Use for contineous background monitoring, background tasks, scheduled reminders, event loops, etc"""
         pass
 
     async def on_system_prompt(self):
-        match self.config.get("sysprompt_style"):
-            case "standard":
-                return "You are an expert in everything related to Example Module."
-            case "uwu":
-                return "You MUST say uwu a lot"
-            case "nag":
-                return "Nag the user about their taxes"
-            case _:
-                return None
+        """Return a string here to inject it into the system prompt. The system prompt lives at the top of the context window, so use it ONLY for information that will not change frequently."""
+        return None
 
     async def on_end_prompt(self):
-        """Will insert its return value into the end of the context (after the conversation history) if something is returned (defaults to None). Useful for things that change frequently, such as displaying what channel the user is currently in. Using the prompt at the end of conversation history means history does not have to be reprocessed if the prompt changes."""
-        return f"current style: {self.config.get('sysprompt_style')}"
+        """Return a string here to append it to the end of the context window (after the conversation history). Useful for things that change frequently, such as displaying what channel the user is currently in."""
+        return None
 
     async def on_user_message(self, content: str):
         """Runs on every message the user sends. Can be used to do whatever you want with the content of a user's sent message."""
-        self.log("user message intercepted", f"message: {content}")
-        self.user_msg_counter += 1
+        pass
 
     async def on_assistant_message(self, content: str):
         """Runs on every message received from the AI assistant. Can be used to do whatever you want with the content of a message received from the AI."""
-        self.log("AI message intercepted", f"message: {content}")
+        pass
 
     async def on_message_inject(self):
         """Will inject whatever string you return here into the user's message. Very useful for adding extra data that should persist in history. For example, when injecting timestamps, instead of using the end prompt for it (which would only show the AI what time it currently is), it can now give the AI a sense of when every message was sent."""
-        return f"this is user message {self.user_msg_counter}"
+        pass
 
     async def on_install(self):
         """This runs after the module's dependencies are installed by the framework's auto-installer. Use it for post-installation hooks"""
@@ -115,9 +103,6 @@ class ExampleModule(core.module.Module):
         Args:
             latency: The latency to set for the simulated ping
         """
-        if not self.config.get("allow_ping"):
-            return self.result("Ping is disabled for security", success=False)
-
         # always return results using self.result, which standardizes the json output emitted by toolcalls
         return self.result(f"Pong! latency: {latency}", success=True)
 
