@@ -368,8 +368,6 @@ async function stopGeneration(sent_from_command = false) {
         currentController = null;
     }
 
-    console.log("attempting to stop generation");
-
     // Notify backend via WebSocket
     try {
         if (window.socket && window.socket.readyState === WebSocket.OPEN) {
