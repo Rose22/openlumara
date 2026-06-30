@@ -749,6 +749,8 @@ class Coder(core.module.Module):
                 # Not a valid regex, use simple substring matching (backward compatible)
                 query_lower = query.lower()
             
+            # placing rstrip string to avoid redefining it for every single line when it remains constant; Windows doesn't allow f-strings to have backlashes but is fine with them being in a predefined string
+            rstrip_string = '\n\r'
             for i, line in enumerate(lines):
                 if len(matches) >= max_matches:
                     break
@@ -764,14 +766,14 @@ class Coder(core.module.Module):
                         snippet = [f"--- Match at line {i+1} ---"]
                         for j in range(max(0, i - context_lines), min(num_lines, i + context_lines + 1)):
                             marker = "  <-- MATCH" if j == i else ""
-                            snippet.append(f"{j+1:4}: {lines[j].rstrip('\n\r')}{marker}")
+                            snippet.append(f"{j+1:4}: {lines[j].rstrip(rstrip_string)}{marker}")
                         matches.append("\n".join(snippet))
                 else:
                     if query_lower in line.lower():
                         snippet = [f"--- Match at line {i+1} ---"]
                         for j in range(max(0, i - context_lines), min(num_lines, i + context_lines + 1)):
                             marker = "  <-- MATCH" if j == i else ""
-                            snippet.append(f"{j+1:4}: {lines[j].rstrip('\n\r')}{marker}")
+                            snippet.append(f"{j+1:4}: {lines[j].rstrip(rstrip_string)}{marker}")
                         matches.append("\n".join(snippet))
             return self.result({"matches": len(matches), "file": file_path, "results": "\n\n".join(matches)}, success=True)
         except OSError as e:
