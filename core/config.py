@@ -46,6 +46,12 @@ default_config = {
         "disabled": [],
         "settings": {}
     },
+    "user_channels": {
+        "path": "user_channels",
+        "enabled": [],
+        "disabled": [],
+        "settings": {}
+    },
     "modules": {
         "enabled": [],
         "disabled": [],
@@ -206,7 +212,7 @@ def _get_registry_data(enabled_channels=None, enabled_user_channels=None, enable
     )) if enabled_channels else []
 
     user_chan_inst = list(core.modules.load(
-        channels, core.channel.Channel, filter=enabled_user_channels, loading_config=True
+        user_channels, core.channel.Channel, filter=enabled_user_channels, loading_config=True
     )) if enabled_user_channels else []
 
     mod_inst = list(core.modules.load(

@@ -12,7 +12,7 @@ let showUnsafeSettings = localStorage.getItem('showUnsafeSettings') === 'true';
 let activeModule = null; // Tracks the selected module for Desktop split view / Mobile drill-down
 let activeChannel = null; // Tracks the selected channel for Desktop split view / Mobile drill-down
 let categories = {}; // Global reference to settings categories
-let modulesExpanded = { modules: false, user_modules: false, channels: false }; // Tracks expansion state per category
+let modulesExpanded = { modules: false, user_modules: false, channels: false, user_channels: false }; // Tracks expansion state per category
 let isMobile = window.innerWidth <= 768; // Tracks mobile viewport state
 
 let resizeTimeout;
@@ -131,7 +131,7 @@ function organizeSettingsIntoCategories(originalData, moduleInfo = {}) {
         };
 
         // Special handling for modules and channels
-        if (topKey === 'modules' || topKey === 'user_modules' || topKey === 'channels') {
+        if (topKey === 'modules' || topKey === 'user_modules' || topKey === 'channels' || topKey === 'user_channels') {
             const hasToggleListStructure = isToggleList(topValue);
             const enabledItems = new Set(topValue.enabled || []);
             const allItems = hasToggleListStructure ? getAllToggleItems(topValue) : [];
@@ -693,7 +693,7 @@ function renderSettingsNav(categories) {
         }
 
         // Add channel sub-list for Channels category on desktop only
-        if (!isMobile && cat === 'channels' && data.groups && data.groups.has('_direct_')) {
+        if (!isMobile && (cat === 'channels' || cat === 'user_channels') && data.groups && data.groups.has('_direct_')) {
             const directGroup = data.groups.get('_direct_');
             if (directGroup && directGroup.items.length > 0) {
                 const channelListData = directGroup.items[0].value;
@@ -790,7 +790,7 @@ function switchSettingsCategory(category) {
     activeSettingsCategory = category;
     
     const isModules = category === 'modules' || category === 'user_modules';
-    const isChannels = category === 'channels';
+    const isChannels = category === 'channels' || category === 'user_channels';
 
     if (isModules || isChannels) {
         // Expand the clicked category's sub-list, collapse others
@@ -1087,7 +1087,7 @@ function renderSettingsForm(categories, activeSettingsCategory = null) {
         }
 
         // Special handling for Channels category
-        if (cat === 'channels') {
+        if (cat === 'channels' || cat === 'user_channels') {
             const directGroup = data.groups?.get('_direct_');
             if (directGroup && directGroup.items.length > 0) {
                 const channelListData = directGroup.items[0].value;
@@ -1231,7 +1231,7 @@ function renderSettingsForm(categories, activeSettingsCategory = null) {
         }
         
         // Skip generic group rendering for modules/user_modules/channels
-        if (cat !== 'modules' && cat !== 'user_modules' && cat !== 'channels') {
+        if (cat !== 'modules' && cat !== 'user_modules' && cat !== 'channels' && cat !== 'user_channels') {
             // Render groups - put direct items first
             if (data.groups) {
                 // First render direct (ungrouped) items into the main vertical stack
@@ -2371,7 +2371,7 @@ async function saveSettings() {
 // Detect if there are changes beyond just theme
 // Detect if there are changes in channel or module settings
 function detectChannelOrModuleChanges() {
-    for (const key of ['channels', 'modules', 'user_modules']) {
+    for (const key of ['channels', 'user_channels', 'modules', 'user_modules']) {
         const newData = settingsData[key];
         const oldData = settingsOriginal[key];
         if (!newData || !oldData) continue;
@@ -3843,7 +3843,7 @@ function updateThemeButtonsInSettings() {
 function clearSidebarSelections() {
     activeModule = null;
     activeChannel = null;
-    modulesExpanded = { modules: false, user_modules: false, channels: false };
+    modulesExpanded = { modules: false, user_modules: false, channels: false, user_channels: false };
 
     document.querySelectorAll('.settings-nav-item').forEach(item => {
         item.classList.remove('active');

@@ -62,8 +62,12 @@ class MyChannel(core.channel.Channel):
         """ALWAYS use this instead of the class constructor (__init__) as it runs at the right time during the framework's startup sequence.
         Initialize instance variables here."""
 
+        # use self.config.get() to access a setting's value
+        example_setting = self.config.get("example_setting")
+
         # we can use self.push() to send messages to the user instantly, without the AI having to process anything
-        await self.push({"role": "assistant":, "content": f"{self.name} is up and running!"})
+        # self.push() can be used in any of the event handlers, this is just for demonstration purposes
+        await self.push({"role": "assistant":, "content": f"{self.name} is up and running! example setting set to: {example_setting}"})
 
         # self.push() is processed by self.on_push, seen later down below in this template
 
@@ -150,7 +154,8 @@ class MyChannel(core.channel.Channel):
 
         print(f"[PUSH] {message_content}", flush=True)
 
-    async def on_log(self, category: stry, message: str):
+    # IMPORTANT: on_log is not async
+    def on_log(self, category: stry, message: str):
         """Triggers whenever a log message is sent by the framework. These are system logs, console messages that are meant to convey technical or debug information. Show them in whichever way you prefer."""
         # Using a simple print statement here as an example. Again, display this in a manner that makes the most sense for your channel.
         print(f"[{self.name}] {category}: {message}")
@@ -164,7 +169,7 @@ class MyChannel(core.channel.Channel):
         pass
 
 # Final notes to the AI:
-# - The user must copy the created user module to the openlumara user channels folder (defaults to user_channels, but the path can be manually set by the user)
+# - The user must copy the created user channel to the openlumara user channels folder (defaults to user_channels, but the path can be manually set by the user)
 # - The user must restart openlumara, which will make openlumara detect the new user channel. Then, the user must enable the channel within the config using either the webUI's settings panel, using `/channel module_name_in_snake_case`, or manually editing their config file.
 # - The channel will then be activated and ready for use.
 # - Any syntax errors from the channel will show up in the console logs. If there is not enough information, the user can use the `--debug` flag when starting openlumara, to see more detail about errors.

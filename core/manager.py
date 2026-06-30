@@ -19,11 +19,15 @@ class Manager:
         self.args = cmdline_args # store commandline args
         self.API = core.api_client.APIClient(self) # connect later with .connect()
         self.savedata = {}
+
         self.channels = {}
         self.user_channels = {}
         self.channel = None # current active channel. gets dynamically switched around
+
         self.modules = {}
+        self.user_modules = {}
         self.broken_modules = [] # tracks modules that threw errors and skips them so that it doesn't break the whole framework
+
         self.tools = []
         self.tool_names = []
         self.pure_mode = False
@@ -89,6 +93,43 @@ class Manager:
             await channel.on_ready()
             self._async_tasks.add(asyncio.create_task(channel.run()))
             self._async_tasks.add(asyncio.create_task(channel._start_push_queue()))
+
+    async def _load_modules(self, storage, modules, enabled_modules, is_user_module=False):
+        loaded_module_names = []
+
+        # install dependencies
+        newly_installed_modules = []
+        if not self.args.disable_auto_installer:
+            for mod_name in enabled_modules:
+                installed = await core.modules.install_module_deps(modules, mod_name, self)
+                if installed:
+                    newly_installed_modules.append(mod_name)
+
+            if newly_installed_modules:
+                # reload config
+                core.config.load()
+
+        # import/load only the enabled modules
+        for module in core.modules.load(modules, core.module.Module, filter=enabled_modules, reload=True):
+            try:
+                loaded_module = await self.add_module_class(module, is_user_module=is_user_module)
+
+                # run installation hook
+                if loaded_module.name in newly_installed_modules:
+                    await loaded_module.on_install()
+
+                await loaded_module._start()
+                await self.load_module_tools(loaded_module)
+
+                storage[loaded_module.name] = loaded_module
+                loaded_module_names.append(loaded_module.name)
+            except Exception as e:
+                self.log_error(f"could not load module {module.__name__}", e)
+
+        if loaded_module_names:
+            self.log("core", f"Modules loaded: {', '.join(loaded_module_names)}")
+        else:
+            self.log("core", f"All modules are disabled")
 
     async def run(self):
         """main loop"""
@@ -159,82 +200,56 @@ class Manager:
 
         if enabled_modules:
             self.log("core", "Loading core modules")
-
-            # install dependencies
-            newly_installed_modules = []
-            if not self.args.disable_auto_installer:
-                for mod_name in enabled_modules:
-                    installed = await core.modules.install_module_deps(modules, mod_name, self)
-                    if installed:
-                        newly_installed_modules.append(mod_name)
-
-                if newly_installed_modules:
-                    # reload config
-                    core.config.load()
-
-            # import/load only the enabled modules
-            for module in core.modules.load(modules, core.module.Module, filter=enabled_modules, reload=True):
-                try:
-                    loaded_module = await self.add_module_class(module)
-
-                    # run installation hook
-                    if loaded_module.name in newly_installed_modules:
-                        await loaded_module.on_install()
-
-                    await loaded_module._start()
-                    await self.load_module_tools(loaded_module)
-
-                    self.modules[loaded_module.name] = loaded_module
-                    loaded_module_names.append(loaded_module.name)
-                except Exception as e:
-                    self.log_error(f"could not load module {module.__name__}", e)
+            await self._load_modules(self.modules, modules, enabled_modules)
 
         if enabled_user_modules:
             self.log("core", "Loading user modules")
+            await self._load_modules(self.modules, user_modules, enabled_user_modules, is_user_module=True)
 
-            # install dependencies
-            newly_installed_user_modules = []
-            if not self.args.disable_auto_installer:
-                for mod_name in enabled_user_modules:
-                    installed = await core.modules.install_module_deps(user_modules, mod_name, self)
-
-                    if installed:
-                        newly_installed_user_modules.append(mod_name)
-
-                if newly_installed_user_modules:
-                    # reload config
-                    core.config.load()
-
-            for module in core.modules.load(user_modules, core.module.Module, filter=enabled_user_modules, reload=True):
-                try:
-                    loaded_module = await self.add_module_class(module, is_user_module=True)
-
-                    # run installation hook
-                    if loaded_module.name in newly_installed_user_modules:
-                        await loaded_module.on_install()
-
-                    await loaded_module._start()
-                    await self.load_module_tools(loaded_module)
-
-                    self.modules[loaded_module.name] = loaded_module
-                    loaded_module_names.append(loaded_module.name)
-                except Exception as e:
-                    self.log_error(f"could not load user module {module.__name__}", e)
-
-        if enabled_modules or enabled_user_modules:
-            self.log("core", f"Modules loaded: {', '.join(loaded_module_names)}")
-        else:
-            self.log("core", "All modules are disabled")
+            # # install dependencies
+            # newly_installed_user_modules = []
+            # if not self.args.disable_auto_installer:
+            #     for mod_name in enabled_user_modules:
+            #         installed = await core.modules.install_module_deps(user_modules, mod_name, self)
+            #
+            #         if installed:
+            #             newly_installed_user_modules.append(mod_name)
+            #
+            #     if newly_installed_user_modules:
+            #         # reload config
+            #         core.config.load()
+            #
+            # for module in core.modules.load(user_modules, core.module.Module, filter=enabled_user_modules, reload=True):
+            #     try:
+            #         loaded_module = await self.add_module_class(module, is_user_module=True)
+            #
+            #         # run installation hook
+            #         if loaded_module.name in newly_installed_user_modules:
+            #             await loaded_module.on_install()
+            #
+            #         await loaded_module._start()
+            #         await self.load_module_tools(loaded_module)
+            #
+            #         self.modules[loaded_module.name] = loaded_module
+            #         loaded_module_names.append(loaded_module.name)
+            #     except Exception as e:
+            #         self.log_error(f"could not load user module {module.__name__}", e)
 
         if not self.args.disable_auto_installer:
             # uninstall dependencies for disabled modules (only if deps are still installed)
             disabled_channels = core.config.get("channels", "disabled", [])
+            disabled_user_channels = core.config.get("user_channels", "disabled", [])
             disabled_modules = core.config.get("modules", "disabled", [])
             disabled_user_modules = core.config.get("user_modules", "disabled", [])
 
             system_changed = False
             for chan_name in disabled_channels:
                 uninstalled = await core.modules.uninstall_module_deps(channels, chan_name, self)
+                if uninstalled and not system_changed:
+                    system_changed = True
+
+            for chan_name in disabled_user_channels:
+                uninstalled = await core.modules.uninstall_module_deps(user_channels, chan_name, self)
                 if uninstalled and not system_changed:
                     system_changed = True
 
@@ -305,6 +320,21 @@ class Manager:
         for channel_name, channel in self.channels.items():
             if hasattr(channel, "on_shutdown"):
                 self.log("core", f"Shutting down channel {channel_name}")
+
+                try:
+                    await channel._shutdown()
+
+                    if asyncio.iscoroutinefunction(channel.on_shutdown):
+                        await channel.on_shutdown()
+                    else:
+                        channel.on_shutdown()
+                except Exception as e:
+                    self.log_error(f"Error shutting down {channel_name}", e)
+
+        # shutdown user channels
+        for channel_name, channel in self.user_channels.items():
+            if hasattr(channel, "on_shutdown"):
+                self.log("core", f"Shutting down user channel {channel_name}")
 
                 try:
                     await channel._shutdown()

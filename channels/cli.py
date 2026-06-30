@@ -130,7 +130,7 @@ class Cli(core.channel.Channel):
             # SKIP
             return
 
-        print(f"[{category.upper()}] {message}")
+        print(f"[{category.upper()}] {message}", flush=True)
 
     def on_shutdown(self):
         self.running = False
