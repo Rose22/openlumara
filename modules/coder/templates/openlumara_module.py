@@ -1,3 +1,4 @@
+# ALWAYS import core at the start. very important.
 import core
 
 # ALWAYS ensure the class name maps perfectly to the filename.
