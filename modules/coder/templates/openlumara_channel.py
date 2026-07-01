@@ -41,6 +41,11 @@ class MyChannel(core.channel.Channel):
                 "internet": "0.0.0.0"
             }
         },
+        "notification_channel": {
+            "type": "select",
+            # use core.channel.get_available_channels() to get a list of channels that can be targeted
+            "options": {name: f"Send notifications via {name}" for name in core.channel.get_available_channels()}
+        },
         "example_list": {
             "type": "list",
             "description": "This is an example setting of type `list`. Will let the user add/remove multiple entries. It's basically an array (a python `list`).",
@@ -67,7 +72,13 @@ class MyChannel(core.channel.Channel):
 
         # we can use self.push() to send messages to the user instantly, without the AI having to process anything
         # self.push() can be used in any of the event handlers, this is just for demonstration purposes
-        await self.push({"role": "assistant":, "content": f"{self.name} is up and running! example setting set to: {example_setting}"})
+        await self.push(f"{self.name} is up and running! example setting set to: {example_setting}")
+
+        # you can also push to another channel by its name:
+        target_channel = self.manager.channels.get(
+            self.config.get("notification_channel")
+        )
+        await target_channel.push("piiing!")
 
         # self.push() is processed by self.on_push, seen later down below in this template
 

@@ -9,6 +9,15 @@ import json_repair
 import re
 import traceback
 
+def get_available_channels():
+    structure = core.config.get_module_structure()
+    channels = []
+    for name, data in structure.items():
+        if data.get("metadata", {}).get("type") == "channel":
+            channels.append(name)
+
+    return channels
+
 class Channel:
     """Base class for channels"""
 
