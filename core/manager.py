@@ -210,25 +210,29 @@ class Manager:
             disabled_user_modules = core.config.get("user_modules", "disabled", [])
 
             system_changed = False
-            for chan_name in disabled_channels:
-                uninstalled = await core.modules.uninstall_module_deps(channels, chan_name, self)
-                if uninstalled and not system_changed:
-                    system_changed = True
+            if enabled_channels:
+                for chan_name in disabled_channels:
+                    uninstalled = await core.modules.uninstall_module_deps(channels, chan_name, self)
+                    if uninstalled and not system_changed:
+                        system_changed = True
 
-            for chan_name in disabled_user_channels:
-                uninstalled = await core.modules.uninstall_module_deps(user_channels, chan_name, self)
-                if uninstalled and not system_changed:
-                    system_changed = True
+            if enabled_user_channels:
+                for chan_name in disabled_user_channels:
+                    uninstalled = await core.modules.uninstall_module_deps(user_channels, chan_name, self)
+                    if uninstalled and not system_changed:
+                        system_changed = True
 
-            for mod_name in disabled_modules:
-                uninstalled = await core.modules.uninstall_module_deps(modules, mod_name, self)
-                if uninstalled and not system_changed:
-                    system_changed = True
+            if enabled_modules:
+                for mod_name in disabled_modules:
+                    uninstalled = await core.modules.uninstall_module_deps(modules, mod_name, self)
+                    if uninstalled and not system_changed:
+                        system_changed = True
 
-            for mod_name in disabled_user_modules:
-                uninstalled = await core.modules.uninstall_module_deps(user_modules, mod_name, self)
-                if uninstalled and not system_changed:
-                    system_changed = True
+            if enabled_user_modules:
+                for mod_name in disabled_user_modules:
+                    uninstalled = await core.modules.uninstall_module_deps(user_modules, mod_name, self)
+                    if uninstalled and not system_changed:
+                        system_changed = True
 
             if system_changed:
                 # reload config
@@ -351,6 +355,37 @@ class Manager:
             if autorestart:
                 if self.channel:
                     await self.channel.push("restarting to apply module change..")
+                await asyncio.sleep(0.1)
+                await self.channel.manager.restart()
+
+        return True
+
+    async def toggle_channel(self, channel_name: str, autorestart=True):
+        channels = core.config.config["channels"]
+        user_channels = core.config.config["user_channels"]
+
+        toggled = False
+        for channel_list in [channels, user_channels]:
+            enabled = channel_list["enabled"]
+            disabled = channel_list["disabled"]
+
+            if channel_name in enabled:
+                enabled.remove(channel_name)
+                disabled.append(channel_name)
+                toggled = True
+            elif channel_name in disabled:
+                disabled.remove(channel_name)
+                enabled.append(channel_name)
+                toggled = True
+            else:
+                continue
+
+        if toggled:
+            core.config.config.save()
+
+            if autorestart:
+                if self.channel:
+                    await self.channel.push("restarting to apply change..")
                 await asyncio.sleep(0.1)
                 await self.channel.manager.restart()
 

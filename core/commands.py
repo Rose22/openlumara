@@ -458,6 +458,18 @@ class Commands:
 
                 await self.channel.manager.toggle_module(module_name)
                 return "module toggled"
+            case "channel":
+                if not args:
+                    return "please provide a name of the channel to toggle"
+
+                channel_name = args[0]
+                all_channels = core.channel.get_available_channels()
+
+                if channel_name not in all_channels:
+                    return "channel with that name doesn't exist"
+
+                await self.channel.manager.toggle_channel(channel_name)
+                return "channel toggled"
             case "tools":
                 if not core.config.get("model").get("use_tools", False):
                     return "tools are turned off"
