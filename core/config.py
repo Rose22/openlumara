@@ -301,6 +301,9 @@ def _get_module_schema_cache():
     for section_key, (package, _) in package_map.items():
         available_names = _discover_available_names(package)
 
+        if section_key not in cache.keys():
+            continue
+
         for name in list(cache[section_key].keys()):
             if name not in available_names:
                 del cache[section_key][name]
