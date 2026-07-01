@@ -117,8 +117,8 @@ def sandbox_path(base_path: str, requested_path: str) -> str:
     # we dont use os.path.normpath here because it resolves '..' and allows path traversal
     # so we do the cross-platform stuff manually instead....
     # using a simple string replacement :(
-    normalised_base_path = base_path.replace("\\", os.path.sep)
-    normalised_base_path = normalised_base_path.replace("/", os.path.sep)
+    base_path = base_path.replace("\\", os.path.sep)
+    base_path = base_path.replace("/", os.path.sep)
     
     path = requested_path.replace("\\", os.path.sep)
     path = path.replace("/", os.path.sep)
@@ -127,10 +127,10 @@ def sandbox_path(base_path: str, requested_path: str) -> str:
     path = path.strip(os.path.sep)
 
     # remove the base path from it in case the AI/user inserts it
-    prefix = normalised_base_path + os.sep
+    prefix = base_path + os.sep
     if path.startswith(prefix):
         path = path[len(prefix):]
-    elif path == normalised_base_path:
+    elif path == base_path:
         path = ""
 
     decoded = validate_path_string(path)
@@ -142,15 +142,15 @@ def sandbox_path(base_path: str, requested_path: str) -> str:
         for i, part in enumerate(parts):
             if i == 0:
                 continue  # Skip root
-            test_path = os.path.join(normalised_base_path, *parts[:i])
+            test_path = os.path.join(base_path, *parts[:i])
             if os.path.islink(test_path):
                 raise ValueError("Symlinks are not allowed in the path")
 
     if not path:
-        return normalised_base_path
+        return base_path
 
     # more path traversal protection
-    path_in_base = os.path.join(normalised_base_path, os.path.normpath(decoded))
+    path_in_base = os.path.join(base_path, os.path.normpath(decoded))
     
     try:
         real_path = os.path.realpath(path_in_base)
@@ -160,16 +160,16 @@ def sandbox_path(base_path: str, requested_path: str) -> str:
     if os.path.islink(path_in_base):
         raise ValueError("Symlinks are not allowed in the requested path")
 
-    base_prefix = normalised_base_path + os.sep
+    base_prefix = base_path + os.sep
 
     if sys.platform == "win32":
         check_path = real_path.lower()
         check_prefix = base_prefix.lower()
-        check_base = normalised_base_path.lower()
+        check_base = base_path.lower()
     else:
         check_path = real_path
         check_prefix = base_prefix
-        check_base = normalised_base_path
+        check_base = base_path
 
     if check_path.startswith(check_prefix) or check_path == check_base:
         return real_path
