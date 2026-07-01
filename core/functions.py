@@ -117,7 +117,11 @@ def sandbox_path(base_path: str, requested_path: str) -> str:
     # we dont use os.path.normpath here because it resolves '..' and allows path traversal
     # so we do the cross-platform stuff manually instead....
     # using a simple string replacement :(
-    path = requested_path.replace("/", os.path.sep)
+    base_path = base_path.replace("\\", os.path.sep)
+    base_path = base_path.replace("/", os.path.sep)
+    
+    path = requested_path.replace("\\", os.path.sep)
+    path = path.replace("/", os.path.sep)
 
     # remove path separator at the beginning and end
     path = path.strip(os.path.sep)
@@ -171,4 +175,3 @@ def sandbox_path(base_path: str, requested_path: str) -> str:
         return real_path
     else:
         raise ValueError("Access denied: target path is outside sandbox")
-1
