@@ -6,14 +6,13 @@ import uvicorn
 import json
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any, Union
 
 class ApiBridge(core.channel.Channel):
     """
-    An OpenAI-compatible API bridge for OpenLumara.
-    This channel allows external applications to interact with OpenLumara 
-    using the standard OpenAI Chat Completions, Models, and Embeddings APIs.
+    Lets you use any application or UI (for example, koboldlite, openwebui, etc) to talk to your OpenLumara instance. Simply connect your chosen application to the port you specify in this channel's settings.
     """
 
     # -------------------------
@@ -21,10 +20,18 @@ class ApiBridge(core.channel.Channel):
     # -------------------------
 
     settings = {
-        "host": {
-            "type": "string",
-            "description": "The host address for the API server.",
-            "default": "0.0.0.0"
+        "network_mode": {
+            "type": "select",
+            "options": {
+                "local": "Allows only the device OpenLumara is running on to access the API bridge (sets hostname to `localhost`)",
+                "internet": "Allows any device to access the API bridge (sets hostname to `0.0.0.0`)",
+                "custom": "Use the custom hostname defined below"
+            },
+            "default": "local"
+        },
+        "custom_host": {
+            "description": "If you want to use a custom hostname, set it here. If you don't know what that is, don't bother with this! Just use the network mode setting on either local or internet.",
+            "default": None
         },
         "port": {
             "type": "number",
@@ -33,17 +40,18 @@ class ApiBridge(core.channel.Channel):
         },
         "api_key_required": {
             "type": "boolean",
-            "description": "If enabled, requires an 'Authorization: Bearer <key>' header. The key is set in 'api_key'.",
+            "description": "Whether to require an API key to use this api endpoint. Recommended for public instances, otherwise anyone can use your AI!",
             "default": False
         },
         "api_key": {
             "type": "string",
-            "description": "The API key required if 'api_key_required' is True.",
+            "description": "Your chosen API key. This acts like a password, so choose a good one!",
             "default": "sk-openlumara-dummy-key"
         }
     }
 
-    dependencies = ["httpx", "fastapi", "uvicorn", "pydantic"]
+    dependencies = ["fastapi", "uvicorn"]
+    # pydantic and httpx are already included with openlumara
 
     # -------------------------
     #   MODELS (OpenAI Spec)
@@ -74,33 +82,40 @@ class ApiBridge(core.channel.Channel):
         object: str = "list"
         data: List[Model]
 
-    class EmbeddingRequest(BaseModel):
-        input: Union[str, List[str]]
-        model: str
-        encoding_format: Optional[str] = "float"
-
-    class EmbeddingData(BaseModel):
-        object: str = "embedding"
-        embedding: List[float]
-        index: int
-
-    class EmbeddingResponse(BaseModel):
-        object: str = "list"
-        data: List[EmbeddingData]
-        model: str
-        usage: Dict[str, int]
-
     # -------------------------
     #   EVENT HANDLERS
     # -------------------------
 
     async def on_ready(self):
-        self.log("api bridge", f"OpenAI Bridge Channel is ready! Listening on {self.config.get('host')}:{self.config.get('port')}")
+        network_mode = self.config.get("network_mode")
+        self.host = None
+        self.port = self.config.get("port")
+        match network_mode:
+            case "local":
+                self.host = "127.0.0.1"
+            case "internet":
+                self.host = "0.0.0.0"
+            case "custom":
+                self.host = self.config.get("custom_host")
+            case _:
+                self.host = "127.0.0.1"
+
+        self.log("api bridge", f"The bridge is up and running on {self.host}:{self.port}")
 
     async def run(self):
         """The main loop: Starts the FastAPI server."""
         app = FastAPI(title="OpenLumara OpenAI Bridge")
 
+        # allow requests from any origin
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+
+        # require API key if set up that way
         @app.middleware("http")
         async def auth_middleware(request: Request, call_next):
             if self.config.get("api_key_required"):
@@ -116,7 +131,6 @@ class ApiBridge(core.channel.Channel):
         async def list_models():
             """Returns a list of available models."""
             models = []
-            print(await self.manager.API.list_models())
             for model_id in await self.manager.API.list_models():
                 models.append(self.Model(id=model_id))
             return self.ModelsResponse(data=models)
@@ -141,19 +155,18 @@ class ApiBridge(core.channel.Channel):
                 return await self._completion_handler(ol_message, chat_req.model)
 
         # Start the server
-        config = uvicorn.Config(app, host=self.config.get("host"), port=self.config.get("port"), log_level="info")
+        config = uvicorn.Config(app, host=self.host, port=self.port, log_level="critical")
         server = uvicorn.Server(config)
         await server.serve()
 
     async def _completion_handler(self, ol_message: dict, model: str) -> JSONResponse:
         try:
-            # Send to OpenLumara
+            # send the request to the framework and format it
             response_dict = await self.send(ol_message, commands_authorized=True)
-            # Format it
             response_dict = self.format_message(response_dict)
             content = response_dict.get("content", "")
 
-            # Translate back to OpenAI
+            # return the response as a full openAI-compatible json object
             return JSONResponse({
                 "id": f"chatcmpl-{uuid.uuid4()}",
                 "object": "chat.completion",
@@ -197,7 +210,6 @@ class ApiBridge(core.channel.Channel):
                 if token_type == "content":
                     yield f"data: {self._openai_chunk(chat_id, created_time, model, token_content)}\n\n"
 
-            print("data: [DONE]\n\n")
             yield "data: [DONE]\n\n"
 
         except Exception as e:
@@ -219,7 +231,9 @@ class ApiBridge(core.channel.Channel):
         return json.dumps(chunk)
 
     async def on_push(self, msg):
+        # no
         pass
 
     def on_log(self, cat, msg):
-        print(f"[{cat}] {msg}")
+        # no
+        return
