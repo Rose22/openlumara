@@ -40,16 +40,16 @@ class APIClient():
         model_msg = f"Model {self._model} not found" if self._model else "You have no model set"
         messages = {
             "auth_failed": "Your API key is invalid or expired. Please check your configuration settings.",
-            "connection_lost": "We lost connection to the AI server. Please check your internet connection and try again.",
+            "connection_lost": "Lost connection to the AI server.",
             "rate_limit": "You are sending requests too quickly. Please wait a moment before trying again.",
-            "api_error": "The AI service is currently experiencing issues. Please try again in a few minutes.",
+            "api_error": "The AI server returned an unknown error. Please try again in a few minutes.",
             "model_not_found": f"{model_msg}. Please select a model by using `/models` or the Settings in the WebUI",
             "cancelled": "The request was cancelled.",
             "blank_request": "The request was empty. Please try typing your message again.",
-            "processing_failed": "We had trouble reading the response from the AI. Please try sending your message again.",
+            "processing_failed": "Failed to process the response from the AI. Please try sending your message again.",
             "invalid_response": "The AI returned an unexpected format. Please try again.",
-            "unknown": "An unexpected error occurred. If this persists, please contact support.",
-            "not_connected": "The AI service is not connected. Please check your connection settings."
+            "unknown": "An unexpected error occurred.",
+            "not_connected": "You are not connected to the AI server."
         }
 
         # Fallback to a generic message if the key isn't found
@@ -158,7 +158,6 @@ class APIClient():
 
         self.connected = False
         self._AI = None
-        self.manager.log("API", "Disconnected from API")
         return True
 
     async def reconnect(self):

@@ -410,15 +410,15 @@ class Commands:
                     result = await self.channel.manager.reconnect_api()
 
                     if result["success"]:
-                        return ["✓ ", result["message"]]
+                        return f"✓ {result['message']}"
                     else:
-                        response = [f"✗ Connection failed: {result['error']}"]
+                        response = f"✗ Connection failed: {result['error']}"
                         if "action" in result:
-                            response.append(f"\n{result['action']}")
+                            response += f"\n{result['action']}"
                         return response
             case "disconnect":
                 await self.channel.manager.API.disconnect()
-                return ["✓ Disconnected from API"]
+                return "Disconnected from API"
             case "status":
                 status = self.channel.manager.get_api_status()
                 lines = ["== API Status =="]

@@ -1003,7 +1003,7 @@ async function deleteChat(chatId) {
 
         await loadChats();
     } else {
-        showApiConfigError("Websocket connection is not ready. Please wait a bit and try again!", 'websocket_not_open');
+        showChatError("Websocket connection is not ready. Please wait a bit and try again!", 'websocket_not_open');
     }
 }
 

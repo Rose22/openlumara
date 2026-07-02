@@ -36,8 +36,8 @@ WEBUI_DIR = core.get_path("channels/webui")
 
 # ordered list of javascript files, to load in this exact order
 JS_FILES = [
-    "icons", "variables", "content_helpers", "markdown", "messages",
-    "msg_actions", "sidebar", "utils", "notif", "status", "chats",
+    "icons", "variables", "errors", "content_helpers", "markdown", "messages",
+    "msg_actions", "sidebar", "utils", "notif", "chats",
     "tags", "search", "export", "modals", "autocomplete", "input", "typewriter", "streaming", "send", "upload", "theming",
     "audio", "modal_settings", "storage_editor", "responsive", "websockets", "system_logs", "init"
 ]
@@ -635,11 +635,14 @@ async def api_logout(request: Request):
 
 @app.get("/")
 async def index(request: Request):
+    global channel_instance
+
     return templates.TemplateResponse(
         request,
         "index.html",
         {
             "request": request,
+            "header_title": channel_instance.config.get("title"),
             "js_files": JS_FILES,
             "css_files": CSS_FILES,
             "require_login": bool(channel_instance.config.get("require_login"))
@@ -869,10 +872,6 @@ async def stream_message(request: Request, user: str = Depends(require_auth)):
 @app.post("/send")
 async def send_message(request: Request, user: str = Depends(require_auth)):
     global channel_instance
-
-    status = get_api_status()
-    if not status['connected']:
-        raise HTTPException(status_code=503, detail=status)
 
     data = await request.json()
     next_index = len(await channel_instance.context.chat.get())
@@ -1720,6 +1719,10 @@ class Webui(core.channel.Channel):
     ]
 
     settings = {
+        "title": {
+            "default": "OpenLumara",
+            "description": "The title to show in the header, above the chat window"
+        },
         "network_mode": {
             "type": "select",
             "options": {

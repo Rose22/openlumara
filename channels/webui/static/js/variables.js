@@ -4,10 +4,6 @@
 
 let isConnected = false;        // Server connection (HTTP)
 let isWsConnected = false;       // WebSocket connection
-let isApiConnected = false;     // API connection
-let apiError = null;            // Last API error message
-let apiErrorType = null;        // Type of API error (config_missing, auth_failed, etc.)
-let apiAction = null;           // Suggested action for API error
 let reconnectAttempts = 0;
 let reconnectTimer = null;
 let lastMessageIndex = 0;
@@ -45,7 +41,6 @@ let globalSearchActiveIndex = -1;
 
 // Polling cleanup
 let pollIntervalId = null;
-let apiStatusIntervalId = null;
 
 // Notification state
 let notificationPermission = 'default';
@@ -57,7 +52,6 @@ const inputField = document.getElementById('message');
 const sendBtn = document.getElementById('send');
 const stopBtn = document.getElementById('stop');
 const statusDot = document.getElementById('status');
-const apiStatusDot = document.getElementById('api-status');
 const dropOverlay = document.getElementById('drop-overlay');
 const sidebar = document.getElementById('sidebar');
 const sidebarOverlay = document.getElementById('sidebar-overlay');
@@ -71,8 +65,7 @@ const CONFIG = {
     RECONNECT_MAX_DELAY: 30000,
     RECONNECT_DELAY_FACTOR: 1.5,
     CONNECTION_TIMEOUT: 10000,
-    POLL_INTERVAL: 1000,
-    API_STATUS_INTERVAL: 10000  // Check API status every 10 seconds
+    POLL_INTERVAL: 1000
 };
 
 // Default values for "standard" themes

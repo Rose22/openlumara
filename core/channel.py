@@ -97,7 +97,7 @@ class Channel:
         status = self.manager.get_api_status()
         error = status.get("error", "Unknown error")
 
-        message_parts = ["Not connected to API."]
+        message_parts = []
 
         if error:
             message_parts.append(f"Error: {error}")
@@ -106,8 +106,6 @@ class Channel:
             message_parts.append("Please configure your API URL in config/config.yml")
         elif not status.get("key_configured"):
             message_parts.append("Please configure your API key in config/config.yml")
-        else:
-            message_parts.append("Use /connect to retry connection, or check your settings.")
 
         return "\n".join(message_parts)
 

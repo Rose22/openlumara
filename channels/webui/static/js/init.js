@@ -3,21 +3,12 @@
 // =============================================================================
 
 async function init() {
-    try {
-        requestNotificationPermission();
-        document.addEventListener('click', () => {
-            if (typeof notificationPermission !== 'undefined' && notificationPermission === 'default') {
-                requestNotificationPermission();
-            }
-        }, { once: true });
-
-        await checkConnection();
-    } catch (err) {
-        console.error('Failed to initialize connection:', err);
-        isConnected = false;
-        updateConnectionStatus('disconnected');
-        scheduleReconnect();
-    }
+    requestNotificationPermission();
+    document.addEventListener('click', () => {
+        if (typeof notificationPermission !== 'undefined' && notificationPermission === 'default') {
+            requestNotificationPermission();
+        }
+    }, { once: true });
 
     try {
         const savedFontSize = localStorage.getItem('fontSize');
@@ -46,12 +37,6 @@ async function init() {
         });
 
         connectWebSocket();
-
-        apiStatusIntervalId = setInterval(() => {
-            if (isConnected) {
-                checkApiStatus();
-            }
-        }, CONFIG.API_STATUS_INTERVAL);
     } catch (err) {
         console.error('Failed to initialize UI and polling:', err);
     }

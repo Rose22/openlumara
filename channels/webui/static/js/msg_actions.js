@@ -123,7 +123,7 @@ async function deleteMessage(index) {
             index: index
         }));
     } else {
-        showApiConfigError("Websocket connection is not ready. Please wait a bit and try again!", 'websocket_not_open');
+        showChatError("Websocket connection is not ready. Please wait a bit and try again!", 'websocket_not_open');
     }
 }
 
@@ -146,7 +146,7 @@ async function regenerateMessage(targetIndex) {
         }));
     } catch (err) {
         console.error('Failed to regenerate message:', err);
-        showApiConfigError('Failed to regenerate message. Please try again.', 'connection_failed');
+        showChatError('Failed to regenerate message. Please try again.', 'connection_failed');
     }
 }
 

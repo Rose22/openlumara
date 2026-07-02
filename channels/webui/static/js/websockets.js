@@ -7,6 +7,7 @@ const BUFFER_BATCH_SIZE = 50; // Tokens per batch
 
 let sending_status = null;
 let wsReconnecting = false;
+let statusMessageElement = null; // For Server connection
 
 // Send queue: messages waiting to be sent while disconnected
 let sendQueue = [];
@@ -64,7 +65,6 @@ function connectWebSocket() {
         console.log('WebSocket connected');
         isWsConnected = true;
         wsReconnecting = false;
-        updateConnectionStatus('connected');
         showConnectionStatus('reconnected');
 
         // sync back up with the backend
@@ -95,7 +95,6 @@ function connectWebSocket() {
             wsSocket = null;
             window.socket = null;
             isWsConnected = false;
-            updateConnectionStatus('disconnected');
             showConnectionStatus('reconnecting');
             scheduleWsReconnect();
         }
@@ -528,7 +527,6 @@ function handleWebSocketMessage(data) {
     }
 
     if (data.type === 'status_updated') {
-        updateConnectionStatus(data.status);
         return;
     }
 
@@ -574,4 +572,66 @@ function handleNewMessage(msg) {
     updateTokenUsage();
 
     return msgEl;
+}
+
+function showConnectionStatus(status) {
+    hideConnectionStatus();
+    const wrapper = document.createElement('div');
+    wrapper.className = 'message-wrapper announce connection-status-banner';
+    if (status === 'reconnecting') {
+        wrapper.classList.add('reconnecting-pulse');
+    }
+    wrapper.setAttribute('role', 'status');
+    wrapper.setAttribute('aria-live', 'polite');
+
+    const msgDiv = document.createElement('div');
+
+    let statusText = '';
+    let showReconnectBtn = false;
+
+    switch(status) {
+        case 'disconnected':
+            msgDiv.className = 'message announce announce_error';
+            statusText = 'Disconnected from server.';
+            showReconnectBtn = true;
+            break;
+        case 'reconnecting':
+            msgDiv.className = 'message announce announce_info';
+            statusText = 'Reconnecting...';
+            showReconnectBtn = true;
+            break;
+        case 'reconnected':
+            msgDiv.className = 'message announce announce_info';
+            statusText = 'Reconnected.';
+            break;
+        case 'api_disconnected':
+            msgDiv.className = 'message announce announce_warning';
+            statusText = 'API disconnected. Use /connect to reconnect.';
+            break;
+    }
+
+    msgDiv.textContent = statusText;
+    wrapper.appendChild(msgDiv);
+
+    if (showReconnectBtn) {
+        const btn = document.createElement('button');
+        btn.className = 'reconnect-btn';
+        btn.textContent = 'Reconnect';
+        btn.addEventListener('click', () => {
+            wsReconnecting = true;
+            scheduleWsReconnect();
+        });
+        wrapper.appendChild(btn);
+    }
+
+    statusMessageElement = wrapper;
+    chat.insertBefore(wrapper, typing);
+    scrollToBottom();
+}
+
+function hideConnectionStatus() {
+    if (statusMessageElement) {
+        statusMessageElement.remove();
+        statusMessageElement = null;
+    }
 }

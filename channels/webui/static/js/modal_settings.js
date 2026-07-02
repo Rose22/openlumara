@@ -2342,7 +2342,6 @@ async function saveSettings() {
         if (hasChannelOrModuleChanges) {
             await restartServer();
         } else if (hasApiOrModelChanges) {
-            await reconnectApi();
             toggleModal('settings');
         } else {
             showSettingsSuccess();
