@@ -180,8 +180,8 @@ class Manager:
             else:
                 self.channel = self.channels.get('cli')
                 if not self.channel:
-                    print("ERROR: This is your first startup of openlumara and you have the CLI channel disabled. Please enable it for initial setup.")
-                    exit(1)
+                    # just default to the first channel in the list
+                    self.channel = self.channels.get(enabled_channels[-1])
 
         if enabled_user_channels:
             self.log("core", "Loading user channels..")
