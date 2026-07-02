@@ -618,7 +618,7 @@ class Channel:
                 strings = {
                     "thinking_header": "**Thinking**\n> ",
                     "thinking_str": "*thinking..*",
-                    "conclusion_header": "\n\n**Conclusion**",
+                    "conclusion_header": "**Conclusion**",
                     "processing_tool": "(processing results..)",
                     "thinking_newline": "\n> "
                 }
@@ -679,6 +679,10 @@ class Channel:
             # show conclusion header
             if token_type == "content" and show_reasoning and currently_reasoning:
                 header_str = "\n"+strings["conclusion_header"]
+                if use_markdown:
+                    # add an extra newline for markdown's newline quirks
+                    header_str = "\n"+header_str
+
                 char_counter += len(header_str)
                 yield text_to_token(header_str)
 
