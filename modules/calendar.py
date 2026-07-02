@@ -27,7 +27,7 @@ class Calendar(core.module.Module):
         },
         "notification_channel": {
             "type": "select",
-            "default": "telegram",
+            "default": "webui",
             "description": "Which channel to send calendar notifications to",
             "options": {name: f"Send notifications via {name}" for name in core.channel.get_available_channels()}
         },

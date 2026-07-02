@@ -9,6 +9,12 @@ class Scheduler(core.module.Module):
     """Lets your AI perform actions on your behalf at specified times! Supports recurring actions."""
 
     settings = {
+        "notification_channel": {
+            "type": "select",
+            "default": "webui",
+            "description": "Which channel to send notifications to by default",
+            "options": {name: f"Send notifications via {name}" for name in core.channel.get_available_channels()}
+        },
         "insert_system_prompt": {
             "description": "Whether to insert a list of all currently scheduled jobs in the system prompt. This will make your AI aware of upcoming scheduled jobs at all times!",
             "default": True
@@ -524,7 +530,7 @@ Use tools if needed. For simple reminders, do not use tools.
         weekdays_only: bool = False,
         recurring: bool = False,
     ):
-        """Adds a scheduled job. MODE 1 - RELATIVE TIME: Use relative_duration (e.g., '2d 4h 30m'). MODE 2 - SPECIFIC CLOCK TIME: Use target_time (e.g., '14:30'). Optionally set target_weekday (0=Monday) or weekdays_only=True. Action is what action should be performed at the scheduled time. Action is an instruction/prompt for the AI to follow, so write it in second person form. Use the word 'user' to refer to the user."""
+        """Adds a scheduled job. MODE 1 - RELATIVE TIME: Use relative_duration (e.g., '2d 4h 30m'). MODE 2 - SPECIFIC CLOCK TIME: Use target_time (e.g., '14:30'). Optionally set target_weekday (0=Monday) or weekdays_only=True. Action is what action should be performed at the scheduled time. Action is an instruction/prompt for the AI to follow, so write it in second person form. Use the word 'user' to refer to the user. Channel is optional, set it only if user requests it - it defaults to the user's preferred channel."""
         if recurring and not self.config.get("allow_recurring_jobs"):
             return self.result(
                 "Error: Recurring scheduler jobs are disabled by security policy. Please inform the user.",
@@ -597,7 +603,7 @@ Use tools if needed. For simple reminders, do not use tools.
             if trigger_time is None:
                 return self.result("error: invalid schedule parameters (zero interval)", False)
 
-            resolved_channel = channel or (self.channel.name if self.channel else None)
+            resolved_channel = self.config.get("notification_channel") or channel or (self.channel.name if self.channel else None)
             if not resolved_channel:
                 return self.result("error: no channel context available", False)
 
