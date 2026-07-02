@@ -673,8 +673,8 @@ class Channel:
                 char_counter += len(think_str)
                 yield text_to_token(think_str)
 
-                char_counter += len("\n")
-                yield text_to_token("\n")
+                char_counter += len(strings["thinking_newline"])
+                yield text_to_token(strings["thinking_newline"])
 
             # show conclusion header
             if token_type == "content" and show_reasoning and currently_reasoning:
