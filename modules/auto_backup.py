@@ -92,8 +92,9 @@ class AutoBackup(core.module.Module):
         """Set up the backup directory and log startup info."""
         # Create backup directory if it doesn't exist
         try:
-            os.makedirs(self.backup_path, exist_ok=True)
-            self.channel.log(self.name, f"Backup directory created: {self.backup_path}")
+            if not os.path.exists(self.backup_path):
+                self.channel.log(self.name, f"Backup directory created: {self.backup_path}")
+                os.makedirs(self.backup_path, exist_ok=True)
         except Exception as e:
             self.channel.log(self.name, f"Warning: Could not create backup directory '{self.backup_path}': {e}")
 
