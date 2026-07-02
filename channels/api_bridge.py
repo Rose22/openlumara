@@ -113,6 +113,8 @@ class ApiBridge(core.channel.Channel):
 
     async def run(self):
         """The main loop: Starts the FastAPI server."""
+        import socket
+        
         app = FastAPI(title="OpenLumara OpenAI Bridge")
 
         # allow requests from any origin
@@ -162,14 +164,25 @@ class ApiBridge(core.channel.Channel):
             else:
                 return await self._completion_handler(ol_message, chat_req.model)
 
-        # Start the server
-        config = uvicorn.Config(app, host=self.host, port=self.port, log_level="critical")
-        self.server = uvicorn.Server(config)
+        # Start the server with SO_REUSEADDR to handle "address already in use" errors
+        # Create a socket with SO_REUSEADDR
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            sock.bind((self.host, self.port))
+            sock.listen(5)
+            
+            config = uvicorn.Config(app, host=self.host, port=self.port, log_level="critical")
+            self.server = uvicorn.Server(config)
 
-        self.log("api bridge", f"The API bridge is up and running on {self.host}:{self.port}")
-        self.server_running = True
-        await self.server.serve()
-        self.server_running = False
+            self.log("api bridge", f"The API bridge is up and running on {self.host}:{self.port}")
+            self.server_running = True
+            await self.server.serve(sockets=[sock])
+            self.server_running = False
+            sock.close()
+        except Exception as e:
+            self.log("api bridge", f"Error while starting API bridge: {core.detail_error(e)}")
+
 
     async def on_shutdown(self):
         if hasattr(self, "server") and self.server:
