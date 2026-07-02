@@ -19,6 +19,9 @@ class StorageList(list):
         self.name = os.path.basename(self.path)
         self.binary = False
 
+        # cache for change detection
+        self._last_modified = 0.0
+
         # lets not overwrite a builtin
         file_type = type
         if not type:
@@ -75,6 +78,21 @@ class StorageList(list):
             core.log("error", f"error reading {self.name}: {e}")
             return False
 
+    def _file_changed(self):
+        """check if the file on disk has changed"""
+        try:
+            current_mtime = os.path.getmtime(self.path)
+            return current_mtime != self._last_modified
+        except OSError:
+            return True
+
+    def _update_mtime(self):
+        """update the cached modification time"""
+        try:
+            self._last_modified = os.path.getmtime(self.path)
+        except OSError:
+            pass
+
     def save(self):
         """save content to file"""
         if TEMPORARY:
@@ -91,13 +109,22 @@ class StorageList(list):
                 if len(self) > 0:
                     self._write("\n".join(self))
 
+        # update mtime after saving so we know our cache is fresh
+        self._update_mtime()
+
     def load(self, data=None):
         """load content from file or data argument"""
-        self.clear()
-
         if data:
+            self.clear()
             self.extend(data)
             return self
+
+        # skip reload if file hasn't changed on disk
+        if not self._file_changed():
+            self._update_mtime()
+            return self
+
+        self.clear()
 
         data = self._read()
         if not data:
@@ -113,6 +140,9 @@ class StorageList(list):
             case "text":
                 self.extend(data.split("\n"))
 
+        # update mtime after loading
+        self._update_mtime()
+
     def get(self, *args, **kwargs):
         if not TEMPORARY:
             self.load()
@@ -121,7 +151,7 @@ class StorageList(list):
 
 class StorageDict(dict):
     """subclassed dict that handles storage of data. supports a variety of storage formats."""
-    def __init__(self, name: str, type: str, manager=None, path=None, autoload=True, *args):
+    def __init__(self, name: str, type: str, manager=None, path=None, autoload=True, override_temporary=False, *args):
         super().__init__(*args)
 
         # default to openlumara data folder if no path specified
@@ -132,6 +162,13 @@ class StorageDict(dict):
 
         self.name = os.path.basename(self.path)
         self.binary = False
+
+        # this is mainly for the config, so that we can still make changes in temporary mode
+        # but who knows what it might be needed for in the future
+        self.override_temporary = override_temporary
+
+        # cache for change detection
+        self._last_modified = 0.0
 
         # lets not overwrite a builtin
         file_type = type
@@ -163,7 +200,7 @@ class StorageDict(dict):
             self.manager = manager
 
         if os.path.exists(self.path):
-            if autoload and not TEMPORARY:
+            if autoload and not (TEMPORARY and not self.override_temporary):
                 self.load()
         else:
             self.save()
@@ -191,6 +228,21 @@ class StorageDict(dict):
         except Exception as e:
             core.log("error", f"error reading {self.name}: {e}")
             return False
+
+    def _file_changed(self):
+        """check if the file on disk has changed"""
+        try:
+            current_mtime = os.path.getmtime(self.path)
+            return current_mtime != self._last_modified
+        except OSError:
+            return True
+
+    def _update_mtime(self):
+        """update the cached modification time"""
+        try:
+            self._last_modified = os.path.getmtime(self.path)
+        except OSError:
+            pass
 
     def _parse_nested_keys(self, flat_dict):
         """Convert flat keys like 'ideas/openlumara/topic' into nested dict structure."""
@@ -238,7 +290,7 @@ class StorageDict(dict):
 
     def save(self):
         """save content to file"""
-        if TEMPORARY:
+        if TEMPORARY and not self.override_temporary:
             return True
 
         match self.type:
@@ -308,13 +360,22 @@ class StorageDict(dict):
                 if len(self) > 0:
                     self._write("\n".join(dict(self)))
 
+        # update mtime after saving so we know our cache is fresh
+        self._update_mtime()
+
     def load(self, data=None):
         """load content from file or data argument"""
-        self.clear()
-
         if data:
+            self.clear()
             self.update(data)
             return True
+
+        # skip reload if file hasn't changed on disk
+        if self.type not in ["markdown"] and not self._file_changed():
+            self._update_mtime()
+            return True
+
+        self.clear()
 
         if self.type not in ["markdown"]:
             data = self._read()
@@ -353,10 +414,12 @@ class StorageDict(dict):
             case "text":
                 self.update(data.split("\n"))
 
+        # update mtime after loading
+        self._update_mtime()
         return True
 
     def get(self, *args, **kwargs):
-        if not TEMPORARY:
+        if not TEMPORARY and not self.override_temporary:
             self.load()
 
         return super().get(*args)
@@ -373,6 +436,9 @@ class StorageText:
         self.path = core.sandbox_path(path, name)
 
         self._data = ""
+
+        # cache for change detection
+        self._last_modified = 0.0
 
         if os.path.exists(self.path):
             if autoload and not TEMPORARY:
@@ -392,11 +458,19 @@ class StorageText:
         return str(self._data)
 
     def load(self):
+        # skip reload if file hasn't changed on disk
+        if not self._file_changed():
+            self._update_mtime()
+            return self
+
         try:
             with open(self.path, "r", encoding="utf-8") as f:
                 self._data = f.read()
         except Exception as e:
             core.log("error", f"error while loading text storage: {e}")
+
+        # update mtime after loading
+        self._update_mtime()
         return self
 
     def save(self):
@@ -406,4 +480,21 @@ class StorageText:
         with open(self.path, "w", encoding="utf-8") as f:
             f.write(self._data)
 
+        # update mtime after saving so we know our cache is fresh
+        self._update_mtime()
         return self
+
+    def _file_changed(self):
+        """check if the file on disk has changed"""
+        try:
+            current_mtime = os.path.getmtime(self.path)
+            return current_mtime != self._last_modified
+        except OSError:
+            return True
+
+    def _update_mtime(self):
+        """update the cached modification time"""
+        try:
+            self._last_modified = os.path.getmtime(self.path)
+        except OSError:
+            pass

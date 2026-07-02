@@ -7,6 +7,16 @@ import json
 import asyncio
 import json_repair
 import re
+import traceback
+
+def get_available_channels():
+    structure = core.config.get_module_structure()
+    channels = []
+    for name, data in structure.items():
+        if data.get("metadata", {}).get("type") in ("channel", "user_channel"):
+            channels.append(name)
+
+    return channels
 
 class Channel:
     """Base class for channels"""
@@ -15,17 +25,27 @@ class Channel:
         # base settings here lol
     }
 
-    def __init__(self, manager):
+    # just like with modules, channels can define python dependencies
+    # for the framework to automatically install/uninstall
+    dependencies = []
+
+    def __init__(self, manager, is_user_channel=False):
         self.manager = manager
         self.name = core.modules.get_name(self) # shorthand alias
         self.commands = core.commands.Commands(self)
         self._last_cmd_was_temporary = False
         self.context = core.context.Context(self) # each channel has its own context window
+        self.console_buffer = [] # used to log system messages
 
         self.tc_manager = core.toolcalls.ToolcallManager(self)
 
+        # used to track whether to preserve reasoning
+        # for only the current "agentic turn"
+        # (so that reasoning from older toolcalls can be discarded)
+        self.agentic_loop_start: int = -1
+
         # load channel config
-        self.config = core.config.ConfigManager(core.config.config, ["channels", "settings", self.name])
+        self.config = core.config.ConfigManager(core.config.config, ["channels" if not is_user_channel else "user_channels", "settings", self.name])
 
         self._shutting_down = False
 
@@ -66,6 +86,8 @@ class Channel:
         if self.manager.channel is self:
             return
         self.manager.channel = self
+        self.manager.savedata["last_channel"] = self.name
+        self.manager.savedata.save()
 
         # give all modules a way to access this channel
         for module_name, module in self.manager.modules.items():
@@ -75,7 +97,7 @@ class Channel:
         status = self.manager.get_api_status()
         error = status.get("error", "Unknown error")
 
-        message_parts = ["Not connected to API."]
+        message_parts = []
 
         if error:
             message_parts.append(f"Error: {error}")
@@ -84,8 +106,6 @@ class Channel:
             message_parts.append("Please configure your API URL in config/config.yml")
         elif not status.get("key_configured"):
             message_parts.append("Please configure your API key in config/config.yml")
-        else:
-            message_parts.append("Use /connect to retry connection, or check your settings.")
 
         return "\n".join(message_parts)
 
@@ -155,17 +175,43 @@ class Channel:
                 break
             except Exception as e:
                 # Always log full traceback for easier debugging
-                import traceback
-                traceback.print_exc()
-                core.log(self.name, f"error in message consumer: {str(e)}")
+                self.log(self.name, traceback.format_exc())
+                self.log(self.name, f"error in message consumer: {str(e)}")
                 await asyncio.sleep(0.5)
+
+    def log(self, category: str, message: str):
+        """
+        used across the framework to log messages
+        basically a drop-in replacement for print()
+        will propagate the messages to the console log buffer of all channels
+        """
+        try:
+            self.manager.log(category, message)
+        except Exception as e:
+            print(f"[FATAL ERROR] failed to send log to channels ({e}): [{category.upper()}] {message}")
+
+    def log_error(self, msg: str, e: Exception):
+        """console log but with extra spice for errors"""
+        if core.debug:
+            self.log("error", f"{msg}: {core.detail_error(e)}")
+            self.log("error traceback", traceback.format_exception(e))
+        else:
+            self.log("error", f"{msg}: {e}")
+
+    def on_log(self, category: str, message: str):
+        """
+        overridable method that you can use to display logs
+        that were broadcasted by self.log()
+        for a simple cli channel, we just print()
+        """
+        pass
 
     # async def _poll_loop(self):
     #     """constantly polls the chat history to see if anything new arrived, and triggers on_message for every new message"""
     #     if not hasattr(self, "on_message"):
     #         return False
     #
-    #     core.log(self.name, "started message polling loop")
+    #     self.log(self.name, "started message polling loop")
     #
     #     while not getattr(self, "_shutting_down", False):
     #         try:
@@ -180,7 +226,7 @@ class Channel:
     #             await asyncio.sleep(0.1)
     #
     #         except Exception as e:
-    #             core.log(self.name, f"error in poll loop: {str(e)}")
+    #             self.log(self.name, f"error in poll loop: {str(e)}")
     #             # if we hit an error, back off for a second so we don't spam the logs
     #             await asyncio.sleep(1)
 
@@ -201,7 +247,7 @@ class Channel:
                 try:
                     cmd_response = await self.commands.process_input(message, authorized=commands_authorized)
                 except Exception as e:
-                    core.log_error("error while executing command", e)
+                    self.log_error("error while executing command", e)
                     return {"role": "assistant", "content": str(e)}
 
                 if cmd_response:
@@ -226,16 +272,21 @@ class Channel:
         # run module event hooks
         for module_name, module in self.manager.modules.items():
             if hasattr(module, "on_user_message"):
+                usr_msg_result = True
+
                 try:
                     if asyncio.iscoroutinefunction(module.on_user_message):
-                        await module.on_user_message(message.get("content", ""))
+                        usr_msg_result = await module.on_user_message(message.get("content", ""))
                     else:
-                        module.on_user_message(message.get("content", ""))
+                        usr_msg_result = module.on_user_message(message.get("content", ""))
                 except Exception as e:
-                    # Always log full traceback for easier debugging
-                    import traceback
-                    traceback.print_exc()
-                    core.log(module.name, f"could not run user message hook: {e}")
+                    self.log("module error", f"{module_name}: in on_user_message(): {core.detail_error(e)}")
+
+                if usr_msg_result is False:
+                    # when returning False from the user message hook,
+                    # we stop the chain here, allowing the hook to basically intercept the message
+                    # and prevent the AI from returning its own response to the message
+                    return
 
         # then get the full context window
         context = await self.context.get(system_prompt=True, end_prompt=True)
@@ -288,10 +339,7 @@ class Channel:
                     else:
                         module.on_assistant_message(assistant_message.get("content", ""))
                 except Exception as e:
-                    # Always log full traceback for easier debugging
-                    import traceback
-                    traceback.print_exc()
-                    core.log(module.name, f"could not run assistant message hook: {e}")
+                    self.log("module error", f"{module_name}: in on_assistant_message(): {core.detail_error(e)}")
 
         if tool_calls:
             return None
@@ -317,7 +365,7 @@ class Channel:
                 try:
                     cmd_response = await self.commands.process_input(user_message, authorized=commands_authorized)
                 except Exception as e:
-                    core.log_error("error while executing command", e)
+                    self.log_error("error while executing command", e)
                     yield {"type": "content", "content": str(e)}
                     return
 
@@ -350,7 +398,12 @@ class Channel:
             await self.context.chat.set_token_usage(user_message_token_estimation)
         else:
             # just fully estimate
-            user_message_token_estimation = await self.context.chat.count_tokens()
+            try:
+                user_message_token_estimation = await self.context.chat.count_tokens()
+            except Exception as e:
+                self.log_error("Error while trying to estimate token use", e)
+                # abort
+                return
 
         # yield so it updates throughout all channels that display token count
         yield {"type": "token_usage", "content": user_message_token_estimation, "source": "estimation"}
@@ -358,16 +411,21 @@ class Channel:
         # run module event hooks
         for module_name, module in self.manager.modules.items():
             if hasattr(module, "on_user_message"):
+                usr_msg_result = True
+
                 try:
                     if asyncio.iscoroutinefunction(module.on_user_message):
-                        await module.on_user_message(message.get("content", ""))
+                        usr_msg_result = await module.on_user_message(message.get("content", ""))
                     else:
-                        module.on_user_message(message.get("content", ""))
+                        usr_msg_result = module.on_user_message(message.get("content", ""))
                 except Exception as e:
-                    # Always log full traceback for easier debugging
-                    import traceback
-                    traceback.print_exc()
-                    core.log(module.name, f"could not run user message hook: {e}")
+                    self.log("module error", f"{module_name}: in on_user_message(): {core.detail_error(e)}")
+
+                if usr_msg_result is False:
+                    # when returning False from the user message hook,
+                    # we stop the chain here, allowing the hook to basically intercept the message
+                    # and prevent the AI from returning its own response to the message
+                    return
 
         # get the new context window with the added message
         context = await self.context.get(system_prompt=True, end_prompt=True)
@@ -451,9 +509,7 @@ class Channel:
                             module.on_assistant_message(assistant_message.get("content", ""))
                     except Exception as e:
                         # Always log full traceback for easier debugging
-                        import traceback
-                        traceback.print_exc()
-                        core.log(module.name, f"could not run assistant message hook: {e}")
+                        self.log("module error", f"{module_name}: in on_assistant_message(): {core.detail_error(e)}")
 
     def _render_tool_token(self, name: str, args_str: str) -> str:
         delta = ""
@@ -543,7 +599,7 @@ class Channel:
         self._tool_state["raw_args"] = args_str
         return delta
 
-    async def format_stream_for_text(self, stream, chunk_size=None, use_markdown=True):
+    async def format_stream_for_text(self, stream, chunk_size=None, use_markdown=True, strings: dict = None):
         """
         helper function so that channels don't need to implement this themselves...
         takes care of properly displaying all the agentic turns
@@ -557,22 +613,23 @@ class Channel:
         last_token_was_newline = False
         char_counter = 0
 
-        strings = {
-            "no_markdown": {
-                "thinking_header": "\n------\nThinking:\n\n",
-                "thinking_str": "\nthinking..\n",
-                "conclusion_header": "\n\n------\nConclusion:\n\n",
-                "processing_tool": "\n(processing results..)\n",
-                "thinking_newline": "\n"
-            },
-            "markdown": {
-                "thinking_header": "\n### Thinking\n> ",
-                "thinking_str": "*thinking..*\n",
-                "conclusion_header": "\n",
-                "processing_tool": "\n(processing results..)\n",
-                "thinking_newline": "\n> "
-            }
-        }
+        if not strings:
+            if use_markdown:
+                strings = {
+                    "thinking_header": "**Thinking**",
+                    "thinking_str": "*thinking..*",
+                    "conclusion_header": "**Conclusion**",
+                    "processing_tool": "(processing results..)",
+                    "thinking_newline": "\n> "
+                }
+            else:
+                strings = {
+                    "thinking_header": "--- Thinking ---",
+                    "thinking_str": "thinking..",
+                    "conclusion_header": "--- Conclusion ---",
+                    "processing_tool": "\n(processing results..)",
+                    "thinking_newline": "\n"
+                }
 
         string_type = "markdown" if use_markdown else "no_markdown"
 
@@ -584,7 +641,7 @@ class Channel:
             try:
                 # format the reasoning to look all fancy
                 if show_reasoning:
-                    newline_str = "\n" if not currently_reasoning else strings[string_type]["thinking_newline"]
+                    newline_str = "\n" if not currently_reasoning else strings["thinking_newline"]
                 else:
                     newline_str = "\n"
 
@@ -608,31 +665,44 @@ class Channel:
             if token_type == "reasoning" and not currently_reasoning:
                 if show_reasoning:
                     # think_str = "\n## Thinking:\n> "
-                    think_str = strings[string_type]["thinking_header"]
+                    think_str = strings["thinking_header"]
                 else:
-                    think_str = strings[string_type]["thinking_str"]
+                    think_str = strings["thinking_str"]
                 currently_reasoning = True
 
                 char_counter += len(think_str)
                 yield text_to_token(think_str)
 
+                char_counter += len(strings["thinking_newline"])
+                yield text_to_token(strings["thinking_newline"])
+
             # show conclusion header
             if token_type == "content" and show_reasoning and currently_reasoning:
-                header_str = strings[string_type]["conclusion_header"]
+                header_str = "\n"+strings["conclusion_header"]
+                if use_markdown:
+                    # add an extra newline for markdown's newline quirks
+                    header_str = "\n"+header_str
+
                 char_counter += len(header_str)
                 yield text_to_token(header_str)
+
+                char_counter += len("\n")
+                yield text_to_token("\n")
 
             if token_type in ["content", "tool_calls", "tool"] and currently_reasoning:
                 # we can have multiple reasoning blocks
                 currently_reasoning = False
 
             # show tool result text
-            if token_type == "tool":
-                tool_result_str = strings[string_type]["processing_tool"]
-                char_counter += len(tool_result_str)
-                yield text_to_token(tool_result_str)
+            # if token_type == "tool":
+            #     tool_result_str = strings["processing_tool"]
+            #     char_counter += len(tool_result_str)
+            #     yield text_to_token(tool_result_str)
 
             if self.config.get("stream_tool_calls") and token_type == "tool_call_delta":
+                char_counter += len("\n")
+                yield text_to_token("\n")
+
                 # Extract the accumulated tool call from the delta
                 tc_list = token.get("tool_calls", [])
                 if tc_list:
@@ -646,11 +716,17 @@ class Channel:
                     char_counter += len(tool_delta_str)
                     yield text_to_token(tool_delta_str)
             elif not self.config.get("stream_tool_calls") and token_type == "tool_calls":
+                char_counter += len("\n")
+                yield text_to_token("\n")
+
                 tool_calls = token.get("tool_calls")
                 for tool_call in tool_calls:
-                    tool_str = "\n"+self.tc_manager.display_call(tool_call)
+                    tool_str = self.tc_manager.display_call(tool_call)+"\n"
                     char_counter += len(tool_str)
                     yield text_to_token(tool_str)
+
+                yield text_to_token("\n")
+                char_counter += len("\n")
 
             if token_type == "content":
                 yield text_to_token(content)
@@ -659,13 +735,30 @@ class Channel:
                 char_counter += len(content)
                 yield text_to_token(content)
 
+    async def run(self):
+        # stub, meant for derivative channels to override
+        pass
+
+    async def on_ready(self):
+        """
+        called when the entire framework has fully initialized
+        (when the message "[CORE] Startup complete" shows up)
+        """
+        pass
+
     async def on_push(self, message: dict):
         raise NotImplementedError
+
+    async def on_install(self):
+        """Overridable method that triggers when the auto-installer installs the dependencies for a channel"""
+        pass
+    async def on_uninstall(self):
+        """Overridable method that triggers when the auto-installer uninstalls the dependencies for a channel"""
+        pass
 
     async def push(self, message):
         """
         push a message to the push queue, which will instantly display it in all channels
-        without adding to context, making it invisible to the AI
         """
 
         if not hasattr(self, "push_queue"):
@@ -675,40 +768,8 @@ class Channel:
         # if dict, just use it as-is
         # otherwise, turn it into an openAI message dict
         if isinstance(message, dict):
+            await self.context.chat.add(message)
             await self.push_queue.put(message)
-            # if add_to_context:
-            #      self.context.chat.add(message)
         else:
+            await self.context.chat.add({"role": "assistant", "content": str(message)})
             await self.push_queue.put({"role": "assistant", "content": str(message)})
-            # if add_to_context:
-            #     await self.context.chat.add({"role": "assistant", "content": str(message)})
-
-    async def announce(self, message: str, type=None, insert_message=True):
-        """called externally to announce things in this channel, such as a reminder sent by the AI"""
-        if not type:
-            type = "info"
-
-        # insert announced message into context
-        if insert_message:
-            await self.context.chat.add({"role": "assistant", "content": f"[System {type}]: {message}"})
-
-        # and push it
-        await self.push(message)
-
-    async def announce_all(self, message: str, type=None):
-        """announces a message across all channels. useful for very important notifications!"""
-        if not type:
-            type = "info"
-
-        should_insert = True
-        for channel_name, channel in self.manager.channels.items():
-            await channel.announce(message, type, insert_message=should_insert)
-
-            if should_insert:
-                # insert into context only once
-                should_insert = False
-        return
-
-    async def ask(self, message: str):
-        """sends a message in the channel and then intercepts communication for one message so that user can be asked for input without that input being sent to the LLM. useful for menus."""
-        raise NotImplementedError

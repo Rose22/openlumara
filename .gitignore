@@ -2,6 +2,7 @@ __pycache__/
 venv/
 data/
 data
+data_backups
 config/
 config.yml
 config.yml*

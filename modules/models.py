@@ -14,8 +14,7 @@ class Models(core.module.Module):
         }
     }
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    async def on_ready(self):
         self.models = None
 
         if self.config.get("insert_available_models_into_system_prompt"):
@@ -41,7 +40,7 @@ class Models(core.module.Module):
                 output += f"\n\nModels you can switch to using the models_switch() toolcall: "
                 output += ", ".join(self.models)
         else:
-            self._header = "current model"
+            self.header = "current model"
             output = current_model
 
         return output

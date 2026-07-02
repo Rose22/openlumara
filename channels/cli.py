@@ -10,78 +10,34 @@ import prompt_toolkit.key_binding
 import prompt_toolkit.shortcuts
 import prompt_toolkit.application
 import sys
-import re
-import json
-import json_repair
-
-class ToolCallRenderer:
-    def __init__(self):
-        self.current_tool = None
-        self.printed_values = {}
-
-    def render(self, name: str, args_str: str):
-        # If this is a new tool, print the header.
-        if self.current_tool != name:
-            prompt_toolkit.shortcuts.print_formatted_text(
-                prompt_toolkit.formatted_text.HTML(f"\n<b>Calling tool: {name}()</b>")
-            )
-            self.current_tool = name
-            self.printed_values = {}
-
-        try:
-            data = json_repair.loads(args_str)
-            if not isinstance(data, dict):
-                return
-
-            for key, value in data.items():
-                should_erase_line = False
-                val_str = str(value)
-                previously_printed = self.printed_values.get(key, "")
-
-                if val_str.startswith(previously_printed):
-                    to_print = val_str[len(previously_printed):]
-                else:
-                    to_print = val_str
-                    should_erase_line = True
-
-                if key not in self.printed_values:
-                    prompt_toolkit.shortcuts.print_formatted_text(
-                        prompt_toolkit.formatted_text.HTML(f"\n<ansicyan>{key}:</ansicyan>\n"),
-                        end="",
-                        flush=True
-                    )
-
-                if to_print:
-                    to_print = to_print.replace("\\n", "\n")
-                    if should_erase_line:
-                        print("\r", end="", flush=True)
-
-                    print(f"{to_print}", end="", flush=True)
-
-                self.printed_values[key] = val_str
-        except Exception:
-            pass
-
-    def reset(self):
-        """Finalize the tool call block with a newline."""
-        if self.current_tool is not None:
-            self.current_tool = None
-            self.printed_values = {}
 
 class Cli(core.channel.Channel):
     """Talk to your AI from the terminal! Auto-disables itself when ran as a background server."""
 
+    dependencies = ["prompt_toolkit"]
+
     running = True
+
+    settings = {
+        "show_reasoning": {
+            "description": "Whether to show the model's internal reasoning process within sent messages. Works in both streaming mode and non-streaming mode",
+            "default": False
+        }
+        # "stream_tool_calls": {
+        #     "description": "Whether to stream tool call arguments as they are written by the AI. Extremely useful when using toolcalls with long content, such as when using the Coder to write code",
+        #     "default": False
+        # }
+    }
 
     def _setup_style(self):
         self.style = prompt_toolkit.styles.Style.from_dict({
-            "prompt": "ansicyan bold",
-            "reasoning-label": "ansiyellow bold",
-            "conclusion-label": "ansimagenta bold",
-            "toolcall-response-label": "ansiblue bold",
-            "error": "ansired bold",
-            "status": "ansiblue",
-            "separator": "ansigray",
+            "prompt": "ansicyan bold"
+            # "reasoning-label": "ansiyellow bold",
+            # "conclusion-label": "ansimagenta bold",
+            # "toolcall-response-label": "ansiblue bold",
+            # "error": "ansired bold",
+            # "status": "ansiblue",
+            # "separator": "ansigray",
         })
 
     def _setup_history(self):
@@ -102,20 +58,35 @@ class Cli(core.channel.Channel):
         else:
             print(text, end="", flush=True)
 
-    def _print_header(self, label: str, style_class: str = None):
-        width = 40
-        separator = "\u2500" * width
-        self._print_formatted(f"\n{separator}", "separator")
-        self._print_formatted(f"  {label}", style_class)
-        self._print_formatted(f"{separator}", "separator")
+    async def _process_message(self, msg):
+        message_state = None
+        # Create a fresh renderer for this message session
+        currently_reasoning = False
+
+        # display sending indicator
+        print("sending..", end="", flush=True)
+
+        first_token_received = False
+        async for token in self.format_stream_for_text(
+            self.send_stream({"role": "user", "content": msg}, commands_authorized=True),
+            use_markdown=False
+        ):
+            if not first_token_received:
+                # remove sending indicator using \r
+                print("\r", end="", flush=True)
+                first_token_received = True
+
+            token_type = token.get("type")
+            content = token.get("content", "")
+
+            if token_type in ["content", "reasoning"]:
+                print(content, end="", flush=True)
+
+        print()
+        print()
 
     async def run(self):
         if not sys.stdin.isatty():
-            return False
-
-        # auto-disabled full CLI if cli lite is enabled
-        if "cli_lite" in self.manager.channels:
-            core.log(self.name, "Full CLI disabled because CLI Lite is active")
             return False
 
         self._setup_style()
@@ -151,67 +122,20 @@ class Cli(core.channel.Channel):
         return True
 
     async def on_push(self, message: dict):
-        core.log("push", message.get("content").strip())
+        self.log("push", message.get("content").strip())
         print(flush=True)
 
-    async def _process_message(self, msg):
-        message_state = None
-        # Create a fresh renderer for this message session
-        tool_renderer = ToolCallRenderer()
-        currently_reasoning = False
+    def on_log(self, category, message):
+        if category == "toolcall":
+            # SKIP
+            return
 
-        async for token in self.send_stream({"role": "user", "content": msg}, commands_authorized=True):
-            token_type = token.get("type")
-            content = token.get("content", "")
+        if core.quiet:
+            return
 
-            # print headers
-            if token_type == "reasoning" and not currently_reasoning:
-                self._print_header("Reasoning", "reasoning-label")
-                currently_reasoning = True
-            elif token_type == "tool":
-                self._print_formatted("\n(processing results..)", "toolcall-response-label")
-            elif token_type == "content" and currently_reasoning:
-                self._print_header("Conclusion", "conclusion-label")
-
-            if token_type in ["content", "tool_calls", "tool"] and currently_reasoning:
-                # we can have multiple reasoning blocks
-                currently_reasoning = False
-
-            # if token_type == "tool":
-            #     # print toolcall response
-            #     result = json.loads(content)
-            #     subcontent = result.get("content")
-            #     print(str(subcontent).strip(), flush=True)
-
-            elif token_type == "tool_call_delta":
-                # Extract the accumulated tool call from the delta
-                tc_list = token.get("tool_calls", [])
-                if tc_list:
-                    tc = tc_list[0]
-                    # Render the partial/full tool call fancy style
-                    tool_renderer.render(tc.function.name, tc.function.arguments)
-
-            elif token_type == "tool_calls":
-                # The final full tool call list is emitted at the end of the stream
-                tool_renderer.reset()
-                print("\n", end="", flush=True)
-
-            # print the actual tokens
-            if token_type in ["content", "reasoning"]:
-                print(content, end="", flush=True)
-
-        print()
-        print()
-
-    async def _announce(self, message: str, type: str = None):
-        style_map = {
-            "error": "error",
-            "status": "status",
-            "warning": "reasoning-label",
-        }
-        style_class = style_map.get(type)
-        self._print_formatted(f"[cli] {message}\n", style_class)
-        core.log("cli", message)
+        # allow hiding the category string for special formatting and stuff
+        cat_str = f"[{category.upper()}] " if category else ""
+        print(f"{cat_str}{message}", flush=True)
 
     def on_shutdown(self):
         self.running = False

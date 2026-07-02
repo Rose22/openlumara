@@ -938,12 +938,12 @@
 
 .message-wrapper.user-placeholder .message {
     border: 1px dashed var(--border-user);
+    gap: 0px !important;
 }
 
 .placeholder-status {
     font-size: 0.75rem;
     color: var(--text-muted);
-    margin-top: 4px;
     font-style: italic;
 }
 

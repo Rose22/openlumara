@@ -5,7 +5,7 @@ import copy
 class Config(core.module.Module):
     """Makes your AI aware of your openlumara settings and optionally allows it to change them"""
 
-    _header = "OpenLumara config"
+    header = "OpenLumara config"
 
     settings = {
         "put_config_in_system_prompt": {
@@ -19,9 +19,7 @@ class Config(core.module.Module):
         }
     }
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
+    async def on_ready(self):
         if not self.config.get("allow_ai_to_modify_config"):
             self.disabled_tools.append("set")
 

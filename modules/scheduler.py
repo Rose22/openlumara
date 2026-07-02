@@ -9,6 +9,12 @@ class Scheduler(core.module.Module):
     """Lets your AI perform actions on your behalf at specified times! Supports recurring actions."""
 
     settings = {
+        "notification_channel": {
+            "type": "select",
+            "default": "webui",
+            "description": "Which channel to send notifications to by default",
+            "options": {name: f"Send notifications via {name}" for name in core.channel.get_available_channels()}
+        },
         "insert_system_prompt": {
             "description": "Whether to insert a list of all currently scheduled jobs in the system prompt. This will make your AI aware of upcoming scheduled jobs at all times!",
             "default": True
@@ -73,7 +79,7 @@ class Scheduler(core.module.Module):
                     if job.get("recurring"):
                         # Advance recurring job to future without executing missed instances
                         self._advance_recurring_to_future(job)
-                        core.log("scheduler", f"advanced missed recurring job {job_id} to next future time")
+                        self.log("scheduler", f"advanced missed recurring job {job_id} to next future time")
                     else:
                         # Overdue one-time job: execute immediately
                         await self._job_wrapper(job)
@@ -105,7 +111,7 @@ class Scheduler(core.module.Module):
             except asyncio.CancelledError:
                 raise
             except Exception as e:
-                core.log_error("[SCHEDULER] error in dispatcher loop", e)
+                self.log_error("[SCHEDULER] error in dispatcher loop", e)
                 # Brief sleep to avoid tight error loops
                 await asyncio.sleep(5)
 
@@ -165,7 +171,7 @@ class Scheduler(core.module.Module):
                 self._remove_job_from_storage(job_id)
 
         except Exception as e:
-            core.log_error(f"[SCHEDULER] error executing job {job_id}", e)
+            self.log_error(f"[SCHEDULER] error executing job {job_id}", e)
 
     def _reschedule_recurring_job(self, job: dict) -> None:
         """Updates a recurring job's trigger_time to the next future occurrence."""
@@ -181,7 +187,7 @@ class Scheduler(core.module.Module):
         next_time = self._calculate_next_from(current_trigger, recur)
 
         if next_time is None:
-            core.log("scheduler", f"could not reschedule recurring job {job.get('id')}: invalid interval")
+            self.log("scheduler", f"could not reschedule recurring job {job.get('id')}: invalid interval")
             return
 
         # If next_time is still in the past, advance until it's in the future
@@ -191,12 +197,12 @@ class Scheduler(core.module.Module):
         while next_time <= now and iteration < max_iterations:
             next_time = self._calculate_next_from(next_time, recur)
             if next_time is None:
-                core.log("scheduler", f"could not reschedule recurring job {job.get('id')}: invalid interval")
+                self.log("scheduler", f"could not reschedule recurring job {job.get('id')}: invalid interval")
                 return
             iteration += 1
 
         if next_time <= now:
-            core.log("scheduler", f"could not advance job {job.get('id')} to future after {max_iterations} iterations")
+            self.log("scheduler", f"could not advance job {job.get('id')} to future after {max_iterations} iterations")
             return
 
         # Update the trigger time in storage
@@ -225,13 +231,13 @@ class Scheduler(core.module.Module):
         while next_time <= now and iteration < max_iterations:
             candidate = self._calculate_next_from(next_time, recur)
             if candidate is None:
-                core.log("scheduler", f"could not advance job {job.get('id')}: invalid interval")
+                self.log("scheduler", f"could not advance job {job.get('id')}: invalid interval")
                 return
             next_time = candidate
             iteration += 1
 
         if next_time <= now:
-            core.log("scheduler", f"could not advance job {job.get('id')} to future after {max_iterations} iterations")
+            self.log("scheduler", f"could not advance job {job.get('id')} to future after {max_iterations} iterations")
             return
 
         # Update in storage
@@ -266,11 +272,11 @@ class Scheduler(core.module.Module):
             job_channel = self.channel
 
         if job_channel is None:
-            core.log("scheduler", f"error executing job {job_id}: no channel available")
+            self.log("scheduler", f"error executing job {job_id}: no channel available")
             return
 
         if not hasattr(job_channel, 'context') or job_channel.context is None:
-            core.log("scheduler", f"error executing job {job_id}: channel has no valid context")
+            self.log("scheduler", f"error executing job {job_id}: channel has no valid context")
             return
 
         # Filter out scheduler tools to prevent circular scheduling
@@ -327,10 +333,10 @@ Use tools if needed. For simple reminders, do not use tools.
                 if response:
                     break  # Success
 
-                core.log("scheduler", f"job {job_id}: empty response, retrying in {base_delay}s")
+                self.log("scheduler", f"job {job_id}: empty response, retrying in {base_delay}s")
 
             except Exception as e:
-                core.log("scheduler", f"job {job_id}: failed: {e}, retrying in {base_delay}s")
+                self.log("scheduler", f"job {job_id}: failed: {e}, retrying in {base_delay}s")
 
             await asyncio.sleep(base_delay)
 
@@ -347,15 +353,14 @@ Use tools if needed. For simple reminders, do not use tools.
             if tool_content:
                 final_content = f"{final_content}\n{tool_content}".strip()
         elif tool_calls:
-            core.log("scheduler", f"error executing job {job_id}: tool calls found but no valid channel")
+            self.log("scheduler", f"error executing job {job_id}: tool calls found but no valid channel")
             return
 
         if final_content and job_channel:
             try:
                 await job_channel.push(final_content)
-                await job_channel.context.chat.add({"role": "assistant", "content": final_content})
             except Exception as e:
-                core.log_error(f"[SCHEDULER] error announcing job {job_id} result", e)
+                self.log_error(f"[SCHEDULER] error announcing job {job_id} result", e)
 
     # ---------------------------------------------------------
     # Time Calculations
@@ -525,7 +530,7 @@ Use tools if needed. For simple reminders, do not use tools.
         weekdays_only: bool = False,
         recurring: bool = False,
     ):
-        """Adds a scheduled job. MODE 1 - RELATIVE TIME: Use relative_duration (e.g., '2d 4h 30m'). MODE 2 - SPECIFIC CLOCK TIME: Use target_time (e.g., '14:30'). Optionally set target_weekday (0=Monday) or weekdays_only=True. Action is what action should be performed at the scheduled time. Action is an instruction/prompt for the AI to follow, so write it in second person form. Use the word 'user' to refer to the user."""
+        """Adds a scheduled job. MODE 1 - RELATIVE TIME: Use relative_duration (e.g., '2d 4h 30m'). MODE 2 - SPECIFIC CLOCK TIME: Use target_time (e.g., '14:30'). Optionally set target_weekday (0=Monday) or weekdays_only=True. Action is what action should be performed at the scheduled time. Action is an instruction/prompt for the AI to follow, so write it in second person form. Use the word 'user' to refer to the user. Channel is optional, set it only if user requests it - it defaults to the user's preferred channel."""
         if recurring and not self.config.get("allow_recurring_jobs"):
             return self.result(
                 "Error: Recurring scheduler jobs are disabled by security policy. Please inform the user.",
@@ -598,7 +603,7 @@ Use tools if needed. For simple reminders, do not use tools.
             if trigger_time is None:
                 return self.result("error: invalid schedule parameters (zero interval)", False)
 
-            resolved_channel = channel or (self.channel.name if self.channel else None)
+            resolved_channel = self.config.get("notification_channel") or channel or (self.channel.name if self.channel else None)
             if not resolved_channel:
                 return self.result("error: no channel context available", False)
 

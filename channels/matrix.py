@@ -82,6 +82,8 @@ class Matrix(core.channel.Channel):
     Matrix channel with encryption support. Experimental, a bit unstable.
     """
 
+    dependencies = ["matrix-nio[e2e]"]
+
     running = False
 
     settings = {
@@ -103,7 +105,7 @@ class Matrix(core.channel.Channel):
             self.device_id: str = cfg.get("device_id", "")
             self.device_name: str = cfg.get("device_name", "Core Bot")
         except (AttributeError, TypeError) as e:
-            core.log("matrix", f"Config error: {e}")
+            self.log("matrix", f"Config error: {e}")
             self.homeserver = ""
             self.user_id = ""
             self.password = ""
@@ -146,7 +148,7 @@ class Matrix(core.channel.Channel):
         path = self._get_credentials_path()
         with open(path, "w") as f:
             json.dump(creds, f)
-        core.log("matrix", f"Credentials saved to {path}")
+        self.log("matrix", f"Credentials saved to {path}")
 
     def _load_credentials(self) -> Optional[Dict[str, str]]:
         path = self._get_credentials_path()
@@ -155,7 +157,7 @@ class Matrix(core.channel.Channel):
                 with open(path, "r") as f:
                     return json.load(f)
             except Exception as e:
-                core.log("matrix", f"Failed to load credentials: {e}")
+                self.log("matrix", f"Failed to load credentials: {e}")
         return None
 
     def _room_display_name(self, room_id: str) -> str:
@@ -186,25 +188,25 @@ class Matrix(core.channel.Channel):
 
     async def run(self):
         if not self.homeserver or not self.user_id:
-            core.log("matrix", "Missing homeserver or user_id – aborting.")
+            self.log("matrix", "Missing homeserver or user_id – aborting.")
             return False
 
         if not self.password and not self.access_token:
             saved = self._load_credentials()
             if not saved or not saved.get("access_token"):
-                core.log("matrix", "No password or access_token – aborting.")
+                self.log("matrix", "No password or access_token – aborting.")
                 return False
 
         try:
-            core.log("matrix", "Initializing client…")
+            self.log("matrix", "Initializing client…")
             self._initialize_client()
 
-            core.log("matrix", "Logging in…")
+            self.log("matrix", "Logging in…")
             await self._login()
 
             self._setup_callbacks()
 
-            core.log("matrix", "Running initial sync…")
+            self.log("matrix", "Running initial sync…")
             await self._initial_sync()
 
             # Set startup timestamp for grace period
@@ -220,7 +222,7 @@ class Matrix(core.channel.Channel):
             await self._main_loop()
 
         except Exception as e:
-            core.log("matrix", f"Critical error: {e}\n{traceback.format_exc()}")
+            self.log("matrix", f"Critical error: {e}\n{traceback.format_exc()}")
             return False
         finally:
             await self._cleanup()
@@ -246,7 +248,7 @@ class Matrix(core.channel.Channel):
     async def _login(self):
         # Priority 1: Config-provided access token
         if self.access_token:
-            core.log("matrix", "Using config-provided access token…")
+            self.log("matrix", "Using config-provided access token…")
             # Use restore_login to properly set up the client state
             self.client.restore_login(
                 user_id=self.user_id,
@@ -260,7 +262,7 @@ class Matrix(core.channel.Channel):
         # Priority 2: Previously saved credentials
         saved = self._load_credentials()
         if saved and saved.get("access_token"):
-            core.log(
+            self.log(
                 "matrix",
                 f"Restoring saved credentials (device: {saved.get('device_id')})…",
             )
@@ -275,7 +277,7 @@ class Matrix(core.channel.Channel):
 
         # Priority 3: Fresh password login (creates a new device)
         if os.path.exists(self._store_path):
-            core.log("matrix", "Wiping old crypto store for clean key registration…")
+            self.log("matrix", "Wiping old crypto store for clean key registration…")
             shutil.rmtree(self._store_path)
             os.makedirs(self._store_path, exist_ok=True)
             self._initialize_client()
@@ -286,7 +288,7 @@ class Matrix(core.channel.Channel):
         if isinstance(response, LoginResponse):
             self.device_id = response.device_id
             self.access_token = response.access_token
-            core.log("matrix", f"Logged in, device_id={self.device_id}")
+            self.log("matrix", f"Logged in, device_id={self.device_id}")
             self._save_credentials(
                 response.user_id, response.device_id, response.access_token
             )
@@ -358,7 +360,7 @@ class Matrix(core.channel.Channel):
         enc_tag = "enc" if self._room_is_encrypted(room.room_id) else "plain"
         dm_tag = "DM" if self._room_is_dm(room.room_id) else "room"
         name = self._room_display_name(room.room_id)
-        core.log(
+        self.log(
             "matrix",
             f"[{dm_tag}][{enc_tag}] {name} | {event.sender}: {body[:80]}",
         )
@@ -383,7 +385,7 @@ class Matrix(core.channel.Channel):
         url = getattr(event, "url", "")
 
         enc_tag = "enc" if self._room_is_encrypted(room.room_id) else "plain"
-        core.log("matrix", f"Media received in {self._room_display_name(room.room_id)}: {body} ({url})")
+        self.log("matrix", f"Media received in {self._room_display_name(room.room_id)}: {body} ({url})")
         # Logic to process media can be added here (e.g. download, transcribe, etc.)
         # For now, we just acknowledge it to avoid crashes.
 
@@ -397,7 +399,7 @@ class Matrix(core.channel.Channel):
         Handles events that could not be decrypted (MegolmEvent).
         We request the key and buffer the event for retry.
         """
-        core.log(
+        self.log(
             "matrix",
             f"Undecryptable event in {self._room_display_name(room.room_id)} "
             f"from {event.sender} (session …{event.session_id[-8:]})",
@@ -416,41 +418,41 @@ class Matrix(core.channel.Channel):
 
     async def _on_invite(self, room, event):
         if not self._auto_join:
-            core.log("matrix", f"Ignoring invite to {room.room_id} (auto-join off).")
+            self.log("matrix", f"Ignoring invite to {room.room_id} (auto-join off).")
             return
 
-        core.log("matrix", f"Invited to {room.room_id} by {event.sender}, joining…")
+        self.log("matrix", f"Invited to {room.room_id} by {event.sender}, joining…")
         try:
             resp = await self.client.join(room.room_id)
             if hasattr(resp, "room_id"):
-                core.log("matrix", f"Joined {room.room_id}")
+                self.log("matrix", f"Joined {room.room_id}")
                 # Sync keys after joining to ensure encryption setup
                 await self.client.keys_query()
                 await self._establish_sessions_for_room(room.room_id)
         except Exception as e:
-            core.log("matrix", f"Failed to join {room.room_id}: {e}")
+            self.log("matrix", f"Failed to join {room.room_id}: {e}")
 
     # ── key verification (SAS) ─────────────────────────────────────────────
 
     async def _on_key_verification_start(self, event):
-        core.log(
+        self.log(
             "matrix",
             f"Verification start from {event.sender} (txn: {event.transaction_id})",
         )
         try:
             resp = await self.client.accept_key_verification(event.transaction_id)
             if isinstance(resp, ToDeviceError):
-                core.log("matrix", f"Failed to accept verification: {resp}")
+                self.log("matrix", f"Failed to accept verification: {resp}")
                 return
-            core.log("matrix", "Verification accepted. Waiting for Key exchange...")
+            self.log("matrix", "Verification accepted. Waiting for Key exchange...")
         except Exception as e:
-            core.log("matrix", f"Error accepting verification: {e}")
+            self.log("matrix", f"Error accepting verification: {e}")
 
     async def _on_key_verification_key(self, event):
-        core.log("matrix", f"Received verification key from {event.sender}")
+        self.log("matrix", f"Received verification key from {event.sender}")
         sas = self.client.key_verifications.get(event.transaction_id)
         if not sas:
-            core.log("matrix", f"Unknown verification transaction {event.transaction_id}")
+            self.log("matrix", f"Unknown verification transaction {event.transaction_id}")
             return
 
         try:
@@ -458,31 +460,31 @@ class Matrix(core.channel.Channel):
             todevice_msg = sas.share_key()
             resp = await self.client.to_device(todevice_msg)
             if isinstance(resp, ToDeviceError):
-                core.log("matrix", f"Failed to share key: {resp}")
+                self.log("matrix", f"Failed to share key: {resp}")
                 return
 
             # 2. Display SAS (Emojis/Decimals)
             emojis = sas.get_emoji()
             if emojis:
                 emoji_str = " ".join(f"{e[0]} ({e[1]})" for e in emojis)
-                core.log("matrix", f"SAS Emojis: {emoji_str}")
+                self.log("matrix", f"SAS Emojis: {emoji_str}")
             else:
                 decimals = sas.get_decimals()
                 if decimals:
-                    core.log("matrix", f"SAS Decimals: {decimals}")
+                    self.log("matrix", f"SAS Decimals: {decimals}")
 
             # 3. Confirm the SAS
             resp = await self.client.confirm_short_auth_string(event.transaction_id)
             if isinstance(resp, ToDeviceError):
-                core.log("matrix", f"Failed to confirm SAS: {resp}")
+                self.log("matrix", f"Failed to confirm SAS: {resp}")
             else:
-                core.log("matrix", "SAS confirmed. Verification almost complete.")
+                self.log("matrix", "SAS confirmed. Verification almost complete.")
 
         except Exception as e:
-            core.log("matrix", f"Error during key exchange: {e}")
+            self.log("matrix", f"Error during key exchange: {e}")
 
     async def _on_key_verification_mac(self, event):
-        core.log("matrix", f"Received verification MAC from {event.sender}")
+        self.log("matrix", f"Received verification MAC from {event.sender}")
         sas = self.client.key_verifications.get(event.transaction_id)
         if not sas:
             return
@@ -490,16 +492,16 @@ class Matrix(core.channel.Channel):
         try:
             if sas.other_olm_device:
                 self.client.verify_device(sas.other_olm_device)
-                core.log(
+                self.log(
                     "matrix",
                     f"✅ Verified device {sas.other_olm_device.device_id} of {sas.other_olm_device.user_id}",
                 )
-            core.log("matrix", "✅ Verification successful.")
+            self.log("matrix", "✅ Verification successful.")
         except Exception as e:
-            core.log("matrix", f"Error processing MAC: {e}")
+            self.log("matrix", f"Error processing MAC: {e}")
 
     async def _on_key_verification_cancel(self, event):
-        core.log(
+        self.log(
             "matrix",
             f"Verification cancelled by {event.sender}: {event.reason} (code: {event.code})",
         )
@@ -542,14 +544,14 @@ class Matrix(core.channel.Channel):
 
                 if filtered:
                     device_count = sum(len(v) for v in filtered.values())
-                    core.log(
+                    self.log(
                         "matrix",
                         f"Claiming keys for {device_count} device(s) in {self._room_display_name(room_id)}",
                     )
                     # 2. Claim one-time keys
                     resp = await self.client.keys_claim(filtered)
                     if isinstance(resp, KeysClaimError):
-                        core.log("matrix", f"keys_claim failed: {resp.message}")
+                        self.log("matrix", f"keys_claim failed: {resp.message}")
 
                 # 3. Check if claiming failed again for some, blacklist them
                 still_missing = self.client.get_missing_sessions(room_id)
@@ -559,7 +561,7 @@ class Matrix(core.channel.Channel):
                             key = (user_id, dev)
                             if key not in self._blacklisted_devices:
                                 self._blacklisted_devices.add(key)
-                                core.log(
+                                self.log(
                                     "matrix",
                                     f"Blacklisting device {dev} of {user_id} (failed to claim key).",
                                 )
@@ -569,12 +571,12 @@ class Matrix(core.channel.Channel):
                 room_id, ignore_unverified_devices=True
             )
             if isinstance(resp, ShareGroupSessionError):
-                core.log(
+                self.log(
                     "matrix",
                     f"share_group_session failed for {self._room_display_name(room_id)}: {resp.message}",
                 )
         except Exception as e:
-            core.log("matrix", f"Session setup for {room_id} failed: {e}")
+            self.log("matrix", f"Session setup for {room_id} failed: {e}")
 
     async def _auto_trust_devices(self):
         """
@@ -601,10 +603,10 @@ class Matrix(core.channel.Channel):
                     client.verify_device(device)
                     trusted_count += 1
         except Exception as exc:
-            core.log("matrix", f"Auto-trust error: {exc}")
+            self.log("matrix", f"Auto-trust error: {exc}")
 
         if trusted_count:
-            core.log("matrix", f"Auto-trusted {trusted_count} new device(s)")
+            self.log("matrix", f"Auto-trusted {trusted_count} new device(s)")
 
     async def _retry_pending_decryptions(self):
         """Retry decrypting buffered MegolmEvents after new keys arrive."""
@@ -629,7 +631,7 @@ class Matrix(core.channel.Channel):
 
             # Successfully decrypted! Route to handler.
             # We dispatch to the text or media handler based on decrypted type
-            core.log("matrix", f"Decrypted buffered event {event.event_id}")
+            self.log("matrix", f"Decrypted buffered event {event.event_id}")
             if hasattr(decrypted, "body"): # Text message
                 await self._on_room_message(room, decrypted)
             elif isinstance(decrypted, (RoomMessageImage, RoomMessageAudio, RoomMessageVideo, RoomMessageFile)):
@@ -651,22 +653,22 @@ class Matrix(core.channel.Channel):
         try:
             if self.client.should_upload_keys:
                 await self.client.keys_upload()
-                core.log("matrix", "Device keys uploaded.")
+                self.log("matrix", "Device keys uploaded.")
         except Exception as e:
-            core.log("matrix", f"Key upload failed: {e}")
+            self.log("matrix", f"Key upload failed: {e}")
 
     async def _query_and_establish_sessions(self):
         try:
             if self.client.should_query_keys:
                 await self.client.keys_query()
-                core.log("matrix", "Keys query complete.")
+                self.log("matrix", "Keys query complete.")
                 # Auto-trust devices found during query (common in bot workflows)
                 await self._auto_trust_devices()
 
             for room_id in list(self.client.rooms):
                 await self._establish_sessions_for_room(room_id)
         except Exception as e:
-            core.log("matrix", f"Key query/establish failed: {e}")
+            self.log("matrix", f"Key query/establish failed: {e}")
 
     async def _sync_encryption_keys(self):
         """Called after every sync to keep keys fresh."""
@@ -703,7 +705,7 @@ class Matrix(core.channel.Channel):
             await self._retry_pending_decryptions()
 
         except Exception as e:
-            core.log("matrix", f"Encryption key sync error: {e}")
+            self.log("matrix", f"Encryption key sync error: {e}")
 
     async def _main_loop(self):
         backoff = 1
@@ -714,13 +716,13 @@ class Matrix(core.channel.Channel):
                     await self._sync_encryption_keys()
                     backoff = 1
                 elif isinstance(resp, SyncError):
-                    core.log("matrix", f"Sync error: {resp.message}")
+                    self.log("matrix", f"Sync error: {resp.message}")
                     await asyncio.sleep(backoff)
                     backoff = min(backoff * 2, 60)
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                core.log("matrix", f"Sync exception: {e}")
+                self.log("matrix", f"Sync exception: {e}")
                 await asyncio.sleep(backoff)
                 backoff = min(backoff * 2, 60)
 
@@ -802,7 +804,7 @@ class Matrix(core.channel.Channel):
                     await self._send_room_message(room_id, final)
 
         except Exception as e:
-            core.log("matrix", f"Message handling error: {e}")
+            self.log("matrix", f"Message handling error: {e}")
             await self._send_room_message(room_id, f"❌ Error: {e}")
         finally:
             # 5. Turn typing OFF only when completely finished
@@ -847,7 +849,7 @@ class Matrix(core.channel.Channel):
         }.get(type, "🔔")
 
         text = f"{emoji} **{type.upper()}**: {message}"
-        core.log("matrix", f"[{type}] {message}")
+        self.log("matrix", f"[{type}] {message}")
 
         if not self.client:
             return
@@ -856,7 +858,7 @@ class Matrix(core.channel.Channel):
             try:
                 await self._send_room_message(room_id, text)
             except Exception as e:
-                core.log("matrix", f"Announce to {room_id} failed: {e}")
+                self.log("matrix", f"Announce to {room_id} failed: {e}")
 
 
 
@@ -869,7 +871,7 @@ class Matrix(core.channel.Channel):
                 ignore_unverified_devices=True,
             )
         except Exception as e:
-            core.log("matrix", f"Send failed ({room_id}): {e}")
+            self.log("matrix", f"Send failed ({room_id}): {e}")
             return None
 
     async def _edit_room_message(self, room_id: str, event_id: str, new_text: str):
@@ -889,7 +891,7 @@ class Matrix(core.channel.Channel):
                 ignore_unverified_devices=True,
             )
         except Exception as e:
-            core.log("matrix", f"Edit failed ({room_id}): {e}")
+            self.log("matrix", f"Edit failed ({room_id}): {e}")
             return None
 
     async def _keep_typing(self, room_id: str):
@@ -906,7 +908,7 @@ class Matrix(core.channel.Channel):
     # ── shutdown / cleanup ────────────────────────────────────────────────
 
     async def on_shutdown(self):
-        core.log("matrix", "Shutting down…")
+        self.log("matrix", "Shutting down…")
         self.running = False
         self._shutting_down = True
         return True

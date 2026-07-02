@@ -1,7 +1,5 @@
 {
   "dark": {
-    "--font-primary": "'Indie Flower', sans-serif",
-    "--font-display": "'Indie Flower', sans-serif",
     "--radius-sm": "16px",
     "--radius-md": "28px",
     "--radius-lg": "36px",
@@ -58,8 +56,6 @@
     "--avatar-shape": "35%"
   },
   "light": {
-    "--font-primary": "'Indie Flower', sans-serif",
-    "--font-display": "'Indie Flower', sans-serif",
     "--radius-sm": "16px",
     "--radius-md": "28px",
     "--radius-lg": "36px",

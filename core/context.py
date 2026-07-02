@@ -35,7 +35,11 @@ class Context:
         # 1. Prepare Components
         system_msg = []
         if system_prompt:
-            content = await self.channel.manager.get_system_prompt()
+            try:
+                content = await self.channel.manager.get_system_prompt()
+            except Exception as e:
+                self.channel.log_error("Error while getting system prompt", e)
+
             if content:
                 system_msg = [{"role": system_role, "content": content}]
 
@@ -68,6 +72,19 @@ class Context:
             # If disabled, remove reasoning from all prior messages
             if not core.config.get("model", "keep_reasoning_in_context"):
                 messages = [{k: v for k, v in m.items() if k != "reasoning_content"} for m in messages]
+
+            if core.config.get("model", "only_preserve_reasoning_for_current_agentic_loop"):
+                # TODO: i really need to make a more user friendly UI for core settings, that matches the UX of module/channel settings...
+                # that name is ridiculous
+
+                if core.config.get("model", "only_preserve_reasoning_for_current_agentic_loop"):
+                    # strip reasoning from tool calls prior to the current agentic loop
+                    loop_idx = self.channel.agentic_loop_start
+                    messages[:loop_idx] = [
+                        {k: v for k, v in m.items() if k != "reasoning_content"}
+                        if "tool_calls" in m else m
+                        for m in messages[:loop_idx]
+                    ]
 
             # Apply max_messages limit to history first
             if len(messages) > max_messages:
@@ -127,6 +144,17 @@ class Context:
             histend = await self.channel.manager.get_end_prompt(prevent_recursion=prevent_recursion)
             if histend:
                 end_msg = [{"role": dev_role, "content": histend}]
+
+        # now we inject anything modules want to inject into the user messages
+        for message in messages:
+            if message.get("injection"):
+                if message.get("role") == "user":
+                    content = message.get("content")
+                    if content and isinstance(content, str):
+                        message["content"] += f"\n\n[SYSTEM MESSAGES]\n{message['injection']}"
+
+                # remove the field from all messages so that it's clean for the API
+                del message["injection"]
 
         # 2. Build and Trim Context
         # We combine them to check the total token count

@@ -21,11 +21,12 @@ async def main_loop(arg_list):
     # parse the --config arg
     arg_pre_parser = argparse.ArgumentParser(add_help=False)
     arg_pre_parser.add_argument("--config")
+    arg_pre_parser.add_argument("--quiet", help="surpress logs", action="store_true")
     pre_args, _ = arg_pre_parser.parse_known_args(arg_list)
 
     # load config file, allowing the path to be overridden
     config_display_str = "config.yaml" if not pre_args.config else pre_args.config
-    if not core.quiet:
+    if not pre_args.quiet:
         core.log("core", f"Loading settings from config {config_display_str}")
 
     core.config.load(pre_args.config)
@@ -43,6 +44,8 @@ async def main_loop(arg_list):
     args_main.add_argument("--quiet", help="surpress logs", action="store_true")
     args_main.add_argument("--insecure_tls", help="Disable verification for SSL/TLS certs. Use when your API uses self-signed or unvalid certificates.", action="store_true")
     args_main.add_argument("--debug", help="Enable debug mode (display all warnings and errors)", action="store_true")
+    args_main.add_argument("--debug_stream", help="Display debug information for all streamed tokens", action="store_true")
+    args_main.add_argument("--disable_auto_installer", help="Disable automatic installation/uninstallation of module/channel dependencies", action="store_true")
 
     args_settings = arg_parser.add_argument_group("settings")
     module_structure = core.config.get_module_structure()
@@ -68,11 +71,14 @@ async def main_loop(arg_list):
     if args.debug:
         core.debug = True
 
+    if args.debug_stream:
+        core.debug_stream = True
+
     # the manager class connects everything together
     manager = core.manager.Manager(cmdline_args=args)
     # run main loop
     result = await manager.run()
-    manager = None # wipe it all
+    del(manager) # wipe it all
     return result
 
 def run_from_args(arg_list: list = []):

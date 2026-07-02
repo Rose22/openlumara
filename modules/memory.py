@@ -10,7 +10,7 @@ class Memory(core.module.Module):
 
     settings = {
         "insert_system_prompt": {
-            "default": True,
+            "default": False,
             "description": "Whether to put extra instructions in the system prompt to help the AI autonomously use its memory system, so that it remembers things without you having to explicitely ask it to."
         },
         "put_pinned_memories_in_system_prompt": {
@@ -20,8 +20,7 @@ class Memory(core.module.Module):
         "max_pinned_memories": 20
     }
 
-    def __init__(self, *args, **kwargs):
-        super().__init__( *args, **kwargs)
+    async def on_ready(self):
         self._mem = core.storage.StorageList("memory", type="msgpack")
         self._mem_deleted = core.storage.StorageList("deleted_memories", type="json")
         self.max_pinned = 10

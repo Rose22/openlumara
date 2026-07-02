@@ -789,8 +789,7 @@ class Http(core.module.Module):
         }
     }
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    async def on_ready(self):
         self.default_headers = {
             'User-Agent': 'OpenLumara/1.0',
             'Accept': 'application/json, text/plain, */*',

@@ -41,7 +41,7 @@ class ToolcallManager:
 
             return f"🔧 {func_name}({', '.join(arg_strs)})"
         except Exception as e:
-            core.log("toolcall", f"Error formatting tool call: {e}")
+            self.channel.log("toolcall", f"Error formatting tool call: {e}")
             return "🔧 Calling tool..."
 
     def _repair_tool_calls(self, tool_calls):
@@ -57,14 +57,14 @@ class ToolcallManager:
                 try:
                     modified_args = json_repair.loads(raw_args)
                 except Exception as e:
-                    core.log("error", f"JSON repair failed: {e}")
+                    self.channel.log("error", f"JSON repair failed: {e}")
                     modified_args = {}
             else:
-                core.log("error", f"unexpected arguments type: {type(raw_args)}")
+                self.channel.log("error", f"unexpected arguments type: {type(raw_args)}")
                 modified_args = {}
 
             if not isinstance(modified_args, dict):
-                core.log("error", f"Arguments not a dict: {modified_args}")
+                self.channel.log("error", f"Arguments not a dict: {modified_args}")
                 modified_args = {}
 
             tool_call['function']['arguments'] = json.dumps(modified_args)
@@ -122,6 +122,8 @@ class ToolcallManager:
         if push:
             await self.channel.push(assistant_message)
 
+        timeout_val = float(core.config.get("core", "tool_timeout", default=10.0))
+
         # execute each tool and add their responses
         for tool_call_dict in repaired_tool_calls:
             tool_name = tool_call_dict['function']['name']
@@ -129,20 +131,30 @@ class ToolcallManager:
 
             module_instance = None
             module_instance_display_name = None
+            method_name = None
 
             # find the module that has the requested tool
             # and store the instance and name of that module
             for module_name, module_obj in self.channel.manager.modules.items():
                 class_display_name = core.modules.get_name(module_obj)
-                translated_tool_name = tool_name.replace(f"{class_display_name}_", "")
+                module_prefix = f"{class_display_name}_"
 
-                if hasattr(module_obj, translated_tool_name):
-                    module_instance = module_obj
-                    module_instance_display_name = class_display_name
-                    break
+                # check if the tool name actually belongs to this module
+                if tool_name.startswith(module_prefix):
+                    # get the translated method name (coder_read() -> read())
+                    method_name = tool_name[len(module_prefix):]
+
+                    if hasattr(module_obj, method_name):
+                        module_instance = module_obj
+                        module_instance_display_name = class_display_name
+                        break
 
             if module_instance:
-                if tool_name not in self.channel.manager.tool_names:
+                if (
+                    tool_name not in self.channel.manager.tool_names
+                    or
+                    method_name in module_instance.disabled_tools
+                ):
                     # don't allow disabled tools to be called
                     rejected_msg = json.dumps({"content": "That tool has been disabled by the user.", "status": "error"})
                     await self.channel.context.chat.add({
@@ -153,25 +165,36 @@ class ToolcallManager:
                     yield {"type": "tool", "tool_call_id": tool_call_dict['id'], "content": rejected_msg}
                     continue
 
-                # remove the module name from the tool name
-                translated_tool_name = tool_name.replace(
-                    f"{module_instance_display_name}_", ""
-                )
                 # and use it to get the function object for that tool
-                func_callable = getattr(module_instance, translated_tool_name)
+                func_callable = getattr(module_instance, method_name)
 
                 # build a fancy toolcall display string
                 tool_call_str = self.display_call(tool_call_dict)
 
-                core.log("toolcall", tool_call_str)
+                self.channel.log("toolcall", tool_call_str)
 
+                func_response = None
                 try:
                     # do the function call and get it's result
                     async def _run_tool():
                         return await func_callable(**tool_args)
 
                     # add a timeout so that tools can't hang the application forever
-                    func_response = await asyncio.wait_for(_run_tool(), timeout=float(core.config.get("core", "tool_timeout", default=10.0)))
+                    func_response = await asyncio.wait_for(_run_tool(), timeout=timeout_val)
+                    if func_response is None:
+                        # bypass the usual response flow and just abort the chain
+                        return
+
+                except asyncio.TimeoutError as e:
+                    err_msg = core.detail_error(e) if core.debug else str(e)
+                    func_response = module_instance.result(f"Tool timed out after {timeout_val}s", success=False)
+                    self.channel.log("toolcall", func_response.get("content"))
+                except Exception as e:
+                    err_msg = core.detail_error(e) if core.debug else str(e)
+                    func_response = module_instance.result(f"Error while executing tool: {err_msg}", success=False)
+                    self.channel.log("toolcall", func_response.get("content"))
+                finally:
+                    func_response_str = None
 
                     # don't double-escape strings
                     if isinstance(func_response, str):
@@ -179,7 +202,7 @@ class ToolcallManager:
                     else:
                         func_response_str = json.dumps(func_response)
 
-                    # then build the openai toolcall response object
+                    # build the openai toolcall response object
                     tool_response = {
                         "role": "tool",
                         "tool_call_id": tool_call_dict['id'],
@@ -189,28 +212,14 @@ class ToolcallManager:
                     # yield it so it can be displayed immediately
                     yield {"type": "tool", "tool_call_id": tool_call_dict['id'], "content": func_response_str}
 
-                except Exception as e:
-                    core.log_error("Tool execution failed", e)
-                    err_msg = core.detail_error(e) if core.debug else str(e)
+                    # add the tool response to the context window
+                    await self.channel.context.chat.add(tool_response)
 
-                    # build an openai-compliant tool error object
-                    tool_response = {
-                        "role": "tool",
-                        "tool_call_id": tool_call_dict['id'],
-                        "content": f"error: {err_msg}"
-                    }
-
-                    # yield it so it can be displayed immediately
-                    yield {"type": "tool", "tool_call_id": tool_call_dict['id'], "content": f"error: {str(e)}"}
-
-                # add the tool response to the context window
-                await self.channel.context.chat.add(tool_response)
-
-                # push it if needed
-                # if push:
-                #     await self.channel.push(tool_response)
+                    # push it if needed
+                    # if push:
+                    #     await self.channel.push(tool_response)
             else:
-                core.log(
+                self.channel.log(
                     "toolcall",
                     f"tried to call tool {tool_name} but couldn't find it"
                 )
@@ -283,11 +292,13 @@ class ToolcallManager:
                         final_msg["reasoning_content"] = final_reasoning_str
 
                     await self.channel.context.chat.add(final_msg)
+                    self.channel.agentic_loop_start = len(await self.channel.context.chat.get())-1
+
                     if push:
                         await self.channel.push(final_msg)
 
         except Exception as e:
-            core.log_error(f"Error while handling tool calls", e)
+            self.channel.log_error(f"Error while handling tool calls", e)
             await self.channel.announce(
                 f"Error while handling tool calls: {e}",
                 "error"

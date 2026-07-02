@@ -9,14 +9,15 @@ from urllib.parse import urlparse
 class WebSearch(modules.http.Http):
     """
     Lets your AI search the web!
-    
-    Enhanced with multi-layer prompt injection defense based on:
-    - OWASP LLM01:2025 Prompt Injection Prevention
-    - Digital Applied's 12-Layer Framework
-    - Defense-in-depth: multiple overlapping controls
     """
 
+    dependencies = ["ddgs"]
+
     settings = {
+        # "allow_ai_to_search": {
+        #     "default": False,
+        #     "description": "Whether to allow the AI to search the web. When this is off, just use the /search command, which will insert the results into chat history so that your AI can read it."
+        # },
         "max_results": {
             "default": 5,
             "description": "The maximum number of results to return for search queries."
@@ -46,6 +47,12 @@ class WebSearch(modules.http.Http):
             "description": "Forbid access to these domains"
         }
     }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # if not self.config.get("allow_ai_to_search"):
+        #     self.disabled_tools.extend(["text", "images", "news", "videos", "books"])
 
     # ---------------------------------------------------------
     # Internal Helper Methods
@@ -184,6 +191,40 @@ class WebSearch(modules.http.Http):
             return self.result(
                 f"An error occurred during {kind} search.", success=False
             )
+
+    def _get_fields(self, kind: str):
+        match kind:
+            case "text":
+                return ("title", "body")
+            case "images":
+                return ("title", "image", "thumbnail")
+            case "news":
+                return ("title", "body")
+            case "videos":
+                return("title", "description")
+            case "books":
+                return ("title", "author", "publisher", "info")
+
+        return ()
+
+    # # command version of search
+    # @core.module.command("search", help={
+    #     "text <query>": "search the web for text",
+    #     "images <query>": "search the web for images",
+    #     "news <query>": "search the web for news",
+    #     "videos <query>": "search the web for videos",
+    #     "books <query>": "search the web for books"
+    # }, send_to_ai=True)
+    # async def cmd_search(self, args: list):
+    #     kind = args[0]
+    #     if kind not in ("text", "images", "news", "videos", "books"):
+    #         return "invalid search type. try one of the supported types (text, images, news, videos, or books)"
+    #
+    #     query = " ".join(args[1:])
+    #     url_key = "href" if kind == "text" else "url"
+    #
+    #     result = await self._search(kind, query, url_key, self._get_fields(kind))
+    #     return result
 
     # ---------------------------------------------------------
     # AI Tools

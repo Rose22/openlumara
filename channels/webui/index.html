@@ -142,8 +142,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
                             </svg>
                         </button>
-                        <div class="status-dot" id="status" role="status" aria-label="Connection status"></div>
-                        <h1>AI</h1>
+                        <h1>{{ header_title }}</h1>
                     </div>
                     <div class="header-right">
                         <button class="header-btn" id="search-btn" onclick="toggleSearch()" title="Search messages (Ctrl+F)">
@@ -171,6 +170,7 @@
                                 <path d="M6 8h.001M10 8h.001M14 8h.001M18 8h.001M8 12h.001M12 12h.001M16 12h.001M6 16h12"></path>
                             </svg>
                         </button>
+ 
                         <button class="header-btn" onclick="showStorageEditor()" title="Storage Editor">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
@@ -493,6 +493,20 @@
                                 </svg>
                                 <p>Start typing to search through all chats</p>
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Log Modal -->
+                <div class="modal-overlay" id="log-overlay" onclick="closeModalOnOverlay(event, 'log')"></div>
+                <div class="modal log-modal" id="log-modal" role="dialog" aria-labelledby="log-title">
+                    <div class="modal-header">
+                        <h2 id="log-title">System Logs</h2>
+                        <button id="log-close" class="modal-close" onclick="toggleModal('log')" aria-label="Close log">×</button>
+                    </div>
+                    <div class="modal-content log-content">
+                        <div class="log-container" id="log-log-container">
+                            <div id="log-log-content"></div>
                         </div>
                     </div>
                 </div>

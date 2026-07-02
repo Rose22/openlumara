@@ -12,7 +12,7 @@ let showUnsafeSettings = localStorage.getItem('showUnsafeSettings') === 'true';
 let activeModule = null; // Tracks the selected module for Desktop split view / Mobile drill-down
 let activeChannel = null; // Tracks the selected channel for Desktop split view / Mobile drill-down
 let categories = {}; // Global reference to settings categories
-let modulesExpanded = { modules: false, user_modules: false, channels: false }; // Tracks expansion state per category
+let modulesExpanded = { modules: false, user_modules: false, channels: false, user_channels: false }; // Tracks expansion state per category
 let isMobile = window.innerWidth <= 768; // Tracks mobile viewport state
 
 let resizeTimeout;
@@ -131,7 +131,7 @@ function organizeSettingsIntoCategories(originalData, moduleInfo = {}) {
         };
 
         // Special handling for modules and channels
-        if (topKey === 'modules' || topKey === 'user_modules' || topKey === 'channels') {
+        if (topKey === 'modules' || topKey === 'user_modules' || topKey === 'channels' || topKey === 'user_channels') {
             const hasToggleListStructure = isToggleList(topValue);
             const enabledItems = new Set(topValue.enabled || []);
             const allItems = hasToggleListStructure ? getAllToggleItems(topValue) : [];
@@ -405,7 +405,7 @@ function flattenSettingsObject(obj, prefix, schema = {}, callback) {
                     else if (subSchema.type === 'select') actualType = 'select';
                     else if (subSchema.type === 'number') actualType = 'number';
                     else if (subSchema.type === 'slider') actualType = 'slider';
-                    else actualType = subSchema.type;
+                    else actualType = detectType(actualValue, fullKey);
                 } else if (isToggleList(actualValue)) {
                     actualType = 'toggle_list';
                 } else {
@@ -502,13 +502,32 @@ function unflattenObject(flat) {
 
 // Format label from key
 function formatLabel(key) {
-    return key
-    .split('.')
-    .pop()
-    .replace(/_/g, ' ')
-    .replace(/([A-Z])/g, ' $1')
-    .replace(/^./, str => str.toUpperCase())
-    .trim();
+    if (typeof key !== 'string') return key;
+
+    // Extract just the last part of a dotted key for display
+    const parts = key.split('.');
+    const lastPart = parts[parts.length - 1];
+
+    // Replace underscores with spaces and capitalize
+    return lastPart.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/**
+ * Get the current value for a given key path from the live settingsData.
+ * This is used during form re-renders to prevent losing unsaved changes.
+ */
+function getCurrentValue(key) {
+    const parts = key.split('.');
+    let current = settingsData;
+
+    for (const part of parts) {
+        if (current === null || current === undefined || typeof current !== 'object') {
+            return undefined;
+        }
+        current = current[part];
+    }
+
+    return current;
 }
 
 // Load settings from backend
@@ -539,6 +558,7 @@ async function loadSettings() {
         // 2. If successful, update the master cache and the original reference
         settingsData = newData;
         settingsOriginal = JSON.parse(JSON.stringify(settingsData));
+        changedModuleSettings.clear();
 
         // 3. Attempt to fetch module info (gracefully)
         try {
@@ -613,6 +633,8 @@ function renderSettingsNav(categories) {
     const nav = document.getElementById('settings-nav');
     nav.innerHTML = '';
  
+    nav_top = document.createElement('div');
+    nav_top.className = 'settings-nav-top';
 
     const sortedCats = Object.entries(categories)
     .sort(([a, catA], [b, catB]) => (catA.order || 0) - (catB.order || 0));
@@ -626,7 +648,7 @@ function renderSettingsNav(categories) {
         <span>${data.title}</span>
         `;
         btn.onclick = () => switchSettingsCategory(cat);
-        nav.appendChild(btn);
+        nav_top.appendChild(btn);
 
         // Add module sub-list for Modules category on desktop only
         if (!isMobile && (cat === 'modules' || cat === 'user_modules') && data.groups && data.groups.has('_direct_')) {
@@ -671,7 +693,7 @@ function renderSettingsNav(categories) {
         }
 
         // Add channel sub-list for Channels category on desktop only
-        if (!isMobile && cat === 'channels' && data.groups && data.groups.has('_direct_')) {
+        if (!isMobile && (cat === 'channels' || cat === 'user_channels') && data.groups && data.groups.has('_direct_')) {
             const directGroup = data.groups.get('_direct_');
             if (directGroup && directGroup.items.length > 0) {
                 const channelListData = directGroup.items[0].value;
@@ -710,6 +732,48 @@ function renderSettingsNav(categories) {
         }
     });
 
+    // add special buttons
+
+    nav_bottom = document.createElement('div');
+    nav_bottom.className = 'settings-nav-bottom';
+
+    const logBtn = document.createElement('button');
+    logBtn.className = 'settings-nav-item';
+    logBtn.innerHTML = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <polyline points="4 17 10 11 4 5"></polyline>
+    <line x1="12" y1="19" x2="20" y2="19"></line>
+    </svg>
+    <span>System Logs</span>
+    `;
+    logBtn.onclick = () => toggleModal('log');
+    nav_bottom.appendChild(logBtn);
+
+    const restartBtn = document.createElement('button');
+    restartBtn.className = 'settings-nav-item restart-btn';
+    restartBtn.innerHTML = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.78.8 6.5 2.1l.5.4"/>
+    <path d="M21 3v5h-5"/>
+    </svg>
+    <span>Restart Server</span>
+    `;
+    restartBtn.onclick = async () => {
+        const confirmed = await showConfirmDialog("Are you sure you want to restart the server? This will disconnect the web UI momentarily.");
+        if (confirmed) {
+            restartServer();
+        }
+    };
+    nav_bottom.appendChild(restartBtn);
+
+    nav.appendChild(nav_top);
+
+    divider = document.createElement('div');
+    divider.className = 'settings-nav-divider';
+    nav.appendChild(divider);
+
+    nav.appendChild(nav_bottom);
+
     // Restore active highlight after re-rendering
     if (activeSettingsCategory) {
         document.querySelectorAll('.settings-nav-item').forEach(item => {
@@ -726,7 +790,7 @@ function switchSettingsCategory(category) {
     activeSettingsCategory = category;
     
     const isModules = category === 'modules' || category === 'user_modules';
-    const isChannels = category === 'channels';
+    const isChannels = category === 'channels' || category === 'user_channels';
 
     if (isModules || isChannels) {
         // Expand the clicked category's sub-list, collapse others
@@ -1023,7 +1087,7 @@ function renderSettingsForm(categories, activeSettingsCategory = null) {
         }
 
         // Special handling for Channels category
-        if (cat === 'channels') {
+        if (cat === 'channels' || cat === 'user_channels') {
             const directGroup = data.groups?.get('_direct_');
             if (directGroup && directGroup.items.length > 0) {
                 const channelListData = directGroup.items[0].value;
@@ -1167,7 +1231,7 @@ function renderSettingsForm(categories, activeSettingsCategory = null) {
         }
         
         // Skip generic group rendering for modules/user_modules/channels
-        if (cat !== 'modules' && cat !== 'user_modules' && cat !== 'channels') {
+        if (cat !== 'modules' && cat !== 'user_modules' && cat !== 'channels' && cat !== 'user_channels') {
             // Render groups - put direct items first
             if (data.groups) {
                 // First render direct (ungrouped) items into the main vertical stack
@@ -1236,6 +1300,9 @@ function renderSettingsForm(categories, activeSettingsCategory = null) {
         section.appendChild(itemsContainer);
         form.appendChild(section);
     }
+
+    // Re-add the unsaved changes indicator after re-rendering
+    updateUnsavedIndicator();
 }
 
 
@@ -1327,7 +1394,9 @@ function createSliderInput(key, value, min = 0, max = 100, step = 1) {
     const wrapper = document.createElement('div');
     wrapper.className = 'setting-slider-container';
 
-    const currentVal = parseFloat(value) || 0;
+    // Get current value from live settingsData (for re-render safety)
+    const currentValue = getCurrentValue(key);
+    const currentVal = parseFloat(currentValue) || parseFloat(value) || 0;
     const minVal = parseFloat(min);
     const maxVal = parseFloat(max);
     const stepVal = parseFloat(step) || 1;
@@ -1381,6 +1450,9 @@ function createSelectInput(key, value, options) {
     wrapper.className = 'setting-select-wrapper';
     wrapper.dataset.key = key;
 
+    // Get current value from live settingsData (for re-render safety)
+    const currentValue = getCurrentValue(key);
+
     const select = document.createElement('select');
     select.className = 'setting-input';
     select.dataset.key = key;
@@ -1390,7 +1462,7 @@ function createSelectInput(key, value, options) {
         const option = document.createElement('option');
         option.value = optKey;
         option.textContent = optKey;
-        if (optKey === value) {
+        if (optKey === (currentValue !== undefined ? currentValue : value)) {
             option.selected = true;
         }
         select.appendChild(option);
@@ -1422,6 +1494,10 @@ function createSelectInput(key, value, options) {
 
 // Create model dropdown input with refresh button
 function createModelInput(key, value) {
+    // Get current value from live settingsData (for re-render safety)
+    const currentValue = getCurrentValue(key);
+    const resolvedValue = currentValue !== undefined ? currentValue : value;
+
     const wrapper = document.createElement('div');
     wrapper.className = 'model-input-wrapper';
     wrapper.dataset.key = key;
@@ -1449,17 +1525,17 @@ function createModelInput(key, value) {
             const option = document.createElement('option');
             option.value = model;
             option.textContent = model;
-            if (model === value) {
+            if (model === resolvedValue) {
                 option.selected = true;
             }
             select.appendChild(option);
         });
 
         // If current value not in list, add it as custom
-        if (value && !cachedModels.find(m => m === value)) {
+        if (resolvedValue && !cachedModels.find(m => m === resolvedValue)) {
             const customOption = document.createElement('option');
-            customOption.value = value;
-            customOption.textContent = `${value} (custom)`;
+            customOption.value = resolvedValue;
+            customOption.textContent = `${resolvedValue} (custom)`;
             customOption.selected = true;
             select.insertBefore(customOption, placeholderOption.nextSibling);
         }
@@ -1498,7 +1574,7 @@ function createModelInput(key, value) {
                 wrapper.replaceWith(newInput);
             } else {
                 // Show error, fall back to text input
-                const textInput = createTextInput(key, value, 'text');
+                const textInput = createTextInput(key, resolvedValue, 'text');
                 wrapper.replaceWith(textInput);
 
                 // Show error message
@@ -1523,7 +1599,7 @@ function createModelInput(key, value) {
         input.type = 'text';
         input.className = 'setting-input';
         input.dataset.key = key;
-        input.value = value ?? '';
+        input.value = resolvedValue ?? '';
         input.placeholder = 'Enter model name';
         input.oninput = () => handleSettingChange(key, input.value);
 
@@ -1586,14 +1662,47 @@ function createModelInput(key, value) {
 
 // Create toggle list (for enabled/disabled arrays)
 function createToggleListInput(key, value, isModuleList = false) {
+    // Get current value from live settingsData (for re-render safety)
+    const currentValue = getCurrentValue(key);
+    const resolvedValue = currentValue !== undefined ? currentValue : value;
+
     const wrapper = document.createElement('div');
     wrapper.className = 'toggle-list';
     wrapper.dataset.key = key;
 
-    const allItems = getAllToggleItems(value);
-    const enabledSet = new Set(value.enabled || []);
-    const descriptions = value.descriptions || {};
-    const unsafeModules = value.unsafeModules || {};
+    // Use resolved value for getAllToggleItems to get current state
+    const allItems = getAllToggleItems(resolvedValue);
+    const enabledSet = new Set(resolvedValue.enabled || []);
+
+    // descriptions and unsafeModules are computed metadata from moduleInfoCache.
+    // On re-render they may be missing from the raw settingsData, so we fall back
+    // to the passed-in value's metadata or recompute from the cache.
+    let descriptions = resolvedValue.descriptions;
+    let unsafeModules = resolvedValue.unsafeModules;
+
+    if ((descriptions === undefined || descriptions === null) && value && value.descriptions) {
+        descriptions = value.descriptions;
+    }
+    if ((unsafeModules === undefined || unsafeModules === null) && value && value.unsafeModules) {
+        unsafeModules = value.unsafeModules;
+    }
+    // Final fallback: recompute from moduleInfoCache if still missing
+    if (descriptions === undefined || descriptions === null) {
+        descriptions = {};
+        for (const itemName in moduleInfoCache) {
+            if (moduleInfoCache[itemName].description) {
+                descriptions[itemName] = moduleInfoCache[itemName].description;
+            }
+        }
+    }
+    if (unsafeModules === undefined || unsafeModules === null) {
+        unsafeModules = {};
+        for (const itemName in moduleInfoCache) {
+            if (moduleInfoCache[itemName].unsafe) {
+                unsafeModules[itemName] = true;
+            }
+        }
+    }
 
     const sortedItems = allItems
     .filter(item => {
@@ -1774,6 +1883,9 @@ function updateToggleListData(key, enabledItems, allItems) {
 
     settingsHasChanges = JSON.stringify(settingsData) !== JSON.stringify(settingsOriginal);
     updateUnsavedIndicator();
+
+    // Note: Module enabled/disabled list changes are handled by server restart
+    // (via hasChannelOrModuleChanges), so we don't track them for individual reload.
 }
 
 // Create text input (with sensitive field detection)
@@ -1782,6 +1894,9 @@ function createTextInput(key, value, type = 'text') {
     const isSensitive = keyLower.includes('token') || keyLower.includes('key') ||
     keyLower.includes('secret') || keyLower.includes('password') ||
     keyLower.includes('credential');
+
+    // Get current value from live settingsData (for re-render safety)
+    const currentValue = getCurrentValue(key) ?? '';
 
     // For sensitive fields, use a reveal/hide toggle
     if (isSensitive) {
@@ -1792,7 +1907,7 @@ function createTextInput(key, value, type = 'text') {
         const input = document.createElement('input');
         input.type = 'password';
         input.className = 'setting-input sensitive-input';
-        input.value = value ?? '';
+        input.value = currentValue;
         input.dataset.revealed = 'false';
 
         const toggleBtn = document.createElement('button');
@@ -1835,7 +1950,7 @@ function createTextInput(key, value, type = 'text') {
     input.type = type === 'url' ? 'url' : (type === 'email' ? 'email' : 'text');
     input.className = 'setting-input';
     input.dataset.key = key;
-    input.value = value ?? '';
+    input.value = currentValue;
     input.oninput = () => handleSettingChange(key, input.value);
     return input;
 }
@@ -1845,11 +1960,14 @@ function createPasswordInput(key, value) {
     const wrapper = document.createElement('div');
     wrapper.style.cssText = 'position: relative; display: flex; align-items: center;';
 
+    // Get current value from live settingsData (for re-render safety)
+    const currentValue = getCurrentValue(key) ?? '';
+
     const input = document.createElement('input');
     input.type = 'password';
     input.className = 'setting-input';
     input.dataset.key = key;
-    input.value = value ?? '';
+    input.value = currentValue;
     input.style.paddingRight = '40px';
     input.oninput = () => handleSettingChange(key, input.value);
 
@@ -1869,28 +1987,37 @@ function createPasswordInput(key, value) {
 
 // Create textarea
 function createTextareaInput(key, value) {
+    // Get current value from live settingsData (for re-render safety)
+    const currentValue = getCurrentValue(key) ?? '';
+
     const textarea = document.createElement('textarea');
     textarea.className = 'setting-input setting-textarea';
     textarea.dataset.key = key;
-    textarea.value = value ?? '';
+    textarea.value = currentValue;
     textarea.oninput = () => handleSettingChange(key, textarea.value);
     return textarea;
 }
 
 // Create number input
 function createNumberInput(key, value) {
+    // Get current value from live settingsData (for re-render safety)
+    const currentValue = getCurrentValue(key) ?? 0;
+
     const input = document.createElement('input');
     input.type = 'number';
     input.className = 'setting-input';
     input.dataset.key = key;
-    input.value = value ?? 0;
-    input.step = Number.isInteger(value) ? '1' : '0.01';
+    input.value = currentValue;
+    input.step = Number.isInteger(currentValue) ? '1' : '0.01';
     input.oninput = () => handleSettingChange(key, parseFloat(input.value) || 0);
     return input;
 }
 
 // Create toggle switch (single boolean)
 function createToggleInput(key, value, isUnsafe = false) {
+    // Get current value from live settingsData (for re-render safety)
+    const currentValue = getCurrentValue(key) ?? value;
+
     const wrapper = document.createElement('div');
     wrapper.className = 'setting-toggle-wrapper';
 
@@ -1899,14 +2026,14 @@ function createToggleInput(key, value, isUnsafe = false) {
 
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
-    checkbox.checked = value;
+    checkbox.checked = currentValue;
 
     const slider = document.createElement('span');
     slider.className = 'toggle-slider';
 
     const labelSpan = document.createElement('span');
     labelSpan.className = 'setting-toggle-label';
-    labelSpan.textContent = value ? 'Enabled' : 'Disabled';
+    labelSpan.textContent = currentValue ? 'Enabled' : 'Disabled';
 
     // Handle change
     checkbox.onchange = async () => {
@@ -1940,7 +2067,10 @@ function createArrayInput(key, value) {
     wrapper.className = 'setting-array';
     wrapper.dataset.key = key;
 
-    const items = Array.isArray(value) ? [...value] : [];
+    // Get current value from live settingsData (for re-render safety)
+    const currentValue = getCurrentValue(key);
+    const resolvedValue = currentValue !== undefined ? currentValue : value;
+    const items = Array.isArray(resolvedValue) ? [...resolvedValue] : [];
 
     const header = document.createElement('div');
     header.className = 'setting-array-header';
@@ -2009,7 +2139,10 @@ function createArrayInput(key, value) {
 
 // Create object input
 function createObjectInput(key, value) {
-    const entries = value && typeof value === 'object' ? Object.entries(value) : [];
+    // Get current value from live settingsData (for re-render safety)
+    const currentValue = getCurrentValue(key);
+    const resolvedValue = currentValue !== undefined ? currentValue : value;
+    const entries = resolvedValue && typeof resolvedValue === 'object' ? Object.entries(resolvedValue) : [];
 
     const wrapper = document.createElement('div');
     wrapper.className = 'setting-object';
@@ -2100,6 +2233,9 @@ function createObjectInput(key, value) {
 }
 
 // Handle setting change
+// Track which modules have had their settings changed (for reload-on-save)
+let changedModuleSettings = new Set();
+
 function handleSettingChange(key, value) {
     const parts = key.split('.');
     let current = settingsData;
@@ -2115,6 +2251,16 @@ function handleSettingChange(key, value) {
 
     settingsHasChanges = JSON.stringify(settingsData) !== JSON.stringify(settingsOriginal);
     updateUnsavedIndicator();
+
+    // Track which modules had settings changed
+    // Module settings keys look like: "modules.settings.mymodule.something"
+    // or "user_modules.settings.mymodule.something"
+    if (parts.length >= 4) {
+        if ((parts[0] === 'modules' || parts[0] === 'user_modules') && parts[1] === 'settings') {
+            const moduleName = parts[2];
+            changedModuleSettings.add(moduleName);
+        }
+    }
 }
 
 // Update unsaved changes indicator
@@ -2142,6 +2288,7 @@ function resetSettingsForm() {
 
     settingsData = JSON.parse(JSON.stringify(settingsOriginal));
     settingsHasChanges = false;
+    changedModuleSettings.clear();
 
     const categories = organizeSettingsIntoCategories(settingsData);
     renderSettingsForm(categories);
@@ -2175,7 +2322,10 @@ async function saveSettings() {
         const response = await fetch('/settings/save', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(settingsData),
+            body: JSON.stringify({
+                settings: settingsData,
+                changed_modules: Array.from(changedModuleSettings)
+            }),
                                      signal: AbortSignal.timeout(15000)
         });
 
@@ -2187,12 +2337,11 @@ async function saveSettings() {
         // Success: Update the original reference so "unsaved" indicator clears
         settingsOriginal = JSON.parse(JSON.stringify(settingsData));
         settingsHasChanges = false;
+        changedModuleSettings.clear();
 
         if (hasChannelOrModuleChanges) {
-            showSettingsSuccessWithRestart();
             await restartServer();
         } else if (hasApiOrModelChanges) {
-            await reconnectApi();
             toggleModal('settings');
         } else {
             showSettingsSuccess();
@@ -2218,9 +2367,21 @@ async function saveSettings() {
 
 // Detect if there are changes beyond just theme
 // Detect if there are changes in channel or module settings
+// Detect if there are changes beyond just theme
+// Detect if there are changes in channel or module settings
 function detectChannelOrModuleChanges() {
-    for (const key of ['channels', 'modules', 'user_modules']) {
-        if (settingsData[key] && JSON.stringify(settingsData[key]) !== JSON.stringify(settingsOriginal[key])) {
+    for (const key of ['channels', 'user_channels', 'modules', 'user_modules']) {
+        const newData = settingsData[key];
+        const oldData = settingsOriginal[key];
+        if (!newData || !oldData) continue;
+
+        // Only check enabled/disabled arrays, not settings values
+        const newEnabled = JSON.stringify(newData.enabled || []);
+        const oldEnabled = JSON.stringify(oldData.enabled || []);
+        const newDisabled = JSON.stringify(newData.disabled || []);
+        const oldDisabled = JSON.stringify(oldData.disabled || []);
+
+        if (newEnabled !== oldEnabled || newDisabled !== oldDisabled) {
             return true;
         }
     }
@@ -2267,6 +2428,10 @@ async function restartServer() {
             restartMsg.textContent = 'Restarting server...';
         }
 
+        // show system logs
+        closeModal('settings');
+        showModal('log', true);
+
         const response = await fetch('/server/restart', {
             method: 'POST',
             signal: AbortSignal.timeout(5000)
@@ -2275,85 +2440,11 @@ async function restartServer() {
             return { ok: true };
         });
 
-        // Show restart notification
-        showRestartNotification();
-
+        // the websocket signal handles the server's on_ready()
+        // so that we can close the modal again/reload the page
     } catch (err) {
-        // Expected - server is restarting
-        showRestartNotification();
+        pass
     }
-}
-
-// Show settings saved with restart message
-function showSettingsSuccessWithRestart() {
-    const form = document.getElementById('settings-form');
-    const existing = form.querySelector('.setting-success-msg');
-    if (existing) existing.remove();
-
-    const success = document.createElement('div');
-    success.className = 'setting-success-msg restart-pending';
-    success.innerHTML = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
-    Settings saved! Server restarting...
-    `;
-
-    form.insertBefore(success, form.firstChild);
-}
-
-
-// Show restart notification
-function showRestartNotification() {
-    const form = document.getElementById('settings-form');
-    const existing = form.querySelector('.restart-notification');
-    if (existing) existing.remove();
-
-    const notification = document.createElement('div');
-    notification.className = 'restart-notification';
-    notification.innerHTML = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-    <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path>
-    <path d="M21 3v5h-5"></path>
-    </svg>
-    <div class="restart-content">
-    <div class="restart-title">Server Restarting</div>
-    <div class="restart-desc">The server is applying your changes. The page will refresh when ready.</div>
-    </div>
-    `;
-
-    form.insertBefore(notification, form.firstChild);
-
-    // Start polling for server availability
-    pollForServerRestart();
-}
-
-// Poll for server to come back up
-function pollForServerRestart() {
-    let attempts = 0;
-    const maxAttempts = 60; // 30 seconds max
-
-    const poll = setInterval(async () => {
-        attempts++;
-
-        if (attempts >= maxAttempts) {
-            clearInterval(poll);
-            showRestartFailed();
-            return;
-        }
-
-        try {
-            const response = await fetch('/settings/load', {
-                method: 'GET',
-                signal: AbortSignal.timeout(1000)
-            });
-
-            if (response.ok) {
-                clearInterval(poll);
-                showRestartComplete();
-            }
-        } catch (err) {
-            // Server not ready yet, keep polling
-        }
-    }, 500);
 }
 
 // Show restart failed message
@@ -2375,28 +2466,6 @@ function showRestartFailed() {
     }
 }
 
-// Show restart complete and refresh page
-function showRestartComplete() {
-    const notification = document.querySelector('.restart-notification');
-    if (notification) {
-        notification.classList.add('restart-complete');
-        notification.innerHTML = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polyline points="20 6 9 17 4 12"></polyline>
-        </svg>
-        <div class="restart-content">
-        <div class="restart-title">Server Restarted</div>
-        <div class="restart-desc">Refreshing page...</div>
-        </div>
-        `;
-    }
-
-    // Refresh the page after a short delay
-    setTimeout(() => {
-        window.location.reload();
-    }, 500);
-}
-
 // Show success message (theme only - no restart)
 function showSettingsSuccess() {
     const form = document.getElementById('settings-form');
@@ -2412,6 +2481,7 @@ function showSettingsSuccess() {
 
     form.insertBefore(success, form.firstChild);
     setTimeout(() => success.remove(), 3000);
+    toggleModal('settings');
 }
 
 // Show error message
@@ -3772,7 +3842,7 @@ function updateThemeButtonsInSettings() {
 function clearSidebarSelections() {
     activeModule = null;
     activeChannel = null;
-    modulesExpanded = { modules: false, user_modules: false, channels: false };
+    modulesExpanded = { modules: false, user_modules: false, channels: false, user_channels: false };
 
     document.querySelectorAll('.settings-nav-item').forEach(item => {
         item.classList.remove('active');
@@ -3840,7 +3910,6 @@ toggleModal = function(modalName) {
     document.body.classList.toggle('token-bar-hidden', !isVisible);
 })();
 
-
 // Create reasoning effort slider
 function createReasoningEffortSlider(key, value) {
     const wrapper = document.createElement('div');
@@ -3849,6 +3918,10 @@ function createReasoningEffortSlider(key, value) {
 
     const container = document.createElement('div');
     container.className = 'setting-slider-container';
+
+    // Get current value from live settingsData (for re-render safety)
+    const currentValue = getCurrentValue(key);
+    const resolvedValue = currentValue !== undefined ? currentValue : value;
 
     const slider = document.createElement('input');
     slider.type = 'range';
@@ -3875,10 +3948,10 @@ function createReasoningEffortSlider(key, value) {
 
     // Find current index from value
     let currentIndex = 0;
-    if (value === 'low') currentIndex = 1;
-    else if (value === 'medium') currentIndex = 2;
-    else if (value === 'high') currentIndex = 3;
-    else if (value === 'xhigh') currentIndex = 4;
+    if (resolvedValue === 'low') currentIndex = 1;
+    else if (resolvedValue === 'medium') currentIndex = 2;
+    else if (resolvedValue === 'high') currentIndex = 3;
+    else if (resolvedValue === 'xhigh') currentIndex = 4;
     else currentIndex = 0;
 
     slider.value = currentIndex;
@@ -3913,7 +3986,9 @@ function createPercentageSlider(key, value) {
     const wrapper = document.createElement('div');
     wrapper.className = 'setting-slider-container';
 
-    const currentVal = parseFloat(value) || 0;
+    // Get current value from live settingsData (for re-render safety)
+    const currentValue = getCurrentValue(key);
+    const currentVal = parseFloat(currentValue) || parseFloat(value) || 0;
     const minVal = 0;
     const maxVal = 1;
     const stepVal = 0.01;

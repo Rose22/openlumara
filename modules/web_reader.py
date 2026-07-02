@@ -12,6 +12,8 @@ class WebReader(modules.http.Http):
     Lets your AI read the content of pages on the web
     """
 
+    dependencies = ["beautifulsoup4", "aiohttp"]
+
     # ---------------------------------------------------------
     # Internal Helper Methods
     # ---------------------------------------------------------

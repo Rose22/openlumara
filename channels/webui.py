@@ -36,10 +36,10 @@ WEBUI_DIR = core.get_path("channels/webui")
 
 # ordered list of javascript files, to load in this exact order
 JS_FILES = [
-    "icons", "variables", "content_helpers", "markdown", "messages",
-    "msg_actions", "sidebar", "utils", "notif", "status", "polling", "chats",
-    "tags", "search", "export", "modals", "autocomplete", "input", "send", "upload", "theming",
-    "audio", "modal_settings", "storage_editor", "responsive", "init"
+    "icons", "variables", "errors", "content_helpers", "markdown", "messages",
+    "msg_actions", "sidebar", "utils", "notif", "chats",
+    "tags", "search", "export", "modals", "autocomplete", "input", "typewriter", "streaming", "send", "upload", "theming",
+    "audio", "modal_settings", "storage_editor", "responsive", "websockets", "system_logs", "init"
 ]
 
 # same deal for css files
@@ -89,24 +89,139 @@ class ConnectionManager:
     def __init__(self):
         self.active_connections: List[WebSocket] = []
         self.connection_users: Dict[WebSocket, str] = {}  # Track authenticated users
+        self.log_buffer: List[dict] = []  # Store all log messages
+        self.max_log_buffer = 1000  # Keep last 1000 logs
+
+        # Global State for Unified Experience
+        self.stream_buffer: List[str] = []  # Accumulates tokens for the current stream
+        self.active_stream_task: Optional[asyncio.Task] = None
+
+        # toggled on when the webui channel has fully started up
+        self.webui_ready = False
 
     async def connect(self, websocket: WebSocket, user: str = "anonymous"):
         await websocket.accept()
         self.active_connections.append(websocket)
         self.connection_users[websocket] = user
 
+        current_chat_id = await channel_instance.context.chat.get_id()
+        
+        # Send log history to new connection
+        if self.log_buffer:
+            await websocket.send_json({
+                "type": "log_history",
+                "logs": self.log_buffer
+            })
+
+        # Send global state sync if active
+        if current_chat_id:
+            await websocket.send_json({
+                "type": "sync_state",
+                "active_chat_id": current_chat_id,
+                "buffer": self.stream_buffer
+            })
+
+        # wait with sending the ready signal until the webui is fully started up
+        asyncio.create_task(self.queue_ready_signal());
+
     def disconnect(self, websocket: WebSocket):
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
         self.connection_users.pop(websocket, None)
 
+    async def queue_ready_signal(self):
+        while not self.webui_ready:
+            await asyncio.sleep(0.1)
+
+        await self.broadcast({"type": "ready"})
+
+    def send_ready_signal(self):
+        self.webui_ready = True
+
     async def broadcast(self, message: dict):
+        disconnected = []
         for connection in self.active_connections:
             try:
                 if connection.client_state == WebSocketState.CONNECTED:
                     await connection.send_json(message)
             except Exception:
+                disconnected.append(connection)
+        
+        # Clean up any dead connections
+        for conn in disconnected:
+            self.disconnect(conn)
+
+    def add_log(self, category: str, message: str):
+        """Add a log entry to the buffer"""
+        self.log_buffer.append({
+            "category": category,
+            "message": message
+        })
+        # Keep only the last N entries
+        if len(self.log_buffer) > self.max_log_buffer:
+            self.log_buffer = self.log_buffer[-self.max_log_buffer:]
+
+    async def start_background_stream(self, chat_id: str, generator: Any):
+        """Start a detached background task for streaming that broadcasts tokens immediately."""
+        # Cancel any existing stream
+        if self.active_stream_task and not self.active_stream_task.done():
+            self.active_stream_task.cancel()
+
+        self.active_chat_id = chat_id
+        self.stream_buffer = []
+
+        next_index = len(await channel_instance.context.chat.get())
+        
+        async def stream_worker():
+            try:
+                async for token_data in generator:
+                    if isinstance(token_data, dict):
+                        p_type = token_data.get("type")
+                        status_str = "idle"
+                        if p_type == "reasoning": status_str = "thinking"
+                        elif p_type == "content": sttus_str = "content"
+                        elif p_type in ["tool_call_delta", "tool", "tool_calls"]: status_str = "tool_call"
+                        elif p_type == "tool": status_str = "tool_exec"
+                        
+                        payload = serialize_for_json(token_data)
+                        payload["_meta"] = {"type": "delta", "status": status_str}
+                        
+                        # Add to buffer
+                        self.stream_buffer.append(payload)
+                        
+                        # Broadcast immediately
+                        await self.broadcast({
+                            "type": "token",
+                            "message": payload
+                        })
+                    else:
+                        # Raw string token
+                        self.stream_buffer.append(str(token_data))
+                        await self.broadcast({
+                            "type": "token",
+                            "content": token_data
+                        })
+
+                # Stream finished normally
+                await self.broadcast({
+                    "type": "stream_complete",
+                    "buffer": self.stream_buffer,
+                    "index": next_index
+                })
+                
+                # Clear buffer
+                self.stream_buffer = []
+                self.active_chat_id = None
+
+            except asyncio.CancelledError:
                 pass
+            except Exception as e:
+                # Log the error but don't broadcast it as it might confuse the UI
+                channel_instance.log("webui", f"Background stream error: {core.detail_error(e)}")
+                self.stream_buffer = []
+                self.active_chat_id = None
+
+        self.active_stream_task = asyncio.create_task(stream_worker())
 
 manager = ConnectionManager()
 
@@ -138,7 +253,7 @@ async def authenticate_websocket(websocket: WebSocket) -> Optional[str]:
             if session_data.get('username'):
                 return session_data.get('username')
         except Exception as e:
-            core.log("webui", f"WebSocket session auth failed: {e}")
+            channel_instance.log("webui", f"WebSocket session auth failed: {core.detail_error(e)}")
 
     # Method 2: Check Bearer token in query parameters
     token = websocket.query_params.get('token')
@@ -157,6 +272,8 @@ async def authenticate_websocket(websocket: WebSocket) -> Optional[str]:
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     # Authenticate before accepting connection
+    global channel_instance
+
     user = await authenticate_websocket(websocket)
 
     if user is None:
@@ -174,13 +291,22 @@ async def websocket_endpoint(websocket: WebSocket):
 
                 if msg_type == "stop":
                     # Signal the API to stop
-                    if channel_instance and channel_instance.manager.API:
-                        channel_instance.manager.API.cancel_request = True
+                    if channel_instance:
+                        await channel_instance.manager.API.cancel()
 
                 elif msg_type == "cancel":
                     stream_id = data.get("id")
                     if stream_id:
                         stream_cancellations.add(stream_id)
+
+                elif msg_type == "reload_messages":
+                    # send all messages from current chat
+                    # for use with cases where the UI needs to sync back up
+                    # with the backend
+                    await manager.broadcast({
+                        "type": "messages_updated",
+                        "messages": await channel_instance.context.chat.get()
+                    })
 
                 elif msg_type == "rename":
                     new_title = data.get("title")
@@ -193,15 +319,112 @@ async def websocket_endpoint(websocket: WebSocket):
                             "tags": await channel_instance.context.chat.get_tags() or []
                         })
 
+                elif msg_type == "switch_chat":
+                    new_chat_id = data.get("chat_id")
+                    if new_chat_id:
+                        # Cancel current stream if any
+                        if manager.active_stream_task and not manager.active_stream_task.done():
+                            manager.active_stream_task.cancel()
+                        
+                        # Switch context
+                        await channel_instance.context.chat.load(new_chat_id)
+                        manager.active_chat_id = new_chat_id
+                        
+                        # Broadcast the switch to all clients
+                        await manager.broadcast({
+                            "type": "chat_switched",
+                            "chat_id": new_chat_id,
+                            "buffer": manager.stream_buffer
+                        })
+
+                elif msg_type == "new_chat":
+                    # Cancel current stream
+                    if manager.active_stream_task and not manager.active_stream_task.done():
+                        manager.active_stream_task.cancel()
+                    
+                    # Create new chat
+                    new_id = await channel_instance.context.chat.new_chat()
+                    manager.active_chat_id = new_id
+                    
+                    # Broadcast the switch
+                    await manager.broadcast({
+                        "type": "chat_switched",
+                        "chat_id": new_id,
+                        "buffer": []
+                    })
+
+                elif msg_type == "chat_delete":
+                    chat_id = data.get("chat_id")
+                    if not chat_id:
+                        return False
+
+                    # delete the chat
+                    await channel_instance.context.chat.delete(chat_id)
+                    # the chat class manages the switch to the chat before the deleted one
+                    await manager.broadcast({
+                        "type": "chat_switched",
+                        "chat_id": channel_instance.context.chat.current,
+                        "buffer": []
+                    })
+                
+                elif msg_type == "user_message":
+                    # Handle user message via WebSocket
+                    content = data.get("content")
+                    if content:
+                        try:
+                            chat_id = await channel_instance.context.chat.get_id() or "default"
+                            # Ensure payload is a dict
+                            payload = content if isinstance(content, dict) else {"role": "user", "content": content}
+                            await start_ai_stream_task(chat_id, payload)
+                        except Exception as e:
+                            channel_instance.log("webui", f"WebSocket user_message error: {core.detail_error(e)}")
+                            await manager.broadcast({
+                                "type": "error",
+                                "error": str(e)
+                            })
+
+                elif msg_type == "message_delete":
+                    index = data.get("index")
+                    if not index:
+                        return False
+
+                    await channel_instance.context.chat.delete_from(index-1)
+                    await manager.broadcast({
+                        "type": "messages_updated",
+                        "messages": await channel_instance.context.chat.get()
+                    })
+
+                elif msg_type == "message_regenerate":
+                    index = data.get("index")
+
+                    if index is not None and channel_instance:
+                        last_user_message_index = await channel_instance.context.chat.get_last_message_with_role("user", cutoff_index=index)
+                        user_message = await channel_instance.context.chat.get_message(last_user_message_index)
+                        await channel_instance.context.chat.delete_from(last_user_message_index-1)
+
+                        if user_message:
+                            # 1. Broadcast update to sync UI (removes the old assistant message)
+                            await manager.broadcast({
+                                "type": "messages_updated",
+                                "messages": await channel_instance.context.chat.get()
+                            })
+                            # 2. Start the new stream using the user content
+                            await start_ai_stream_task(await channel_instance.context.chat.get_id(), user_message)
+                        else:
+                            await manager.broadcast({
+                                "type": "error",
+                                "error": "Could not regenerate message (no preceding user message found)."
+                            })
+
             except json.JSONDecodeError:
                 pass
             except Exception as e:
-                core.log("webui", f"WebSocket command error: {e}")
+                channel_instance.log("webui", f"WebSocket command error: {core.detail_error(e)}")
 
     except WebSocketDisconnect:
         manager.disconnect(websocket)
     except Exception as e:
-        core.log("webui", f"WebSocket error: {e}")
+        channel_instance.log("webui", f"WebSocket error: {core.detail_error(e)}")
         manager.disconnect(websocket)
 
 
@@ -412,11 +635,14 @@ async def api_logout(request: Request):
 
 @app.get("/")
 async def index(request: Request):
+    global channel_instance
+
     return templates.TemplateResponse(
         request,
         "index.html",
         {
             "request": request,
+            "header_title": channel_instance.config.get("title"),
             "js_files": JS_FILES,
             "css_files": CSS_FILES,
             "require_login": bool(channel_instance.config.get("require_login"))
@@ -508,8 +734,7 @@ async def api_disconnect(user: str = Depends(require_auth)):
 async def list_models(user: str = Depends(require_auth)):
     if not channel_instance:
         raise HTTPException(status_code=500, detail="Channel not available")
-    if not channel_instance.manager.API.connected:
-        raise HTTPException(status_code=503, detail="Not connected to API")
+
     try:
         models = await channel_instance.manager.API.list_models()
         return {'models': models}
@@ -574,6 +799,59 @@ async def get_commands(user: str = Depends(require_auth)):
     return core.commands.get_commands(channel_instance.manager.modules)
 
 @app.post("/stream")
+async def start_ai_stream_task(chat_id: str, payload_body: dict):
+    """
+    Starts an AI response stream for a given chat.
+    Broadcasts the user's message with the correct index first, then streams the AI response.
+    """
+    
+    # 1. Calculate the true next index before broadcasting anything
+    messages = await channel_instance.context.chat.get() or []
+    next_index = len(messages)
+
+    # 2. Broadcast the user message with the correct index
+    user_msg_payload = payload_body.copy()
+    if isinstance(user_msg_payload, dict):
+        user_msg_payload['index'] = next_index
+    
+    await manager.broadcast({
+        "type": "user_message_added",
+        "message": user_msg_payload
+    })
+
+    # 3. Start the AI stream
+    stream_id = str(uuid.uuid4())[:8]
+
+    async def generator():
+        user_message_confirmed = False
+
+        try:
+            async for token_data in channel_instance.send_stream(payload_body, commands_authorized=True):
+                if stream_id in stream_cancellations:
+                    stream_cancellations.discard(stream_id)
+                    yield {'type': 'cancelled'}
+                    return
+
+                if isinstance(token_data, dict) and token_data.get('type') == 'error':
+                    yield token_data
+                    return
+
+                # AS SOON AS FIRST TOKEN ARRIVES: Confirm the user message to remove 'sending...'
+                # We use the index we calculated earlier
+                if not user_message_confirmed:
+                    user_message_confirmed = True
+                    await manager.broadcast({
+                        "type": "user_message_confirmed",
+                        "index": next_index
+                    })
+
+                yield token_data
+        except Exception as e:
+            yield {'type': 'error', 'content': core.detail_error(e) if core.debug else str(e)}
+
+    await manager.start_background_stream(chat_id, generator())
+    return stream_id
+
 async def stream_message(request: Request, user: str = Depends(require_auth)):
     global channel_instance
 
@@ -582,69 +860,33 @@ async def stream_message(request: Request, user: str = Depends(require_auth)):
         raise HTTPException(status_code=503, detail=status)
 
     data = await request.json()
-    stream_id = str(uuid.uuid4())[:8]
+    chat_id = await channel_instance.context.chat.get_id() or "default"
+    
+    # Use the unified task starter
+    stream_id = await start_ai_stream_task(chat_id, data)
 
-    async def event_generator():
-        try:
-            # Initial connection signal
-            yield f"data: {json.dumps({'_meta': {'type': 'connection', 'status': 'connected'}, 'id': stream_id})}\n\n"
-
-            async for token_data in channel_instance.send_stream(data, commands_authorized=True):
-                if stream_id in stream_cancellations:
-                    stream_cancellations.discard(stream_id)
-                    yield f"data: {json.dumps({'_meta': {'type': 'cancelled'}})}\n\n"
-                    break
-
-                if isinstance(token_data, dict) and token_data.get('type') == 'error':
-                    yield f"data: {json.dumps({'_meta': {'type': 'error'}, 'error_data': token_data.get('content', {})})}\n\n"
-                    break
-
-                # Map status
-                p_type = token_data.get("type")
-                status_str = "idle"
-                if p_type == "reasoning": status_str = "thinking"
-                elif p_type in ["tool_call_delta", "tool", "tool_calls"]: status_str = "tool_call"
-                elif p_type == "tool": status_str = "tool_exec"
-
-                payload = serialize_for_json(token_data)
-                payload["_meta"] = {"type": "delta", "status": status_str}
-                yield f"data: {json.dumps(payload)}\n\n"
-
-            # Post-stream: Broadcast the new message with index
-            messages = await channel_instance.context.chat.get() or []
-            if messages:
-                last_msg = messages[-1]
-                # Add index for frontend compatibility
-                last_msg['index'] = len(messages) - 1
-                await manager.broadcast({
-                    "type": "message_added",
-                    "message": serialize_for_json(last_msg)
-                })
-
-            # Commit phase
-            serialized_history = [serialize_for_json(m) for m in messages]
-            yield f"data: {json.dumps({'_meta': {'type': 'commit'}, 'history': serialized_history})}\n\n"
-
-        except Exception as e:
-            err_msg = core.detail_error(e) if core.debug else str(e)
-            yield f"data: {json.dumps({'_meta': {'type': 'error'}, 'error': err_msg})}\n\n"
-
-    return StreamingResponse(event_generator(), media_type="text/event-stream", headers={
-        'Cache-Control': 'no-cache',
-        'X-Accel-Buffering': 'no'
-    })
+    return JSONResponse({"status": "streaming", "id": stream_id})
 
 
 @app.post("/send")
 async def send_message(request: Request, user: str = Depends(require_auth)):
     global channel_instance
 
-    status = get_api_status()
-    if not status['connected']:
-        raise HTTPException(status_code=503, detail=status)
-
     data = await request.json()
+    next_index = len(await channel_instance.context.chat.get())
+    data["index"] = next_index
+
+    await manager.broadcast({
+        "type": "user_message_added",
+        "message": data
+    })
+
     response = await channel_instance.send(data, commands_authorized=True)
+
+    await manager.broadcast({
+        "type": "user_message_confirmed",
+        "index": next_index
+    })
 
     if isinstance(response, dict) and 'error' in response:
         raise HTTPException(status_code=500, detail=response)
@@ -652,6 +894,9 @@ async def send_message(request: Request, user: str = Depends(require_auth)):
     messages = await channel_instance.context.chat.get() or []
     current_id = await channel_instance.context.chat.get_id()
     current_title = await channel_instance.context.chat.get_title()
+
+    await manager.broadcast({"type": "messages_updated", "messages": messages})
+    await manager.broadcast({"type": "stream_complete", "buffer": [], "index": next_index})
 
     return {
         'response': response, 'total': len(messages),
@@ -669,6 +914,7 @@ async def edit_message(request: Request, user: str = Depends(require_auth)):
         if messages[index].get('role') in ('user', 'assistant'):
             messages[index]['content'] = new_content
             await channel_instance.context.chat.set(messages)
+            await manager.broadcast({"type": "messages_updated", "messages": await channel_instance.context.chat.get()})
             return {'success': True, 'total': len(messages)}
         return {'success': False, 'error': 'Cannot edit this message type'}
     return {'success': False, 'error': f'Index {index} out of range'}
@@ -681,8 +927,9 @@ async def delete_message(request: Request, user: str = Depends(require_auth)):
     messages = await channel_instance.context.chat.get()
     if 0 <= int(index) < len(messages):
         if messages[index].get('role') in ('user', 'assistant', 'command', 'command_response') or messages[index].get('role', '').startswith('announce_'):
-            await channel_instance.context.chat.set(messages[:index])
+            await channel_instance.context.chat.delete_from(index)
             remaining = len(await channel_instance.context.chat.get())
+            await manager.broadcast({"type": "messages_updated", "messages": await channel_instance.context.chat.get()})
             return {'success': True, 'remaining': remaining}
     return {'success': False, 'error': f'Index {index} out of range'}
 
@@ -869,6 +1116,8 @@ async def load_chat(id: str, user: str = Depends(require_auth)):
 
     for i, msg in enumerate(messages):
         msg['index'] = i
+
+    await manager.broadcast({"type": "chat_switched", "chat_id": loaded_id})
 
     return {
         'success': True, 'chat': {
@@ -1066,13 +1315,25 @@ async def load_settings(user: str = Depends(require_auth)):
     return core.config.config
 
 @app.post("/settings/save")
+@app.post("/settings/save")
 async def save_settings(request: Request, user: str = Depends(require_auth)):
-    form_data = await request.json()
+    data = await request.json()
+    form_data = data.get("settings", data)  # Support both formats
+    changed_modules = data.get("changed_modules", [])
+    
     result = core.config.config.load(data=form_data)
     core.config.config.save()
 
     if not result:
         raise HTTPException(status_code=500, detail="Something went wrong while saving settings!")
+
+    # Reload modules that had their settings changed
+    if changed_modules and channel_instance:
+        for module_name in changed_modules:
+            try:
+                await channel_instance.manager.reload_module(module_name)
+            except Exception as e:
+                channel_instance.log("webui", f"Error reloading module {module_name}: {core.detail_error(e)}")
 
     return {"success": True}
 
@@ -1099,6 +1360,8 @@ async def get_module_info(user: str = Depends(require_auth)):
 @app.get("/storage/list")
 async def list_storage_files(user: str = Depends(require_auth)):
     """List all storage files in the data folder."""
+    global channel_instance
+
     data_dir = core.get_data_path()
     if not os.path.exists(data_dir):
         return {'files': []}
@@ -1128,7 +1391,7 @@ async def list_storage_files(user: str = Depends(require_auth)):
                             data = msgpack.unpackb(f.read())
                             file_type = 'dict' if isinstance(data, dict) else 'list' if isinstance(data, list) else 'text'
                 except Exception as e:
-                    core.log("webui", f"Error reading {rel_path}: {e}")
+                    channel_instance.log("webui", f"Error reading {rel_path}: {core.detail_error(e)}")
                     file_type = 'unknown'
             elif ext in ['.txt', '.md']:
                 file_type = 'text'
@@ -1147,6 +1410,8 @@ async def list_storage_files(user: str = Depends(require_auth)):
 @app.get("/storage/load")
 async def load_storage_file(file: str, user: str = Depends(require_auth)):
     """Load a specific storage file."""
+    global channel_instance
+
     data_dir = core.get_data_path()
     full_path = os.path.join(data_dir, file)
 
@@ -1193,12 +1458,14 @@ async def load_storage_file(file: str, user: str = Depends(require_auth)):
 
     except Exception as e:
         err_msg = core.detail_error(e) if core.debug else str(e)
-        core.log("webui", f"Error loading storage file: {e}")
+        channel_instance.log("webui", f"Error loading storage file: {core.detail_error(e)}")
         raise HTTPException(status_code=500, detail=err_msg)
 
 @app.post("/storage/save")
 async def save_storage_file(request: Request, user: str = Depends(require_auth)):
     """Save a storage file."""
+    global channel_instance
+
     data = await request.json()
     file_path = data.get('file')
     storage_type = data.get('type')
@@ -1255,17 +1522,19 @@ async def save_storage_file(request: Request, user: str = Depends(require_auth))
         else:
             raise HTTPException(status_code=400, detail="Unknown storage type")
 
-        core.log("webui", f"Saved storage file: {file_path}")
+        channel_instance.log("webui", f"Saved storage file: {file_path}")
         return {'success': True}
 
     except Exception as e:
         err_msg = core.detail_error(e) if core.debug else str(e)
-        core.log("webui", f"Error saving storage file: {e}")
+        channel_instance.log("webui", f"Error saving storage file: {core.detail_error(e)}")
         raise HTTPException(status_code=500, detail=err_msg)
 
 @app.post("/storage/delete-key")
 async def delete_storage_key(request: Request, user: str = Depends(require_auth)):
     """Delete a key from a dict storage file."""
+    global channel_instance
+
     data = await request.json()
     file_path = data.get('file')
     key = data.get('key')
@@ -1321,12 +1590,14 @@ async def delete_storage_key(request: Request, user: str = Depends(require_auth)
 
     except Exception as e:
         err_msg = core.detail_error(e) if core.debug else str(e)
-        core.log("webui", f"Error deleting key: {e}")
+        channel_instance.log("webui", f"Error deleting key: {core.detail_error(e)}")
         raise HTTPException(status_code=500, detail=err_msg)
 
 @app.post("/storage/add-key")
 async def add_storage_key(request: Request, user: str = Depends(require_auth)):
     """Add a new key to a dict storage file."""
+    global channel_instance
+
     data = await request.json()
     file_path = data.get('file')
     key = data.get('key', '').strip()
@@ -1382,7 +1653,7 @@ async def add_storage_key(request: Request, user: str = Depends(require_auth)):
 
     except Exception as e:
         err_msg = core.detail_error(e) if core.debug else str(e)
-        core.log("webui", f"Error adding key: {e}")
+        channel_instance.log("webui", f"Error adding key: {core.detail_error(e)}")
         raise HTTPException(status_code=500, detail=err_msg)
 
 # =============================================================================
@@ -1392,7 +1663,7 @@ async def add_storage_key(request: Request, user: str = Depends(require_auth)):
 @app.post("/server/restart")
 async def restart_server(user: str = Depends(require_auth)):
     global channel_instance
-    core.log("webui", "Restart triggered")
+    channel_instance.log("webui", "Restart triggered")
     await channel_instance.manager.restart()
     return {"success": True}
 
@@ -1436,7 +1707,21 @@ async def favicon():
 class Webui(core.channel.Channel):
     """Polished web interface that can be used on any device, granting you a fully private way to talk to your AI."""
 
+    dependencies = [
+        "jinja2",
+        "itsdangerous",
+        "starlette>=1.0.1",
+        "fastapi",
+        "uvicorn",
+        "websockets",
+        "python-multipart"
+    ]
+
     settings = {
+        "title": {
+            "default": "OpenLumara",
+            "description": "The title to show in the header, above the chat window"
+        },
         "network_mode": {
             "type": "select",
             "options": {
@@ -1484,7 +1769,7 @@ class Webui(core.channel.Channel):
         global channel_instance
         channel_instance = self
 
-        core.log("webui", f"Starting WebUI on {self.url}")
+        self.log("webui", f"Starting WebUI on {self.url}")
 
         config = uvicorn.Config(app, host=self.host, port=self.port, log_level="error")
         self.server = uvicorn.Server(config)
@@ -1493,13 +1778,46 @@ class Webui(core.channel.Channel):
 
     async def on_shutdown(self):
         """Shutdown the server gracefully."""
-        core.log("webui", "Shutting down WebUI server...")
+        await manager.broadcast({"type": "shutdown"})
+        self.log("webui", "Shutting down WebUI server...")
         self.server.should_exit = True
         await asyncio.sleep(1) # Allow grace period
 
+    async def on_ready(self):
+        if not core.quiet:
+            print(flush=True)
+            print(f"Please open the WebUI at {self.url}", flush=True)
+
+        # broadcast the signal that makes the page unlock and reconnect
+        manager.send_ready_signal()
+
+    def on_log(self, category, message):
+        # Store log in buffer for history
+        manager.add_log(category, message)
+        
+        # Broadcast log messages to all connected webui clients
+        # Since on_log is sync but manager.broadcast is async, we schedule it as a task
+        log_message = {
+            "type": "log",
+            "category": category,
+            "message": message
+        }
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(manager.broadcast(log_message))
+        except RuntimeError:
+            # No event loop running - create one for this task
+            asyncio.ensure_future(manager.broadcast(log_message))
+
     async def on_push(self, message: dict):
         """Triggered when a message is pushed (announcements, etc)"""
-        await manager.broadcast(message)
+        next_index = len(await channel_instance.context.chat.get())-1
+        if next_index < 0:
+            next_index = 0
+
+        message["index"] = next_index
+        self.log("webui", f"sending push message (index: {next_index}) to clients")
+        await manager.broadcast({"type": "push", "message": message, "index": next_index})
 
 # Add SessionMiddleware with secure settings
 app.add_middleware(

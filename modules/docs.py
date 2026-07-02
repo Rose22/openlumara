@@ -14,9 +14,7 @@ class Docs(core.module.Module):
         }
     }
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
+    async def on_ready(self):
         docs_path = self.config.get("documentation_path") or core.get_path("docs")
         self.data = core.storage.StorageDict(".", "markdown", path=docs_path)
 

@@ -1,4 +1,5 @@
 import core
+import httpx
 import openai
 import asyncio
 import json
@@ -39,16 +40,16 @@ class APIClient():
         model_msg = f"Model {self._model} not found" if self._model else "You have no model set"
         messages = {
             "auth_failed": "Your API key is invalid or expired. Please check your configuration settings.",
-            "connection_lost": "We lost connection to the AI server. Please check your internet connection and try again.",
+            "connection_lost": "Lost connection to the AI server.",
             "rate_limit": "You are sending requests too quickly. Please wait a moment before trying again.",
-            "api_error": "The AI service is currently experiencing issues. Please try again in a few minutes.",
+            "api_error": "The AI server returned an unknown error. Please try again in a few minutes.",
             "model_not_found": f"{model_msg}. Please select a model by using `/models` or the Settings in the WebUI",
             "cancelled": "The request was cancelled.",
             "blank_request": "The request was empty. Please try typing your message again.",
-            "processing_failed": "We had trouble reading the response from the AI. Please try sending your message again.",
+            "processing_failed": "Failed to process the response from the AI. Please try sending your message again.",
             "invalid_response": "The AI returned an unexpected format. Please try again.",
-            "unknown": "An unexpected error occurred. If this persists, please contact support.",
-            "not_connected": "The AI service is not connected. Please check your connection settings."
+            "unknown": "An unexpected error occurred.",
+            "not_connected": "You are not connected to the AI server."
         }
 
         # Fallback to a generic message if the key isn't found
@@ -70,11 +71,23 @@ class APIClient():
         self._connection_attempts += 1
         api_config = core.config.get("api", {})
 
+        # infinite timeout
+        httpx_timeout = httpx.Timeout(
+            connect=5.0,
+            read=None,
+            write=None,
+            pool=None
+        )
+
+        use_secure_connection = not self.manager.args.insecure_tls
+        if not use_secure_connection:
+            self.manager.log("API", "WARNING: TLS certificate and hostname verification are disabled")
+
         try:
-            if self.manager.args.insecure_tls:
-                import httpx
-                self._httpx_client = httpx.AsyncClient(verify=False)
-                core.log("API", "WARNING: TLS certificate and hostname verification are disabled")
+            self._httpx_client = httpx.AsyncClient(
+                verify=use_secure_connection,
+                timeout=httpx_timeout
+            )
 
             self._AI = openai.AsyncOpenAI(
                 base_url=api_config.get("url"),
@@ -87,39 +100,39 @@ class APIClient():
             # Check if the error message specifically mentions the model is not found
             error_str = str(e).lower()
             if "model" in error_str and ("not found" in error_str or "missing" in error_str):
-                core.log_error("Model not found (400)", e)
+                self.manager.log_error("Model not found (400)", e)
                 return {"error": "model_not_found", **self._get_user_friendly_message("model_not_found", e)}
             else:
                 # It's a different kind of 400 error (e.g., invalid parameters)
-                core.log_error("Bad request (400)", e)
+                self.manager.log_error("Bad request (400)", e)
                 return {"error": "api_error", **self._get_user_friendly_message("api_error", e)}
 
         except openai.AuthenticationError as e:
             await self.disconnect()
             error_info = self._get_user_friendly_message("auth_failed", e)
             self._connection_error = error_info["message"]
-            core.log("API", f"Authentication failed: {e}")
+            self.manager.log("API", f"Authentication failed: {e}")
             return False
 
         except openai.APIConnectionError as e:
             await self.disconnect()
             error_info = self._get_user_friendly_message("connection_lost", e)
             self._connection_error = error_info["message"]
-            core.log("API", f"Connection failed: {e}")
+            self.manager.log("API", f"Connection failed: {e}")
             return False
         except Exception as e:
             await self.disconnect()
             error_info = self._get_user_friendly_message("unknown", e)
             self._connection_error = error_info["message"]
-            core.log("API", f"Unexpected connection error: {e}")
+            self.manager.log("API", f"Unexpected connection error: {e}")
             return False
 
         self.connected = True
         self._connection_error = None
         self._connection_attempts = 0
-        self.supports_developer_role = await self._check_developer_role_support(self._AI)
+        self.supports_developer_role = core.config.get("api", "use_developer_role", default=False)
 
-        core.log("API", "Successfully connected to AI")
+        # self.manager.log("API", "Successfully connected to AI")
         return True
 
     def get_connection_status(self):
@@ -145,7 +158,6 @@ class APIClient():
 
         self.connected = False
         self._AI = None
-        core.log("API", "Disconnected from API")
         return True
 
     async def reconnect(self):
@@ -155,26 +167,6 @@ class APIClient():
 
     def get_model(self):
         return self._model
-
-    async def _check_developer_role_support(self, client):
-        try:
-            # We send a minimal request using the 'developer' role.
-            # We use a very short prompt to minimize token usage/cost.
-            response = await self._AI.chat.completions.create(
-                # send dev -> user -> dev to check for multi-dev-message support,
-                # which is what the dev role is useful for in our case
-                model=self._model or "default",
-                messages=[
-                    {"role": "developer", "content": "test"},
-                    {"role": "user", "content": "test"},
-                    {"role": "developer", "content": "test2"}
-                ],
-                max_tokens=1
-            )
-        except Exception as e:
-            return False
-
-        return True
 
     def set_model(self, name: str):
         self._model = name
@@ -235,8 +227,45 @@ class APIClient():
             # request token usage from the API
             req["stream_options"] = {"include_usage": True}
 
-        # if core.debug:
-        #     core.log("debug:request", str(req))
+        if core.debug:
+            message_summary = []
+            api_config = core.config.get("api", {})
+
+            for message in context:
+                summary = {
+                    "role": message.get("role")
+                }
+
+                content = message.get("content")
+                if isinstance(content, str):
+                    summary["content_chars"] = len(content)
+                elif isinstance(content, list):
+                    summary["content_items"] = len(content)
+
+                if message.get("tool_calls"):
+                    summary["tool_calls"] = len(message.get("tool_calls") or [])
+
+                message_summary.append(summary)
+
+            tool_count = len(tools or [])
+            custom_field_keys = sorted(list(custom_fields.keys())) if isinstance(custom_fields, dict) else []
+
+            self.manager.log(
+                "debug:request",
+                json.dumps({
+                    "base_url": api_config.get("url"),
+                    "model": self._model,
+                    "stream": stream,
+                    "use_thinking": use_thinking,
+                    "message_count": len(context),
+                    "tool_count": tool_count,
+                    "max_completion_tokens": req.get("max_completion_tokens"),
+                    "temperature": req.get("temperature"),
+                    "reasoning_effort": req.get("reasoning_effort"),
+                    "custom_field_keys": custom_field_keys,
+                    "messages": message_summary,
+                }, ensure_ascii=True, sort_keys=True)
+            )
 
         try:
             # check for cancellation before starting the request
@@ -263,47 +292,50 @@ class APIClient():
             # Check if the error message specifically mentions the model is not found
             error_str = str(e).lower()
             if "model" in error_str and ("not found" in error_str or "missing" in error_str):
-                core.log_error("Model not found (400)", e)
+                self.manager.log_error("Model not found (400)", e)
                 return {"error": "model_not_found", **self._get_user_friendly_message("model_not_found", e)}
             else:
                 # It's a different kind of 400 error (e.g., invalid parameters)
-                core.log_error("Bad request (400)", e)
+                self.manager.log_error("Bad request (400)", e)
                 return {"error": "api_error", **self._get_user_friendly_message("api_error", e)}
 
         except asyncio.CancelledError:
-            core.log_error("request was cancelled", None)
+            self.manager.log_error("request was cancelled", None)
             return {"error": "cancelled", **self._get_user_friendly_message("cancelled")}
 
         except openai.AuthenticationError as e:
-            core.log_error("Authentication error", e)
+            self.manager.log_error("Authentication error", e)
             self.connected = False
             error_info = self._get_user_friendly_message("auth_failed", e)
             self._connection_error = error_info["message"]
             return {"error": "auth_failed", **error_info}
 
         except openai.APIConnectionError as e:
-            core.log_error("Connection error", e)
+            self.manager.log_error("Connection error", e)
             self.connected = False
             error_info = self._get_user_friendly_message("connection_lost", e)
             self._connection_error = error_info["message"]
             return {"error": "connection_lost", **error_info}
 
         except openai.NotFoundError as e:
-            core.log_error("Model not found", e)
+            self.manager.log_error("Model not found", e)
             return {"error": "model_not_found", **self._get_user_friendly_message("model_not_found", e)}
 
         except openai.RateLimitError as e:
-            core.log_error("Rate limit exceeded", e)
+            self.manager.log_error("Rate limit exceeded", e)
             return {"error": "rate_limit", **self._get_user_friendly_message("rate_limit", e)}
 
         except openai.APIStatusError as e:
-            core.log_error("API status error", e)
+            self.manager.log_error("API status error", e)
             return {"error": "api_error", **self._get_user_friendly_message("api_error", e)}
 
         except Exception as e:
-            core.log_error("error while sending request to AI", e)
+            self.manager.log_error("error while sending request to AI", e)
             self.connected = False
             return {"error": "unknown", **self._get_user_friendly_message("unknown", e)}
+
+        if core.debug:
+            self.manager.log("debug:response", str(response))
 
         return response
 
@@ -326,7 +358,7 @@ class APIClient():
             result = await self._recv(response)
             return result
         except Exception as e:
-            core.log_error("error while processing response from AI", e)
+            self.manager.log_error("error while processing response from AI", e)
             return {"error": "processing_failed", **self._get_user_friendly_message("processing_failed", e)}
 
     async def send_stream(self, context: list, use_tools=True, tools=None, use_thinking=True, **kwargs):
@@ -351,10 +383,13 @@ class APIClient():
                     # cancel the entire stream
                     break
 
+                if core.debug_stream:
+                    self.manager.log("debug:stream", json.dumps(token, ensure_ascii=True))
+
                 # let the channel calling send_stream() handle token processing
                 yield token
         except Exception as e:
-            core.log_error("error while sending request to AI", e)
+            self.manager.log_error("error while sending request to AI", e)
             yield {"type": "error", "content": {"error": "stream_failed", **self._get_user_friendly_message("processing_failed", e)}}
 
     async def cancel(self):
@@ -371,14 +406,14 @@ class APIClient():
             # normal non-streaming mode
             response_main = response.choices[0]
         except Exception as e:
-            core.log_error("error while receiving response from AI", e)
+            self.manager.log_error("error while receiving response from AI", e)
             return {"error": "invalid_response", "message": self._get_user_friendly_message("invalid_response", e)}
 
         reasoning_content = getattr(response_main.message, "reasoning_content", None) or \
                             getattr(response_main.message, "reasoning", None) or ""
 
         if reasoning_content and core.debug:
-            core.log("debug:reasoning", reasoning_content)
+            self.manager.log("debug:reasoning", reasoning_content)
 
         # extract message content
         final_content = response_main.message.content or ""
@@ -552,12 +587,12 @@ class APIClient():
                     yield {"type": "tool_calls", "tool_calls": tool_call_dicts}
 
         except Exception as e:
-            core.log_error("error while receiving response from AI", e)
+            self.manager.log_error("error while receiving response from AI", e)
             raise e # Re-raise so send_stream can catch it and yield the error type
 
     async def list_models(self):
         if not self.connected:
-            return []
+            await self.connect()
 
         try:
             # get alphabetically sorted model list
@@ -566,7 +601,7 @@ class APIClient():
             models_list.sort()
 
         except Exception as e:
-            core.log_error("error while retrieving model list", e)
+            self.manager.log_error("error while retrieving model list", e)
             return []
 
         return models_list

@@ -3,12 +3,6 @@ import datetime
 import ulid
 import asyncio
 
-structure = core.config.get_module_structure()
-channels = []
-for name, data in structure.items():
-    if data.get("metadata", {}).get("type") == "channel":
-        channels.append(name)
-
 class Calendar(core.module.Module):
     """Lets your AI manage a calendar for you"""
 
@@ -20,9 +14,12 @@ class Calendar(core.module.Module):
             "default": True
         },
         "range": {
-            "type": "date",
             "description": "The range of days relative to today that you want the AI to see the events of",
             "default": 7
+        },
+        "include_past_events": {
+            "description": "Whether or not to make the AI aware of calendar events that have already passed. Many local AI's don't handle this very well, so it's recommended to leave this off, or they will start to remind you of appointments that have already happened. It's still included for posterity, in case you're using a model that handles this better.",
+            "default": False
         },
         "notifications": {
             "description": "Whether to receive notifications about upcoming events",
@@ -30,9 +27,9 @@ class Calendar(core.module.Module):
         },
         "notification_channel": {
             "type": "select",
-            "default": "telegram",
+            "default": "webui",
             "description": "Which channel to send calendar notifications to",
-            "options": {name: f"Send notifications via {name}" for name in channels}
+            "options": {name: f"Send notifications via {name}" for name in core.channel.get_available_channels()}
         },
         "notification_window": {
             "description": "Amount of minutes in advance you should be notified. You can set this to 0 to be notified at the time of the event.",
@@ -40,12 +37,9 @@ class Calendar(core.module.Module):
         }
     }
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
+    async def on_ready(self):
         self.events = core.storage.StorageList("calendar", "json")
 
-    async def on_ready(self):
         # schedule all event notifications
         for event in self.events:
             if event.get("notify"):
@@ -75,7 +69,7 @@ class Calendar(core.module.Module):
                 lambda: asyncio.create_task(self._notify_user(event))
             )
         except Exception as e:
-            core.log_error("[CALENDAR] failed to schedule notification", e)
+            self.log("calendar", f"failed to schedule notification: {core.detail_error(e)}")
 
     async def _notify_user(self, event: dict):
         if not event.get("notify"):
@@ -112,19 +106,26 @@ class Calendar(core.module.Module):
                 self.events.save()
 
     async def _get_events_in_range(self):
-        # display appointments between certain range (days before -> center (today) -> days after. divide by 2?)
+        # display appointments between certain range
         matches = []
 
         date_range = int(self.config.get("range", default=7))
-        day_margin = date_range/2 # amount of days before and after today to filter by
+        include_past = self.config.get("include_past_events")
 
         today = datetime.datetime.today()
-        past_boundary = today - datetime.timedelta(days=day_margin)
-        future_boundary = today + datetime.timedelta(days=day_margin)
+
+        # future is always today + the configured range
+        future_boundary = today + datetime.timedelta(days=date_range)
+
+        # past boundary depends on the setting. if we want to include past events, it's the configured amount of days into the past
+        if include_past:
+            past_boundary = today - datetime.timedelta(days=date_range)
+        else:
+            past_boundary = today
 
         for event in self.events:
             event_date = datetime.datetime.fromisoformat(event["date"])
-            if event_date <= future_boundary and event_date >= past_boundary:
+            if past_boundary <= event_date <= future_boundary:
                 matches.append(event)
 
         return matches

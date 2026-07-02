@@ -3,8 +3,7 @@ import core
 class Notes(core.module.Module):
     """Lets your AI store notes in a notebook. Notes are folders with markdown files, no vendor lock-in!"""
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    async def on_ready(self):
         self.data = core.storage.StorageDict("notes", "markdown")
 
     async def create(self, name: str, category: str, content: str):

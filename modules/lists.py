@@ -14,9 +14,7 @@ class Lists(core.module.Module):
         "max_pinned_lists": 10
     }
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
+    async def on_ready(self):
         self.data = core.storage.StorageDict("lists", "yaml")
 
     async def on_system_prompt(self):

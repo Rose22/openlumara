@@ -19,25 +19,14 @@ function requestNotificationPermission() {
     }
 }
 
-function showAnnouncementNotification(content, type) {
+function showNotification(content, timeout=null) {
     if (notificationPermission !== 'granted') return;
     if (!('Notification' in window)) return;
 
-    // Determine notification options based on type
-    const typeSettings = {
-        schedule: { icon: '📢', tag: 'announce-info' },
-        warning: { icon: '⚠️', tag: 'announce-warning' },
-        error: { icon: '❌', tag: 'announce-error' },
-        success: { icon: '✅', tag: 'announce-success' },
-        info: { icon: 'ℹ️', tag: 'announce-info' }
-    };
-
-    const settings = typeSettings[type] || typeSettings.info;
-
-    const notification = new Notification(`System ${type.charAt(0).toUpperCase() + type.slice(1)}`, {
+    const notification = new Notification(`OpenLumara`, {
         body: content,
-        icon: settings.icon,
-        tag: settings.tag,
+        icon: '📢',
+        tag: 'openlumara',
         renotify: true
     });
 
@@ -46,6 +35,7 @@ function showAnnouncementNotification(content, type) {
         notification.close();
     };
 
-    // Auto-close after 5 seconds
-    setTimeout(() => notification.close(), 5000);
+    if (timeout) {
+        setTimeout(() => notification.close(), timeout);
+    }
 }

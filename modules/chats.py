@@ -10,9 +10,7 @@ class Chats(core.module.Module):
         }
     }
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
+    async def on_ready(self):
         if not self.config.get("insert_system_prompt"):
             self.disabled_tools.append("get_categories")
 

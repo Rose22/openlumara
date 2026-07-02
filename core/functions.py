@@ -6,22 +6,43 @@ import traceback
 import urllib.parse
 
 def log(category: str, msg: str):
-    """simple console log"""
-    if not core.quiet:
+    """
+    simple console log
+    WARNING: strictly for cases where the manager or channel instance(s) cannot be accessed
+    for example during config loading
+
+    using this will print into the terminal if the manager isn't loaded,
+    but otherwise will use the proper logging path via the manager
+
+    so this is a last resort
+    """
+    if not core.manager.global_instance:
         print(f"[{category.upper()}] {msg}", flush=True)
+    else:
+        core.manager.global_instance.log(category, msg)
 
 def detail_error(e: Exception):
     """provides more detail about an exception, but in a compact format"""
 
+    # just return the normal message if debug mode is off
+    if not core.debug:
+        return str(e)
+
+    # lots of detail for debugging!
     return f"{e} | {e.__traceback__.tb_frame.f_code.co_filename}, {e.__traceback__.tb_frame.f_code.co_name}, ln:{e.__traceback__.tb_lineno}\n\n{traceback.format_exc()}"
 
 def log_error(msg: str, e: Exception):
-    """console log but with extra spice for errors"""
-    if core.debug:
-        log("error", f"{msg}: {detail_error(e)}")
+    """
+    console log but with extra spice for errors
+    WARNING: strictly for cases where the manager or channel instance(s) cannot be accessed
+    for example during config loading
+    """
+    if not core.manager.global_instance:
+        print(f"[ERROR] {msg}: {detail_error(e)}")
         traceback.print_exception(e, file=sys.stdout)
     else:
-        log("error", f"{msg}: {e}")
+        tb = traceback.format_exception(e)
+        core.manager.global_instance.log("error", f"{msg}: {detail_error(e)}\n{tb}")
 
 def get_path(path: str = ""):
     """get path relative to the project root directory. returns root path if no path is specified."""
@@ -33,8 +54,12 @@ def get_path(path: str = ""):
     if not path:
         return project_root
 
-    # is a relative path
-    return sandbox_path(project_root, path)
+    if os.path.isabs(path):
+        # return an absolute path as-is
+        return path
+    else:
+        # is a relative path, return it sandboxed to the project root
+        return sandbox_path(project_root, path)
 
 def get_data_path(subpath=None):
     """get path to the data directory. contains all persistent data used by the framework"""
@@ -92,7 +117,11 @@ def sandbox_path(base_path: str, requested_path: str) -> str:
     # we dont use os.path.normpath here because it resolves '..' and allows path traversal
     # so we do the cross-platform stuff manually instead....
     # using a simple string replacement :(
-    path = requested_path.replace("/", os.path.sep)
+    base_path = base_path.replace("\\", os.path.sep)
+    base_path = base_path.replace("/", os.path.sep)
+    
+    path = requested_path.replace("\\", os.path.sep)
+    path = path.replace("/", os.path.sep)
 
     # remove path separator at the beginning and end
     path = path.strip(os.path.sep)
@@ -146,4 +175,3 @@ def sandbox_path(base_path: str, requested_path: str) -> str:
         return real_path
     else:
         raise ValueError("Access denied: target path is outside sandbox")
-

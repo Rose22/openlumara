@@ -6,6 +6,12 @@ function toggleModal(modalName) {
     const overlay = document.getElementById(modalName + '-overlay');
     const modal = document.getElementById(modalName + '-modal');
 
+    // make the close button visible again in case we hid it (with a forced modal)
+    const closeBtn = document.getElementById(modalName + '-close');
+    if (closeBtn) {
+        closeBtn.style.visibility = "visible";
+    }
+
     if (overlay) {
         overlay.classList.toggle('show');
     }
@@ -14,7 +20,43 @@ function toggleModal(modalName) {
     }
 }
 
+function showModal(modalName, forced=false) {
+    const overlay = document.getElementById(modalName + '-overlay');
+    const modal = document.getElementById(modalName + '-modal');
+
+    if (overlay) {
+        overlay.classList.add('show');
+    }
+    if (modal) {
+        modal.classList.add('show');
+        if (forced) {
+            modal.classList.add('forced');
+            const closeBtn = document.getElementById(modalName + '-close');
+            closeBtn.style.visibility = "hidden";
+        }
+    }
+}
+
+function closeModal(modalName) {
+    const overlay = document.getElementById(modalName + '-overlay');
+    const modal = document.getElementById(modalName + '-modal');
+
+    if (overlay) {
+        overlay.classList.remove('show');
+    }
+    if (modal) {
+        modal.classList.remove('show');
+        modal.classList.remove('forced');
+    }
+}
+
 function closeModalOnOverlay(event, modalName) {
+    // don't allow closing forced modals using the overlay
+    const modal = document.getElementById(modalName + '-modal');
+    if (modal.classList.contains('forced')) {
+        return;
+    }
+
     if (event.target.id === modalName + '-overlay') {
         toggleModal(modalName);
     }

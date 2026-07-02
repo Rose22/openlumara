@@ -208,6 +208,53 @@ if (messageInput) {
     });
 }
 
+/**
+ * Updates the stop button icon and streaming indicator based on typewriter state.
+ * Shows typing icon with indicator when tokens are streaming and typewriter is active.
+ * Shows skip icon when tokens are done but typing is still in progress.
+ * Shows streaming icon when only tokens are streaming (no typewriter).
+ */
+function updateStopButtonState() {
+    const stopBtn = document.getElementById('stop');
+    if (!stopBtn) return;
+
+    // Only update if button is visible (has 'show' class)
+    if (!stopBtn.classList.contains('show')) return;
+
+    const typewriterEnabled = localStorage.getItem("typewriterEnabled") === 'true';
+    const typewriterSpeed = parseInt(localStorage.getItem("typewriterSpeed") ?? "30", 10);
+    const useTypewriter = typewriterEnabled && typewriterSpeed > 0;
+
+    // Remove all state classes first
+    stopBtn.classList.remove('streaming', 'typing', 'skip', 'streaming-only', 'show-text');
+
+    // When typewriter is OFF: just show "Stop" during streaming
+    if (!useTypewriter) {
+        stopBtn.style.paddingBottom = '0px';
+        return;
+    }
+
+    // When typewriter is ON: track streaming/typing/skip states
+    const tokensStreaming = isDataStreaming === true;
+    const typewriterRunning = isTypewriterRunning === true;
+
+    stopBtn.style.paddingBottom = '0px';
+
+    // Both tokens and typewriter running
+    if (tokensStreaming && typewriterRunning) {
+        stopBtn.classList.add('streaming', 'typing');
+    }
+    // Tokens done but typewriter still running (skip state)
+    else if (!tokensStreaming && typewriterRunning) {
+        stopBtn.classList.add('streaming', 'skip');
+    }
+    // Only tokens streaming, typewriter not yet started
+    else if (tokensStreaming && !typewriterRunning) {
+        stopBtn.classList.add('streaming');
+    }
+    // Both done - no state classes
+}
+
 // =============================================================================
 // Input Handling
 // =============================================================================

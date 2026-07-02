@@ -51,7 +51,7 @@ class Client(discord.Client):
                                 state.pending_content = ""
                                 try:
                                     await state.message_obj.edit(content=state.full_content)
-                                    core.log(self.ai_channel.name, state.full_content)
+                                    self.ai_channel.log(self.ai_channel.name, state.full_content)
                                 except:
                                     pass
                             
@@ -77,7 +77,7 @@ class Client(discord.Client):
                     state.pending_content = ""
                 
                 if state.full_content:
-                    core.log(self.ai_channel.name, state.full_content)
+                    self.ai_channel.log(self.ai_channel.name, state.full_content)
                     try:
                         await state.message_obj.edit(content=state.full_content)
                     except Exception:
@@ -87,7 +87,7 @@ class Client(discord.Client):
                             pass
 
     async def on_ready(self):
-        core.log("discord", "logged in.")
+        self.ai_channel.log("discord", "logged in.")
         startup_message = self.ai_channel.config.get("startup_message")
         if startup_message:
             await self.ai_channel.push(startup_message)
@@ -116,7 +116,7 @@ class Client(discord.Client):
                 mentioned = True
 
             if mentioned:
-                core.log("discord", f"<{message.author.name}> {message.clean_content}")
+                self.ai_channel.log("discord", f"<{message.author.name}> {message.clean_content}")
 
                 async with message.channel.typing():
                     try:
@@ -188,7 +188,7 @@ class Client(discord.Client):
 
                                 for chunk in chunks:
                                     await message.channel.send(chunk, mention_author=self.ai_channel.config.get("use_replies"))
-                                    core.log("discord", f"<{message.guild.me.name}> {chunk}")
+                                    self.ai_channel.log("discord", f"<{message.guild.me.name}> {chunk}")
                                     await asyncio.sleep(0.5)
                     except Exception as e:
                         err_msg = core.detail_error(e) if core.debug else str(e)
@@ -196,6 +196,8 @@ class Client(discord.Client):
 
 class Discord(core.channel.Channel):
     """Talk to your AI over Discord"""
+
+    dependencies = ["discord.py"]
 
     settings =  {
         "token": {
@@ -257,12 +259,12 @@ class Discord(core.channel.Channel):
 
         target_channel_id = self.config.get("target_channel_id")
         if not target_channel_id:
-            core.log(self.name, "Error while sending push message: No target channel ID set. Could not send message! Please configure your target channel.")
+            self.log(self.name, "Error while sending push message: No target channel ID set. Could not send message! Please configure your target channel.")
             return
 
         # split the content into chunk sizes that discord accepts
         content = message.get("content")
-        core.log(f"{self.name} push", content)
+        self.log(f"{self.name} push", content)
         chunks = [content[i:i + MAX_CHARS] for i in range(0, len(content), MAX_CHARS)]
 
         # send into the channel if we have the permissions to
@@ -277,14 +279,14 @@ class Discord(core.channel.Channel):
                         await channel.send(chunk)
                         await asyncio.sleep(0.5)
                 else:
-                    core.log(self.name, "Error while sending push message: Discord bot does not have the required permissions to send messages into the target channel. Please give it the needed permissions!")
+                    self.log(self.name, "Error while sending push message: Discord bot does not have the required permissions to send messages into the target channel. Please give it the needed permissions!")
                     return
 
     async def run(self):
         token = core.config.config.get("channels").get("settings").get("discord").get("token")
 
         if not token:
-            core.log("error", "Discord token not set! Set it up in the webui or by editing the config")
+            self.log("error", "Discord token not set! Set it up in the webui or by editing the config")
             return False
 
         intents = discord.Intents.default()
@@ -294,7 +296,7 @@ class Discord(core.channel.Channel):
         # discordpy really likes to throw useless exceptions. shut up already.
         discord.utils.setup_logging(level=50, root=False)
 
-        core.log("discord", "logging in..")
+        self.log("discord", "logging in..")
 
         try:
             await self._client.start(token)
@@ -302,7 +304,7 @@ class Discord(core.channel.Channel):
             # shut up no one cares about this stupid error
             pass
         except Exception as e:
-            core.log("error", f"error connecting to discord: {e}")
+            self.log("error", f"error connecting to discord: {e}")
 
     async def on_shutdown(self):
         shutdown_message = self.config.get("shutdown_message")

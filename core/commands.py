@@ -85,9 +85,10 @@ def _convert_type(value: str):
     """
     Converts string inputs from the CLI/Chat into appropriate Python types.
     """
-    if value.lower() == "true":
+
+    if value.lower() in ["true", "on"]:
         return True
-    if value.lower() == "false":
+    if value.lower() in ["false", "off"]:
         return False
 
     # Try integer conversion
@@ -107,18 +108,19 @@ def _convert_type(value: str):
     # Default to string
     return value
 
-def _set_config_value(path: list, value: str):
+async def _set_config_value(path: list, value: str, manager=None):
     """
     Sets a configuration value at a nested path.
 
     Args:
         path: A list of keys representing the nested path (e.g., ["api", "url"]).
         value: The value to set (as a string, will be type-converted).
+        manager: Optional manager instance for reloading modules after settings change.
     """
     if not path:
         return "error: Path cannot be empty"
 
-    typed_value = _convert_type(value)
+    typed_value = _convert_type(value.strip())
 
     try:
         # Access the StorageDict instance from the config module
@@ -146,6 +148,18 @@ def _set_config_value(path: list, value: str):
 
         # Persist changes to the YAML file
         core.config.config.save()
+
+        # Check if this is a module setting change and reload the module
+        module_name = None
+        if manager and len(path) >= 3 and path[0] == "modules":
+            module_name = path[2]
+
+        if module_name:
+            try:
+                await manager.reload_module(module_name)
+                return f"Config updated: {' -> '.join(path)} = {typed_value}"
+            except Exception as e:
+                return f"Config updated: {' -> '.join(path)} = {typed_value}\nWarning: Failed to reload module '{module_name}': {e}"
 
         return f"Config updated: {' -> '.join(path)} = {typed_value}"
     except Exception as e:
@@ -266,7 +280,6 @@ class Commands:
             return (cmd_prefix, cmd, args)
         except ValueError as e:
             # Handle malformed shell syntax gracefully
-            core.log_error("Command parsing error", e)
             return None, None, []
 
     async def process_input(self, message: dict, authorized=False):
@@ -397,15 +410,15 @@ class Commands:
                     result = await self.channel.manager.reconnect_api()
 
                     if result["success"]:
-                        return ["✓ ", result["message"]]
+                        return f"✓ {result['message']}"
                     else:
-                        response = [f"✗ Connection failed: {result['error']}"]
+                        response = f"✗ Connection failed: {result['error']}"
                         if "action" in result:
-                            response.append(f"\n{result['action']}")
+                            response += f"\n{result['action']}"
                         return response
             case "disconnect":
                 await self.channel.manager.API.disconnect()
-                return ["✓ Disconnected from API"]
+                return "Disconnected from API"
             case "status":
                 status = self.channel.manager.get_api_status()
                 lines = ["== API Status =="]
@@ -438,13 +451,25 @@ class Commands:
                     return "please provide a name of the module to toggle"
 
                 module_name = args[0]
-                all_modules = core.config.get("modules", "enabled", default=[]) + core.config.get("modules", "disabled", default=[])
+                all_modules = core.config.get("modules", "enabled", default=[]) + core.config.get("modules", "disabled", default=[]) + core.config.get("user_modules", "enabled", default=[]) + core.config.get("user_modules", "disabled", default=[])
 
                 if module_name not in all_modules:
                     return "module with that name doesn't exist"
 
                 await self.channel.manager.toggle_module(module_name)
                 return "module toggled"
+            case "channel":
+                if not args:
+                    return "please provide a name of the channel to toggle"
+
+                channel_name = args[0]
+                all_channels = core.channel.get_available_channels()
+
+                if channel_name not in all_channels:
+                    return "channel with that name doesn't exist"
+
+                await self.channel.manager.toggle_channel(channel_name)
+                return "channel toggled"
             case "tools":
                 if not core.config.get("model").get("use_tools", False):
                     return "tools are turned off"
@@ -503,7 +528,7 @@ class Commands:
                         return f"setting '{key}' does not exist at that path."
                 
                 if is_set:
-                    return str(_set_config_value(path_to_use, value_to_use))
+                    return await _set_config_value(path_to_use, value_to_use, self.channel.manager)
                 else:
                     return str(_get_config_value(path_to_use))
 
@@ -619,6 +644,6 @@ class Commands:
                                     try:
                                         return await bound_method(cmd[1:])
                                     except Exception as e:
-                                        core.log_error("error while executing command", e)
+                                        self.channel.log_error("error while executing command", e)
 
                 return "no such command! check /help"

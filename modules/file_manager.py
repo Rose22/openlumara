@@ -9,7 +9,7 @@ class FileManager(core.module.Module):
     """Gives your AI full access to your filesystem. CAUTION: Unsafe! Use at your own risk."""
 
     unsafe = True
-    _header = "System info"
+    header = "System info"
 
     settings = {
         "put_system_info_in_prompt": False

@@ -321,6 +321,8 @@ function renderSingleMessage(msg, index, animate) {
     }
 
     chat.insertBefore(wrapper, typing);
+
+    return wrapper
 }
 
 /**
@@ -626,6 +628,12 @@ function toggleToolCard(headerElement) {
 // Tool Response Rendering - Compact & Clean
 // =============================================================================
 
+/**
+ * Global data store for JSON modal - maps IDs to their data payloads.
+ * Used to pass data from inline onclick handlers without JSON escaping issues.
+ */
+window._jsonModalData = window._jsonModalData || {};
+
 function renderToolResponseContent(content) {
     let displayContent = content;
     let isJson = false;
@@ -689,6 +697,15 @@ function renderJsonResponseCompact(data, depth = 0) {
 }
 
 /**
+ * Store data in the modal data map and return a unique ID.
+ */
+function storeJsonModalData(data) {
+    const id = 'jm-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+    window._jsonModalData[id] = data;
+    return id;
+}
+
+/**
  * Render array with smart truncation.
  */
 function renderArrayCompact(arr, depth) {
@@ -699,9 +716,11 @@ function renderArrayCompact(arr, depth) {
     // Only collapse to summary at depth 3+, not depth 2
     if (depth >= 3) {
         const preview = getArrayPreview(arr);
-        return `<span class="tool-response-summary" onclick="this.classList.toggle('expanded')">
+        const dataId = storeJsonModalData(arr);
+        return `<span class="tool-response-summary" onclick="showFullJsonModal('${dataId}', 'Array[${arr.length}]')">
         <span class="tool-response-summary-icon">[${arr.length}]</span>
         <span class="tool-response-summary-text">${preview}</span>
+        <span class="tool-response-summary-expand">[+]</span>
         </span>`;
     }
 
@@ -734,7 +753,9 @@ function renderArrayCompact(arr, depth) {
 
     if (hasMore) {
         const remaining = arr.length - maxItems;
-        html += `<div class="tool-response-truncated">+ ${remaining} more</div>`;
+        const truncatedItems = arr.slice(maxItems);
+        const dataId = storeJsonModalData(truncatedItems);
+        html += `<span class="tool-response-truncated" onclick="showFullJsonModal('${dataId}', 'Array (remaining ${remaining})')" style="cursor:pointer;">+ ${remaining} more</span>`;
     }
 
     html += `</div>`;
@@ -754,9 +775,11 @@ function renderObjectCompact(obj, depth) {
     // Only collapse to summary at depth 3+
     if (depth >= 3) {
         const keyPreview = entries.slice(0, 2).map(([k]) => k).join(', ');
-        return `<span class="tool-response-summary">
+        const dataId = storeJsonModalData(obj);
+        return `<span class="tool-response-summary" onclick="showFullJsonModal('${dataId}', 'Object{${entries.length} keys}')">
         <span class="tool-response-summary-icon">{${entries.length}}</span>
         <span class="tool-response-summary-text">${escapeHtml(keyPreview)}${entries.length > 2 ? '...' : ''}</span>
+        <span class="tool-response-summary-expand">[+]</span>
         </span>`;
     }
 
@@ -779,7 +802,9 @@ function renderObjectCompact(obj, depth) {
 
     if (entries.length > maxKeys) {
         const remaining = entries.length - maxKeys;
-        html += `<div class="tool-response-truncated">+ ${remaining} more keys</div>`;
+        const truncatedEntries = entries.slice(maxKeys).reduce((acc, [k, v]) => { acc[k] = v; return acc; }, {});
+        const dataId = storeJsonModalData(truncatedEntries);
+        html += `<span class="tool-response-truncated" onclick="showFullJsonModal('${dataId}', 'Object (remaining ${remaining} keys)')" style="cursor:pointer;">+ ${remaining} more keys</span>`;
     }
 
     html += `</div>`;
@@ -814,6 +839,185 @@ function getArrayPreview(arr) {
         preview += ', ...';
     }
     return preview;
+}
+
+// =============================================================================
+// Full JSON Tree Modal
+// =============================================================================
+
+/**
+ * Show a modal dialog with the full JSON tree starting from the stored data.
+ */
+function showFullJsonModal(dataId, title) {
+    const data = window._jsonModalData[dataId];
+    if (!data) {
+        console.warn('JSON modal data not found for ID:', dataId);
+        return;
+    }
+
+    // Remove any existing modal
+    const existing = document.getElementById('json-full-modal');
+    if (existing) existing.remove();
+    const existingOverlay = document.getElementById('json-full-modal-overlay');
+    if (existingOverlay) existingOverlay.remove();
+
+    // Create overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'json-full-modal-overlay';
+    overlay.onclick = (e) => {
+        if (e.target === overlay) closeJsonModal();
+    };
+
+    // Create modal
+    const modal = document.createElement('div');
+    modal.className = 'modal json-full-modal';
+    modal.id = 'json-full-modal';
+
+    modal.innerHTML = `
+    <div class="modal-header">
+        <h2>${escapeHtml(title)}</h2>
+        <button class="modal-close" onclick="closeJsonModal()">&times;</button>
+    </div>
+    <div class="modal-content json-full-modal-content">
+        <div class="json-full-tree">
+        ${renderFullJsonTree(data, 0)}
+        </div>
+    </div>`;
+
+    document.body.appendChild(overlay);
+    document.body.appendChild(modal);
+
+    // Trigger animation
+    requestAnimationFrame(() => {
+        overlay.classList.add('show');
+        modal.classList.add('show');
+    });
+
+    // Store references for closing
+    window._jsonModalOverlay = overlay;
+    window._jsonModal = modal;
+}
+
+/**
+ * Close the full JSON modal.
+ */
+function closeJsonModal() {
+    const overlay = document.getElementById('json-full-modal-overlay');
+    const modal = document.getElementById('json-full-modal');
+    if (overlay) overlay.remove();
+    if (modal) modal.remove();
+    window._jsonModalOverlay = null;
+    window._jsonModal = null;
+}
+
+/**
+ * Render a full expandable JSON tree for the modal view.
+ * This is a complete tree renderer, not a compact one.
+ */
+function renderFullJsonTree(data, depth) {
+    if (data === null) {
+        return `<span class="json-scalar json-null">null</span>`;
+    }
+
+    if (typeof data === 'boolean') {
+        return `<span class="json-scalar json-boolean">${data}</span>`;
+    }
+
+    if (typeof data === 'number') {
+        return `<span class="json-scalar json-number">${data}</span>`;
+    }
+
+    if (typeof data === 'string') {
+        const escaped = escapeHtml(data);
+        const display = escaped.length > 200 ? escaped.substring(0, 200) + '...' : escaped;
+        return `<span class="json-scalar json-string">"${display}"</span>`;
+    }
+
+    if (Array.isArray(data)) {
+        return renderFullArrayTree(data, depth);
+    }
+
+    if (typeof data === 'object') {
+        return renderFullObjectTree(data, depth);
+    }
+
+    return `<span class="json-scalar">${escapeHtml(String(data))}</span>`;
+}
+
+/**
+ * Render a full array tree for the modal.
+ */
+function renderFullArrayTree(arr, depth) {
+    const indent = depth * 2;
+
+    let html = `<div class="json-array">`;
+    html += `<div class="json-array-header">`;
+    html += `<span class="json-toggle" onclick="toggleJsonSection(this)" style="padding-left:${indent}px">▼</span>`;
+    html += `<span class="json-bracket">[</span>`;
+    html += `<span class="json-count">${arr.length} items</span>`;
+    html += `</div>`;
+    html += `<div class="json-section-body">`;
+
+    for (let i = 0; i < arr.length; i++) {
+        const item = arr[i];
+        html += `<div class="json-array-entry" style="padding-left:${indent + 1}em">`;
+        html += `<span class="json-index">${i}:</span> `;
+        html += renderFullJsonTree(item, depth + 1);
+        if (i < arr.length - 1) html += `,`;
+        html += `</div>`;
+    }
+
+    html += `</div>`;
+    html += `<span class="json-bracket">]</span>`;
+    html += `</div>`;
+    return html;
+}
+
+/**
+ * Render a full object tree for the modal.
+ */
+function renderFullObjectTree(obj, depth) {
+    const entries = Object.entries(obj);
+    const indent = depth * 2;
+
+    let html = `<div class="json-object">`;
+    html += `<div class="json-object-header">`;
+    html += `<span class="json-toggle" onclick="toggleJsonSection(this)" style="padding-left:${indent}px">▼</span>`;
+    html += `<span class="json-bracket">{</span>`;
+    html += `<span class="json-count">${entries.length} keys</span>`;
+    html += `</div>`;
+    html += `<div class="json-section-body">`;
+
+    for (const [key, value] of entries) {
+        html += `<div class="json-kv-entry" style="padding-left:${indent + 1}em">`;
+        html += `<span class="json-key">"${escapeHtml(key)}"</span>`;
+        html += `<span class="json-colon">: </span>`;
+        html += renderFullJsonTree(value, depth + 1);
+        html += `</div>`;
+    }
+
+    html += `</div>`;
+    html += `<span class="json-bracket">}</span>`;
+    html += `</div>`;
+    return html;
+}
+
+/**
+ * Toggle expand/collapse of a JSON section in the modal.
+ */
+function toggleJsonSection(toggleEl) {
+    const parent = toggleEl.closest('.json-array, .json-object');
+    if (!parent) return;
+
+    const isCollapsed = parent.classList.contains('json-collapsed');
+    if (isCollapsed) {
+        parent.classList.remove('json-collapsed');
+        toggleEl.textContent = '▼';
+    } else {
+        parent.classList.add('json-collapsed');
+        toggleEl.textContent = '▶';
+    }
 }
 
 // =============================================================================

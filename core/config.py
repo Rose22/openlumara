@@ -5,6 +5,7 @@ import core
 import modules
 import user_modules
 import channels
+import user_channels
 import pkgutil
 import hashlib
 import json
@@ -28,6 +29,7 @@ default_config = {
         "max_context": 8192,
         "max_output_tokens": 8192,
         "max_messages": 200,
+        "use_developer_role": False,
         "custom_fields": {}
     },
     "model": {
@@ -35,10 +37,17 @@ default_config = {
         "temperature": 0.7,
         "enable_thinking": True,
         "keep_reasoning_in_context": True,
+        "only_preserve_reasoning_for_current_agentic_loop": True,
         "reasoning_effort": None,
         "use_tools": True
     },
     "channels": {
+        "enabled": [],
+        "disabled": [],
+        "settings": {}
+    },
+    "user_channels": {
+        "path": "user_channels",
         "enabled": [],
         "disabled": [],
         "settings": {}
@@ -74,8 +83,7 @@ DEFAULT_MODULES = (
     "calculator",
     "token_threshold",
     "time",
-    "web_search",
-    "web_reader"
+    "auto_backup"
 )
 
 DEFAULT_CHANNELS = ["webui"] # "cli" is disabled for Esobold
@@ -89,6 +97,9 @@ class ConfigManager:
         """Shorthand for accessing nested config values.
         Usage: config.get("api", "url") or config.get("api", "url", default_value)
         """
+        # reload from disk
+        self.root_config.load()
+
         default = kwargs.get("default", None)
         if not args:
             return default
@@ -115,6 +126,9 @@ class ConfigManager:
         return current
 
     def to_dict(self):
+        # reload from disk
+        self.root_config.load()
+
         # Start from the root config and traverse through the base path
         current = self.root_config
         for k in self.base_path:
@@ -166,7 +180,7 @@ def _discover_available_names(package):
         return []
     return [modname for _, modname, _ in pkgutil.iter_modules(package.__path__)]
 
-def _get_registry_data(enabled_channels=None, enabled_modules=None, enabled_user_modules=None):
+def _get_registry_data(enabled_channels=None, enabled_user_channels=None, enabled_modules=None, enabled_user_modules=None):
     """
     Build registry data, importing ONLY enabled modules/channels.
 
@@ -178,6 +192,7 @@ def _get_registry_data(enabled_channels=None, enabled_modules=None, enabled_user
     # Build cache key from enabled lists
     cache_key = (
         tuple(enabled_channels or []),
+        tuple(enabled_user_channels or []),
         tuple(enabled_modules or []),
         tuple(enabled_user_modules or [])
     )
@@ -187,20 +202,25 @@ def _get_registry_data(enabled_channels=None, enabled_modules=None, enabled_user
 
     # Discover all available names from filesystem (no imports!)
     available_channels = _discover_available_names(channels)
+    available_user_channels = _discover_available_names(user_channels)
     available_modules = _discover_available_names(modules)
     available_user_modules = _discover_available_names(user_modules)
 
     # Only import and instantiate ENABLED items
     chan_inst = list(core.modules.load(
-        channels, core.channel.Channel, filter=enabled_channels
+        channels, core.channel.Channel, filter=enabled_channels, loading_config=True
     )) if enabled_channels else []
 
+    user_chan_inst = list(core.modules.load(
+        user_channels, core.channel.Channel, filter=enabled_user_channels, loading_config=True
+    )) if enabled_user_channels else []
+
     mod_inst = list(core.modules.load(
-        modules, core.module.Module, filter=enabled_modules
+        modules, core.module.Module, filter=enabled_modules, loading_config=True
     )) if enabled_modules else []
 
     user_mod_inst = list(core.modules.load(
-        user_modules, core.module.Module, filter=enabled_user_modules
+        user_modules, core.module.Module, filter=enabled_user_modules, loading_config=True
     )) if enabled_user_modules else []
 
     result = [
@@ -210,6 +230,13 @@ def _get_registry_data(enabled_channels=None, enabled_modules=None, enabled_user
             "available_names": available_channels,
             "names": [core.modules.get_name(m) for m in chan_inst],
             "default_names": DEFAULT_CHANNELS
+        },
+        {
+            "section_key": "user_channels",
+            "instances": user_chan_inst,
+            "available_names": available_user_channels,
+            "names": [core.modules.get_name(m) for m in user_chan_inst],
+            "default_names": []
         },
         {
             "section_key": "modules",
@@ -249,7 +276,7 @@ def _get_module_schema_cache():
     If the cache is missing or outdated, it performs a refresh.
     """
     cache_path = os.path.abspath(os.path.join(core.get_path(), SCHEMA_CACHE_FILE))
-    cache = {"channels": {}, "modules": {}, "user_modules": {}}
+    cache = {"channels": {}, "user_channels": {}, "modules": {}, "user_modules": {}}
 
     # Load existing cache
     if os.path.exists(cache_path):
@@ -257,12 +284,13 @@ def _get_module_schema_cache():
             with open(cache_path, 'r') as f:
                 cache = json.load(f)
         except Exception as e:
-            core.log_error("error while loading module cache", e)
+            print(f"[CORE] error while loading module cache {core.detail_error(e)}")
     else:
-        core.log("core", f"creating module cache at {cache_path}")
+        print(f"[CORE] creating module cache at {cache_path}")
 
     package_map = {
         "channels": (channels, core.channel.Channel),
+        "user_channels": (user_channels, core.channel.Channel),
         "modules": (modules, core.module.Module),
         "user_modules": (user_modules, core.module.Module)
     }
@@ -272,6 +300,9 @@ def _get_module_schema_cache():
     # 1. Check for deletions or changes in existing cache
     for section_key, (package, _) in package_map.items():
         available_names = _discover_available_names(package)
+
+        if section_key not in cache.keys():
+            continue
 
         for name in list(cache[section_key].keys()):
             if name not in available_names:
@@ -312,7 +343,7 @@ def _get_module_schema_cache():
             package, base_class = package_map[section_key]
             try:
                 # skip reloading modules because we just want the data
-                classes = core.modules.load(package, base_class, reload=False)
+                classes = core.modules.load(package, base_class, reload=False, loading_config=True)
 
                 for cls in classes:
                     name = core.modules.get_name(cls)
@@ -338,13 +369,13 @@ def _get_module_schema_cache():
                     }
 
             except Exception as e:
-                core.log_error(f"Failed to refresh cache for {section_key}", e)
+                print(f"[CORE] Failed to refresh cache for {section_key}: {core.detail_error(e)}")
 
         try:
             with open(cache_path, 'w') as f:
                 json.dump(cache, f, indent=2)
         except Exception as e:
-            core.log_error("failed to save module cache", e)
+            print(f"[CORE] failed to save module cache: {core.detail_error(e)}")
 
     return cache
 
@@ -401,6 +432,7 @@ def get_module_structure():
     # Map section keys to their descriptive type strings
     type_map = {
         "channels": "channel",
+        "user_channels": "user_channel",
         "modules": "module",
         "user_modules": "user_module"
     }
@@ -545,12 +577,9 @@ def load(file_path=None):
     global _registry_cache
     _registry_cache = None
 
-    config = core.storage.StorageDict(filename, "yaml", path=dirname)
+    config = core.storage.StorageDict(filename, "yaml", path=dirname, override_temporary=True)
     if not config:
         new_config = True
-
-    if not new_config and core.storage.TEMPORARY:
-        config.load()
 
     raw_config = dict(config) if config else {}
 
@@ -563,12 +592,13 @@ def load(file_path=None):
         enabled_modules = DEFAULT_MODULES
 
     enabled_user_modules = raw_config.get("user_modules", {}).get("enabled", [])
+    enabled_user_channels = raw_config.get("user_channels", {}).get("enabled", [])
 
     # Use the new cached schema (contains all possible settings)
     schema = get_schema()
 
     # Registry only contains ENABLED instances and their available names
-    registry = _get_registry_data(enabled_channels, enabled_modules, enabled_user_modules)
+    registry = _get_registry_data(enabled_channels, enabled_user_channels, enabled_modules, enabled_user_modules)
 
     if new_config:
         target = copy.deepcopy(schema)
