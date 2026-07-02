@@ -178,10 +178,15 @@ class Manager:
             if last_channel and last_channel in self.channels.keys():
                 self.channel = self.channels[last_channel]
             else:
+                target_channel = "cli"
                 self.channel = self.channels.get('cli')
                 if not self.channel:
                     # just default to the first channel in the list
-                    self.channel = self.channels.get(enabled_channels[-1])
+                    target_channel = enabled_channels[0]
+                    self.channel = self.channels.get(target_channel)
+
+                self.savedata["last_channel"] = target_channel
+                self.savedata.save()
 
         if enabled_user_channels:
             self.log("core", "Loading user channels..")
