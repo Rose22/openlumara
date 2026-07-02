@@ -206,38 +206,8 @@ function showChatError(message, errorType = null, action = null, rawError = null
     const errorWrapper = document.createElement('div');
     errorWrapper.className = 'message-wrapper system';
 
-    let header = 'API Error';
-    let guidance = 'Please check your API settings.';
-    let buttons = [];
-
-    switch (errorType) {
-        case 'config_missing':
-            header = 'Setup Required';
-            guidance = 'Your API configuration is missing. Please provide a valid API URL and Key.';
-            buttons = [{ text: 'Open Settings', action: "toggleModal('settings')", style: 'primary' }];
-            break;
-        case 'auth_failed':
-            header = 'Authentication Failed';
-            guidance = 'The API key is invalid. Please verify your API Key in the settings.';
-            buttons = [{ text: 'Open Settings', action: "toggleModal('settings')", style: 'primary' }];
-            break;
-        case 'connection_failed':
-            header = 'Connection Failed';
-            guidance = 'Unable to reach the API server. Please verify your API URL is correct.';
-            buttons = [
-                { text: 'Retry Connection', action: 'reconnectApi()', style: 'secondary' },
-                { text: 'Open Settings', action: "toggleModal('settings')", style: 'primary' }
-            ];
-            break;
-        default:
-            header = 'API Error';
-            guidance = 'An unexpected error occurred.';
-            buttons = [{ text: 'Retry Connection', action: 'reconnectApi()', style: 'primary' }];
-            break;
-    }
-
     // Use the provided message if it's meaningful (not just the generic guidance)
-    const displayMessage = message && message !== guidance ? message : guidance;
+    const displayMessage = message
 
     let errorHtml = `
     <div class="message system-error" style="
@@ -250,28 +220,13 @@ function showChatError(message, errorType = null, action = null, rawError = null
     ">
     <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
     <span style="font-size: 1.2em;">⚠</span>
-    <strong style="color: #ff8888; font-size: 1.1em;">${escapeHtml(header)}</strong>
+    <strong style="color: #ff8888; font-size: 1.1em;">Error</strong>
     </div>
-    <p style="margin: 0 0 12px 0; color: #e0e0e0; font-size: 0.95em; line-height: 1.4; white-space: pre-wrap;">${escapeHtml(displayMessage)}</p>
+    <p style="margin: 0 0 12px 0; color: #e0e0e0; font-size: 0.95em; line-height: 1.4; white-space: pre-wrap;">${escapeHtml(message)}</p>
     ${rawError ? `<details style="margin: 0 0 12px 0; color: #aaa; font-size: 0.85em;"><summary style="cursor: pointer; color: #888; margin-bottom: 4px;">Technical details</summary><pre style="margin: 8px 0 0 0; padding: 8px; background: #1a1a1a; border-radius: 4px; overflow-x: auto; white-space: pre-wrap; word-break: break-all;">${escapeHtml(rawError)}</pre></details>` : ''}
     ${action && !rawError ? `<p style="margin: 0 0 12px 0; color: #aaa; font-size: 0.85em; font-style: italic;">${escapeHtml(action)}</p>` : ''}
     <div style="display: flex; gap: 8px; flex-wrap: wrap;">
     `;
-
-    buttons.forEach(btn => {
-        const isPrimary = btn.style === 'primary';
-        const btnStyle = `
-        background: ${isPrimary ? '#4a6fa5' : 'transparent'};
-        color: ${isPrimary ? '#ffffff' : '#aaa'};
-        border: ${isPrimary ? 'none' : '1px solid #555'};
-        padding: 6px 14px;
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 0.85em;
-        font-weight: 500;
-        `;
-        errorHtml += `<button onclick="${btn.action}" style="${btnStyle}">${escapeHtml(btn.text)}</button>`;
-    });
 
     errorHtml += `</div></div>`;
     errorWrapper.innerHTML = errorHtml;
