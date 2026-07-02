@@ -47,6 +47,14 @@ class ApiBridge(core.channel.Channel):
             "type": "string",
             "description": "Your chosen API key. This acts like a password, so choose a good one!",
             "default": "sk-openlumara-dummy-key"
+        },
+        "show_reasoning": {
+            "description": "Whether to show the model's internal reasoning process within sent messages. Works in both streaming mode and non-streaming mode",
+            "default": False
+        },
+        "stream_tool_calls": {
+            "description": "Whether to stream tool call arguments as they are written by the AI. Extremely useful when using toolcalls with long content, such as when using the Coder to write code",
+            "default": False
         }
     }
 
@@ -129,9 +137,9 @@ class ApiBridge(core.channel.Channel):
         @app.get("/v1/models")
         async def list_models():
             """Returns a list of available models."""
-            models = []
-            for model_id in await self.manager.API.list_models():
-                models.append(self.Model(id=model_id))
+            models = [self.Model(id="openlumara"]
+            #for model_id in await self.manager.API.list_models():
+            #    models.append(self.Model(id=model_id))
             return self.ModelsResponse(data=models)
 
         @app.post("/v1/chat/completions")
