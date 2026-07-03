@@ -157,7 +157,7 @@ class Manager:
 
         if not enabled_channels:
             print("ERROR: At least one channel must be enabled in the config! Try the `cli` channel for a basic terminal UI.", flush=True)
-            exit(1)
+            sys.exit(1)
 
         import channels
         import modules
