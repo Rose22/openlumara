@@ -6,3 +6,4 @@ json-repair
 python-ulid
 requests
 httpx
+PyPDF2

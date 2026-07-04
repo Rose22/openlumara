@@ -93,3 +93,25 @@
     font-size: 0.85rem;
     color: var(--text-secondary);
 }
+
+/* PDF Preview Styles */
+.uploaded-pdf-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    max-width: 200px;
+    padding: 20px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+}
+
+.uploaded-pdf-icon {
+    font-size: 3rem;
+    line-height: 1;
+}
+
+.queue-file-icon.pdf {
+    color: var(--error);
+}

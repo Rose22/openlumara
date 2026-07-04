@@ -2,74 +2,76 @@
 // Drag and Drop
 // =============================================================================
 
-// temporarily disabled
+const SUPPORTED_FILE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
 
-// ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-//     chat.addEventListener(eventName, preventDefaults, false);
-// });
-//
-// function preventDefaults(e) {
-//     e.preventDefault();
-//     e.stopPropagation();
-// }
-//
-// ['dragenter', 'dragover'].forEach(eventName => {
-//     chat.addEventListener(eventName, () => {
-//         chat.classList.add('drag-over');
-//         dropOverlay.classList.add('active');
-//     }, false);
-// });
-//
-// ['dragleave', 'drop'].forEach(eventName => {
-//     chat.addEventListener(eventName, () => {
-//         chat.classList.remove('drag-over');
-//         dropOverlay.classList.remove('active');
-//     }, false);
-// });
-//
-// chat.addEventListener('drop', (e) => {
-//     const files = e.dataTransfer.files;
-//     if (files.length > 0) {
-//         handleFileUpload({ target: { files: files } });
-//     }
-// }, false);
-//
-// document.body.addEventListener('dragover', (e) => {
-//     // Prevent file upload overlay when dragging a chat item
-//     if (window.isDraggingChat) {
-//         e.preventDefault();
-//         return;
-//     }
-//     e.preventDefault();
-//     dropOverlay.classList.add('active');
-// });
-//
-// document.body.addEventListener('dragleave', (e) => {
-//     if (e.target === document.body || !e.relatedTarget) {
-//         dropOverlay.classList.remove('active');
-//     }
-// });
-//
-// document.body.addEventListener('drop', (e) => {
-//     // Prevent file upload when dropping a chat item
-//     if (window.isDraggingChat) {
-//         e.preventDefault();
-//         return;
-//     }
-//     e.preventDefault();
-//     dropOverlay.classList.remove('active');
-//
-//     const files = e.dataTransfer.files;
-//     if (files.length > 0) {
-//         handleFileUpload({ target: { files: files } });
-//     }
-// });
+['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+    chat.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+    }, false);
+});
+
+['dragenter', 'dragover'].forEach(eventName => {
+    chat.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        if (!window.isDraggingChat) {
+            chat.classList.add('drag-over');
+            dropOverlay.classList.add('active');
+        }
+    }, false);
+});
+
+['dragleave', 'drop'].forEach(eventName => {
+    chat.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        chat.classList.remove('drag-over');
+        dropOverlay.classList.remove('active');
+    }, false);
+});
+
+chat.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+        handleFileUpload({ target: { files: files } });
+    }
+}, false);
+
+document.body.addEventListener('dragover', (e) => {
+    if (window.isDraggingChat) {
+        e.preventDefault();
+        return;
+    }
+    e.preventDefault();
+    dropOverlay.classList.add('active');
+});
+
+document.body.addEventListener('dragleave', (e) => {
+    if (e.target === document.body || !e.relatedTarget) {
+        dropOverlay.classList.remove('active');
+    }
+});
+
+document.body.addEventListener('drop', (e) => {
+    if (window.isDraggingChat) {
+        e.preventDefault();
+        return;
+    }
+    e.preventDefault();
+    dropOverlay.classList.remove('active');
+
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+        handleFileUpload({ target: { files: files } });
+    }
+});
 
 // =============================================================================
 // File Upload (Modified for Queuing)
 // =============================================================================
 const SUPPORTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 const MAX_IMAGE_SIZE = 20 * 1024 * 1024; // 20MB
+const MAX_PDF_SIZE = 25 * 1024 * 1024; // 25MB
 
 // Global queue to hold files and their UI wrappers until 'send' is clicked
 window.upload_queue = {
@@ -99,8 +101,10 @@ window.updateUploadQueueUI = function() {
     window.upload_queue.files.forEach((fileObj, index) => {
         const item = document.createElement('div');
         item.className = 'upload-queue-item';
+        const iconClass = fileObj.is_pdf ? 'queue-file-icon pdf' : (fileObj.is_image ? 'queue-file-icon image' : 'queue-file-icon');
+        const iconChar = fileObj.is_pdf ? '\uD83D\uDCC4' : '\uD83D\uDDBC\uFE0F';
         item.innerHTML = `
-        <span class="queue-file-icon">📄</span>
+        <span class="${iconClass}">${iconChar}</span>
         <span class="queue-file-name">${escapeHtml(fileObj.name)}</span>
         <button class="delete-queue-item" aria-label="Remove file">&times;</button>
         `;
@@ -147,6 +151,17 @@ async function handleFileUpload(event) {
 
         for (const file of rawFiles) {
             const isImage = SUPPORTED_IMAGE_TYPES.includes(file.type);
+            const isPdf = file.type === 'application/pdf';
+
+            if (!isImage && !isPdf && !file.type.startsWith('text/')) {
+                continue;
+            }
+
+            if (isPdf && file.size > MAX_PDF_SIZE) {
+                console.warn(`PDF ${file.name} exceeds ${MAX_PDF_SIZE / 1024 / 1024}MB limit`);
+                continue;
+            }
+
             const previewWrapper = document.createElement('div');
             previewWrapper.className = 'message-wrapper user animate-in';
             previewWrapper.dataset.index = 'pending';
@@ -155,6 +170,7 @@ async function handleFileUpload(event) {
             previewMsg.className = 'message user';
 
             let contentPart = {};
+            let fileMeta = {};
 
             if (isImage) {
                 // Image processing
@@ -192,7 +208,11 @@ async function handleFileUpload(event) {
                 img.style.width = `${width}px`;
                 img.style.height = `${height}px`;
 
-                // Prepare the parts for the final payload
+                imgContainer.appendChild(img);
+                previewMsg.appendChild(imgContainer);
+                previewWrapper.appendChild(previewMsg);
+                previewWrappers.push(previewWrapper);
+
                 contentPart = [
                     {
                         type: "text",
@@ -203,6 +223,66 @@ async function handleFileUpload(event) {
                         image_url: { url: imageDataUrl }
                     }
                 ];
+                fileMeta = { is_image: true };
+            } else if (isPdf) {
+                // PDF processing — extract text via backend
+                const pdfBase64 = await new Promise((res, rej) => {
+                    const r = new FileReader();
+                    r.onload = () => {
+                        const parts = r.result.split(',');
+                        res(parts[1] || r.result);
+                    };
+                    r.onerror = () => rej(new Error('Failed to read PDF file'));
+                    r.readAsDataURL(file);
+                });
+
+                const pdfContainer = document.createElement('div');
+                pdfContainer.className = 'uploaded-pdf-container';
+                const pdfIcon = document.createElement('div');
+                pdfIcon.className = 'uploaded-pdf-icon';
+                pdfIcon.innerHTML = '&#128196;';
+                const pdfName = document.createElement('div');
+                pdfName.className = 'uploaded-image-caption';
+                pdfName.textContent = file.name;
+                pdfContainer.appendChild(pdfIcon);
+                pdfContainer.appendChild(pdfName);
+                previewMsg.appendChild(pdfContainer);
+                previewWrapper.appendChild(previewMsg);
+                previewWrappers.push(previewWrapper);
+
+                let pdfText = "[PDF could not be parsed]";
+                let pdfFallback = null;
+                try {
+                    const parseResp = await fetch('/parse-pdf', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ content: pdfBase64, filename: file.name })
+                    });
+                    const parseData = await parseResp.json();
+                    if (parseData.success) {
+                        if (parseData.mode === 'pdf_image' && parseData.pdf_base64) {
+                            pdfFallback = parseData.pdf_base64;
+                            pdfText = `[PDF: ${file.name} (${parseData.pages} pages, sent as image for OCR)]`;
+                        } else if (parseData.text) {
+                            pdfText = parseData.text;
+                        }
+                    }
+                } catch (e) {
+                    console.error('Failed to parse PDF:', e);
+                }
+
+                if (pdfFallback) {
+                    contentPart = [
+                        { type: "text", text: pdfText },
+                        { type: "image_url", image_url: { url: `data:application/pdf;base64,${pdfFallback}` } }
+                    ];
+                } else {
+                    contentPart = {
+                        type: "text",
+                        text: `[PDF: ${file.name} (${pdfText.length} chars extracted)]\n${pdfText}`
+                    };
+                }
+                fileMeta = { is_pdf: true };
             } else {
                 // Text file processing
                 const content = await new Promise((resolve) => {
@@ -216,11 +296,14 @@ async function handleFileUpload(event) {
                     type: "text",
                     text: `[File: ${file.name}]\n${content}`
                 };
+                fileMeta = {};
             }
 
             window.upload_queue.files.push({
                 content: contentPart,
-                name: file.name
+                name: file.name,
+                is_image: fileMeta.is_image || false,
+                is_pdf: fileMeta.is_pdf || false
             });
             window.upload_queue.wrappers.push(previewWrapper);
         }

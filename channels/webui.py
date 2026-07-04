@@ -28,6 +28,8 @@ from starlette.websockets import WebSocketState
 
 import core
 import msgpack
+from io import BytesIO
+from PyPDF2 import PdfReader
 import yaml
 import logging
 import io
@@ -105,7 +107,7 @@ class ConnectionManager:
         self.connection_users[websocket] = user
 
         current_chat_id = await channel_instance.context.chat.get_id()
-        
+
         # Send log history to new connection
         if self.log_buffer:
             await websocket.send_json({
@@ -146,7 +148,7 @@ class ConnectionManager:
                     await connection.send_json(message)
             except Exception:
                 disconnected.append(connection)
-        
+
         # Clean up any dead connections
         for conn in disconnected:
             self.disconnect(conn)
@@ -171,7 +173,7 @@ class ConnectionManager:
         self.stream_buffer = []
 
         next_index = len(await channel_instance.context.chat.get())
-        
+
         async def stream_worker():
             try:
                 async for token_data in generator:
@@ -182,13 +184,13 @@ class ConnectionManager:
                         elif p_type == "content": sttus_str = "content"
                         elif p_type in ["tool_call_delta", "tool", "tool_calls"]: status_str = "tool_call"
                         elif p_type == "tool": status_str = "tool_exec"
-                        
+
                         payload = serialize_for_json(token_data)
                         payload["_meta"] = {"type": "delta", "status": status_str}
-                        
+
                         # Add to buffer
                         self.stream_buffer.append(payload)
-                        
+
                         # Broadcast immediately
                         await self.broadcast({
                             "type": "token",
@@ -208,7 +210,7 @@ class ConnectionManager:
                     "buffer": self.stream_buffer,
                     "index": next_index
                 })
-                
+
                 # Clear buffer
                 self.stream_buffer = []
                 self.active_chat_id = None
@@ -325,11 +327,11 @@ async def websocket_endpoint(websocket: WebSocket):
                         # Cancel current stream if any
                         if manager.active_stream_task and not manager.active_stream_task.done():
                             manager.active_stream_task.cancel()
-                        
+
                         # Switch context
                         await channel_instance.context.chat.load(new_chat_id)
                         manager.active_chat_id = new_chat_id
-                        
+
                         # Broadcast the switch to all clients
                         await manager.broadcast({
                             "type": "chat_switched",
@@ -341,11 +343,11 @@ async def websocket_endpoint(websocket: WebSocket):
                     # Cancel current stream
                     if manager.active_stream_task and not manager.active_stream_task.done():
                         manager.active_stream_task.cancel()
-                    
+
                     # Create new chat
                     new_id = await channel_instance.context.chat.new_chat()
                     manager.active_chat_id = new_id
-                    
+
                     # Broadcast the switch
                     await manager.broadcast({
                         "type": "chat_switched",
@@ -366,7 +368,7 @@ async def websocket_endpoint(websocket: WebSocket):
                         "chat_id": channel_instance.context.chat.current,
                         "buffer": []
                     })
-                
+
                 elif msg_type == "user_message":
                     # Handle user message via WebSocket
                     content = data.get("content")
@@ -446,6 +448,8 @@ def serialize_for_json(obj):
         return obj
     else:
         return str(obj)
+
+
 
 # -----------------------------------------------------------------------------
 # Security & Auth Middleware
@@ -804,7 +808,7 @@ async def start_ai_stream_task(chat_id: str, payload_body: dict):
     Starts an AI response stream for a given chat.
     Broadcasts the user's message with the correct index first, then streams the AI response.
     """
-    
+
     # 1. Calculate the true next index before broadcasting anything
     messages = await channel_instance.context.chat.get() or []
     next_index = len(messages)
@@ -813,7 +817,7 @@ async def start_ai_stream_task(chat_id: str, payload_body: dict):
     user_msg_payload = payload_body.copy()
     if isinstance(user_msg_payload, dict):
         user_msg_payload['index'] = next_index
-    
+
     await manager.broadcast({
         "type": "user_message_added",
         "message": user_msg_payload
@@ -861,7 +865,7 @@ async def stream_message(request: Request, user: str = Depends(require_auth)):
 
     data = await request.json()
     chat_id = await channel_instance.context.chat.get_id() or "default"
-    
+
     # Use the unified task starter
     stream_id = await start_ai_stream_task(chat_id, data)
 
@@ -954,11 +958,29 @@ async def upload_file(request: Request, user: str = Depends(require_auth)):
         filename = f.get('filename', '')
         content_b64 = f.get('content', '')
         is_image = f.get('is_image', False)
+        is_pdf = f.get('is_pdf', False)
 
         if is_image:
             image_url = f"data:image/jpeg;base64,{content_b64}"
             message_content.append({"type": "text", "text": f"[Image: {filename}]"})
             message_content.append({"type": "image_url", "image_url": {"url": image_url}})
+        elif is_pdf:
+            try:
+                pdf_bytes = base64.b64decode(content_b64)
+                reader = PdfReader(BytesIO(pdf_bytes))
+                pages_text = []
+                for i, page in enumerate(reader.pages):
+                    text = page.extract_text()
+                    if text:
+                        pages_text.append(f"--- Page {i + 1} ---\n{text}")
+                full_text = '\n\n'.join(pages_text)
+                if full_text:
+                    message_content.append({"type": "text", "text": f"[PDF: {filename}]\n{full_text}"})
+                else:
+                    message_content.append({"type": "text", "text": f"[PDF: {filename} (sending as image for OCR)]"})
+                    message_content.append({"type": "image_url", "image_url": {"url": f"data:application/pdf;base64,{content_b64}"}})
+            except Exception:
+                message_content.append({"type": "text", "text": f"[PDF: {filename} - failed to extract text]"})
         else:
             content = base64.b64decode(content_b64).decode('utf-8', errors='replace')
             message_content.append({"type": "text", "text": f"[File: {filename}]\n{content}"})
@@ -966,6 +988,35 @@ async def upload_file(request: Request, user: str = Depends(require_auth)):
     await channel_instance.context.chat.add({"role": "user", "content": message_content})
     total = len(await channel_instance.context.chat.get())
     return {'success': True, 'total': total, 'type': 'multi'}
+
+@app.post("/parse-pdf")
+async def parse_pdf(request: Request, user: str = Depends(require_auth)):
+    data = await request.json()
+    content_b64 = data.get('content', '')
+    filename = data.get('filename', 'document.pdf')
+
+    try:
+        pdf_bytes = base64.b64decode(content_b64)
+        reader = PdfReader(BytesIO(pdf_bytes))
+        pages_text = []
+        for i, page in enumerate(reader.pages):
+            text = page.extract_text()
+            if text:
+                pages_text.append(f"--- Page {i + 1} ---\n{text}")
+        full_text = '\n\n'.join(pages_text)
+        if full_text:
+            return {'success': True, 'text': full_text, 'pages': len(reader.pages)}
+
+        # Text extraction failed — return raw PDF for vision model OCR
+        return {
+            'success': True,
+            'text': None,
+            'pages': len(reader.pages),
+            'mode': 'pdf_image',
+            'pdf_base64': content_b64
+        }
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
 
 # =============================================================================
 # Chat Management Routes
@@ -1320,7 +1371,7 @@ async def save_settings(request: Request, user: str = Depends(require_auth)):
     data = await request.json()
     form_data = data.get("settings", data)  # Support both formats
     changed_modules = data.get("changed_modules", [])
-    
+
     result = core.config.config.load(data=form_data)
     core.config.config.save()
 
@@ -1794,7 +1845,7 @@ class Webui(core.channel.Channel):
     def on_log(self, category, message):
         # Store log in buffer for history
         manager.add_log(category, message)
-        
+
         # Broadcast log messages to all connected webui clients
         # Since on_log is sync but manager.broadcast is async, we schedule it as a task
         log_message = {
