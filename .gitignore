@@ -15,8 +15,3 @@ dev_run.sh
 *.swp
 *.swo
 *.kate-swp
-.vscode/*
-config/*
-data/*
-**/__pycache__/*
-

@@ -86,7 +86,7 @@ DEFAULT_MODULES = (
     "auto_backup"
 )
 
-DEFAULT_CHANNELS = ["webui"] # "cli" is disabled for Esobold
+DEFAULT_CHANNELS = ["cli", "webui"]
 
 class ConfigManager:
     def __init__(self, config, base_path=None):
