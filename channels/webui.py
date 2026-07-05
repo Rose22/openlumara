@@ -30,9 +30,10 @@ import core
 import msgpack
 from io import BytesIO
 from PyPDF2 import PdfReader
+import pymupdf
 import yaml
 import logging
-import io
+
 
 WEBUI_DIR = core.get_path("channels/webui")
 
@@ -181,7 +182,7 @@ class ConnectionManager:
                         p_type = token_data.get("type")
                         status_str = "idle"
                         if p_type == "reasoning": status_str = "thinking"
-                        elif p_type == "content": sttus_str = "content"
+                        elif p_type == "content": status_str = "content"
                         elif p_type in ["tool_call_delta", "tool", "tool_calls"]: status_str = "tool_call"
                         elif p_type == "tool": status_str = "tool_exec"
 
@@ -946,6 +947,7 @@ async def cancel_stream(request: Request, user: str = Depends(require_auth)):
         stream_cancellations.add(stream_id)
     return {'success': True}
 
+
 @app.post("/upload")
 async def upload_file(request: Request, user: str = Depends(require_auth)):
     data = await request.json()
@@ -967,20 +969,16 @@ async def upload_file(request: Request, user: str = Depends(require_auth)):
         elif is_pdf:
             try:
                 pdf_bytes = base64.b64decode(content_b64)
-                reader = PdfReader(BytesIO(pdf_bytes))
-                pages_text = []
-                for i, page in enumerate(reader.pages):
-                    text = page.extract_text()
-                    if text:
-                        pages_text.append(f"--- Page {i + 1} ---\n{text}")
-                full_text = '\n\n'.join(pages_text)
+                full_text, _ = await asyncio.to_thread(_extract_pdf_text_sync, pdf_bytes)
                 if full_text:
-                    message_content.append({"type": "text", "text": f"[PDF: {filename}]\n{full_text}"})
+                    message_content.append({"type": "text", "text": f"[File: {filename}]\n{full_text}"})
                 else:
-                    message_content.append({"type": "text", "text": f"[PDF: {filename} (sending as image for OCR)]"})
-                    message_content.append({"type": "image_url", "image_url": {"url": f"data:application/pdf;base64,{content_b64}"}})
+                    message_content.append({"type": "text", "text": f"[File: {filename} (sending as images for OCR)]"})
+                    page_images = await asyncio.to_thread(pdf_pages_to_images, pdf_bytes)
+                    for img_url in page_images:
+                        message_content.append({"type": "image_url", "image_url": {"url": img_url}})
             except Exception:
-                message_content.append({"type": "text", "text": f"[PDF: {filename} - failed to extract text]"})
+                message_content.append({"type": "text", "text": f"[File: {filename} - failed to extract text]"})
         else:
             content = base64.b64decode(content_b64).decode('utf-8', errors='replace')
             message_content.append({"type": "text", "text": f"[File: {filename}]\n{content}"})
@@ -989,34 +987,52 @@ async def upload_file(request: Request, user: str = Depends(require_auth)):
     total = len(await channel_instance.context.chat.get())
     return {'success': True, 'total': total, 'type': 'multi'}
 
+
+def _extract_pdf_text_sync(pdf_bytes):
+    reader = PdfReader(BytesIO(pdf_bytes))
+    pages_text = []
+    for i, page in enumerate(reader.pages):
+        text = page.extract_text()
+        if text:
+            pages_text.append(f"--- Page {i + 1} ---\n{text}")
+    return ('\n\n'.join(pages_text), len(reader.pages))
+
+
+def pdf_pages_to_images(pdf_bytes, dpi=150, max_images=10):
+    doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
+    try:
+        images = []
+        for i in range(min(len(doc), max_images)):
+            page = doc[i]
+            pix = page.get_pixmap(dpi=dpi)
+            img_b64 = base64.b64encode(pix.tobytes("png")).decode()
+            images.append(f"data:image/png;base64,{img_b64}")
+        return images
+    finally:
+        doc.close()
+
+
 @app.post("/parse-pdf")
 async def parse_pdf(request: Request, user: str = Depends(require_auth)):
     data = await request.json()
     content_b64 = data.get('content', '')
-    filename = data.get('filename', 'document.pdf')
 
     try:
         pdf_bytes = base64.b64decode(content_b64)
-        reader = PdfReader(BytesIO(pdf_bytes))
-        pages_text = []
-        for i, page in enumerate(reader.pages):
-            text = page.extract_text()
-            if text:
-                pages_text.append(f"--- Page {i + 1} ---\n{text}")
-        full_text = '\n\n'.join(pages_text)
+        full_text, page_count = await asyncio.to_thread(_extract_pdf_text_sync, pdf_bytes)
         if full_text:
-            return {'success': True, 'text': full_text, 'pages': len(reader.pages)}
+            return {'success': True, 'text': full_text, 'pages': page_count}
 
-        # Text extraction failed — return raw PDF for vision model OCR
+        page_images = await asyncio.to_thread(pdf_pages_to_images, pdf_bytes)
         return {
             'success': True,
             'text': None,
-            'pages': len(reader.pages),
+            'pages': page_count,
             'mode': 'pdf_image',
-            'pdf_base64': content_b64
+            'page_images': page_images
         }
     except Exception as e:
-        return {'success': False, 'error': str(e)}
+        return {'success': False, 'error': "Failed to parse PDF. An unexpected error occured"}
 
 # =============================================================================
 # Chat Management Routes

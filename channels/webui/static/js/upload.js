@@ -250,8 +250,8 @@ async function handleFileUpload(event) {
                 previewWrapper.appendChild(previewMsg);
                 previewWrappers.push(previewWrapper);
 
-                let pdfText = "[PDF could not be parsed]";
-                let pdfFallback = null;
+                let pdfText = null;
+                let pdfPageImages = null;
                 try {
                     const parseResp = await fetch('/parse-pdf', {
                         method: 'POST',
@@ -260,26 +260,29 @@ async function handleFileUpload(event) {
                     });
                     const parseData = await parseResp.json();
                     if (parseData.success) {
-                        if (parseData.mode === 'pdf_image' && parseData.pdf_base64) {
-                            pdfFallback = parseData.pdf_base64;
-                            pdfText = `[PDF: ${file.name} (${parseData.pages} pages, sent as image for OCR)]`;
+                        if (parseData.mode === 'pdf_image' && parseData.page_images) {
+                            pdfPageImages = parseData.page_images;
+                            pdfText = `[File: ${file.name} (${parseData.pages} pages, sent as images for OCR)]`;
                         } else if (parseData.text) {
                             pdfText = parseData.text;
+                        } else {
+                            pdfText = "[PDF could not be parsed — no extractable text or images]";
                         }
                     }
                 } catch (e) {
                     console.error('Failed to parse PDF:', e);
+                    pdfText = "[PDF could not be parsed]";
                 }
 
-                if (pdfFallback) {
+                if (pdfPageImages) {
                     contentPart = [
                         { type: "text", text: pdfText },
-                        { type: "image_url", image_url: { url: `data:application/pdf;base64,${pdfFallback}` } }
+                        ...pdfPageImages.map(url => ({ type: "image_url", image_url: { url } }))
                     ];
                 } else {
                     contentPart = {
                         type: "text",
-                        text: `[PDF: ${file.name} (${pdfText.length} chars extracted)]\n${pdfText}`
+                        text: `[File: ${file.name} (${pdfText.length} chars extracted)]\n${pdfText}`
                     };
                 }
                 fileMeta = { is_pdf: true };

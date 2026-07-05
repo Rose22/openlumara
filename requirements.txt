@@ -7,3 +7,4 @@ python-ulid
 requests
 httpx
 PyPDF2
+PyMuPDF
