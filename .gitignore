@@ -15,3 +15,5 @@ dev_run.sh
 *.swp
 *.swo
 *.kate-swp
+.module_cache.json
+.tiktoken_cache/
