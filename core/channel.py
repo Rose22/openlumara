@@ -284,7 +284,7 @@ class Channel:
                     return
                 elif usr_msg_result is not None:
                     # allow modifying user message by returning the modified message as a string
-                    message['content'] = usr_msg_result
+                    user_message['content'] = usr_msg_result
 
         # add sent message to context
         add_success = await self.context.chat.add(user_message)
@@ -405,7 +405,7 @@ class Channel:
                     return
                 elif usr_msg_result is not None:
                     # allow modifying user message by returning the modified message as a string
-                    message['content'] = usr_msg_result
+                    user_message['content'] = usr_msg_result
 
         # add user's message to context
         add_success = await self.context.chat.add(user_message)
