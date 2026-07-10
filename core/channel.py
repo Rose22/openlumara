@@ -233,19 +233,21 @@ class Channel:
     async def send(self, message: dict, commands_authorized=False):
         """sends a message to the AI from within the current channel"""
 
+        user_message = message #alias for readability
+
         # as soon as user sends a message in this channel, set current channel (tracked in the manager) to this one
         await self._set_as_active_channel()
 
         # process any /commands
-        if isinstance(message.get("content"), str):
+        if isinstance(user_message.get("content"), str):
             cmd_response = None
-            is_cmd = message.get("content", "").strip().lower().startswith(
+            is_cmd = user_message.get("content", "").strip().lower().startswith(
                 core.config.get("core", "cmd_prefix").strip().lower()
             )
 
-            if is_cmd and message.get("role", "user") == "user":
+            if is_cmd and user_message.get("role", "user") == "user":
                 try:
-                    cmd_response = await self.commands.process_input(message, authorized=commands_authorized)
+                    cmd_response = await self.commands.process_input(user_message, authorized=commands_authorized)
                 except Exception as e:
                     self.log_error("error while executing command", e)
                     return {"role": "assistant", "content": str(e)}
@@ -263,22 +265,15 @@ class Channel:
             if not reconnected:
                 return {"role": "assistant", "content": self._get_disconnection_message()}
 
-        # add sent message to context
-        add_success = await self.context.chat.add(message)
-
-        if not add_success:
-            return None
-
         # run module event hooks
+        usr_msg_result = None
         for module_name, module in self.manager.modules.items():
             if hasattr(module, "on_user_message"):
-                usr_msg_result = True
-
                 try:
                     if asyncio.iscoroutinefunction(module.on_user_message):
-                        usr_msg_result = await module.on_user_message(message.get("content", ""))
+                        usr_msg_result = await module.on_user_message(user_message.get("content", ""))
                     else:
-                        usr_msg_result = module.on_user_message(message.get("content", ""))
+                        usr_msg_result = module.on_user_message(user_message.get("content", ""))
                 except Exception as e:
                     self.log("module error", f"{module_name}: in on_user_message(): {core.detail_error(e)}")
 
@@ -287,6 +282,15 @@ class Channel:
                     # we stop the chain here, allowing the hook to basically intercept the message
                     # and prevent the AI from returning its own response to the message
                     return
+                elif usr_msg_result is not None:
+                    # allow modifying user message by returning the modified message as a string
+                    user_message['content'] = usr_msg_result
+
+        # add sent message to context
+        add_success = await self.context.chat.add(user_message)
+
+        if not add_success:
+            return None
 
         # then get the full context window
         context = await self.context.get(system_prompt=True, end_prompt=True)
@@ -382,10 +386,34 @@ class Channel:
                 yield {"type": "content", "content": self._get_disconnection_message()}
                 return
 
+        # run user message module event hooks
+        usr_msg_result = None
+        for module_name, module in self.manager.modules.items():
+            if hasattr(module, "on_user_message"):
+                try:
+                    if asyncio.iscoroutinefunction(module.on_user_message):
+                        usr_msg_result = await module.on_user_message(user_message.get("content", ""))
+                    else:
+                        usr_msg_result = module.on_user_message(user_message.get("content", ""))
+                except Exception as e:
+                    self.log("module error", f"{module_name}: in on_user_message(): {core.detail_error(e)}")
+
+                if usr_msg_result is False:
+                    # when returning False from the user message hook,
+                    # we stop the chain here, allowing the hook to basically intercept the message
+                    # and prevent the AI from returning its own response to the message
+                    return
+                elif usr_msg_result is not None:
+                    # allow modifying user message by returning the modified message as a string
+                    user_message['content'] = usr_msg_result
+
         # add user's message to context
         add_success = await self.context.chat.add(user_message)
         if not add_success:
             return
+
+        # yield user message as a special token for display in UI's (because user message can be modified by module hooks)
+        yield {"type": "user_message", "content": user_message.get("content")}
 
         # estimate tokens used for user message
         user_message_token_estimation = 0
@@ -407,25 +435,6 @@ class Channel:
 
         # yield so it updates throughout all channels that display token count
         yield {"type": "token_usage", "content": user_message_token_estimation, "source": "estimation"}
-
-        # run module event hooks
-        for module_name, module in self.manager.modules.items():
-            if hasattr(module, "on_user_message"):
-                usr_msg_result = True
-
-                try:
-                    if asyncio.iscoroutinefunction(module.on_user_message):
-                        usr_msg_result = await module.on_user_message(message.get("content", ""))
-                    else:
-                        usr_msg_result = module.on_user_message(message.get("content", ""))
-                except Exception as e:
-                    self.log("module error", f"{module_name}: in on_user_message(): {core.detail_error(e)}")
-
-                if usr_msg_result is False:
-                    # when returning False from the user message hook,
-                    # we stop the chain here, allowing the hook to basically intercept the message
-                    # and prevent the AI from returning its own response to the message
-                    return
 
         # get the new context window with the added message
         context = await self.context.get(system_prompt=True, end_prompt=True)

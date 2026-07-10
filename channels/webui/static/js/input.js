@@ -5,6 +5,7 @@ const HISTORY_KEY = 'message_history';
 const MAX_HISTORY = 100;
 let messageHistory = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
 let historyIndex = -1;
+let currentValue = '';
 
 function saveHistory() {
     localStorage.setItem(HISTORY_KEY, JSON.stringify(messageHistory));
@@ -148,6 +149,9 @@ document.addEventListener('keydown', (event) => {
         }
 
         if (!isMobile && event.ctrlKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+            if (!currentValue.length && historyIndex === -1) {
+                currentValue = inputField.value;
+            }
             if (messageHistory.length > 0) {
                 if (event.key === 'ArrowUp') {
                     if (historyIndex === -1) {
@@ -166,7 +170,8 @@ document.addEventListener('keydown', (event) => {
                 }
 
                 if (historyIndex === -1) {
-                    inputField.value = '';
+                    inputField.value = currentValue;
+                    currentValue = '';
                 } else {
                     inputField.value = messageHistory[historyIndex];
                 }

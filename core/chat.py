@@ -139,7 +139,7 @@ class Chat:
         self.data.save()
 
         # Adjust current index if needed
-        if self.current:
+        if self.current is not None:
             if self.current == index:
                 # Deleted the current chat - reset or move to previous
                 self._set_current(min(index, len(self.data) - 1) if self.data else None)
