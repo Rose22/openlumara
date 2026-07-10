@@ -198,6 +198,10 @@ function processToken(msg, isSimulated = false) {
         return;
     }
 
+    if (type === 'user_message') {
+        return;
+    }
+
     if (!window._currentAiMsgDiv) {
         createAiWrapper();
     } else if (window._currentAiWrapper && !window._currentAiWrapper.parentNode) {
