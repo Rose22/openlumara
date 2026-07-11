@@ -531,6 +531,82 @@ class Coder(core.module.Module):
 
         return False
 
+    def _get_symbol_nodes(self, file_path: str, symbol_name: str, language: str) -> Optional[Tuple[Any, bytes]]:
+        """Get the parsed node and source bytes for a symbol using tree-sitter."""
+        result = self._find_symbol_info(file_path, symbol_name, language)
+        if not result:
+            return None
+        node, _ = result
+        parse_result = self._parse_file(file_path, language)
+        if not parse_result:
+            return None
+        _, source_bytes = parse_result
+        return (node, source_bytes)
+
+    def _find_symbol_end_line(self, file_path: str, symbol_name: str, language: str) -> Optional[int]:
+        """Find the end line of a symbol using tree-sitter node boundaries."""
+        result = self._find_symbol_info(file_path, symbol_name, language)
+        return result[0].end_point[0] + 1 if result else None
+
+    def _get_symbol_indent(self, file_path: str, symbol_name: str, language: str) -> Tuple[str, int]:
+        """Get the indentation character and length of a symbol using tree-sitter."""
+        result = self._find_symbol_info(file_path, symbol_name, language)
+        if not result:
+            return (" ", 1)
+
+        target_node, _ = result
+        parse_result = self._parse_file(file_path, language)
+        if not parse_result:
+            return (" ", 1)
+
+        _, source_bytes = parse_result
+
+        # Find start of the line containing the symbol
+        line_start = source_bytes.rfind(b'\n', 0, target_node.start_byte)
+        line_start = line_start + 1 if line_start != -1 else 0
+
+        # Extract leading whitespace byte by byte
+        indent_bytes = b''
+        for byte in source_bytes[line_start:target_node.start_byte]:
+            if byte in (0x20, 0x09):  # space or tab
+                indent_bytes += bytes([byte])
+            else:
+                break
+
+        if not indent_bytes:
+            return (" ", 1)
+
+        indent_char = '\t' if indent_bytes[0:1] == b'\t' else ' '
+        return (indent_char, len(indent_bytes))
+
+    def _normalize_symbol_indent(self, content_body: str, indent_char: str, indent_len: int) -> str:
+        """Strip existing indent from ALL lines of content_body and apply the target indent."""
+        content_lines = content_body.split('\n')
+        normalized_lines = []
+        for i, line in enumerate(content_lines):
+            stripped = line.lstrip(' \t')
+            if i == 0:
+                # First line gets the base indent
+                normalized_lines.append(indent_char * indent_len + stripped)
+            else:
+                # For subsequent lines, detect relative indentation level from original
+                original_indent = len(line) - len(stripped)
+                if indent_char == ' ':
+                    # Count 4-space groups
+                    levels = original_indent // 4
+                else:
+                    # Count tabs
+                    levels = original_indent
+                # Base indent + relative levels (each level = 4 spaces or 1 tab)
+                normalized_lines.append(indent_char * (indent_len + levels * 4) + stripped)
+
+        # Strip trailing empty lines to avoid extra blank lines in output
+        while normalized_lines and normalized_lines[-1].strip() == '':
+            normalized_lines.pop()
+
+        return '\n'.join(normalized_lines)
+
+
     async def get_symbol(self, project_name: str, file_path: str, symbol_name: str, language: str = None):
         """Read a specific symbol (function/class/method). Use after get_outline to inspect exact code before making changes."""
         file_path_str = self._get_file_path(project_name, file_path)
@@ -562,108 +638,146 @@ class Coder(core.module.Module):
     async def edit_symbol(self, project_name: str, file_path: str, symbol_name: str, new_content: str, language: str = None):
         """Replace a single symbol's implementation. Use for all modifications to existing functions, classes, or methods."""
         file_path_str = self._get_file_path(project_name, file_path)
-
         if not os.path.exists(file_path_str):
             return self.result("Error: file does not exist", success=False)
+
         if not language:
             language = self._get_language_from_ext(file_path_str)
-        info = self._find_symbol_info(file_path_str, symbol_name, language)
 
-        if not info:
+        line_number = self._find_symbol_line(file_path_str, symbol_name, language)
+        if not line_number:
             return self.result(f"Error: symbol '{symbol_name}' not found", success=False)
-        node, _ = info
 
-        # if it's a class, outright reject the edit
-        if self._check_if_symbol_is_class(node, language):
-            return self.result("Error: target symbol is a class. Do NOT edit entire classes. Target class methods instead - use get_outline() on the class to see them.", success=False)
+        node_info = self._get_symbol_nodes(file_path_str, symbol_name, language)
+        if node_info:
+            node, source_bytes = node_info
 
-        parse_result = self._parse_file(file_path_str, language)
-        if not parse_result:
-            return self.result("Error: failed to parse file", success=False)
+            # Detect the target symbol's indentation style and apply it to new_content
+            indent_char, indent_len = self._get_symbol_indent(file_path_str, symbol_name, language)
+            new_content = self._normalize_symbol_indent(new_content, indent_char, indent_len)
 
-        _, source_bytes = parse_result
-        new_content_bytes = new_content.encode('utf-8')
-        updated_bytes = source_bytes[:node.start_byte] + new_content_bytes + source_bytes[node.end_byte:]
-        is_valid, error = self._verify_syntax_content(updated_bytes, language)
+            new_content_bytes = new_content.encode('utf-8')
+            updated_bytes = source_bytes[:node.start_byte] + new_content_bytes + source_bytes[node.end_byte:]
 
-        if not is_valid:
-            return self.result(f"Error: {error}. Edit not applied.", success=False)
+            is_valid, error = self._verify_syntax_content(updated_bytes, language)
+            if not is_valid:
+                return self.result(f"Error: {error}. Edit not applied due to syntax errors. Fix and try again.", success=False)
 
-        await self._backup_file(file_path_str)
-        with open(file_path_str, 'wb') as f:
-            f.write(updated_bytes)
-        return self.result(f"Symbol '{symbol_name}' edited in {file_path}", success=True)
+            await self._backup_file(file_path_str)
+
+            with open(file_path_str, 'wb') as f:
+                f.write(updated_bytes)
+
+            return self.result(f"Symbol '{symbol_name}' edited in {file_path}", success=True)
 
     async def add_symbol_before(self, project_name: str, file_path: str, target_symbol_name: str, name: str, content_body: str, language: str = None):
         """Insert a new symbol before an existing one. Use for adding new functions, methods, or classes."""
         file_path_str = self._get_file_path(project_name, file_path)
-
         if not os.path.exists(file_path_str):
             return self.result("Error: file does not exist", success=False)
+
         if not language:
             language = self._get_language_from_ext(file_path_str)
 
-        info = self._find_symbol_info(file_path_str, target_symbol_name, language)
-        if not info:
+        line_number = self._find_symbol_line(file_path_str, target_symbol_name, language)
+        if not line_number:
             return self.result(f"Error: symbol '{target_symbol_name}' not found", success=False)
-        target_node, _ = info
-        parse_result = self._parse_file(file_path_str, language)
-        if not parse_result:
-            return self.result("Error: failed to parse file", success=False)
 
-        _, source_bytes = parse_result
-        insert_pos = target_node.start_byte
-        new_symbol_bytes = content_body.encode('utf-8')
-        if not new_symbol_bytes.endswith(b'\n'):
-            new_symbol_bytes += b'\n'
-        if insert_pos > 0 and source_bytes[insert_pos-1:insert_pos] != b'\n':
-            new_symbol_bytes += b'\n'
-        updated_bytes = source_bytes[:insert_pos] + new_symbol_bytes + source_bytes[insert_pos:]
-        is_valid, error = self._verify_syntax_content(updated_bytes, language)
+        try:
+            with open(file_path_str, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
 
-        if not is_valid:
-            return self.result(f"Error: {error}. Addition not applied.", success=False)
+            # Use tree-sitter to detect correct indentation (tabs vs spaces, length)
+            indent_char, indent_len = self._get_symbol_indent(file_path_str, target_symbol_name, language)
+            indent_str = indent_char * indent_len
 
-        await self._backup_file(file_path_str)
-        with open(file_path_str, 'wb') as f:
-            f.write(updated_bytes)
-        return self.result(f"Symbol '{name}' added before '{target_symbol_name}'", success=True)
+            # Normalize content_body: strip existing indent, apply correct indent to all lines
+            content_body = self._normalize_symbol_indent(content_body, indent_char, indent_len)
+
+            new_symbol = content_body
+
+            if not new_symbol.endswith('\n'):
+                new_symbol += '\n'
+            new_symbol += '\n'
+
+            insert_pos = line_number - 1
+            if insert_pos > 0 and not lines[insert_pos - 1].endswith('\n'):
+                lines.insert(insert_pos, '\n')
+                insert_pos += 1
+
+            new_lines_list = lines[:insert_pos] + [new_symbol] + lines[insert_pos:]
+            combined_content = "".join(new_lines_list)
+
+            combined_bytes = combined_content.encode('utf-8')
+            is_valid, error = self._verify_syntax_content(combined_bytes, language)
+            if not is_valid:
+                return self.result(f"Error: {error}. Addition not applied due to syntax errors. Fix and try again.", success=False)
+
+            await self._backup_file(file_path_str)
+
+            with open(file_path_str, 'w', encoding='utf-8') as f:
+                f.writelines(new_lines_list)
+
+            return self.result(f"Symbol '{name}' added before '{target_symbol_name}'", success=True)
+        except OSError as e:
+            return self.result(f"Error: {e}", success=False)
 
     async def add_symbol_after(self, project_name: str, file_path: str, target_symbol_name: str, name: str, content_body: str, language: str = None):
         """Insert a new symbol after an existing one. Use for adding new functions, methods, or classes."""
         file_path_str = self._get_file_path(project_name, file_path)
-
         if not os.path.exists(file_path_str):
             return self.result("Error: file does not exist", success=False)
+
         if not language:
             language = self._get_language_from_ext(file_path_str)
 
-        info = self._find_symbol_info(file_path_str, target_symbol_name, language)
-        if not info:
+        line_number = self._find_symbol_line(file_path_str, target_symbol_name, language)
+        if not line_number:
             return self.result(f"Error: symbol '{target_symbol_name}' not found", success=False)
 
-        target_node, _ = info
-        parse_result = self._parse_file(file_path_str, language)
-        if not parse_result:
-            return self.result("Error: failed to parse file", success=False)
+        try:
+            with open(file_path_str, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
 
-        _, source_bytes = parse_result
-        insert_pos = target_node.end_byte
-        new_symbol_bytes = content_body.encode('utf-8')
-        if not new_symbol_bytes.startswith(b'\n'):
-            new_symbol_bytes = b'\n' + new_symbol_bytes
-        if not new_symbol_bytes.endswith(b'\n'):
-            new_symbol_bytes += b'\n'
-        updated_bytes = source_bytes[:insert_pos] + new_symbol_bytes + source_bytes[insert_pos:]
-        is_valid, error = self._verify_syntax_content(updated_bytes, language)
+            end_line_number = self._find_symbol_end_line(file_path_str, target_symbol_name, language)
+            if end_line_number is None:
+                return self.result(f"Error: could not determine end of symbol '{target_symbol_name}'", success=False)
 
-        if not is_valid:
-            return self.result(f"Error: {error}. Addition not applied.", success=False)
+            end_idx = end_line_number
 
-        await self._backup_file(file_path_str)
-        with open(file_path_str, 'wb') as f:
-            f.write(updated_bytes)
-        return self.result(f"Symbol '{name}' added after '{target_symbol_name}'", success=True)
+            # Use tree-sitter to detect correct indentation
+            indent_char, indent_len = self._get_symbol_indent(file_path_str, target_symbol_name, language)
+            indent_str = indent_char * indent_len
+
+            # Normalize content_body: strip existing indent, apply correct indent to all lines
+            content_body = self._normalize_symbol_indent(content_body, indent_char, indent_len)
+
+            new_symbol = content_body
+
+            if not new_symbol.endswith('\n'):
+                new_symbol += '\n'
+            new_symbol += '\n'
+
+            if end_idx > 0 and not lines[end_idx - 1].endswith('\n'):
+                lines.insert(end_idx, '\n')
+                end_idx += 1
+
+            new_lines_list = lines[:end_idx] + [new_symbol] + lines[end_idx:]
+            combined_content = "".join(new_lines_list)
+
+            combined_bytes = combined_content.encode('utf-8')
+            is_valid, error = self._verify_syntax_content(combined_bytes, language)
+            if not is_valid:
+                return self.result(f"Error: {error}. Addition not applied due to syntax errors. Fix and try again.", success=False)
+
+            await self._backup_file(file_path_str)
+
+            with open(file_path_str, 'w', encoding='utf-8') as f:
+                f.writelines(new_lines_list)
+
+            return self.result(f"Symbol '{name}' added after '{target_symbol_name}'", success=True)
+        except OSError as e:
+            return self.result(f"Error: {e}", success=False)
 
     async def delete_symbol(self, project_name: str, file_path: str, symbol_name: str, language: str = None):
         """Remove a single symbol. Use to delete functions, classes, or methods."""
