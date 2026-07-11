@@ -44,7 +44,7 @@ def log_error(msg: str, e: Exception):
         tb = traceback.format_exception(e)
         core.manager.global_instance.log("error", f"{msg}: {detail_error(e)}\n{tb}")
 
-def get_path(path: str = ""):
+def get_path(path: str = "", sandbox=True):
     """get path relative to the project root directory. returns root path if no path is specified."""
     project_root = os.path.abspath(os.path.join(
         os.path.dirname(__file__),
@@ -59,7 +59,10 @@ def get_path(path: str = ""):
         return path
     else:
         # is a relative path, return it sandboxed to the project root
-        return sandbox_path(project_root, path)
+        if sandbox:
+            return sandbox_path(project_root, path)
+        else:
+            return os.path.join(project_root, path)
 
 def get_data_path(subpath=None):
     """get path to the data directory. contains all persistent data used by the framework"""

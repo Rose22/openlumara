@@ -7,11 +7,11 @@ debug_stream = False
 from core.functions import *
 import core.exceptions
 
-user_module_path = core.get_path("user_modules")
+user_module_path = core.get_path("user_modules", sandbox=False)
 if not os.path.exists(user_module_path):
     os.makedirs(user_module_path, exist_ok=True)
 
-user_channel_path = core.get_path("user_channels")
+user_channel_path = core.get_path("user_channels", sandbox=False)
 if not os.path.exists(user_channel_path):
     os.makedirs(user_channel_path, exist_ok=True)
 

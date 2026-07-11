@@ -151,7 +151,7 @@ class Context:
                 if message.get("role") == "user":
                     content = message.get("content")
                     if content and isinstance(content, str):
-                        message["content"] += f"\n\n[SYSTEM MESSAGES]\n{message['injection']}"
+                        message["content"] += f"\n\n{message['injection']}"
 
                 # remove the field from all messages so that it's clean for the API
                 del message["injection"]
