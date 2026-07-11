@@ -1108,23 +1108,26 @@ async def load_chat(id: str, user: str = Depends(require_auth)):
     curr_chat_id = await channel_instance.context.chat.get_id()
 
     if id.strip() == curr_chat_id.strip():
-        return {
-            "success": "false",
-            "reason": "chat already loaded"
-        }
+        # since the webui frontend is so picky about things (i REALLY need to rewrite a lot of it manually..)
+        # we just trick the webui into thinking we did a full load
+        # but really, we just pass the data we've already loaded
+        # stupid AI-coded slop webUI javascript code...
+        # uuuugggghhhh
+        # at least it's one of the very few parts of openlumara that's so badly ai generated
+        # and i already replaced a lot of it with manual code.
+        # i just need to do a total cleanup of it...
+        success = True
+    else:
+        success = await channel_instance.context.chat.load(id)
 
-    success = await channel_instance.context.chat.load(id)
     if not success:
         raise HTTPException(status_code=404, detail="Chat not found")
 
-    messages_orig = await channel_instance.context.chat.get() or []
-    messages = copy.deepcopy(messages_orig)
+    chat = channel_instance.context.chat # alias for readability
+    loaded_id = await chat.get_id()
 
-    title = await channel_instance.context.chat.get_title()
-    loaded_id = await channel_instance.context.chat.get_id()
-    category = await channel_instance.context.chat.get_category()
-    tags = await channel_instance.context.chat.get_tags() or []
-    custom_data = await channel_instance.context.chat.get_data()
+    messages_orig = await chat.get() or []
+    messages = copy.deepcopy(messages_orig)
 
     for i, msg in enumerate(messages):
         msg['index'] = i
@@ -1133,8 +1136,8 @@ async def load_chat(id: str, user: str = Depends(require_auth)):
 
     return {
         'success': True, 'chat': {
-            'id': loaded_id, 'title': title, "category": category, 'tags': tags,
-            'custom_data': custom_data, 'messages': messages, 'total': len(messages)
+            'id': loaded_id, 'title': await chat.get_title(), "category": await chat.get_category(), 'tags': await chat.get_tags(),
+            'custom_data': await chat.get_data(), 'messages': messages, 'total': len(messages)
         }
     }
 
