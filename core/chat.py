@@ -111,7 +111,9 @@ class Chat:
         await self.set_token_usage(0)
         self.using_api_token_data = False
 
-        self.data.save()
+        # don't immediately save, to avoid lag when creating a new chat
+        # handle saving later on
+        #self.data.save()
 
         # start a system prompt warmup so that the response is instant (if the user types slowly... lol)
         await self.channel.manager.API.start_prompt_warmup(notify=core.debug)
