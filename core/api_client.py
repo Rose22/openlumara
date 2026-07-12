@@ -68,7 +68,7 @@ class APIClient():
 
         return result
 
-    async def connect(self):
+    async def connect(self, silent=False):
         if self.connected:
             return True
 
@@ -137,7 +137,8 @@ class APIClient():
         self._connection_attempts = 0
         self.supports_developer_role = core.config.get("api", "use_developer_role", default=False)
 
-        self.manager.log("API", "Successfully connected to AI")
+        if not silent:
+            self.manager.log("API", "Successfully connected to AI")
 
         # send the system prompt in the background,
         # so that the AI is ready to respond right away when the user has finished
@@ -197,7 +198,7 @@ class APIClient():
 
         if not self.connected:
             # attempt to connect
-            connected = await self.connect()
+            connected = await self.connect(silent=True)
             if not connected:
                 return {"error": "not_connected", "message": self._connection_error}
 
@@ -432,7 +433,8 @@ class APIClient():
             #self.manager.log("api", "Force closing HTTP connection due to unclean state..")
             await self.disconnect()
         except Exception as e:
-            self.manager.log_error("Warmup request failed", e)
+            if notify:
+                self.manager.log("api", f"Warmup request failed: {core.detail_error(e)}")
         finally:
             self.prompt_warming_up = False
             self._warmup_done.set()
@@ -528,7 +530,7 @@ class APIClient():
             # normal non-streaming mode
             response_main = response.choices[0]
         except Exception as e:
-            self.manager.log_error("error while receiving response from AI", e)
+            #self.manager.log_error("error while receiving response from AI", e)
             return {"error": "invalid_response", "message": self._get_user_friendly_message("invalid_response", e)}
 
         reasoning_content = getattr(response_main.message, "reasoning_content", None) or \
@@ -709,7 +711,7 @@ class APIClient():
                     yield {"type": "tool_calls", "tool_calls": tool_call_dicts}
 
         except Exception as e:
-            self.manager.log_error("error while receiving response from AI", e)
+            #self.manager.log_error("error while receiving response from AI", e)
             raise e # Re-raise so send_stream can catch it and yield the error type
 
     async def list_models(self):
