@@ -32,6 +32,7 @@ import yaml
 import logging
 import io
 
+VERSION = "8.1.3"
 WEBUI_DIR = core.get_path("channels/webui")
 
 # ordered list of javascript files, to load in this exact order
@@ -644,6 +645,7 @@ async def index(request: Request):
         {
             "request": request,
             "header_title": channel_instance.config.get("title"),
+            "version": VERSION,
             "js_files": JS_FILES,
             "css_files": CSS_FILES,
             "require_login": bool(channel_instance.config.get("require_login"))
@@ -1714,10 +1716,22 @@ async def manifest():
 
 @app.get('/sw.js')
 async def service_worker():
-    """Serve the service worker."""
+    """Serve service worker with injected version."""
     with open(core.get_path("channels/webui/sw.js")) as f:
         sw_code = f.read()
-    return Response(content=sw_code, media_type='application/javascript', headers={'Cache-Control': 'no-store'})
+
+    # Inject version into the file
+    sw_code = sw_code.replace('{{VERSION}}', VERSION)
+
+    return Response(
+        content=sw_code,
+        media_type='application/javascript',
+        headers={
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+        }
+    )
 
 @app.get('/icon-192.png')
 async def icon_192():
