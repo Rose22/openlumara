@@ -397,10 +397,13 @@ function handleWebSocketMessage(data) {
             // process the buffer in batches so that we don't crash the browser
             processBuffer(data.buffer);
         } else {
-            // Empty buffer — just set local state, don't trigger backend call
+            // Empty buffer — restore the current chat from the backend's state
+            // This ensures messages are displayed even when there's no active stream
             if (data.active_chat_id) {
                 currentChatId = data.active_chat_id;
             }
+            // Use restoreCurrentChat to properly sync the UI with the backend's current chat
+            restoreCurrentChat();
         }
         return;
     }

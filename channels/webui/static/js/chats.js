@@ -387,6 +387,9 @@ function updateExistingChatItems(newChatsMap) {
         const dateEl = el.querySelector('.chat-item-meta span');
         if (dateEl) dateEl.textContent = formatDate(chat.updated || chat.created);
 
+        // Update active state
+        el.classList.toggle('active', id === currentChatId);
+
         // Update tags if they changed
         const tagsContainer = el.querySelector('.chat-tags');
         if (tagsContainer) {
