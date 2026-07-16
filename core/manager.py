@@ -7,6 +7,7 @@ import asyncio
 import json_repair
 import inspect
 import re
+import traceback
 
 global_instance = None
 
@@ -83,6 +84,8 @@ class Manager:
                     await storage[channel_name].on_install()
 
             except Exception as e:
+                print(f"[CORE] failed to load channel {channel_name}: {core.detail_error(e)}", file=sys.stderr, flush=True)
+                traceback.print_exc()
                 self.log(channel_name, f"failed to load channel: {core.detail_error(e)}")
 
             is_user_str = "user " if is_user_channels else ""
@@ -157,7 +160,7 @@ class Manager:
 
         if not enabled_channels:
             print("ERROR: At least one channel must be enabled in the config! Try the `cli` channel for a basic terminal UI.", flush=True)
-            exit(1)
+            sys.exit(1)
 
         import channels
         import modules

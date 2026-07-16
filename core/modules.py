@@ -5,17 +5,22 @@ import inspect
 import sys
 import subprocess
 import ast
+import traceback
+import importlib.util
+from packaging.requirements import Requirement, InvalidRequirement
 
 try:
-    from importlib.metadata import version, PackageNotFoundError
+    from importlib.metadata import version, PackageNotFoundError, packages_distributions
 except ImportError:
-    from importlib_metadata import version, PackageNotFoundError
+    from importlib_metadata import version, PackageNotFoundError, packages_distributions
 
 # modules that should have their prompts inserted even when tools are off
 nonagentic = ("characters", "writing_style", "time")
 
 reported_missing = []
 reported_broken = []
+reported_missing_console = set()
+dist_to_import_cache = None
 
 # buffer the warnings and errors so that we can propagate them to manager.log()
 log_buffer = []
@@ -88,15 +93,121 @@ def _get_module_file_path(package, module_name):
         return spec.origin
     return None
 
+def _normalize_dist_name(name: str) -> str:
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+def _build_dist_to_import_map():
+    """Build a mapping of distribution names to top-level import names."""
+    global dist_to_import_cache
+    if dist_to_import_cache is not None:
+        return dist_to_import_cache
+
+    dist_to_import_cache = {}
+    try:
+        pkg_to_dist = packages_distributions() or {}
+        for import_name, dists in pkg_to_dist.items():
+            for dist_name in dists or []:
+                key = _normalize_dist_name(dist_name)
+                dist_to_import_cache.setdefault(key, set()).add(import_name)
+    except Exception:
+        pass
+
+    return dist_to_import_cache
+
+def _parse_requirement(dep: str):
+    """Parse a requirement string, returning None when it cannot be parsed."""
+    try:
+        return Requirement(dep)
+    except InvalidRequirement:
+        # Keep compatibility for loose inputs by extracting a likely package token.
+        token = dep.split(";", 1)[0].strip()
+        for op in ("===", "==", ">=", "<=", "~=", "!=", ">", "<"):
+            if op in token:
+                token = token.split(op, 1)[0].strip()
+                break
+        token = token.split("[", 1)[0].strip()
+        if not token:
+            return None
+        try:
+            return Requirement(token)
+        except InvalidRequirement:
+            return None
+
+def _candidate_import_names(dist_name: str):
+    """Generate import-name candidates from a distribution name generically."""
+    raw = dist_name.strip()
+    candidates = set()
+
+    if not raw:
+        return candidates
+
+    # Canonical python import-style transform.
+    candidates.add(raw.replace("-", "_").replace(".", "_"))
+
+    # Tokenized variants cover common pip-name vs import-name drift.
+    tokens = [t for t in re.split(r"[-_.]+", raw) if t]
+    if tokens:
+        candidates.add(tokens[0])
+        candidates.add(tokens[-1])
+
+    # Common wheel naming convention: python-foo-bar -> foo/bar/foo_bar
+    if raw.startswith("python-") and len(tokens) > 1:
+        tail_tokens = tokens[1:]
+        candidates.add("_".join(tail_tokens))
+        candidates.add(tail_tokens[0])
+        candidates.add(tail_tokens[-1])
+
+    # Distribution metadata mapping (when available) is most accurate.
+    for import_name in _build_dist_to_import_map().get(_normalize_dist_name(raw), set()):
+        candidates.add(import_name)
+
+    return {c for c in candidates if c and c not in {"python", "py"}}
+
 def _check_missing_deps(deps):
-    """return list of dependencies that are not installed (using pip package names)"""
+    """Return dependencies that are unavailable in this runtime.
+
+    This uses requirement parsing and generic import discovery instead of
+    hardcoded package-name mappings.
+    """
+
+    def _is_dep_available(dep: str) -> bool:
+        req = _parse_requirement(dep)
+        if not req:
+            return False
+
+        # Ignore requirements gated off by environment markers.
+        if req.marker is not None:
+            try:
+                if not req.marker.evaluate():
+                    return True
+            except Exception:
+                pass
+
+        dist_name = req.name
+        dist_key = _normalize_dist_name(dist_name)
+
+        # First try metadata lookup (best for non-frozen installs).
+        try:
+            version(dist_name)
+            return True
+        except PackageNotFoundError:
+            pass
+
+        # Generic fallback: infer likely import names and test importability.
+        candidates = _candidate_import_names(dist_name)
+
+        for import_name in candidates:
+            try:
+                if importlib.util.find_spec(import_name) is not None:
+                    return True
+            except Exception:
+                continue
+
+        return False
+
     missing = []
     for dep in deps:
-        # extract the base package name (e.g. 'python-telegram-bot' from 'python-telegram-bot>=1.0')
-        pkg_name = dep.split('>=')[0].split('==')[0].split('<')[0].split('>')[0].strip()
-        try:
-            version(pkg_name)
-        except PackageNotFoundError:
+        if not _is_dep_available(dep):
             missing.append(dep)
     return missing
 
@@ -246,11 +357,17 @@ def load(package, base_class = None, filter: list = None, reload: bool = False, 
             if deps:
                 missing = _check_missing_deps(deps)
                 if missing:
-                    if modname not in reported_missing and not loading_config:
-                        log(modname, "Warning: loading skipped because of missing dependencies")
-                        reported_missing.append(modname)
+                    if modname not in reported_missing_console:
+                        print(f"[CORE] skipping {modname} because of missing dependencies: {', '.join(missing)}", file=sys.stderr, flush=True)
+                        reported_missing_console.add(modname)
+                    # In frozen/PyInstaller builds, metadata lookups can be incomplete.
+                    # Do not hard-skip here: attempt import and let real import errors surface.
+                    if not getattr(sys, "frozen", False):
+                        if modname not in reported_missing and not loading_config:
+                            log(modname, "Warning: loading skipped because of missing dependencies")
+                            reported_missing.append(modname)
 
-                    continue
+                        continue
 
         try:
             # Import the module relative to the package
@@ -291,6 +408,8 @@ def load(package, base_class = None, filter: list = None, reload: bool = False, 
             if modname in reported_broken:
                 continue
 
+            print(f"[CORE] failed to load module {modname}: {core.detail_error(e)}", file=sys.stderr, flush=True)
+            traceback.print_exc()
             log("core", f"failed to load module {modname}: {core.detail_error(e)}")
             reported_broken.append(modname)
             continue

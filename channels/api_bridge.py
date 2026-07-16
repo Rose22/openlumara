@@ -10,6 +10,35 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any, Union
 
+
+class ChatMessage(BaseModel):
+    role: str
+    content: Optional[str] = None
+    name: Optional[str] = None
+
+
+class ChatCompletionRequest(BaseModel):
+    model: str
+    messages: List[ChatMessage]
+    stream: Optional[bool] = False
+    temperature: Optional[float] = 1.0
+    top_p: Optional[float] = 1.0
+    n: Optional[int] = 1
+    max_tokens: Optional[int] = None
+    stop: Optional[Union[str, List[str]]] = None
+    presence_penalty: Optional[float] = 0.0
+    frequency_penalty: Optional[float] = 0.0
+
+
+class Model(BaseModel):
+    id: str
+    object: str = "model"
+
+
+class ModelsResponse(BaseModel):
+    object: str = "list"
+    data: List[Model]
+
 class ApiBridge(core.channel.Channel):
     """
     Lets you use any application or UI (for example, koboldlite, openwebui, etc) to talk to your OpenLumara instance. Simply connect your chosen application to the port you specify in this channel's settings.
@@ -62,35 +91,6 @@ class ApiBridge(core.channel.Channel):
     # pydantic and httpx are already included with openlumara
 
     # -------------------------
-    #   MODELS (OpenAI Spec)
-    # -------------------------
-
-    class ChatMessage(BaseModel):
-        role: str
-        content: Optional[str] = None
-        name: Optional[str] = None
-
-    class ChatCompletionRequest(BaseModel):
-        model: str
-        messages: List[ChatMessage]
-        stream: Optional[bool] = False
-        temperature: Optional[float] = 1.0
-        top_p: Optional[float] = 1.0
-        n: Optional[int] = 1
-        max_tokens: Optional[int] = None
-        stop: Optional[Union[str, List[str]]] = None
-        presence_penalty: Optional[float] = 0.0
-        frequency_penalty: Optional[float] = 0.0
-
-    class Model(BaseModel):
-        id: str
-        object: str = "model"
-
-    class ModelsResponse(BaseModel):
-        object: str = "list"
-        data: List[Model]
-
-    # -------------------------
     #   EVENT HANDLERS
     # -------------------------
 
@@ -140,15 +140,15 @@ class ApiBridge(core.channel.Channel):
         @app.get("/v1/models")
         async def list_models():
             """Returns a list of available models."""
-            models = [self.Model(id="openlumara")]
+            models = [Model(id="openlumara")]
             #for model_id in await self.manager.API.list_models():
-            #    models.append(self.Model(id=model_id))
-            return self.ModelsResponse(data=models)
+            #    models.append(Model(id=model_id))
+            return ModelsResponse(data=models)
 
         @app.post("/v1/chat/completions")
         async def chat_completions(request: Request):
             body = await request.json()
-            chat_req = self.ChatCompletionRequest(**body)
+            chat_req = ChatCompletionRequest(**body)
 
             if not chat_req.messages:
                 raise HTTPException(status_code=400, detail="No messages provided")

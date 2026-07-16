@@ -16,6 +16,7 @@ import asyncio
 import core
 import subprocess
 import argparse
+import sys
 
 async def main_loop(arg_list):
     # parse the --config arg
@@ -94,7 +95,7 @@ def run_from_args(arg_list: list = []):
             print("-" * 40, flush=True)
             pass
         else:
-            exit()
+            sys.exit(0)
 
 def str2bool(v):
     if isinstance(v, bool):
