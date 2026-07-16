@@ -1,0 +1,18 @@
+<div x-data="{ messages: [] }" x-init="messages = await simpleApiFetch('/api/chat/messages')">
+    <template x-if="messages">
+        <template x-for="message in messages">
+            <div :class="{
+                'message-wrapper': true,
+                'user': message.role === 'user',
+                'assistant': message.role === 'assistant'
+            }">
+                <div class="message">
+                    <div :class="message.role"><div class="content-wrapper" x-html="renderMarkdown(message.content)"></div></div>
+                </div>
+            </div>
+        </template>
+    </template>
+    <template x-if="!messages">
+        Please select a chat.
+    </template>
+</div>

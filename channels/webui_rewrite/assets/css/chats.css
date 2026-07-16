@@ -1,0 +1,35 @@
+/* the chatlist in the sidebar */
+#chat-list {
+    display: flex;
+    flex-direction: column;
+    padding: 7px;
+    gap: var(--gap);
+    height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+#chat-list .item {
+    display: flex;
+    flex-direction: column;
+    
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    gap: var(--gap);
+}
+
+/* tags */
+#chat-list .item .tags {
+    display: flex;
+    flex-direction: row;
+    list-style-type: none;
+    gap: var(--gap);
+}
+
+#chat-list .item .tags .tag {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: var(--gap);
+    background-color: var(--bg-secondary);
+}

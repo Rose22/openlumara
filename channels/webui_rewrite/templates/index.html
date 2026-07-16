@@ -1,14 +1,33 @@
 <!DOCTYPE html>
+<!-- OpenLumara WebUI v{{ version }} by Rose22 -->
 <html>
     <head>
         <title>{{ title }}</title>
         
         <!-- libraries -->
-        <script src="{{ url_for('assets', path='js/libs/alpine.min.js') }}"></script>
+        <script src="{{ url_for('assets', path='js/libs/alpine.min.js') }}" defer></script>
+        <script src="{{ url_for('assets', path='js/libs/purify.min.js') }}"></script>
+        <script src="{{ url_for('assets', path='js/libs/marked.min.js') }}"></script>
+
+        <!-- stylesheets -->
+        {% for file in css_files %}
+        <link rel="stylesheet" href="{{ url_for('assets', path='css/'+file) }}" />
+        {% endfor %}
     </head>
     <body>
-        <div x-data="{ action: 'go' }">
-            <p>Hi! im an alpine-enhanced template! Look at me <span x-text="action"></span></p>
-        </div>
+        <section id="main-wrapper">
+            <section id="sidebar">
+                {% include 'components/chats.html' %}
+            </section>
+
+            <section id="chat-window">
+                {% include 'components/chat.html' %}
+            </section>
+        </section>
+
+        <!-- javascript files -->
+        {% for file in js_files %}
+        <script src="{{ url_for('assets', path='js/'+file) }}"></script>
+        {% endfor %}
     </body>
 </html>

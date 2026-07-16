@@ -1,0 +1,17 @@
+#main-wrapper {
+    display: flex;
+    gap: 8px;
+    height: 100%;
+    max-height: 100%;
+    overflow: hidden;
+}
+
+#main-wrapper #sidebar {
+    width: 20%;
+}
+
+#main-wrapper #chat-window {
+    width: 80%;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+}

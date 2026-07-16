@@ -1,0 +1,191 @@
+#chat-window {
+    height: 100%;
+    max-height: 100%;
+    overflow-y: auto;
+}
+
+.message-wrapper {
+    display: flex;
+    flex-direction: column;
+
+    .message {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 14px 16px;
+        border-radius: var(--radius-sm);
+        border: 1px solid transparent;
+        box-shadow: var(--shadow-soft);
+        word-wrap: break-word;
+        overflow: hidden;
+        position: relative;
+        max-width: var(--message-max-width, 75%);
+        width: fit-content;
+        gap: var(--gap);
+        backdrop-filter: blur(10px);
+
+        .content-wrapper {
+            padding: 14px 16px;
+        }
+
+        .user {
+            background: var(--bg-message-user);
+            border: 1px solid var(--border-user);
+            border-bottom-right-radius: var(--radius-sm);
+            color: var(--text-primary);
+        }
+        
+        .assistant {
+            background: var(--bg-message-ai);
+            border: 1px solid var(--border-message);
+            border-bottom-left-radius: var(--radius-sm);
+            color: var(--text-primary);
+            min-width: 80px;
+        }
+
+        h1,
+        h2,
+        h3,
+        h4 {
+            margin: 18px 0 10px;
+            font-weight: 600;
+            line-height: 1.3;
+        }
+
+        h1:first-child,
+        h2:first-child,
+        h3:first-child {
+            margin-top: 0;
+        }
+
+        h1 { font-size: 1.5em; }
+        h2 { font-size: 1.3em; }
+        h3 { font-size: 1.15em; }
+        h4 { font-size: 1.05em; }
+
+        p {
+            margin: 10px 0;
+            line-height: 1.7;
+        }
+
+        p:first-child {
+            margin-top: 0;
+        }
+
+        p:last-child {
+            margin-bottom: 0;
+        }
+
+        ul,
+        ol {
+            margin: 10px 0;
+            padding-left: 24px;
+        }
+
+        li {
+            margin: 5px 0;
+            line-height: 1.6;
+        }
+
+        blockquote {
+            border-left: 3px solid var(--accent);
+            margin: 10px 0;
+            padding: 10px 16px;
+            color: var(--text-secondary);
+            background: var(--bg-tertiary);
+            border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+        }
+
+        blockquote p {
+            margin: 5px 0;
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+            transition: color 0.15s ease;
+            border-bottom: 1px solid transparent;
+        }
+
+        a:hover {
+            text-decoration: underline;
+            color: var(--accent-light);
+        }
+
+        hr {
+            border: none;
+            border-top: 1px solid var(--border-color);
+            margin: 20px 0;
+        }
+
+        /* Tables */
+        table {
+            border-collapse: collapse;
+            margin: 10px 0;
+            width: 100%;
+            overflow-x: auto;
+            display: block;
+        }
+
+        th,
+        td {
+            border: 1px solid var(--border-message);
+            padding: 8px 12px;
+            text-align: left;
+        }
+
+        th {
+            background: var(--bg-tertiary);
+            font-weight: 600;
+        }
+
+        tr:nth-child(even) td {
+            background: rgba(0, 0, 0, 0.1);
+        }
+
+        pre {
+            background: var(--bg-code);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 16px;
+            margin: 10px 0;
+            overflow-x: auto;
+            position: relative;
+            max-width: 100%;
+            white-space: pre-wrap !important;
+        }
+
+        pre code {
+            background: transparent;
+            padding: 0;
+            font-size: 0.88em;
+            line-height: 1.6;
+        }
+
+        code {
+            font-family: var(--code-font);
+        }
+    }
+
+    .animate-in {
+        animation: messageSlideIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+}
+
+/* message bubble alignment */
+.message-wrapper.user {
+    align-items: flex-end;
+}
+
+.message-wrapper.assistant {
+    align-items: flex-start;
+}
+
+.message-wrapper.user_command {
+    align-items: flex-end;
+}
+
+.message-wrapper.command_response {
+    align-items: flex-start;
+}
+

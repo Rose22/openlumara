@@ -21,6 +21,8 @@ import core
 # --------------------
 class WebuiRewrite(core.channel.Channel):
     """A full-featured, modern webUI for OpenLumara, providing you with a privacy-friendly option that doesn't depend on any external chat providers"""
+    version = 2.0
+
     dependencies = [
         "fastapi",
         "starlette>=1.0.1",
@@ -108,6 +110,14 @@ class WebuiRewrite(core.channel.Channel):
 # -------------------
 # FastAPI creator (contains routes and so on)
 # -------------------
+def api_result(obj = None, success: bool = True):
+    if obj is None:
+        result = {}
+    else:
+        result = obj
+
+    return {"data": result, "success": success}
+
 async def create_fastapi(channel):
     app = fastapi.FastAPI()
 
@@ -119,6 +129,47 @@ async def create_fastapi(channel):
 
     @app.get("/")
     async def root(request: fastapi.Request):
-        return channel.templates.TemplateResponse(request, "index.html")
+        js_files = os.listdir(os.path.join(channel.assets_path, "js"))
+        js_files.remove("libs")
+
+        return channel.templates.TemplateResponse(request, "index.html", {
+            "version": channel.version,
+            "css_files": os.listdir(os.path.join(channel.assets_path, "css")),
+            "js_files": js_files
+        })
+
+    # ------------------
+    # API routes (/api)
+    # ------------------
+
+    # --- chats
+    # -- GET
+    @app.get("/api/chat/load/{id}")
+    async def chat_load(id: str):
+        success = await channel.context.chat.load(id)
+        if not success:
+            return api_result(success=False)
+
+        return api_result(channel.context.chat.data, success=True)
+
+    @app.get("/api/chat/messages")
+    async def chat_messages():
+       messages = await channel.context.chat.get() 
+       return api_result(messages, success=(len(messages)>0))
+
+    @app.get("/api/chats")
+    async def get_chats(request: fastapi.Request):
+        return {
+            "chats": await channel.context.chat.get_all()
+        }
+
+    # -- POST
+    @app.post("/api/chat/new")
+    async def chat_new():
+        return api_result(success=await channel.context.chat.new())
+
+    @app.post("/api/chat/delete/{id}")
+    async def chat_delete(id: str):
+        return api_result(success=await channel.context.chat.delete(id))
 
     return app
