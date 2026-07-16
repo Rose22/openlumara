@@ -11,7 +11,7 @@ Let's get this WebUI up to the standards of the rest of openlumara, since it's b
 """
 
 import os
-import fastapi, fastapi.templating
+import fastapi, fastapi.templating, fastapi.staticfiles
 import uvicorn
 
 import core
@@ -58,15 +58,30 @@ class WebuiRewrite(core.channel.Channel):
             "default": False
         },
         "username": "admin",
-        "password": "admin"
+        "password": "admin",
+        "debug_mode": {
+            "description": "When enabled, this will show a ton of webui-related messages in the server console. Very useful for debugging webui related issues!",
+            "default": False
+        }
     }
 
     async def on_ready(self):
-        self.app = await create_fastapi(self)
+        debug = self.config.get("debug_mode")
+
+        # paths
         self.path = core.get_path(os.path.join("channels", "webui_rewrite"))
         self.template_path = os.path.join(self.path, "templates")
+        self.assets_path = os.path.join(self.path, "assets")
+
+        # fastapi-specific instances
+        if debug: self.log(self.name, "Loading templates..")
         self.templates = fastapi.templating.Jinja2Templates(self.template_path)
 
+        # aaand create it
+        if debug: self.log(self.name, "Creating FastAPI instance..")
+        self.app = await create_fastapi(self)
+
+        # determine network mode
         network_mode = self.config.get("network_mode")
         match network_mode:
             case "local":
@@ -84,6 +99,7 @@ class WebuiRewrite(core.channel.Channel):
     async def run(self):
         self.log("webui", f"Starting WebUI on {self.url}")
 
+        # serve the app using uvicorn
         config = uvicorn.Config(self.app, host=self.host, port=self.port, log_level="error")
         self.server = uvicorn.Server(config)
 
@@ -94,6 +110,12 @@ class WebuiRewrite(core.channel.Channel):
 # -------------------
 async def create_fastapi(channel):
     app = fastapi.FastAPI()
+
+    debug = channel.config.get("debug_mode")
+
+    # serve asset files (formerly /static) using fastAPI's mount()
+    if debug: channel.log(channel.name, "Serving assets..") 
+    app.mount("/assets", fastapi.staticfiles.StaticFiles(directory=channel.assets_path), name="assets")
 
     @app.get("/")
     async def root(request: fastapi.Request):

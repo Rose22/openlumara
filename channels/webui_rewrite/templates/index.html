@@ -1,1 +1,14 @@
-hi! im a template!
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>{{ title }}</title>
+        
+        <!-- libraries -->
+        <script src="{{ url_for('assets', path='js/libs/alpine.min.js') }}"></script>
+    </head>
+    <body>
+        <div x-data="{ action: 'go' }">
+            <p>Hi! im an alpine-enhanced template! Look at me <span x-text="action"></span></p>
+        </div>
+    </body>
+</html>
