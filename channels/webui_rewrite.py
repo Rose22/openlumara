@@ -1,14 +1,36 @@
-import core
-import fastapi
+"""
+OpenLumara WebUI - manual rewrite
+
+This is daunting, but i'm rewriting the entire WebUI from the ground up, manually, with minimal AI-generated code, due to high amount of unpredictable bugs in the previous version, and sheer difficulty of maintaining it
+
+The plan is to use FastAPI for the backend again, but manually written, and alpine.js for the frontend, since it's nice and lightweight and not React.
+
+Let's get this WebUI up to the standards of the rest of openlumara, since it's become basically the primary way everyone uses it..
+
+~ Rose22
+"""
+
+import os
+import fastapi, fastapi.templating
 import uvicorn
 
+import core
+
+# --------------------
+# Channel class
+# --------------------
 class WebuiRewrite(core.channel.Channel):
+    """A full-featured, modern webUI for OpenLumara, providing you with a privacy-friendly option that doesn't depend on any external chat providers"""
     dependencies = [
         "fastapi",
         "starlette>=1.0.1",
+        "jinja2",
         "uvicorn"
     ]
 
+    # these settings are taken straight from the previous webUI,
+    # and currently, many of the settings don't do anything yet
+    # but i plan to support these of course
     settings = {
         "title": {
             "default": "OpenLumara",
@@ -41,6 +63,9 @@ class WebuiRewrite(core.channel.Channel):
 
     async def on_ready(self):
         self.app = await create_fastapi(self)
+        self.path = core.get_path(os.path.join("channels", "webui_rewrite"))
+        self.template_path = os.path.join(self.path, "templates")
+        self.templates = fastapi.templating.Jinja2Templates(self.template_path)
 
         network_mode = self.config.get("network_mode")
         match network_mode:
@@ -64,11 +89,14 @@ class WebuiRewrite(core.channel.Channel):
 
         await self.server.serve()
 
+# -------------------
+# FastAPI creator (contains routes and so on)
+# -------------------
 async def create_fastapi(channel):
     app = fastapi.FastAPI()
 
     @app.get("/")
-    async def root():
-        return {"message": "Working!"}
+    async def root(request: fastapi.Request):
+        return channel.templates.TemplateResponse(request, "index.html")
 
     return app
