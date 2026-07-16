@@ -88,15 +88,15 @@ class APIClient():
                 return APIError(f"Bad request", e)
 
         except openai.AuthenticationError as e:
-            await self.disconnect()
+            #await self.disconnect()
             return APIError("Authentication failed. Check if your API key is valid.", e)
 
         except openai.APIConnectionError as e:
-            await self.disconnect()
+            #await self.disconnect()
             return APIError("Failed to connect to the API", e)
 
         except Exception as e:
-            await self.disconnect()
+            #await self.disconnect()
             return APIError("Unknown error while attempting to connect", e)
 
         self.connected = True
@@ -283,8 +283,7 @@ class APIClient():
             # fully kill the connection because ive been debuggging this for like 5 hours and im tired
             # make it stop
             #self.manager.log("api", "Force closing HTTP connection due to unclean state..")
-            await self.disconnect()
-
+            #await self.disconnect()
             self.cancel_request = False
 
             # and propagate it up for any other stuff to handle
@@ -300,11 +299,11 @@ class APIClient():
                 return APIError("Bad request", e)
 
         except openai.AuthenticationError as e:
-            await self.disconnect()
+            #await self.disconnect()
             return APIError("Authentication failed. Check whether your API key is valid!", e)
 
         except openai.APIConnectionError as e:
-            await self.disconnect()
+            #await self.disconnect()
             return APIError("Failed to connect to API")
 
         except openai.NotFoundError as e:
@@ -317,7 +316,7 @@ class APIClient():
             return APIError("API Status Error",  e)
 
         except Exception as e:
-            await self.disconnect()
+            #await self.disconnect()
             return APIError("Unknown error while sending request to the API", e)
 
         finally:
@@ -395,7 +394,8 @@ class APIClient():
             # fully kill the connection because ive been debuggging this for like 5 hours and im tired
             # make it stop
             #self.manager.log("api", "Force closing HTTP connection due to unclean state..")
-            await self.disconnect()
+            #await self.disconnect()
+            self.manager.log("api", "Request was cancelled")
         except Exception as e:
             if notify:
                 self.manager.log("api", f"Warmup request failed: {core.detail_error(e)}")
