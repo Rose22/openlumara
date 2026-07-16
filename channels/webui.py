@@ -93,6 +93,114 @@ def serialize_for_json(obj):
         return str(obj)
 
 # -----------------------------------------------------------------------------
+# Channel Class
+# -----------------------------------------------------------------------------
+
+class Webui(core.channel.Channel):
+    """Polished web interface that can be used on any device, granting you a fully private way to talk to your AI."""
+
+    dependencies = [
+        "jinja2",
+        "itsdangerous",
+        "starlette>=1.0.1",
+        "fastapi",
+        "uvicorn",
+        "websockets",
+        "python-multipart"
+    ]
+
+    settings = {
+        "title": {
+            "default": "OpenLumara",
+            "description": "The title to show in the header, above the chat window"
+        },
+        "network_mode": {
+            "type": "select",
+            "options": {
+                "local": "Allows only the device OpenLumara is running on to access the WebUI (sets hostname to `localhost`)",
+                "internet": "Allows any device to access the WebUI (sets hostname to `0.0.0.0`)",
+                "custom": "Use the custom hostname defined below"
+            },
+            "default": "local"
+        },
+        "custom_host": {
+            "description": "If you want to use a custom hostname, set it here. If you don't know what that is, don't bother with this! Just use the network mode setting on either local or internet.",
+            "default": None
+        },
+        "port": {
+            "description": "What port to run the WebUI on. Set this to 80 to be able to access it like a normal website, and anything else to access it on that port (for example http://yourdomain.org:3000)",
+            "default": 3000
+        },
+        "require_login": {
+            "description": "Whether to protect the WebUI with a username and password. **Highly recommended if your webui is exposed to the internet!!**",
+            "default": False
+        },
+        "username": "admin",
+        "password": "admin",
+        "secret_key": {
+            "description": "A cryptographic key used to secure the connection between the backend (server) and frontend (what you see in the browser) of the webUI. It defaults to a random key, so it's fine to leave it as default.",
+            "default": secrets.token_hex(32)
+        },
+        "login_max_attempts": {
+            "description": "How many attempts to allow within the rate limit window (a rate limit protects against bruteforcing attacks)",
+            "default": 5
+        },
+        "rate_limit_window": {
+            "description": "How many minutes until the user is allowed to try logging in again",
+            "default": 900
+        }
+    }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        network_mode = self.config.get("network_mode")
+        match network_mode:
+            case "local":
+                self.host = "127.0.0.1"
+            case "internet":
+                self.host = "0.0.0.0"
+            case "custom":
+                self.host = self.config.get("custom_host")
+            case _:
+                self.host = "127.0.0.1"
+
+        self.port = self.config.get("port")
+        self.url = f"http://{self.host}:{self.port}"
+
+        self.stream_cancellations = set()
+
+        # Create the FastAPI app with this channel instance
+        self.app = create_webui_app(self)
+        self.app.add_middleware(SessionMiddleware, secret_key=self.config.get("secret_key"))
+
+    async def run(self):
+        """Start the FastAPI web server."""
+        self.log("webui", f"Starting WebUI on {self.url}")
+
+        config = uvicorn.Config(self.app, host=self.host, port=self.port, log_level="error")
+        self.server = uvicorn.Server(config)
+
+        await self.server.serve()
+
+    async def on_shutdown(self):
+        """Shutdown the server gracefully."""
+        await self.websocket_manager.broadcast({"type": "shutdown"})
+        self.log("webui", "Shutting down WebUI server...")
+        self.server.should_exit = True
+        await asyncio.sleep(1)
+
+    async def on_ready(self):
+        if not core.quiet:
+            print(flush=True)
+            print(f"Please open the WebUI at {self.url}", flush=True)
+
+        self.websocket_manager.send_ready_signal()
+
+    def on_log(self, category, message):
+        self.websocket_manager.add_log(category, message)
+
+# -----------------------------------------------------------------------------
 # FastAPI App Factory
 # -----------------------------------------------------------------------------
 
@@ -115,6 +223,35 @@ def create_webui_app(channel) -> FastAPI:
     async def inject_channel_middleware(request: Request, call_next):
         request.state.channel_instance = channel
         return await call_next(request)
+
+    # --- important variables ---
+    api_endpoints = [
+        "/api",
+        "/messages",
+        "/send",
+        "/stream",
+        "/edit",
+        "/delete",
+        "/cancel",
+        "/upload",
+        "/chat",
+        "/storage",
+        "/settings",
+        "/server",
+        "/get_"
+    ]
+
+    # -----------------------------------------------------------------
+    # Helpers
+    # -----------------------------------------------------------------
+    def is_api_request(request):
+        if request.headers.get("accept") == "application/json":
+            return True
+
+        for endpoint in api_endpoints:
+            if request.url.path.startswith(endpoint):
+                return True
+        return False
 
     # -----------------------------------------------------------------
     # WebSocket Manager
@@ -355,24 +492,7 @@ def create_webui_app(channel) -> FastAPI:
         if user:
             return await call_next(request)
 
-        is_api_request = (
-            request.url.path.startswith('/api') or
-            request.url.path.startswith('/messages') or
-            request.url.path.startswith('/send') or
-            request.url.path.startswith('/stream') or
-            request.url.path.startswith('/edit') or
-            request.url.path.startswith('/delete') or
-            request.url.path.startswith('/cancel') or
-            request.url.path.startswith('/upload') or
-            request.url.path.startswith('/chat') or
-            request.url.path.startswith('/storage') or
-            request.url.path.startswith('/settings') or
-            request.url.path.startswith('/server') or
-            request.url.path.startswith('/get_') or
-            request.headers.get("accept") == "application/json"
-        )
-
-        if is_api_request:
+        if is_api_request(request):
             return JSONResponse({'error': 'Unauthorized'}, status_code=401)
 
         return RedirectResponse(url='/login', status_code=303)
@@ -600,6 +720,7 @@ def create_webui_app(channel) -> FastAPI:
     # API Helper
     # -----------------------------------------------------------------
 
+    # TODO: deprecate this, it's unneeded. but the current frontend code falls apart when i try to remove it :(
     def get_api_status():
         if not channel:
             return {
@@ -673,42 +794,6 @@ def create_webui_app(channel) -> FastAPI:
 
         return Response(themes_script, media_type="application/javascript")
 
-    @app.get("/api/health")
-    async def health_check():
-        return {"status": "OK"}
-
-    @app.get("/api/status")
-    async def api_status(user: str = Depends(require_auth)):
-        return get_api_status()
-
-    @app.post("/api/reconnect")
-    async def api_reconnect(user: str = Depends(require_auth)):
-        if not channel:
-            raise HTTPException(status_code=500, detail="Channel not available")
-        result = await channel.manager.API.reconnect()
-        
-        if isinstance(result, core.api.APIError):
-            return {"success": False, "error": str(result)}
-
-        return {"success": True, "message": "Successfully connected to the API"}
-
-    @app.post("/api/disconnect")
-    async def api_disconnect(user: str = Depends(require_auth)):
-        if not channel:
-            raise HTTPException(status_code=500, detail="Channel not available")
-        await channel.manager.API.disconnect()
-        return {'success': True}
-
-    @app.get("/api/models")
-    async def list_models(user: str = Depends(require_auth)):
-        if not channel:
-            raise HTTPException(status_code=500, detail="Channel not available")
-
-        try:
-            models = await channel.manager.API.list_models()
-            return {'models': models}
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
 
     @app.get("/messages")
     async def get_messages(user: str = Depends(require_auth)):
@@ -746,27 +831,6 @@ def create_webui_app(channel) -> FastAPI:
             'current_chat_tags': current_tags
         }
 
-    @app.get("/api/token_usage")
-    async def token_usage(user: str = Depends(require_auth)):
-        if not channel:
-            raise HTTPException(status_code=500, detail="Channel not available")
-        try:
-            usage = await channel.context.get_token_usage()
-            return usage
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
-
-    @app.get("/api/command_prefix")
-    async def get_command_prefix(user: str = Depends(require_auth)):
-        return core.config.get("core", "cmd_prefix")
-
-    @app.get("/api/commands")
-    async def get_commands(user: str = Depends(require_auth)):
-        return core.commands.get_commands(channel.manager.modules)
-
-    # -----------------------------------------------------------------
-    # Stream helpers
-    # -----------------------------------------------------------------
 
     async def start_ai_stream_task(channel: "Webui", chat_id: str, payload_body: dict):
         messages = await channel.context.chat.get() or []
@@ -929,9 +993,70 @@ def create_webui_app(channel) -> FastAPI:
         return {'success': True, 'total': total, 'type': 'multi'}
 
     # -----------------------------------------------------------------
+    # API Routes
+    # -----------------------------------------------------------------
+    # TODO: move to endpoints that don't start with /api, since this is confusing and a result of AI coding. most endpoints don't start with /api, yet return json. so this is stupid
+
+    @app.get("/api/token_usage")
+    async def token_usage(user: str = Depends(require_auth)):
+        if not channel:
+            raise HTTPException(status_code=500, detail="Channel not available")
+        try:
+            usage = await channel.context.get_token_usage()
+            return usage
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/api/command_prefix")
+    async def get_command_prefix(user: str = Depends(require_auth)):
+        return core.config.get("core", "cmd_prefix")
+
+    @app.get("/api/commands")
+    async def get_commands(user: str = Depends(require_auth)):
+        return core.commands.get_commands(channel.manager.modules)
+
+    @app.get("/api/health")
+    async def health_check():
+        return {"status": "OK"}
+
+    @app.get("/api/status")
+    async def api_status(user: str = Depends(require_auth)):
+        return get_api_status()
+
+    @app.post("/api/reconnect")
+    async def api_reconnect(user: str = Depends(require_auth)):
+        if not channel:
+            raise HTTPException(status_code=500, detail="Channel not available")
+        result = await channel.manager.API.reconnect()
+        
+        if isinstance(result, core.api.APIError):
+            return {"success": False, "error": str(result)}
+
+        return {"success": True, "message": "Successfully connected to the API"}
+
+    @app.post("/api/disconnect")
+    async def api_disconnect(user: str = Depends(require_auth)):
+        if not channel:
+            raise HTTPException(status_code=500, detail="Channel not available")
+        await channel.manager.API.disconnect()
+        return {'success': True}
+
+    @app.get("/api/models")
+    async def list_models(user: str = Depends(require_auth)):
+        if not channel:
+            raise HTTPException(status_code=500, detail="Channel not available")
+
+        try:
+            models = await channel.manager.API.list_models()
+            return {'models': models}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    # -----------------------------------------------------------------
     # Chat Management Routes
     # -----------------------------------------------------------------
 
+    # TODO: rename to /search. frontend currently breaks if i try
     @app.post("/api/search")
     async def search_chats(request: Request, user: str = Depends(require_auth)):
         if not channel:
@@ -1675,113 +1800,3 @@ def create_webui_app(channel) -> FastAPI:
         return FileResponse(os.path.join(WEBUI_DIR, "favicon.ico"))
 
     return app
-
-
-# -----------------------------------------------------------------------------
-# Channel Class
-# -----------------------------------------------------------------------------
-
-class Webui(core.channel.Channel):
-    """Polished web interface that can be used on any device, granting you a fully private way to talk to your AI."""
-
-    dependencies = [
-        "jinja2",
-        "itsdangerous",
-        "starlette>=1.0.1",
-        "fastapi",
-        "uvicorn",
-        "websockets",
-        "python-multipart"
-    ]
-
-    settings = {
-        "title": {
-            "default": "OpenLumara",
-            "description": "The title to show in the header, above the chat window"
-        },
-        "network_mode": {
-            "type": "select",
-            "options": {
-                "local": "Allows only the device OpenLumara is running on to access the WebUI (sets hostname to `localhost`)",
-                "internet": "Allows any device to access the WebUI (sets hostname to `0.0.0.0`)",
-                "custom": "Use the custom hostname defined below"
-            },
-            "default": "local"
-        },
-        "custom_host": {
-            "description": "If you want to use a custom hostname, set it here. If you don't know what that is, don't bother with this! Just use the network mode setting on either local or internet.",
-            "default": None
-        },
-        "port": {
-            "description": "What port to run the WebUI on. Set this to 80 to be able to access it like a normal website, and anything else to access it on that port (for example http://yourdomain.org:3000)",
-            "default": 3000
-        },
-        "require_login": {
-            "description": "Whether to protect the WebUI with a username and password. **Highly recommended if your webui is exposed to the internet!!**",
-            "default": False
-        },
-        "username": "admin",
-        "password": "admin",
-        "secret_key": {
-            "description": "A cryptographic key used to secure the connection between the backend (server) and frontend (what you see in the browser) of the webUI. It defaults to a random key, so it's fine to leave it as default.",
-            "default": secrets.token_hex(32)
-        },
-        "login_max_attempts": {
-            "description": "How many attempts to allow within the rate limit window (a rate limit protects against bruteforcing attacks)",
-            "default": 5
-        },
-        "rate_limit_window": {
-            "description": "How many minutes until the user is allowed to try logging in again",
-            "default": 900
-        }
-    }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        network_mode = self.config.get("network_mode")
-        match network_mode:
-            case "local":
-                self.host = "127.0.0.1"
-            case "internet":
-                self.host = "0.0.0.0"
-            case "custom":
-                self.host = self.config.get("custom_host")
-            case _:
-                self.host = "127.0.0.1"
-
-        self.port = self.config.get("port")
-        self.url = f"http://{self.host}:{self.port}"
-
-        self.stream_cancellations = set()
-
-        # Create the FastAPI app with this channel instance
-        self.app = create_webui_app(self)
-        self.app.add_middleware(SessionMiddleware, secret_key=self.config.get("secret_key"))
-
-    async def run(self):
-        """Start the FastAPI web server."""
-        self.log("webui", f"Starting WebUI on {self.url}")
-
-        config = uvicorn.Config(self.app, host=self.host, port=self.port, log_level="error")
-        self.server = uvicorn.Server(config)
-
-        await self.server.serve()
-
-    async def on_shutdown(self):
-        """Shutdown the server gracefully."""
-        await self.websocket_manager.broadcast({"type": "shutdown"})
-        self.log("webui", "Shutting down WebUI server...")
-        self.server.should_exit = True
-        await asyncio.sleep(1)
-
-    async def on_ready(self):
-        if not core.quiet:
-            print(flush=True)
-            print(f"Please open the WebUI at {self.url}", flush=True)
-
-        self.websocket_manager.send_ready_signal()
-
-    def on_log(self, category, message):
-        self.websocket_manager.add_log(category, message)
-
