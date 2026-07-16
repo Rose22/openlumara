@@ -19,7 +19,6 @@ async function init() {
         loadTheme();
         loadChats();
         initTagFilterState();
-        restoreCurrentChat();
 
         window.addEventListener('resize', handleTitleBarResize);
 

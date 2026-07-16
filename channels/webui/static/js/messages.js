@@ -3,18 +3,6 @@
 // =============================================================================
 
 /**
- * Safely insert an element before the typing indicator.
- * Falls back to appending to chat if typing indicator doesn't exist.
- */
-function insertBeforeTyping(element) {
-    if (typing && typing.parentNode) {
-        chat.insertBefore(element, typing);
-    } else {
-        chat.appendChild(element);
-    }
-}
-
-/**
  * Render all messages with proper turn handling.
  */
 function renderAllMessages(messages, animate = false) {
@@ -180,7 +168,7 @@ function renderAssistantTurn(messages, index, animate) {
     const actions = createActionButtons('assistant', index, combinedContent);
     wrapper.appendChild(actions);
 
-    insertBeforeTyping(wrapper);
+    chat.insertBefore(wrapper, typing);
 }
 
 /**
@@ -270,15 +258,6 @@ function renderSingleMessage(msg, index, animate) {
         msgClass = 'ai';
     }
 
-    // For tool responses that update existing cards, check BEFORE creating wrapper
-    if (role === 'tool' && toolCallId) {
-        const existingCard = findToolCallCard(toolCallId);
-        if (existingCard) {
-            updateToolCallCardWithResponse(existingCard, rawText);
-            return null;
-        }
-    }
-
     const wrapper = document.createElement('div');
     wrapper.className = `message-wrapper ${wrapperClass}`;
     if (animate) wrapper.classList.add('animate-in');
@@ -302,6 +281,14 @@ function renderSingleMessage(msg, index, animate) {
     } else if (parsed.isCommandOutput || wrapperClass === 'user_command') {
         messageHtml += `<pre>${escapeHtml(parsed.displayContent || rawText)}</pre>`;
     } else if (role === 'tool' && toolCallId) {
+        // Tool response with ID - try to find existing tool call card and update it
+        const existingCard = findToolCallCard(toolCallId);
+        if (existingCard) {
+            updateToolCallCardWithResponse(existingCard, rawText);
+            // Don't render a separate wrapper for this tool response
+            wrapper.remove();
+            return;
+        }
         // No existing card found, render as standalone
         messageHtml += renderStandaloneToolResponse(rawText);
     } else if (role === 'tool' && !toolCallId) {
@@ -333,7 +320,7 @@ function renderSingleMessage(msg, index, animate) {
         wrapper.appendChild(actions);
     }
 
-    insertBeforeTyping(wrapper);
+    chat.insertBefore(wrapper, typing);
 
     return wrapper
 }

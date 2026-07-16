@@ -33,13 +33,8 @@ function scrollToBottom() {
     });
 }
 
-let scrollTimeoutId = null;
 function scrollToBottomDelayed() {
-    if (scrollTimeoutId) return; // Already scheduled, skip
-    scrollTimeoutId = setTimeout(() => {
-        scrollToBottom();
-        scrollTimeoutId = null;
-    }, 10);
+    setTimeout(scrollToBottom, 10);
 }
 
 function autoResize(textarea) {

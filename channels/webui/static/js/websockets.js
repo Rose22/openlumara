@@ -15,7 +15,7 @@ let sendQueue = [];
 /**
  * Send a message immediately if the socket is open, otherwise queue it.
  */
-async function safeSocketSend(data) {
+function safeSocketSend(data) {
     if (window.socket && window.socket.readyState === WebSocket.OPEN) {
         window.socket.send(JSON.stringify(data));
     } else {
@@ -26,7 +26,7 @@ async function safeSocketSend(data) {
 /**
  * Drain the send queue by transmitting all queued messages over the WebSocket.
  */
-async function drainSendQueue() {
+function drainSendQueue() {
     if (!window.socket || window.socket.readyState !== WebSocket.OPEN) {
         return;
     }
@@ -43,7 +43,7 @@ async function drainSendQueue() {
     }
 }
 
-async function connectWebSocket() {
+function connectWebSocket() {
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const token = window.apiToken || '';
     const tokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
@@ -57,57 +57,66 @@ async function connectWebSocket() {
         wsSocket = new WebSocket(wsUrl);
         window.socket = wsSocket;  // Keep global reference for send.js
     } catch (e) {
-        await scheduleWsReconnect();
+        scheduleWsReconnect();
         return;
     }
 
-    wsSocket.onopen = async () => {
+    wsSocket.onopen = () => {
         console.log('WebSocket connected');
         isWsConnected = true;
         wsReconnecting = false;
         showConnectionStatus('reconnected');
 
+        // sync back up with the backend
+        try {
+            wsSocket.send(JSON.stringify({
+                type: 'reload_messages'
+            }));
+        } catch (e) {
+            console.warn('Failed to send message reload request:', e);
+        }
+
         // Drain any queued messages
-        await drainSendQueue();
+        drainSendQueue();
     };
 
-    wsSocket.onmessage = async (event) => {
+    wsSocket.onmessage = (event) => {
         try {
             const data = JSON.parse(event.data);
-            await handleWebSocketMessage(data);
+            handleWebSocketMessage(data);
         } catch (e) {
             console.error('Error parsing WebSocket message:', e);
         }
     };
 
-    wsSocket.onclose = async (event) => {
+    wsSocket.onclose = (event) => {
         if (!wsReconnecting) {
             console.log('WebSocket disconnected:', event.code, event.reason);
             wsSocket = null;
             window.socket = null;
             isWsConnected = false;
             showConnectionStatus('reconnecting');
-            await scheduleWsReconnect();
+            scheduleWsReconnect();
         }
     };
 
-    wsSocket.onerror = async (error) => {
+    wsSocket.onerror = (error) => {
         if (!wsReconnecting) {
             console.error('WebSocket error:', error);
         }
-        await scheduleWsReconnect();
+        scheduleWsReconnect();
     };
 }
 
-async function scheduleWsReconnect() {
+function scheduleWsReconnect() {
     console.log(`attempting to reconnect to websocket..`);
     wsReconnecting = true;
-    setTimeout(async function () {
-        await connectWebSocket();
+    setTimeout(function () {
+        connectWebSocket();
     }, 1000);
 }
 
-async function handlePromptProgress(prog) {
+function handlePromptProgress(prog) {
     let progressData = prog;
     try {
         if (typeof prog === 'string') {
@@ -174,55 +183,18 @@ async function handlePromptProgress(prog) {
  * @param {Object} msg - The message object containing type and content (or tool_calls).
  * @param {boolean} isSimulated - If true, suppresses playback sounds (used for initial catch-up).
  */
-async function processToken(msg, isSimulated = false) {
+function processToken(msg, isSimulated = false) {
     const type = msg.type || 'content';
     const content = msg.content || '';
 
-    // Handle errors from the backend
-    if (type === 'error') {
-        console.log(msg)
-
-        clearProcessingIndicators();
-        if (fancyProcessingIndicator) {
-            fancyProcessingIndicator.remove();
-        }
-
-        // Create AI wrapper if it doesn't exist
-        if (!window._currentAiMsgDiv) {
-            createAiWrapper();
-        } else if (window._currentAiWrapper && !window._currentAiWrapper.parentNode) {
-            insertBeforeTyping(window._currentAiWrapper);
-        }
-
-        // Show the error in the AI message div
-        console.log(msg);
-
-        window._currentAiMsgDiv.innerHTML = `
-        <div class="api-error-inline">
-        <div class="api-error-header">
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-        </svg>
-        <span class="api-error-title">API Error</span>
-        </div>
-        <div class="api-error-message">${content}</div>
-        </div>`;
-
-        // Finalize the stream so the wrapper gets proper action buttons
-        // if (window._currentAiWrapper) {
-        //     finalizeStreamingUI(window._currentAiWrapper, window._currentAiMsgDiv);
-        // }
-        return;
-    }
-
     // show ongoing prompt processing progress
     if (type === 'prompt_progress') {
-        await handlePromptProgress(content);
+        handlePromptProgress(content);
         return;
     }
 
     if (type === 'token_usage') {
-        await updateTokenUsage(content);
+        updateTokenUsage(content);
         return;
     }
 
@@ -231,14 +203,9 @@ async function processToken(msg, isSimulated = false) {
     }
 
     if (!window._currentAiMsgDiv) {
-        await createAiWrapper();
+        createAiWrapper();
     } else if (window._currentAiWrapper && !window._currentAiWrapper.parentNode) {
-        await insertBeforeTyping(window._currentAiWrapper);
-    }
-
-    // Hide typing indicator when first token arrives (in case prompt_progress was skipped)
-    if (!fancyProcessingIndicatorCreated) {
-        typing.classList.remove('show');
+        chat.insertBefore(window._currentAiWrapper, typing);
     }
 
     if (!responseStartSoundPlayed) {
@@ -321,6 +288,7 @@ async function processToken(msg, isSimulated = false) {
         clearProcessingIndicators();
 
         finalizeStreamingToolCalls(msg.tool_calls || [], window._currentAiMsgDiv);
+        TypewriterAudioManager.stopProcessingSound();
         updateStopButtonState();
         return;
     }
@@ -342,12 +310,12 @@ async function processToken(msg, isSimulated = false) {
 // ketchup buffer
 // ketchup
 // yummy
-async function processBuffer(buffer) {
+function processBuffer(buffer) {
     if (!buffer.length) return;
 
     catchingUpFromBuffer = true;
 
-    async function processNextBatch() {
+    function processNextBatch() {
         let processed = 0;
 
         while (processed < BUFFER_BATCH_SIZE && buffer.length > 0) {
@@ -359,7 +327,7 @@ async function processBuffer(buffer) {
             try {
                 // process the token as if we're streaming live
                 // (but we're not, this is a rapid simulation of a token stream that already happened)
-                await processToken(token, true);
+                processToken(token, true);
                 processed++;
             } catch (error) {
                 console.error('Token processing error:', error);
@@ -380,7 +348,7 @@ async function processBuffer(buffer) {
     processNextBatch();
 }
 
-async function handleWebSocketMessage(data) {
+function handleWebSocketMessage(data) {
     if (data.type !== 'token') {
         console.log(data);
     }
@@ -389,31 +357,25 @@ async function handleWebSocketMessage(data) {
     if (data.type === 'sync_state') {
         if (data.buffer.length > 0) {
             catchingUpFromBuffer = true;
-            await loadChat(data.active_chat_id, catchingUpFromBuffer);
+            loadChat(data.active_chat_id, catchingUpFromBuffer);
             createAiWrapper();
             isStreaming = true;
             isDataStreaming = true;
             setInputState(true, false, true);
 
             // process the buffer in batches so that we don't crash the browser
-            await processBuffer(data.buffer);
+            processBuffer(data.buffer);
         } else {
-            await loadChat(data.active_chat_id, false);
+            if (data.active_chat_id) {
+                loadChat(data.active_chat_id);
+            }
         }
         return;
     }
 
     if (data.type === 'chat_switched') {
         if (data.chat_id === currentChatId) return;
-
-        if (isChatSwitching) return;
-        isChatSwitching = true;
-
-        await loadChat(data.chat_id, catchingUpFromBuffer, true).finally(async () => {
-            isChatSwitching = false;
-            await loadChats();
-            await updateSidebarActiveChat(data.chat_id);
-        });
+        window.loadChat(data.chat_id, catchingUpFromBuffer, true);
         return;
     }
 
@@ -422,7 +384,7 @@ async function handleWebSocketMessage(data) {
         msgEl.classList.add('user-placeholder');
 
         // show the message as a "placeholder" (sent to backend but not sent to API yet)
-        let sending_status = document.createElement('span');
+        sending_status = document.createElement('span');
         sending_status.className = 'placeholder-status';
         sending_status.textContent = 'Sending...';
         msgEl.querySelector('.message').appendChild(sending_status);
@@ -438,9 +400,6 @@ async function handleWebSocketMessage(data) {
             window.updateUploadQueueUI();
         }
 
-        // reload the chats so that the new chat title is immediately applied
-        await loadChats();
-
         return;
     }
 
@@ -449,8 +408,7 @@ async function handleWebSocketMessage(data) {
         const msgWrapper = chat.querySelector(`[data-index="${data.index}"]`);
         if (msgWrapper) {
             msgWrapper.classList.remove('user-placeholder');
-            const statusEl = msgWrapper.querySelector('.message').querySelector('.placeholder-status');
-            if (statusEl) statusEl.remove();
+            msgWrapper.querySelector('.message').removeChild(sending_status);
         }
 
         // show typing indicator
@@ -469,7 +427,7 @@ async function handleWebSocketMessage(data) {
             if (!window._currentAiMsgDiv) {
                 createAiWrapper();
             } else if (window._currentAiWrapper && !window._currentAiWrapper.parentNode) {
-                insertBeforeTyping(window._currentAiWrapper);
+                chat.insertBefore(window._currentAiWrapper, typing);
             }
         }
 
@@ -499,15 +457,15 @@ async function handleWebSocketMessage(data) {
         if (window._currentAiWrapper) {
             window._currentAiWrapper.dataset.index = data.index;
 
-            // Capture wrapper refs in closure to avoid race conditions
-            const savedWrapper = window._currentAiWrapper;
-            const savedMsgDiv = window._currentAiMsgDiv;
-
             if (typeof isTypewriterRunning === 'undefined' || !isTypewriterRunning) {
-                finalizeStreamingUI(savedWrapper, savedMsgDiv);
+                if (window._currentAiWrapper) {
+                    finalizeStreamingUI(window._currentAiWrapper, window._currentAiMsgDiv);
+                }
             } else {
                 waitForTypewriter().then(() => {
-                    finalizeStreamingUI(savedWrapper, savedMsgDiv);
+                    if (window._currentAiWrapper) {
+                        finalizeStreamingUI(window._currentAiWrapper, window._currentAiMsgDiv);
+                    }
                 });
             }
             window._streamInitialized = false;
@@ -517,30 +475,37 @@ async function handleWebSocketMessage(data) {
     }
 
     if (data.type === 'messages_updated') {
-        // Don't re-render during active streaming - it wipes out the streaming wrapper
-        if (isStreaming && !catchingUpFromBuffer) {
-            // Just clear stale wrapper refs without re-rendering
-            window._currentAiWrapper = null;
-            window._currentAiMsgDiv = null;
-            return;
-        }
         try {
-            if (data.chat_id && data.chat_id != currentChatId) {
-                // if an id was provided, and it's different from the current chat id, just load that chat
-                await updateSidebarActiveChat(data.chat_id);
-                await loadChat(data.chat_id);
-                await loadChats();
-                await scrollToActiveChat();
-            } else {
-                // otherwise just re-render the messages
-                renderAllMessages(data.messages, false);
-            }
+            renderAllMessages(data.messages, false);
 
             if (!catchingUpFromBuffer) {
                 // Clear streaming state - the chat structure has changed,
                 // so any existing wrapper references are stale.
                 // This ensures a new AI wrapper is created when streaming starts
                 // (e.g., during message regeneration).
+
+                // thanks Qwen, your comments are kinda verbose though
+                // imagine commenting on your AI's comments in your code
+                // hi potential readers of the code, you enjoying this?
+                // im starting to learn more and more javascript and
+                // hope to get the webUI to be more and more manually coded
+                // as it is the one part of openlumara that's 90% AI generated
+                // which im definitely not happy about
+
+                // also it's way too hot here right now
+                // did you know 2026 had a really bad heatwave? yup.
+                // hows your day, reader? i know you cant talk back but like,
+                // imagine if someone actually read this code and found it and
+                // talked to me about it. that would be funny lol
+
+                // it's hard to focus in this heat
+                // i'll probably look back on this code after the heatwave is over
+                // and be like... WTF Rose
+                // but like whatever
+
+                // all AI-assisted code in openlumara is done by local models btw
+                // barely any reliance on cloud API coding except for the initial draft of the webUI
+                // which was done by GLM-5 on NanoGPT
                 window._currentAiWrapper = null;
                 window._currentAiMsgDiv = null;
             }
@@ -600,7 +565,7 @@ function handleNewMessage(msg) {
     if (!msg || msg.index === undefined) return;
     if (msg.index < lastMessageIndex) return;
 
-    let msgEl = renderSingleMessage(msg, msg.index, true);
+    msgEl = renderSingleMessage(msg, msg.index, true);
 
     if (msg.role !== 'user') {
         TypewriterAudioManager.play('response_start');
@@ -664,7 +629,7 @@ function showConnectionStatus(status) {
     }
 
     statusMessageElement = wrapper;
-    insertBeforeTyping(wrapper);
+    chat.insertBefore(wrapper, typing);
     scrollToBottom();
 }
 

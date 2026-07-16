@@ -7,7 +7,6 @@ let activeCategory = 'general'; // Default category
 let chatDataMap = new Map();
 
 let chatSearchInitialized = false;
-let isChatSwitching = false;
 
 function setupChatSearch() {
     if (chatSearchInitialized) return;
@@ -325,84 +324,47 @@ function parseCategory(categoryString) {
 
 async function loadChats() {
     try {
+        // OPTIMIZATION: Parallel fetch is good, ensure backend returns summary data only
         const [chatResponse, tagsResponse] = await Promise.all([
             fetch('/chats'),
-                                                               fetch('/chat/tags')
+            fetch('/chat/tags')
         ]);
 
         const chatData = await chatResponse.json();
         const tagsData = await tagsResponse.json();
 
-        const newChatsMap = new Map();
-        chatData.chats?.forEach(chat => newChatsMap.set(chat.id, chat));
+        allTags = tagsData.tags || [];
+        allChats = chatData.chats || [];
 
-        // Check if the same chats already exist
-        const list = document.getElementById('chat-list');
-        const existingIds = new Set();
-        list.querySelectorAll('.chat-item').forEach(el => existingIds.add(el.dataset.chatId));
+        // OPTIMIZATION: Store chats in a Map for O(1) access by ID.
+        chatDataMap.clear();
+        allChats.forEach(chat => chatDataMap.set(chat.id, chat));
 
-        if (newChatsMap.size === existingIds.size &&
-            [...newChatsMap.keys()].every(id => existingIds.has(id))) {
-            // No structural changes — just update titles/dates
-            updateExistingChatItems(newChatsMap);
-        return;
+        const categories = new Set();
+        allChats.forEach(chat => {
+            // 1. Standard direct categories
+            if (chat.category && chat.category !== 'general') {
+                categories.add(chat.category);
             }
 
-            // Structural changes detected — full re-render
-            allTags = tagsData.tags || [];
-            allChats = chatData.chats || [];
-            chatDataMap.clear();
-            allChats.forEach(chat => chatDataMap.set(chat.id, chat));
-
-            const categories = new Set();
-            allChats.forEach(chat => {
-                if (chat.category && chat.category !== 'general') {
-                    categories.add(chat.category);
+            // 2. Metadata-driven groups (e.g. char:Bob, model:gpt-4)
+            for (const [prefix, path] of Object.entries(METADATA_GROUP_CONFIG)) {
+                const val = getNestedValue(chat, path);
+                if (val) {
+                    categories.add(`${prefix}:${val}`);
                 }
-                for (const [prefix, path] of Object.entries(METADATA_GROUP_CONFIG)) {
-                    const val = getNestedValue(chat, path);
-                    if (val) {
-                        categories.add(`${prefix}:${val}`);
-                    }
-                }
-            });
+            }
+        });
 
-            renderTagFilter();
-            renderCategoryList(Array.from(categories));
-            selectCategory(activeCategory);
-            scrollToActiveChat();
-            setupChatSearch();
+        renderTagFilter();
+        renderCategoryList(Array.from(categories));
+        selectCategory(activeCategory);
+        scrollToActiveChat();
+        setupChatSearch();
+
     } catch (e) {
         console.error('Failed to load chats:', e);
     }
-}
-
-function updateExistingChatItems(newChatsMap) {
-    newChatsMap.forEach((chat, id) => {
-        const el = document.querySelector(`.chat-item[data-chat-id="${id}"]`);
-        if (!el) return;
-
-        const titleEl = el.querySelector('.chat-item-title');
-        if (titleEl) titleEl.textContent = chat.title || 'New chat';
-
-        const dateEl = el.querySelector('.chat-item-meta span');
-        if (dateEl) dateEl.textContent = formatDate(chat.updated || chat.created);
-
-        // Update active state
-        el.classList.toggle('active', id === currentChatId);
-
-        // Update tags if they changed
-        const tagsContainer = el.querySelector('.chat-tags');
-        if (tagsContainer) {
-            const tags = chat.tags || [];
-            if (tags.length > 0) {
-                tagsContainer.innerHTML = '';
-                renderFittedTags(tagsContainer, tags, { maxStart: 3, minTags: 1, showTooltip: true });
-            } else {
-                tagsContainer.innerHTML = '';
-            }
-        }
-    });
 }
 
 /**
@@ -895,71 +857,54 @@ async function loadChatInternal(chatId, cachedMessages = null) {
     }
 }
 
-let lastKnownTokenUsage = null;
-let tokenUsagePendingUpdate = null;
-
-function updateTokenUsage(token = null) {
-    // If we already have the latest data, skip
-    if (token && lastKnownTokenUsage && token.current === lastKnownTokenUsage.current) {
-        return;
-    }
-
-    // If a DOM update is already scheduled, skip (debounce)
-    if (tokenUsagePendingUpdate) {
-        return;
-    }
-
-    tokenUsagePendingUpdate = setTimeout(() => {
-        tokenUsagePendingUpdate = null;
-
-        // Fetch fresh data if we don't have it
+async function updateTokenUsage(token=null) {
+    try {
+        let data = null;
         if (!token) {
-            fetch('/api/token_usage')
-            .then(r => r.json())
-            .then(data => applyTokenUsage(data))
-            .catch(() => {});
+            const response = await fetch('/api/token_usage');
+            data = await response.json();
         } else {
-            applyTokenUsage(token);
-        }
-    }, 200);
-}
-
-function applyTokenUsage(data) {
-    if (data.current === undefined || data.max === undefined) return;
-
-    // Check if value actually changed
-    if (lastKnownTokenUsage &&
-        lastKnownTokenUsage.current === data.current &&
-        lastKnownTokenUsage.max === data.max) {
-        return;
+            data = token;
         }
 
-        lastKnownTokenUsage = { current: data.current, max: data.max };
+        if (data.current !== undefined && data.max !== undefined) {
+            const container = document.getElementById('token-usage-container');
+            const fill = document.getElementById('token-usage-fill');
+            const text = document.getElementById('token-usage-text');
 
-    // DOM updates
-    const container = document.getElementById('token-usage-container');
-    const fill = document.getElementById('token-usage-fill');
-    const text = document.getElementById('token-usage-text');
-    if (!container || !fill || !text) return;
+            const percentage = (data.current / data.max) * 100;
+            const NOTIFY_THRESHOLD = 70;
 
-    const percentage = (data.current / data.max) * 100;
+            // 1. Always update the numbers and the width
+            fill.style.width = `${Math.min(percentage, 100)}%`;
+            text.textContent = `Tokens: ${data.current.toLocaleString()} / ${data.max.toLocaleString()}`;
 
-    fill.style.width = `${Math.min(percentage, 100)}%`;
-    text.textContent = `Tokens: ${data.current.toLocaleString()} / ${data.max.toLocaleString()}`;
+            // 2. Handle "Notification" (Visual Prominence)
+            if (percentage >= NOTIFY_THRESHOLD) {
+                // Make it bright and "active"
+                container.classList.add('active');
 
-    const NOTIFY_THRESHOLD = 70;
-    if (percentage >= NOTIFY_THRESHOLD) {
-        container.classList.add('active');
-        if (percentage >= 90) fill.style.backgroundColor = '#ef4444';
-        else if (percentage >= 75) fill.style.backgroundColor = '#f59e0b';
-        else fill.style.backgroundColor = '#10b981';
-    } else {
-        container.classList.remove('active');
-        fill.style.backgroundColor = '#10b981';
+                // Change color based on urgency
+                if (percentage >= 90) {
+                    fill.style.backgroundColor = '#ef4444'; // Red
+                } else if (percentage >= 75) {
+                    fill.style.backgroundColor = '#f59e0b'; // Amber
+                } else {
+                    fill.style.backgroundColor = '#10b981'; // Green
+                }
+            } else {
+                // Keep it "quiet" (dimmed)
+                container.classList.remove('active');
+                fill.style.backgroundColor = '#10b981'; // Reset to green
+            }
+
+            // 3. Toggle shimmer animation based on streaming state
+            const isStreamingActive = typeof isStreaming !== 'undefined' && isStreaming;
+            container.classList.toggle('shimmer-active', isStreamingActive);
+        }
+    } catch (e) {
+        console.error('Token usage update failed:', e);
     }
-
-    const isStreamingActive = typeof isStreaming !== 'undefined' && isStreaming;
-    container.classList.toggle('shimmer-active', isStreamingActive);
 }
 
 async function loadChat(chatId, onlyUpToUserMessage = false, overrideStreamBlock = false) {
@@ -968,11 +913,10 @@ async function loadChat(chatId, onlyUpToUserMessage = false, overrideStreamBlock
         return;
     }
 
+    // do not allow chat switching while streaming
     if (isStreaming && !overrideStreamBlock) {
         return;
     }
-
-    isChatSwitching = true;
 
     try {
         const response = await fetch('/chat/load?id=' + chatId);
@@ -982,6 +926,7 @@ async function loadChat(chatId, onlyUpToUserMessage = false, overrideStreamBlock
             currentChatId = chatId;
             let messages = data.chat.messages || [];
 
+            // If catching up on buffer, only load up to the last user message
             if (onlyUpToUserMessage) {
                 let lastUserMsgIndex = -1;
                 for (let i = messages.length - 1; i >= 0; i--) {
@@ -995,22 +940,24 @@ async function loadChat(chatId, onlyUpToUserMessage = false, overrideStreamBlock
                 }
             }
 
-            // Nuclear clear-and-render is correct here — different chats have overlapping indexes
             renderAllMessages(messages, true);
 
+            // Set lastMessageIndex based on the (potentially filtered) messages
             lastMessageIndex = messages.length;
 
             updateChatTitleBar(data.chat.title, data.chat.tags || []);
             updateTokenUsage();
             closeSidebar();
 
-            // Lightweight sidebar update — just toggle active class, no full re-render
-            updateSidebarActiveChat(chatId);
+            const chatCategory = data.chat.category || 'general';
+            if (chatCategory !== activeCategory) {
+                await loadChats();
+            } else {
+                updateSidebarActiveChat(chatId);
+            }
         }
     } catch (e) {
         console.error('Failed to load chat:', e);
-    } finally {
-        isChatSwitching = false;
     }
 }
 
@@ -1019,14 +966,19 @@ async function loadChat(chatId, onlyUpToUserMessage = false, overrideStreamBlock
  * This prevents layout jumps and scroll stutters.
  */
 function updateSidebarActiveChat(chatId) {
-    const list = document.getElementById('chat-list');
-    if (!list) return;
+    // 1. Remove active class from the current active item
+    const currentActive = document.querySelector('.chat-item.active');
+    if (currentActive) {
+        currentActive.classList.remove('active');
+    }
 
-    list.querySelectorAll('.chat-item').forEach(el => {
-        el.classList.toggle('active', el.dataset.chatId === chatId);
-    });
+    // 2. Find the new chat item and add the active class
+    // This works whether the item is a fully rendered item or still a 'shell'
+    const newActive = document.querySelector(`.chat-item[data-chat-id="${chatId}"]`);
+    if (newActive) {
+        newActive.classList.add('active');
+    }
 }
-
 
 // Note: Chats are auto-saved by the backend when messages are added.
 // No explicit save endpoint exists. This function is kept for potential future use
@@ -1041,6 +993,7 @@ async function deleteChat(chatId) {
     if (!confirm('Delete this chat?')) return;
 
     const chatItem = document.querySelector(`[data-chat-id="${chatId}"]`);
+    if (chatItem) chatItem.remove();
 
     if (window.socket && window.socket.readyState === WebSocket.OPEN) {
         window.socket.send(JSON.stringify({
@@ -1209,7 +1162,7 @@ async function renameChat(chatId, currentTitle) {
                 }
         }, 100);
     };
-}
+}2
 
 // =============================================================================
 // Chat Title Bar Management
@@ -1473,4 +1426,25 @@ async function clearChat() {
     } catch (err) {
         console.error('Failed to clear chat:', err);
     }
+}
+
+
+
+
+function escapeRegex(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\$&');
+}
+
+function formatDate(timestamp) {
+    if (!timestamp) return '';
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diff = now - date;
+
+    if (diff < 60000) return 'Just now';
+    if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
+    if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
+    if (diff < 604800000) return Math.floor(diff / 86400000) + 'd ago';
+
+    return date.toLocaleDateString();
 }

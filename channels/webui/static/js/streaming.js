@@ -156,13 +156,12 @@ function renderStreamSegments(msgDiv, onlyUpdateLast = false) {
             msgDiv.appendChild(seg.el);
         }
 
-        // Only update the last segment when streaming
-        if (onlyUpdateLast && i < streamSegments.length - 1) continue;
-
-        updateSegmentContent(seg, i);
+        if (!onlyUpdateLast || i === streamSegments.length - 1) {
+            updateSegmentContent(seg, i);
+        }
     }
 
-    highlightCode(msgDiv, onlyUpdateLast || streamSegments.length > 1);
+    highlightCode(msgDiv);
     scrollToBottomDelayed();
 }
 
@@ -280,26 +279,25 @@ async function finalizeStreamingUI(aiWrapper, aiMsgDiv) {
     }
 
     // Update chat info
-    await loadChats();
-    // try {
-    //     const chatResponse = await fetch('/chat/current');
-    //     const chatData = await chatResponse.json();
-    //     if (chatData.success && chatData.chat) {
-    //         currentChatId = chatData.chat.id;
-    //         updateChatTitleBar(chatData.chat.title, chatData.chat.tags || []);
+    try {
+        const chatResponse = await fetch('/chat/current');
+        const chatData = await chatResponse.json();
+        if (chatData.success && chatData.chat) {
+            currentChatId = chatData.chat.id;
+            updateChatTitleBar(chatData.chat.title, chatData.chat.tags || []);
 
-    //         // Update the sidebar chat item title so it reflects the auto-generated title
-    //         const sidebarItem = document.querySelector(`.chat-item[data-chat-id="${currentChatId}"]`);
-    //         if (sidebarItem) {
-    //             const titleEl = sidebarItem.querySelector('.chat-item-title');
-    //             if (titleEl) {
-    //                 titleEl.textContent = chatData.chat.title || 'New chat';
-    //             }
-    //         }
-    //     }
-    // } catch (e) {
-    //     console.error("Failed to update chat info", e);
-    // }
+            // Update the sidebar chat item title so it reflects the auto-generated title
+            const sidebarItem = document.querySelector(`.chat-item[data-chat-id="${currentChatId}"]`);
+            if (sidebarItem) {
+                const titleEl = sidebarItem.querySelector('.chat-item-title');
+                if (titleEl) {
+                    titleEl.textContent = chatData.chat.title || 'New chat';
+                }
+            }
+        }
+    } catch (e) {
+        console.error("Failed to update chat info", e);
+    }
 
     // Final safety cleanup for processing indicators
     if (fancyProcessingIndicator) {
@@ -307,6 +305,9 @@ async function finalizeStreamingUI(aiWrapper, aiMsgDiv) {
         fancyProcessingIndicator = null;
     }
     typing.style.display = '';
+
+    // Reset stream state AFTER UI is finalized
+    resetStreamState();
 
     // prevents duplicate sounds when typewriter is enabled
     const typewriterEnabled = localStorage.getItem("typewriterEnabled") === 'true';
@@ -323,9 +324,6 @@ async function finalizeStreamingUI(aiWrapper, aiMsgDiv) {
     displayedContent = '';
     isTypewriterRunning = false;
     inputField.focus();
-
-    // Reset stream state AFTER everything else is done
-    resetStreamState();
 }
 
 function startStreamingUI(aiWrapper, typingIndicator) {
@@ -339,6 +337,7 @@ function startStreamingUI(aiWrapper, typingIndicator) {
 function finishStream() {
     removePlaceholder();
     clearStreamingToolCalls();
+    resetStreamState();
 
     // Clean up separate fancy processing indicator
     if (fancyProcessingIndicator) {
@@ -356,8 +355,6 @@ function finishStream() {
     displayedContent = '';
     isTypewriterRunning = false;
     inputField.focus();
-
-    resetStreamState();
 }
 
 // =============================================================================

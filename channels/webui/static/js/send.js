@@ -42,11 +42,6 @@ async function send(providedContent = null) {
     isTypewriterRunning = false;
     resetStreamState();
 
-    // manually force a scroll to bottom without caring if the user is scrolled up
-    requestAnimationFrame(() => {
-        chat.scrollTop = chat.scrollHeight;
-    });
-
     // Build payload
     const hasFiles = window.upload_queue && window.upload_queue.files.length > 0;
     const isMultimodalInput = typeof rawContent !== 'string';
@@ -76,6 +71,7 @@ async function send(providedContent = null) {
 
     let playedCompletionSound = false;
 
+    let streamHadError = false;
     let streamStarted = false;
 
     const typewriterEnabled = localStorage.getItem("typewriterEnabled") === 'true';
