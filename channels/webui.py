@@ -1284,15 +1284,13 @@ async def new_chat(request: Request, user: str = Depends(require_auth)):
         "buffer": []
     })
 
-    return {"success": True}
-
-    # return {
-    #     'success': True, 'chat': {
-    #         'id': await channel_instance.context.chat.get_id(),
-    #         'title': data.get('title', ''), 'category': data.get('category', ''),
-    #         'messages': [], 'metadata': data.get('metadata', {})
-    #     }
-    # }
+    return {
+        'success': True, 'chat': {
+            'id': await channel_instance.context.chat.get_id(),
+            'title': data.get('title', ''), 'category': data.get('category', ''),
+            'messages': [], 'metadata': data.get('metadata', {})
+        }
+    }
 
 @app.post("/chat/clear")
 async def clear_chat(user: str = Depends(require_auth)):
