@@ -148,7 +148,7 @@ document.addEventListener('alpine:init', () => {
              */
             const stream = Alpine.store('stream');
             if (
-                stream.state === 'streaming' || stream.state === 'processing_tool' 
+                stream.state === 'streaming' || stream.state === 'calling_tools' || stream.state === 'processing_tools' 
                 && stream.tokens
                 && stream.tokens.length > 0
             ) {
