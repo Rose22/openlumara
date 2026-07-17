@@ -98,6 +98,9 @@ class WebuiRewrite(core.channel.Channel):
         self.port = self.config.get("port")
         self.url = f"http://{self.host}:{self.port}"
 
+        # initialize the websocket manager
+        self.websocket_manager = WebSocketManager(self)
+
     async def run(self):
         self.log("webui", f"Starting WebUI on {self.url}")
 
@@ -106,6 +109,147 @@ class WebuiRewrite(core.channel.Channel):
         self.server = uvicorn.Server(config)
 
         await self.server.serve()
+
+# -------------------
+# Helper Functions
+# -------------------
+def serialize_for_json(obj):
+    """Recursively converts non-serializable objects into plain dicts/lists."""
+    if isinstance(obj, dict):
+        return {k: serialize_for_json(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [serialize_for_json(x) for x in obj]
+    elif hasattr(obj, 'to_dict'):
+        return serialize_for_json(obj.to_dict())
+    elif hasattr(obj, '__dict__'):
+        return serialize_for_json(obj.__dict__)
+    elif isinstance(obj, (str, int, float, bool, type(None))):
+        return obj
+    else:
+        return str(obj)
+
+# -------------------
+# Websocket Manager
+# -------------------
+# TODO: clean this up
+class WebSocketManager:
+    def __init__(self, channel):
+        self.channel = channel
+
+        self.active_connections = []
+
+        self.log_buffer = []
+        self.max_log_buffer = 1000
+
+        self.stream_buffer = []
+        self.active_stream_task = None
+        self.active_chat_id = None
+        self.webui_ready = False
+
+    async def connect(self, websocket: fastapi.WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+        current_chat_id = await self.channel.context.chat.get_id()
+
+        if self.log_buffer:
+            await websocket.send_json({
+                "type": "log_history",
+                "logs": self.log_buffer
+            })
+
+        if current_chat_id:
+            await websocket.send_json({
+                "type": "sync_state",
+                "active_chat_id": current_chat_id,
+                "buffer": self.stream_buffer
+            })
+
+        asyncio.create_task(self.queue_ready_signal())
+
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+        self.connection_users.pop(websocket, None)
+
+    async def queue_ready_signal(self):
+        while not self.webui_ready:
+            await asyncio.sleep(0.1)
+        await self.broadcast({"type": "ready"})
+
+    def send_ready_signal(self):
+        self.webui_ready = True
+
+    async def broadcast(self, message: dict):
+        disconnected = []
+        for connection in self.active_connections:
+            try:
+                if connection.client_state == WebSocketState.CONNECTED:
+                    await connection.send_json(message)
+            except Exception:
+                disconnected.append(connection)
+
+        for conn in disconnected:
+            self.disconnect(conn)
+
+    def add_log(self, category: str, message: str):
+        self.log_buffer.append({
+            "category": category,
+            "message": message
+        })
+        if len(self.log_buffer) > self.max_log_buffer:
+            self.log_buffer = self.log_buffer[-self.max_log_buffer:]
+
+    async def start_background_stream(self, chat_id: str, generator):
+        if self.active_stream_task and not self.active_stream_task.done():
+            self.active_stream_task.cancel()
+
+        self.active_chat_id = chat_id
+        self.stream_buffer = []
+        next_index = len(await channel.context.chat.get())
+
+        async def stream_worker():
+            try:
+                async for token_data in generator:
+                    if isinstance(token_data, dict):
+                        p_type = token_data.get("type")
+                        status_str = "idle"
+                        if p_type == "reasoning": status_str = "thinking"
+                        elif p_type == "content": sttus_str = "content"
+                        elif p_type in ["tool_call_delta", "tool", "tool_calls"]: status_str = "tool_call"
+                        elif p_type == "tool": status_str = "tool_exec"
+
+                        payload = serialize_for_json(token_data)
+
+                        self.stream_buffer.append(payload)
+                        await self.broadcast({
+                            "type": "token",
+                            "message": payload
+                        })
+                    else:
+                        self.stream_buffer.append(str(token_data))
+                        await self.broadcast({
+                            "type": "token",
+                            "content": token_data
+                        })
+
+                await self.broadcast({
+                    "type": "stream_complete",
+                    "buffer": self.stream_buffer,
+                    "index": next_index
+                })
+
+                self.stream_buffer = []
+                self.active_chat_id = None
+
+            except asyncio.CancelledError:
+                pass
+            except Exception as e:
+                channel.log("webui", f"Background stream error: {core.detail_error(e)}")
+                self.stream_buffer = []
+                self.active_chat_id = None
+
+        self.active_stream_task = asyncio.create_task(stream_worker())
 
 # -------------------
 # FastAPI creator (contains routes and so on)
@@ -150,7 +294,7 @@ async def create_fastapi(channel):
         if not success:
             return api_result(success=False)
 
-        return api_result(channel.context.chat.data, success=True)
+        return api_result(channel.context.chat.data[channel.context.chat.current], success=True)
 
     @app.get("/api/chat/messages")
     async def chat_messages():
@@ -159,9 +303,15 @@ async def create_fastapi(channel):
 
     @app.get("/api/chats")
     async def get_chats(request: fastapi.Request):
-        return {
-            "chats": await channel.context.chat.get_all()
-        }
+        filtered_chats = []
+
+        # get rid of messages, for faster loading
+        for chat in await channel.context.chat.get_all():
+            chat_copy = dict(chat)
+            chat_copy.pop("messages")
+            filtered_chats.append(chat_copy)
+
+        return api_result(filtered_chats, success=True)
 
     # -- POST
     @app.post("/api/chat/new")
@@ -173,3 +323,142 @@ async def create_fastapi(channel):
         return api_result(success=await channel.context.chat.delete(id))
 
     return app
+
+    # ------------------
+    # WebSocket endpoint
+    # ------------------
+    @app.websocket("/ws")
+    async def websocket_endpoint(websocket: fastapi.WebSocket):
+        ws_mgr = channel.websocket_manager
+        await ws_mgr.connect(websocket, user)
+
+        try:
+            while True:
+                data_text = await websocket.receive_text()
+                try:
+                    data = json.loads(data_text)
+                    msg_type = data.get("type")
+
+                    if msg_type == "stop":
+                        if channel:
+                            await channel.manager.API.cancel()
+                            ws_mgr.stream_buffer.clear()
+
+                    elif msg_type == "cancel":
+                        stream_id = data.get("id")
+                        if stream_id:
+                            channel.stream_cancellations.add(stream_id)
+
+                    elif msg_type == "reload_messages":
+                        await ws_mgr.broadcast({
+                            "type": "messages_updated",
+                            "messages": await channel.context.chat.get()
+                        })
+
+                    elif msg_type == "rename":
+                        new_title = data.get("title")
+                        if channel and new_title:
+                            await channel.context.chat.set_title(new_title)
+                            await ws_mgr.broadcast({
+                                "type": "chat_metadata_updated",
+                                "title": new_title,
+                                "tags": await channel.context.chat.get_tags() or []
+                            })
+
+                    elif msg_type == "switch_chat":
+                        new_chat_id = data.get("chat_id")
+                        if new_chat_id:
+                            if ws_mgr.active_stream_task and not ws_mgr.active_stream_task.done():
+                                ws_mgr.active_stream_task.cancel()
+
+                            await channel.context.chat.load(new_chat_id)
+                            ws_mgr.active_chat_id = new_chat_id
+
+                            await ws_mgr.broadcast({
+                                "type": "chat_switched",
+                                "chat_id": new_chat_id,
+                                "buffer": ws_mgr.stream_buffer
+                            })
+
+                    elif msg_type == "new_chat":
+                        if ws_mgr.active_stream_task and not ws_mgr.active_stream_task.done():
+                            ws_mgr.active_stream_task.cancel()
+
+                        new_id = await channel.context.chat.new()
+                        ws_mgr.active_chat_id = new_id
+
+                        await ws_mgr.broadcast({
+                            "type": "chat_switched",
+                            "chat_id": new_id,
+                            "buffer": []
+                        })
+
+                    elif msg_type == "chat_delete":
+                        chat_id = data.get("chat_id")
+                        if not chat_id:
+                            return False
+
+                        await channel.context.chat.delete(chat_id)
+                        await ws_mgr.broadcast({
+                            "type": "chat_switched",
+                            "chat_id": channel.context.chat.current,
+                            "buffer": []
+                        })
+
+                    elif msg_type == "user_message":
+                        content = data.get("content")
+                        if content:
+                            try:
+                                chat_id = await channel.context.chat.get_id() or "default"
+                                payload = content if isinstance(content, dict) else {"role": "user", "content": content}
+                                await start_ai_stream_task(channel, chat_id, payload)
+                            except Exception as e:
+                                channel.log("webui", f"WebSocket user_message error: {core.detail_error(e)}")
+                                await ws_mgr.broadcast({
+                                    "type": "error",
+                                    "error": str(e)
+                                })
+
+                    elif msg_type == "message_delete":
+                        index = data.get("index")
+                        if not index:
+                            return False
+
+                        await channel.context.chat.delete_from(index-1)
+                        await ws_mgr.broadcast({
+                            "type": "messages_updated",
+                            "messages": await channel.context.chat.get()
+                        })
+
+                    elif msg_type == "message_regenerate":
+                        index = data.get("index")
+
+                        if index is not None and channel:
+                            last_user_message_index = await channel.context.chat.get_last_message_with_role("user", cutoff_index=index)
+                            user_message = await channel.context.chat.get_message(last_user_message_index)
+                            await channel.context.chat.delete_from(last_user_message_index-1)
+
+                            if user_message:
+                                await ws_mgr.broadcast({
+                                    "type": "messages_updated",
+                                    "messages": await channel.context.chat.get()
+                                })
+                                await start_ai_stream_task(channel, await channel.context.chat.get_id(), user_message)
+                            else:
+                                await ws_mgr.broadcast({
+                                    "type": "error",
+                                    "error": "Could not regenerate message (no preceding user message found)."
+                                })
+
+                except json.JSONDecodeError:
+                    pass
+                except Exception as e:
+                    channel.log("webui", f"WebSocket command error: {core.detail_error(e)}")
+
+        except WebSocketDisconnect:
+            ws_mgr.disconnect(websocket)
+        except Exception as e:
+            channel.log("webui", f"WebSocket error: {core.detail_error(e)}")
+            ws_mgr.disconnect(websocket)
+
+

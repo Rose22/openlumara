@@ -1,0 +1,49 @@
+<!--
+<span id="token-usage-text" class="token-usage-text"></span>
+<div id="token-usage-container" class="token-usage-container">
+    <div class="token-usage-bar-bg">
+        <div id="token-usage-fill" class="token-usage-bar-fill"></div>
+    </div>
+</div>
+-->
+
+<div class="input-area">
+    <button id="upload" title="Upload file" aria-label="Upload file">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+        </svg>
+    </button>
+    <input type="file" id="file-input" aria-hidden="true" multiple>
+
+    <!-- user_input is defined over in index.html, so that we have access to it everywhere -->
+    <textarea 
+        id="text-input" placeholder="Type a message..." rows="1" aria-label="Message input"
+        x-model="user_input"
+    ></textarea>
+
+    <button id="send" aria-label="Send message" @click="await send(user_input)">Send</button>
+    <button id="stop" aria-label="Stop generation">
+        <span class="stop-text">Stop</span>
+        <!--
+        <span class="streaming-icon">
+            <svg class="icon-streaming" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 16 14"/>
+            </svg>
+            <svg class="icon-typing" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect>
+                <path d="M6 8h.001M10 8h.001M14 8h.001M18 8h.001M8 12h.001M12 12h.001M16 12h.001M6 16h12"></path>
+            </svg>
+            <svg class="icon-skip" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="5 4 15 12 5 20 5 4"/>
+                <line x1="19" y1="5" x2="19" y2="19"/>
+            </svg>
+        </span>
+        <span class="streaming-indicator" style="display: none;">
+            <span class="indicator-dot"></span>
+            <span class="indicator-dot"></span>
+            <span class="indicator-dot"></span>
+        </span>
+        -->
+    </button>
+</div>

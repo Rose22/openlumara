@@ -15,7 +15,25 @@
         {% endfor %}
     </head>
     <body>
-        <section id="main-wrapper">
+        <section id="main-wrapper"
+            x-data="{
+                chats: [],
+                chat: {},
+                messages: [],
+                user_input: '',
+                selectedChat: null,
+
+                async selectChat(chatId) {
+                    this.selectedChat = chatId;
+                    this.chat = await simpleApiFetch(`/api/chat/load/${chatId}`);
+                    this.messages = this.chat.messages;
+                }
+            }"
+            x-init="
+                chats = await simpleApiFetch('/api/chats');
+                messages = await simpleApiFetch('/api/chat/messages');
+            "
+        >
             <section id="sidebar">
                 {% include 'components/chats.html' %}
             </section>
@@ -29,5 +47,15 @@
         {% for file in js_files %}
         <script src="{{ url_for('assets', path='js/'+file) }}"></script>
         {% endfor %}
+
+        <!-- initialization script -->
+        <script language="javascript">
+            async function initialize() {
+                // disabled until websocket support is actually in
+                // await connectWebSocket();
+            }
+
+            initialize();
+        </script>
     </body>
 </html>

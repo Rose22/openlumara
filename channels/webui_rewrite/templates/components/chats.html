@@ -1,22 +1,7 @@
 <!-- list of chats -->
-<div 
-    id="chat-list"
-    x-ref="chat-list"
-
-    x-data="{ chats : [] }"
-    x-init="
-        data = await(
-            await fetch('/api/chats')
-        ).json()
-
-        console.log(data.chats);
-
-        chats = data.chats;
-    "
->
-    
+<div id="chat-list" x-ref="chat-list">
     <template x-for="chat in chats">
-        <div class="item">
+        <div class="item" @click="selectChat(chat.id)">
             <span class="title" x-text="chat.title"></span>
             <ul class="tags" x-data="{ tags: chat.tags }">
                 <template x-for="tag in tags">

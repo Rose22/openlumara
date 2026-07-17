@@ -1,0 +1,416 @@
+.input-area {
+    padding: 10px;
+    background: var(--bg-primary);
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-shrink: 0;
+    border-top: none; /* Removed default border to be replaced by token bar when visible */
+    box-sizing: border-box;
+
+    /* Upload Button */
+    #upload {
+        padding: 0;
+        width: 48px;
+        height: 48px;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        color: var(--text-primary);
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        box-sizing: border-box;
+        position: relative;
+        overflow: hidden;
+
+        :hover {
+            background: var(--bg-tertiary);
+            color: var(--accent);
+            border-color: var(--accent);
+             box-shadow: 0 4px 12px rgba(var(--accent-rgb, 171, 171, 171), 0.3);
+
+            ::before {
+                opacity: 0.1;
+            }
+        }
+
+        ::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at center, var(--accent) 0%, transparent 70%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        svg {
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+            transition: transform 0.2s ease;
+        }
+    }
+
+    /* Message Input - Pill Shape */
+    #text-input {
+        flex: 1;
+        padding: 14px 20px;
+        height: 48px; 
+        min-height: auto;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        background: var(--bg-input);
+        color: var(--text-primary);
+        font-size: 1rem;
+        outline: none;
+        transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+        resize: none;
+        max-height: 200px;
+        font-family: inherit;
+        line-height: 1.5;
+        box-sizing: border-box;
+        vertical-align: middle;
+        
+        #focus {
+            border-color: var(--accent);
+
+            ::placeholder {
+                opacity: 0.6;
+            }
+        }
+
+        :disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        ::placeholder {
+            color: var(--text-muted);
+            transition: opacity 0.2s ease;
+        }
+
+        /* Hide Scrollbar */
+        scrollbar-width: none; 
+        -ms-overflow-style: none;
+
+        ::-webkit-scrollbar { 
+            display: none; 
+        }:
+
+    }
+
+    /* send button */
+    #send, #stop {
+        padding: 0 24px; 
+        height: 48px; 
+        border-radius: var(--radius-lg);
+        font-size: 0.95rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+        vertical-align: middle;
+        color: var(--text-primary);
+        position: relative;
+        overflow: hidden;
+
+        :active {
+            transform: scale(0.96) translateY(0); 
+        }
+    }
+
+    #send {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+
+        :hover {
+            background: var(--bg-tertiary);
+            color: var(--accent);
+            border-color: var(--accent);
+            box-shadow: 0 4px 12px rgba(var(--accent-rgb, 171, 171, 171), 0.3);
+
+            ::after {
+                transform: translateX(100%);
+            }
+        }
+
+        ::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.1) 50%, transparent 70%);
+            transform: translateX(-100%);
+            transition: transform 0.6s ease;
+        }
+
+        :disabled { 
+            opacity: 0.5; 
+            cursor: not-allowed; 
+            transform: none; 
+        }
+    }
+
+    #stop {
+        background: var(--error-bg);
+        border: 1px solid var(--error-border);
+        color: var(--error);
+        display: none;
+
+        :hover {
+            background: var(--button-stop-hover);
+            box-shadow: 0 0 15px var(--button-stop-glow);
+            border-color: var(--accent);
+            transform: translateY(-2px);
+        }
+
+        .stop-text {
+            display: block;
+            font-size: 0.95rem;
+            font-weight: 600;
+            line-height: 1;
+        }
+
+        .streaming-icon {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+
+            svg {
+                width: 20px;
+                height: 20px;
+                flex-shrink: 0;
+                stroke: currentColor;
+                stroke-width: 2;
+                fill: none;
+            }
+        }
+    }
+}
+
+/* --- AI SLOP BELOW, NEEDS REFACTOR --- */
+
+.streaming-indicator {
+    display: none;
+    align-items: center;
+}
+
+
+/* Ensure SVGs render on mobile */
+@media (max-width: 768px) {
+    #stop svg {
+        width: 20px !important;
+        height: 20px !important;
+        stroke: var(--error, #f87171) !important;
+        fill: none !important;
+    }
+}
+
+/* Streaming indicator dots */
+.streaming-indicator {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 6px;
+}
+/* Only position absolutely when actually visible (during streaming states) */
+#stop.streaming .streaming-indicator {
+    position: absolute;
+    bottom: 10px;
+    left: 2px;
+    right: 0;
+    margin: 0;
+    justify-content: center;
+}
+
+.indicator-dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--error);
+    margin-right: 3px;
+    animation: dotPulse 1.4s infinite ease-in-out;
+
+    :nth-child(1) {
+        animation-delay: 0s;
+    }
+
+    :nth-child(2) {
+        animation-delay: 0.2s;
+    }
+
+    :nth-child(3) {
+        animation-delay: 0.4s;
+    }
+
+    @keyframes dotPulse {
+        0%, 80%, 100% {
+            opacity: 0.3;
+            transform: scale(0.8);
+        }
+        40% {
+            opacity: 1;
+            transform: scale(1.2);
+        }
+    }
+
+    @keyframes buttonPopIn {
+        from {
+            opacity: 0;
+            transform: scale(0.8);
+        }
+        to {
+            opacity: 1;
+            transform: scale(1);
+        }
+    }
+}
+
+/* Token Usage Bar - Slim & Replaces Top Border */
+.token-usage-container {
+    align-items: center;
+    justify-content: space-between;
+    background: var(--bg-primary); /* Blends seamlessly with input area */
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    box-sizing: border-box;
+}
+
+.token-usage-bar-bg {
+    width: 100%;
+    height: 1px; /* Ultra-slim track */
+    background: var(--border-color);
+    overflow: hidden;
+}
+
+.token-usage-bar-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--accent) !important; /* Sleek gradient */
+    transition: width 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.token-usage-bar-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    transform: translateX(-100%);
+    animation: shimmer 2s infinite;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.token-usage-container.shimmer-active .token-usage-bar-fill::after {
+    opacity: 1;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+.token-usage-text {
+    position: relative;
+    height: 0px;
+    white-space: nowrap;
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    transition: color 0.2s ease;
+    text-align: right;
+    margin-right: 15px;
+    bottom: 0.45rem;
+    z-index: 1;
+}
+
+/* Warning state for high token usage */
+.token-usage-container.warning .token-usage-bar-fill {
+    background: linear-gradient(90deg, #f59e0b, #ef4444);
+}
+
+.token-usage-container.warning .token-usage-text {
+    color: var(--error);
+}
+
+body.token-bar-hidden .input-area {
+    border-top: 1px solid var(--border-color);
+}
+
+/* Streaming Status Indicator */
+.streaming-status-indicator {
+    font-size: 0.8rem;
+    color: var(--text-secondary, #888);
+    font-style: italic;
+    margin: 4px 0 0 0; 
+    padding: 2px 8px;
+    animation: streamingFadeIn 0.3s ease-out;
+    display: inline-block;
+    width: 100%;
+    box-sizing: border-box;
+    text-align: left;
+}
+
+@keyframes streamingFadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Optimistic UI Styles */
+.user-placeholder {
+    opacity: 0.7;
+    filter: grayscale(0.5);
+}
+
+.placeholder-status {
+    font-size: 0.75rem;
+    color: var(--text-secondary, #888);
+    margin-top: 4px;
+    font-style: italic;
+    text-align: left;
+}
+
+.typing-status-text {
+    display: block;
+    text-align: left; 
+    font-size: 0.75rem;
+    color: var(--text-secondary, #888);
+    margin-bottom: 4px;
+    margin-top: 0;
+    font-style: italic;
+    width: 100%;
+    box-sizing: border-box;
+    animation: statusFadeIn 0.2s ease-out;
+}
+
+.typing-status-text.hidden {
+    display: none;
+}
+
+@keyframes statusFadeIn {
+    from { opacity: 0; transform: translateY(2px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+}
+
+/* Restore normal border & adjust padding when token bar is hidden */
+body.token-bar-hidden .input-area {
+    border-top: 1px solid var(--border-color);
+}
+
+
+#file-input {
+    display: none;
+}
+
