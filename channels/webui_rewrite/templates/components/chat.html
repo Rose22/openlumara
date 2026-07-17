@@ -1,14 +1,69 @@
-<div id="messages">
-    <template x-for="message in messages">
-        <div :class="{
-            'message-wrapper': true,
-            'user': message.role === 'user',
-            'assistant': message.role === 'assistant'
-        }">
-            <div class="message">
-                <div :class="message.role"><div class="content-wrapper" x-html="renderMarkdown(message.content)"></div></div>
-            </div>
+<div id="messages" x-ref="messages" x-auto-scroll x-effect="reloadChat()">
+    <template x-for="turn in turns">
+        <div>
+            <!-- user messages get rendered seperately -->
+            <template x-if="turn.role === 'user'">
+                <div class="message-wrapper user">
+                    <div class="message user" x-html="renderMarkdown(turn.messages[0].content)"></div>
+                </div>
+            </template>
+
+            <!-- 
+                assistant messages get collected into turns for display in the UI,
+                by the turn() getter in js/alpine_main.js
+            -->
+            <template x-if="turn.role === 'assistant'">
+                <div class="message-wrapper assistant">
+                    <div class="message assistant">
+                        <!-- all messages within a turn are displayed within the same message bubble -->
+                        <template x-for="message in turn.messages">
+                            <div>
+                                <!-- render the messages based on message role -->
+
+                                <template x-if="message.role === 'user'">
+                                    <div class="content normal" x-text="message.content"></div>
+                                </template>
+
+                                <template x-if="message.role === 'assistant'">
+                                    <div>
+                                        <template x-if="message.type === 'reasoning' || message.type === 'history'">
+                                            {% include 'components/reasoning.html' %}
+                                        </template>
+                                        <template x-if="message.type === 'content' || message.type === 'history'">
+                                            <div class="content" x-html="renderMarkdown(message.content)"></div>
+                                        </template>
+                                        <template x-if="message.type === 'tool_call_delta'">
+                                            <div x-show="$store.stream.state === 'calling_tools'">
+                                                <p><i>calling tool..</i></p>
+                                            </div>
+                                        </template>
+                                        <template x-if="message.type === 'tool_calls'">
+                                            {% include 'components/toolcalls.html' %}
+                                        </template>
+                                    </div>
+                                </template>
+
+                                <template x-if="message.role === 'tool'">
+                                    {% include 'components/tool.html' %}
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </template>
         </div>
+    </template>
+
+    <!-- typing indicator -->
+    <template x-if="$store.stream.state === 'sending'">
+        <div class="typing-indicator" id="typing" aria-label="AI is typing" x-ignore>
+            <span></span><span></span><span></span>
+        </div>
+    </template>
+
+    <!-- prompt processing indicator (works with llama.cpp) -->
+    <template x-if="$store.stream.state === 'processing'">
+        {% include 'components/prompt_processing.html' %}
     </template>
 </div>
 

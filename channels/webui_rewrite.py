@@ -255,7 +255,7 @@ class WebSocketManager:
 
                         await self.broadcast({
                             "type": "token",
-                            "message": payload
+                            "content": payload
                         })
 
         await self.broadcast({
@@ -335,6 +335,13 @@ async def create_fastapi(channel):
 
         return api_result(channel.context.chat.data[channel.context.chat.current], success=True)
 
+    @app.get("/api/chat/current")
+    async def chat_get_current():
+        if not channel.context.chat.current:
+            return api_result(success=False)
+
+        return api_result(channel.context.chat.data[channel.context.chat.current])
+
     @app.get("/api/chat/messages")
     async def chat_messages():
        messages = await channel.context.chat.get() 
@@ -363,7 +370,8 @@ async def create_fastapi(channel):
 
     @app.post("/api/chat/delete/{id}")
     async def chat_delete(id: str):
-        return api_result(success=await channel.context.chat.delete(id))
+        await channel.context.chat.delete(id)
+        return api_result(success=True)
 
     # ------------------
     # WebSocket endpoint

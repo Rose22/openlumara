@@ -1,0 +1,5 @@
+<!-- displays tokens streaming in from the AI -->
+<template x-if="$store.stream.reasoning">
+    {% include 'components/token_stream_reasoning.html' %}
+</template>
+<div class="content normal" x-html="renderMarkdown($store.stream.content)"></div>

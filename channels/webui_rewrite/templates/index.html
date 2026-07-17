@@ -30,15 +30,5 @@
         {% for file in js_files %}
         <script src="{{ url_for('assets', path='js/'+file) }}"></script>
         {% endfor %}
-
-        <!-- initialization script -->
-        <script language="javascript">
-            async function initialize() {
-                // disabled until websocket support is actually in
-                // await connectWebSocket();
-            }
-
-            initialize();
-        </script>
     </body>
 </html>

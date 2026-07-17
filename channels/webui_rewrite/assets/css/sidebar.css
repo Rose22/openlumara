@@ -216,3 +216,31 @@
         }
     }
 }
+
+/* New Chat Button - Modern Style */
+.new-chat-btn {
+    width: 100%;
+    padding: 12px 16px;
+    background: var(--bg-tertiary);
+    border: none;
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+
+    svg {
+        width: 18px;
+        height: 18px;
+    }
+}
+.new-chat-btn:hover {
+    filter: brightness(1.15);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-soft);
+}

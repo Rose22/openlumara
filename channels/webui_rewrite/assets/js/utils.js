@@ -8,6 +8,20 @@ async function simpleApiFetch(url) {
 
     return raw_data.data;
 }
+async function simpleApiPost(url, content=null) {
+    // posts something to the API and returns the data extracted from the JSON response
+    raw_data = await(
+        await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(content)
+        })
+    ).json()
+
+    // console.log(raw_data.data);
+
+    return raw_data.data;
+}
 
 function escapeHtml(str) {
     const div = document.createElement('div');

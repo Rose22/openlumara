@@ -7,7 +7,7 @@
 </div>
 -->
 
-<button id="upload" title="Upload file" aria-label="Upload file">
+<button id="upload" title="Upload file" aria-label="Upload file" :disabled="$store.stream.state != 'idle'">
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
     </svg>
@@ -16,13 +16,22 @@
 
 <!-- user_input is defined over in index.html, so that we have access to it everywhere -->
 <textarea 
-    id="text-input" placeholder="Type a message..." rows="1" aria-label="Message input"
+    id="text-input" 
+    :placeholder="
+        if ($store.stream.state == 'idle') {
+            return 'Type a message...';
+        } else {
+            return $store.stream.state+'..';
+        }
+    " 
+    :disabled="$store.stream.state != 'idle';"
+    rows="1" aria-label="Message input"
     x-model="user_input"
     @keyup.enter="await send(user_input); user_input='';"
 ></textarea>
 
-<button id="send" aria-label="Send message" @click="await send(user_input)">Send</button>
-<button id="stop" aria-label="Stop generation">
+<button id="send" aria-label="Send message" @click="await send(user_input)" x-show="$store.stream.state === 'idle'">Send</button>
+<button id="stop" aria-label="Stop generation" x-show="$store.stream.state != 'idle'">
     <span class="stop-text">Stop</span>
     <!--
     <span class="streaming-icon">

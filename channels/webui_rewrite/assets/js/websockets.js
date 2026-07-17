@@ -63,7 +63,53 @@ async function scheduleWsReconnect() {
     }, 1000);
 }
 
-async function handleWebSocketMessage(data) {
-    // stub for now
-    console.log(data);
-}
+ async function handleWebSocketMessage(data) {
+     // we store all the stream-related data in an Alpine store
+     const store = Alpine.store("stream");
+ 
+     data_type = data.type;
+     data_content = data.content;
+ 
+     // process based on broadcast type
+     switch (data_type) {
+         case "token":
+             token = data_content;
+             token_type = token.type;
+             token_content = token.content;
+ 
+             // process tokens based on their type
+             switch (token_type) {
+                 case "prompt_progress":
+                     if (store.state != "processing_tools") {
+                         // let it stay in that state if it's been set
+                         store.state = 'processing';
+                     }
+
+                     store.processing = token_content;
+                     break;
+                 case "reasoning":
+                     store.state = 'streaming';
+                     break;
+                 case "content":
+                     store.state = 'streaming';
+                     break;
+                 case "tool_call_delta":
+                     store.state = 'calling_tools';
+                     break;
+                 case "tool_calls":
+                     store.state = 'calling_tools';
+                     break;
+                 case "tool":
+                     store.state = 'processing_tools';
+                     break;
+             }
+
+             console.log(token);
+             store.tokens.push(token);
+             break;
+         case "stream_complete":
+             store.state = 'idle';
+             await store.clearTokens();
+             break;
+     }
+ }

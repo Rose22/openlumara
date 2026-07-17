@@ -181,7 +181,6 @@
             background: var(--error-bg);
             border: 1px solid var(--error-border);
             color: var(--error);
-            display: none;
 
             .stop-text {
                 display: block;
@@ -232,27 +231,7 @@
         position: relative;
         max-width: var(--message-max-width, 75%);
         width: fit-content;
-        gap: var(--gap);
         backdrop-filter: blur(10px);
-
-        .content-wrapper {
-            padding: 14px 16px;
-        }
-
-        .user {
-            background: var(--bg-message-user);
-            border: 1px solid var(--border-user);
-            border-bottom-right-radius: var(--radius-sm);
-            color: var(--text-primary);
-        }
-        
-        .assistant {
-            background: var(--bg-message-ai);
-            border: 1px solid var(--border-message);
-            border-bottom-left-radius: var(--radius-sm);
-            color: var(--text-primary);
-            min-width: 80px;
-        }
 
         h1,
         h2,
@@ -375,6 +354,30 @@
 
         code {
             font-family: var(--code-font);
+        }
+    }
+
+    .message.user {
+        background: var(--bg-message-user);
+        border: 1px solid var(--border-user);
+        border-bottom-right-radius: var(--radius-sm);
+        color: var(--text-primary);
+    }
+    
+    .message.assistant {
+        background: var(--bg-message-ai);
+        border: 1px solid var(--border-message);
+        border-bottom-left-radius: var(--radius-sm);
+        color: var(--text-primary);
+        min-width: 80px;
+
+        gap: var(--gap);
+
+        .content.reasoning {
+            font-family: monospace;
+        }
+        
+        .content.normal {
         }
     }
 

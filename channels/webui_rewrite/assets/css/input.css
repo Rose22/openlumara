@@ -162,7 +162,6 @@
         background: var(--error-bg);
         border: 1px solid var(--error-border);
         color: var(--error);
-        display: none;
 
         :hover {
             background: var(--button-stop-hover);
