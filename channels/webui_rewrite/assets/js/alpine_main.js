@@ -9,10 +9,15 @@ document.addEventListener('alpine:init', () => {
         selectedChat: null,
         selectedCategory: 'general',
 
+        // one of: idle, sending, processing, streaming
+        streamingState: 'idle',
+
         async init() {
             this.chats = await simpleApiFetch('/api/chats');
             this.categories = await simpleApiFetch('/api/chats/categories');
             this.messages = await simpleApiFetch('/api/chat/messages');
+
+            await connectWebSocket();
         },
 
         async selectChat(chatId) {

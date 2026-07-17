@@ -18,6 +18,7 @@
 <textarea 
     id="text-input" placeholder="Type a message..." rows="1" aria-label="Message input"
     x-model="user_input"
+    @keyup.enter="await send(user_input); user_input='';"
 ></textarea>
 
 <button id="send" aria-label="Send message" @click="await send(user_input)">Send</button>

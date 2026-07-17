@@ -1,7 +1,7 @@
 <!-- list of categories -->
 <div id="category-list" x-ref="category-list">
     <template x-for="category in categories">
-        <ul class="item" @click="selectCategory(category)">
+        <ul :class="{'item': true, 'active': category == selectedCategory}" @click="selectCategory(category)">
             <span class="title" x-text="category"></span>
         </ul>
     </template>
@@ -21,12 +21,14 @@
                     chat.category === selectedCategory
                     &&
                     chat.title.toLowerCase().includes(query.toLowerCase())
-            ">
+                "
+            >
                 <!-- give selected chats a nice border via the CSS class -->
                 <div
                     x-data="{ active: false }"
                     :class="{'item': true, 'active': chat.id === selectedChat}"
                     @click="active = !active; selectChat(chat.id)"
+                    x-transition
                 >
                     <span class="title" x-text="chat.title"></span>
                     <ul class="tags" x-data="{ tags: chat.tags }">

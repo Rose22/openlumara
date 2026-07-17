@@ -4,7 +4,7 @@ async function simpleApiFetch(url) {
         await fetch(url)
     ).json()
 
-    console.log(raw_data.data);
+    // console.log(raw_data.data);
 
     return raw_data.data;
 }

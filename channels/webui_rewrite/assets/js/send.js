@@ -6,8 +6,8 @@ async function send(text) {
     console.log(text);
 
     // send it via websocket, and let it be received by websocket events
-    window.socket.broadcast({
-        "type": "send_stream",
-        "content": text
-    })
+    window.socket.send(JSON.stringify({
+        "type": "user_message",
+        "content": {"role": "user", "content": text}
+    }))
 }

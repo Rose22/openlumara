@@ -65,15 +65,15 @@
             text-overflow: ellipsis;
         }
 
-        .active {
-            background: rgba(var(--primary-rgb), 0.15);
-            color: var(--accent);
-            font-weight: 600;
-        }
     }
     .item:hover {
         background: var(--bg-tertiary);
         color: var(--text-primary);
+    }
+    .item.active {
+        background: rgba(var(--primary-rgb), 0.15);
+        color: var(--accent);
+        font-weight: 600;
     }
 }
 

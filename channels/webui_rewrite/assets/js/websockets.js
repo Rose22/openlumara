@@ -53,7 +53,6 @@ async function connectWebSocket() {
         if (!wsReconnecting) {
             console.error('WebSocket error:', error);
         }
-        await scheduleWsReconnect();
     };
 }
 
