@@ -15,27 +15,10 @@
         {% endfor %}
     </head>
     <body>
-        <section id="main-wrapper"
-            x-data="{
-                chats: [],
-                chat: {},
-                messages: [],
-                user_input: '',
-                selectedChat: null,
-
-                async selectChat(chatId) {
-                    this.selectedChat = chatId;
-                    this.chat = await simpleApiFetch(`/api/chat/load/${chatId}`);
-                    this.messages = this.chat.messages;
-                }
-            }"
-            x-init="
-                chats = await simpleApiFetch('/api/chats');
-                messages = await simpleApiFetch('/api/chat/messages');
-            "
-        >
+        <!-- the x-data is defined in assets/js/alpine_main.js -->
+        <section id="main-wrapper" x-data="main">
             <section id="sidebar">
-                {% include 'components/chats.html' %}
+                {% include 'components/sidebar.html' %}
             </section>
 
             <section id="chat-window">

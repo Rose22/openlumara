@@ -292,7 +292,11 @@ async def create_fastapi(channel):
     async def chat_load(id: str):
         success = await channel.context.chat.load(id)
         if not success:
-            return api_result(success=False)
+            # that likely means this is already the loaded chat
+            if not channel.context.chat.current:
+                return api_result(success=False)
+
+            return api_result(channel.context.chat.data[channel.context.chat.current], success=True)
 
         return api_result(channel.context.chat.data[channel.context.chat.current], success=True)
 
@@ -312,6 +316,10 @@ async def create_fastapi(channel):
             filtered_chats.append(chat_copy)
 
         return api_result(filtered_chats, success=True)
+
+    @app.get("/api/chats/categories")
+    async def get_chat_categories():
+        return api_result(await channel.context.chat.get_categories(), True)
 
     # -- POST
     @app.post("/api/chat/new")
