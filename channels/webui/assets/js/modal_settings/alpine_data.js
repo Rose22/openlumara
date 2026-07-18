@@ -114,7 +114,7 @@ function settingsModal() {
 
             try {
                 const backendData = flattenForBackend(this.categories);
-                await simpleApiPost('/settings/save', backendData);
+                await simpleApiPost('/api/settings/save', backendData);
                 this.settings = backendData;
                 this.originalCategories = JSON.parse(JSON.stringify(this.categories));
                 this.changedModuleSettings.clear();
@@ -130,7 +130,27 @@ function settingsModal() {
             this.changedModuleSettings.clear();
         },
 
-        // Update a setting by passing the setting object directly
+        toggleEnabled(category, itemName) {
+            const cat = this.categories[category];
+            if (!cat) return;
+
+            const isEnabled = cat.enabled.includes(itemName);
+            
+            if (isEnabled) {
+                // Disable: remove from enabled, add to disabled
+                cat.enabled = cat.enabled.filter(item => item !== itemName);
+                cat.disabled.push(itemName);
+            } else {
+                // Enable: remove from disabled, add to enabled
+                cat.disabled = cat.disabled.filter(item => item !== itemName);
+                cat.enabled.push(itemName);
+            }
+            
+            // Sort for consistency
+            cat.enabled.sort();
+            cat.disabled.sort();
+        },
+
         updateSetting(settingObj, value) {
             settingObj.value = value;
             
@@ -163,4 +183,3 @@ function settingsModal() {
         }
     };
 }
-

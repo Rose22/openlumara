@@ -59,19 +59,21 @@
     </head>
     <body>
         <!-- the x-data is defined in js/alpine/data.js -->
-        <section id="main-wrapper" x-data="main">
-            {% if config.get("enable_sidebar") %}
-                <section id="sidebar">
-                    {% include 'sidebar.html' %}
+        <div x-data="main" style="display: inline">
+            <section id="main-wrapper">
+                {% if config.get("enable_sidebar") %}
+                    <section id="sidebar">
+                        {% include 'sidebar.html' %}
+                    </section>
+                {% endif %}
+
+                <section id="chat-window">
+                    {% include 'chat.html' %}
                 </section>
-            {% endif %}
-
-            <section id="chat-window">
-                {% include 'chat.html' %}
             </section>
-        </section>
 
-        {% include 'modals.html' %}
+            {% include 'modals.html' %}
+        </div>
 
         <!-- javascript files -->
         <script src="{{ url_for('assets', path='js/utils.js') }}"></script>

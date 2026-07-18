@@ -1,0 +1,192 @@
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px) saturate(180%);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease-out, visibility 0.2s ease-out;
+}
+
+.modal-overlay.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+.modal {
+    position: fixed;
+    inset: 0;
+    width: 80%;
+    max-height: 90vh;
+    z-index: 1001;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-strong);
+    margin: auto;
+    overflow-y: auto;
+    transform: translateZ(0) translateY(8px);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    transition: opacity 0.2s ease-out, visibility 0.2s ease-out, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    font-family: var(--font-primary);
+    color: var(--text-primary);
+}
+
+.modal.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateZ(0) translateY(0);
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 12px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-tertiary);
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 1.25rem;
+    color: var(--text-primary);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    margin-left: 3px;
+}
+
+.modal-close {
+    padding: 0px 4px;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-size: 1.25rem;
+    line-height: 1;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-family: var(--font-primary);
+}
+
+.modal-close:hover {
+    background: var(--button-bg);
+    color: var(--text-primary);
+    border-color: var(--accent);
+}
+
+.modal-content {
+    padding: 24px;
+}
+
+.modal-content h3 {
+    margin-bottom: 12px;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+/* Confirmation Dialog Styling */
+.confirm-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.confirm-modal {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 28px;
+    max-width: 420px;
+    width: 90%;
+    box-shadow: var(--shadow-strong);
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    font-family: var(--font-primary);
+}
+
+@keyframes slideUp {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.confirm-message {
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: var(--text-primary);
+}
+
+.confirm-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.confirm-btn {
+    padding: 10px 20px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    font-weight: 500;
+    font-family: var(--font-primary);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.confirm-btn.cancel {
+    background: var(--button-bg);
+    color: var(--text-primary);
+}
+
+.confirm-btn.cancel:hover {
+    background: var(--button-hover);
+    border-color: var(--accent);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-soft);
+}
+
+.confirm-btn.confirm {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg-primary);
+    font-weight: 600;
+}
+
+.confirm-btn.confirm:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 0 16px var(--accent-glow);
+}
+
+#export-modal {
+    width: 320px;
+    height: 350px;
+}
+
+#shortcuts-modal {
+    width: 50%;
+    height: 650px;
+}
+

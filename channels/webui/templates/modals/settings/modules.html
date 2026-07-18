@@ -3,8 +3,18 @@
     <div class="module-unified-list">
         <h3 x-text="categories[activeCategory].title"></h3>
         <p class="settings-section-desc" x-text="categories[activeCategory].description"></p>
-        <template x-for="module in categories[activeCategory].enabled" :key="module">
-            <button type="button" @click="activeModule = module" class="module-unified-card" x-text="formatLabel(module)"></button>
+        
+        <!-- All modules (enabled first, then disabled) -->
+        <template x-for="module in [...categories[activeCategory].enabled, ...categories[activeCategory].disabled]" :key="module">
+            <div class="module-unified-card" :class="{ 'disabled': !categories[activeCategory].enabled.includes(module) }">
+                <div class="module-info" @click="activeModule = module">
+                    <span type="button" class="module-name-btn" x-text="formatLabel(module)"></span>
+                    <p class="module-description" x-html="categories[activeCategory].descriptions[module] || ''"></p>
+                </div>
+                <button type="button" :class="{'toggle-active': true, 'toggle-off': categories[activeCategory].disabled.includes(module), 'toggle-on': categories[activeCategory].enabled.includes(module) }" 
+                        @click="toggleEnabled(activeCategory, module)">
+                </button>
+            </div>
         </template>
     </div>
 </template>
@@ -13,7 +23,7 @@
 <template x-if="activeModule && (activeCategory === 'modules' || activeCategory === 'user_modules')">
     <div class="module-drilldown">
         <button type="button" @click="activeModule = null" class="mobile-back-btn">← Back</button>
-        <h3 x-text="formatLabel(activeModule)" x-init="console.log(categories)"></h3>
+        <h3 x-text="formatLabel(activeModule)"></h3>
         <p class="settings-section-desc" x-html="categories[activeCategory].descriptions[activeModule] || ''"></p>
         
         <template x-if="categories[activeCategory].settings[activeModule] && categories[activeCategory].settings[activeModule].value">

@@ -52,6 +52,9 @@ div  {
     z-index: 0;
 }
 
+/* alpine-specific fix that they officially recommend */
+[x-cloak] { display: none !important; }
+
 /* ==========================================================================
  *  Modern Scrollbar Styling (Theme Aware)
  *  ========================================================================== */

@@ -5,7 +5,6 @@
             <div class="toggle-row">
                 <label x-text="setting.title"></label>
                 <button type="button" :class="{ active: setting.value }" @click="updateSetting(setting, !setting.value)">
-                    <span x-text="setting.value ? 'ON' : 'OFF'"></span>
                 </button>
             </div>
             <span class="setting-description" x-show="setting.description" x-html="setting.description"></span>

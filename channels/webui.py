@@ -293,6 +293,28 @@ async def create_fastapi(channel):
                 }
 
         return api_result(module_info)
+    # -- POST
+    @app.post("/api/settings/save")
+    async def settings_save(request: fastapi.Request):
+        data = await request.json()
+
+        # changed_modules = data.get("changed_modules", [])
+        
+        result = core.config.config.load(data=data)
+        core.config.config.save()
+
+        if not result:
+            return api_result(success=Falsed)
+
+        # Reload modules that had their settings changed
+        # if changed_modules:
+        #     for module_name in changed_modules:
+        #         try:
+        #             await channel.manager.reload_module(module_name)
+        #         except Exception as e:
+        #             channel.log(self.name, f"Error reloading module {module_name}: {core.detail_error(e)}")
+
+        return api_result(success=True)
 
     # ------------------
     # WebSocket endpoint

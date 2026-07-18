@@ -1,72 +1,76 @@
-<div class="settings-modal" x-show="true" x-data="settingsModal()">
-    <!-- Loading State -->
-    <div x-show="loading" class="settings-loading">
-        <div class="spinner"></div>
-        <span>Loading settings...</span>
-    </div>
+<div x-show="currentModal === 'settings'" x-cloak>
+    <div class="settings-modal modal" x-data="settingsModal()">
+        <div class="modal-header">
+            <h2 id="settings-title">Settings</h2>
+            <button class="modal-close" @click="currentModal = null" aria-label="Close settings">×</button>
+        </div>
 
-    <!-- Error State -->
-    <div x-show="error" class="settings-error">
-        <span x-text="error"></span>
-        <button @click="load()">Retry</button>
-    </div>
+        <!-- Loading State -->
+        <div x-show="loading" class="settings-loading">
+            <div class="spinner"></div>
+            <span>Loading settings...</span>
+        </div>
 
-    <!-- Settings Content -->
-    <div class="settings-body" x-show="!loading && !error">
-        <!-- SIDEBAR NAV -->
-        {% include 'modals/settings/sidebar.html' %}
+        <!-- Error State -->
+        <div x-show="error" class="settings-error">
+            <span x-text="error"></span>
+            <button @click="load()">Retry</button>
+        </div>
 
-        <!-- MAIN CONTENT AREA -->
-        <main class="settings-content">
-            <!-- Mobile: show category list when no category selected -->
-            <template x-if="mobile && !activeCategory">
-                <div class="mobile-category-list">
-                    <template x-for="[cat, data] in sortedCategories" :key="cat">
-                        <button @click="activeCategory = cat" class="mobile-category-btn">
-                            <span x-text="data.title"></span>
-                        </button>
-                    </template>
+        <!-- Settings Content -->
+        <div class="settings-body" x-show="!loading && !error">
+            <!-- SIDEBAR NAV -->
+            {% include 'modals/settings/sidebar.html' %}
+
+            <!-- MAIN CONTENT AREA -->
+            <main class="settings-content">
+                <!-- Mobile: show category list when no category selected -->
+                <template x-if="mobile && !activeCategory">
+                    <div class="mobile-category-list">
+                        <template x-for="[cat, data] in sortedCategories" :key="cat">
+                            <button @click="activeCategory = cat" class="mobile-category-btn">
+                                <span x-text="data.title"></span>
+                            </button>
+                        </template>
+                    </div>
+                </template>
+
+                <!-- Unsaved changes indicator -->
+                <div x-show="hasChanges" class="settings-unsaved">
+                    You have unsaved changes
                 </div>
-            </template>
 
-            <!-- Unsaved changes indicator -->
-            <div x-show="hasChanges" class="settings-unsaved">
-                You have unsaved changes
-            </div>
+                <!-- MODULES CONTENT -->
+                {% include 'modals/settings/modules.html' %}
 
-            <!-- MODULES CONTENT -->
-            {% include 'modals/settings/modules.html' %}
+                <!-- CHANNELS CONTENT -->
+                {% include 'modals/settings/channels.html' %}
 
-            <!-- CHANNELS CONTENT -->
-            {% include 'modals/settings/channels.html' %}
+                <!-- APPEARANCE (special theme section) -->
+                {% include 'modals/settings/appearance.html' %}
+                
+                <!-- ALL OTHER CATEGORIES -->
+                <template x-if="!activeModule && !activeChannel && 
+                                 !['appearance', 'modules', 'user_modules', 'channels', 'user_channels'].includes(activeCategory) && 
+                                 activeCategory">
+                    <div class="settings-section">
+                        <h3 class="settings-section-title" x-text="categories[activeCategory].title"></h3>
+                        <p class="settings-section-desc" x-text="categories[activeCategory].description"></p>
+                        
+                        <template x-for="[key, setting] in Object.entries(categories[activeCategory].settings)" :key="key">
+                            {% include 'modals/settings/fields.html' %}
+                        </template>
+                    </div>
+                </template>
+                
+            </main>
 
-            <!-- APPEARANCE (special theme section) -->
-            {% include 'modals/settings/appearance.html' %}
-            
-            <!-- ALL OTHER CATEGORIES -->
-            <template x-if="!activeModule && !activeChannel && 
-                             !['appearance', 'modules', 'user_modules', 'channels', 'user_channels'].includes(activeCategory) && 
-                             activeCategory">
-                <div class="settings-section">
-                    <h3 class="settings-section-title" x-text="categories[activeCategory].title"></h3>
-                    <p class="settings-section-desc" x-text="categories[activeCategory].description"></p>
-                    
-                    <template x-for="[key, setting] in Object.entries(categories[activeCategory].settings)" :key="key">
-                        <div class="settings-group" x-data="{ collapsed: false }">
-                            <div x-show="!collapsed" class="settings-group-content">
-                                {% include 'modals/settings/fields.html' %}
-                            </div>
-                        </div>
-                    </template>
-                </div>
-            </template>
-            
-            <!-- Action Buttons -->
-            <div class="settings-actions">
-                <button type="button" @click="resetSettingsForm()" :disabled="!hasChanges">Reset</button>
-                <button type="button" @click="saveSettings()" :disabled="!hasChanges">Save</button>
-            </div>
-        </main>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="settings-actions">
+            <button type="button" @click="resetSettingsForm()" :disabled="!hasChanges">Reset</button>
+            <button type="button" @click="saveSettings()" :disabled="!hasChanges">Save</button>
+        </div>
     </div>
 </div>
-
