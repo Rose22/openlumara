@@ -6,10 +6,8 @@ function settingsModal() {
         
         // --- Settings Data ---
         settings: {},
-        original: {},
+        originalCategories: {},
         changedModuleSettings: new Set(),
-        categoryDescriptions: {},
-        fieldDescriptions: {},
         
         // --- Navigation State ---
         activeCategory: null,
@@ -38,7 +36,7 @@ function settingsModal() {
 
         // --- Computed Getters ---
         get hasChanges() {
-            return JSON.stringify(this.settings) !== JSON.stringify(this.original);
+            return JSON.stringify(this.categories) !== JSON.stringify(this.originalCategories);
         },
 
         get activeNavCategory() {
@@ -53,7 +51,6 @@ function settingsModal() {
 
         // --- Init & Load ---
         async init() {
-            // Listen for viewport changes
             window.addEventListener('resize', () => {
                 clearTimeout(this.resizeTimeout);
                 this.resizeTimeout = setTimeout(() => {
@@ -72,34 +69,22 @@ function settingsModal() {
             this.error = null;
 
             try {
-                // Load settings
-                const settings = await simpleApiFetch('/api/settings/load');
-                this.settings = settings;
-                this.original = JSON.parse(JSON.stringify(settings));
-                this.changedModuleSettings.clear();
-
-                // Load module info (gracefully)
+                const rawSettings = await simpleApiFetch('/api/settings/load');
+                this.settings = rawSettings;
+                
                 try {
                     this.moduleInfoCache = await simpleApiFetch('/api/settings/get_module_info');
                 } catch (infoErr) {
                     console.warn('Failed to fetch module info:', infoErr);
                 }
 
-                console.log(this.moduleInfoCache);
+                this.categories = buildSettingsStructure(rawSettings, this.moduleInfoCache);
+                this.originalCategories = JSON.parse(JSON.stringify(this.categories));
+                this.changedModuleSettings.clear();
 
-                // Organize into categories
-                this.categories = organizeSettingsIntoCategories(
-                    this.settings, 
-                    this.moduleInfoCache, 
-                    this.categoryDescriptions,
-                    this.fieldDescriptions
-                );
-
-                // Load first category
                 const firstCategory = Object.keys(this.categories)[0];
                 this.activeCategory = firstCategory;
 
-                // Pre-fetch models if needed
                 if (checkForModelField(this.settings)) {
                     this.fetchModels().catch(e => console.warn("Model fetch failed:", e));
                 }
@@ -123,14 +108,15 @@ function settingsModal() {
             }
         },
 
-        // --- Settings Operations ---
         async saveSettings() {
             this.loading = true;
             this.error = null;
 
             try {
-                await simpleApiPost('/settings/save', this.settings);
-                this.original = JSON.parse(JSON.stringify(this.settings));
+                const backendData = flattenForBackend(this.categories);
+                await simpleApiPost('/settings/save', backendData);
+                this.settings = backendData;
+                this.originalCategories = JSON.parse(JSON.stringify(this.categories));
                 this.changedModuleSettings.clear();
             } catch (err) {
                 this.error = err.message || 'Failed to save settings';
@@ -140,39 +126,27 @@ function settingsModal() {
         },
 
         resetSettingsForm() {
-            this.settings = JSON.parse(JSON.stringify(this.original));
+            this.categories = JSON.parse(JSON.stringify(this.originalCategories));
             this.changedModuleSettings.clear();
         },
 
-        handleChange(key, value) {
-            // Set value at dot-notation path
-            const parts = key.split('.');
-            let current = this.settings;
+        // Update a setting by passing the setting object directly
+        updateSetting(settingObj, value) {
+            settingObj.value = value;
             
-            for (let i = 0; i < parts.length - 1; i++) {
-                if (!(parts[i] in current)) {
-                    current[parts[i]] = {};
-                }
-                current = current[parts[i]];
-            }
-            current[parts[parts.length - 1]] = value;
-
             // Track changed modules
-            if (key.startsWith('modules.') || key.startsWith('user_modules.')) {
-                const moduleMatch = key.match(/^(modules|user_modules)\.(.*?)\./);
-                if (moduleMatch) {
-                    this.changedModuleSettings.add(moduleMatch[2]);
-                }
+            const cat = this.activeCategory;
+            const module = this.activeModule || this.activeChannel;
+            if (cat && module && (cat.startsWith('modules') || cat.startsWith('user_modules'))) {
+                this.changedModuleSettings.add(module);
             }
         },
 
-        // --- Navigation ---
         switchCategory(cat) {
             this.activeCategory = cat;
             this.activeModule = null;
             this.activeChannel = null;
 
-            // Expand/collapse sub-lists
             for (const key in this.expanded) {
                 this.expanded[key] = (cat === key);
             }
@@ -186,39 +160,7 @@ function settingsModal() {
                 this.activeChannel = item;
                 this.activeModule = null;
             }
-        },
-
-        visibleItems(cat) {
-            const category = this.categories[cat];
-            if (!category || !category.groups) return [];
-
-            const directGroup = category.groups.get('_direct_');
-            if (!directGroup || !directGroup.items.length) return [];
-
-            const item = directGroup.items[0];
-            if (item.type !== 'toggle_list') return [];
-
-            const allItems = getAllToggleItems(item.value);
-            const enabledSet = new Set(item.value.enabled);
-
-            return allItems.filter(name => {
-                if (!enabledSet.has(name)) return false;
-                
-                // Only show items that have settings
-                const settingsKey = `${cat}.settings.${name}`;
-                return category.groups.has(settingsKey);
-            });
-        },
-
-        sortedGroups(groups) {
-            if (!groups) return [];
-            return Array.from(groups.entries())
-                .sort(([a], [b]) => {
-                    // Sort _direct_ groups last
-                    if (a === '_direct_') return 1;
-                    if (b === '_direct_') return -1;
-                    return 0;
-                });
         }
     };
 }
+

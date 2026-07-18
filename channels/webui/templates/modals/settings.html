@@ -12,7 +12,7 @@
     </div>
 
     <!-- Settings Content -->
-    <div class="settings-body">
+    <div class="settings-body" x-show="!loading && !error">
         <!-- SIDEBAR NAV -->
         {% include 'modals/settings/sidebar.html' %}
 
@@ -34,28 +34,32 @@
                 You have unsaved changes
             </div>
 
+            <!-- MODULES CONTENT -->
             {% include 'modals/settings/modules.html' %}
+
+            <!-- CHANNELS CONTENT -->
             {% include 'modals/settings/channels.html' %}
 
-            <!-- ALL OTHER CATEGORIES (appearance, core, advanced, etc.) -->
-            <template x-if="!activeModule && !activeChannel && !['appearance', 'modules', 'user_modules', 'channels', 'user_channels'].includes(activeCategory) && activeCategory">
+            <!-- APPEARANCE (special theme section) -->
+            {% include 'modals/settings/appearance.html' %}
+            
+            <!-- ALL OTHER CATEGORIES -->
+            <template x-if="!activeModule && !activeChannel && 
+                             !['appearance', 'modules', 'user_modules', 'channels', 'user_channels'].includes(activeCategory) && 
+                             activeCategory">
                 <div class="settings-section">
                     <h3 class="settings-section-title" x-text="categories[activeCategory].title"></h3>
                     <p class="settings-section-desc" x-text="categories[activeCategory].description"></p>
-                    <template x-for="[groupKey, group] in sortedGroups(categories[activeCategory].groups)" :key="groupKey">
+                    
+                    <template x-for="[key, setting] in Object.entries(categories[activeCategory].settings)" :key="key">
                         <div class="settings-group" x-data="{ collapsed: false }">
                             <div x-show="!collapsed" class="settings-group-content">
-                                <template x-for="item in group.items" :key="item.key">
-                                    {% include 'modals/settings/fields.html' %}
-                                </template>
+                                {% include 'modals/settings/fields.html' %}
                             </div>
                         </div>
                     </template>
                 </div>
             </template>
-
-            <!-- APPEARANCE (special theme section) -->
-            {% include 'modals/settings/appearance.html' %}
             
             <!-- Action Buttons -->
             <div class="settings-actions">
@@ -65,3 +69,4 @@
         </main>
     </div>
 </div>
+

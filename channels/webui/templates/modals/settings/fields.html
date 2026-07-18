@@ -1,93 +1,59 @@
 <div class="setting-item">
-    <!-- Text/URL -->
-    <template x-if="item.type === 'text' || item.type === 'url'">
-        <div class="setting-row">
-            <label x-text="formatLabel(item.key)"></label>
-            <input type="text" :type="item.type" :value="item.value" @input="$dispatch('change', { key: item.key, value: $event.target.value })" :placeholder="item.description">
-            <span class="setting-description" x-show="item.description" x-html="item.description"></span>
+    <!-- Boolean -->
+    <template x-if="setting.type === 'boolean'">
+        <div>
+            <div class="toggle-row">
+                <label x-text="setting.title"></label>
+                <button type="button" :class="{ active: setting.value }" @click="updateSetting(setting, !setting.value)">
+                    <span x-text="setting.value ? 'ON' : 'OFF'"></span>
+                </button>
+            </div>
+            <span class="setting-description" x-show="setting.description" x-html="setting.description"></span>
         </div>
     </template>
 
     <!-- Number -->
-    <template x-if="item.type === 'number'">
+    <template x-if="setting.type === 'number'">
         <div class="setting-row">
-            <label x-text="formatLabel(item.key)"></label>
-            <input type="number" :value="item.value" :min="item.min" :max="item.max" :step="item.step || 1" @input="$dispatch('change', { key: item.key, value: parseFloat($event.target.value) })">
-            <span class="setting-description" x-show="item.description" x-html="item.description"></span>
+            <label x-text="setting.title"></label>
+            <input type="number" :value="setting.value" :min="setting.min" :max="setting.max" :step="setting.step || 1" 
+                   @input="updateSetting(setting, parseFloat($event.target.value))">
+            <span class="setting-description" x-show="setting.description" x-html="setting.description"></span>
         </div>
     </template>
 
-    <!-- Boolean -->
-    <template x-if="item.type === 'boolean'">
-        <div class="setting-row toggle-row">
-            <label x-text="formatLabel(item.key)"></label>
-            <button type="button" :class="{ active: item.value }" @click="$dispatch('change', { key: item.key, value: !item.value })">
-                <span x-text="item.value ? 'ON' : 'OFF'"></span>
-            </button>
-            <span class="setting-description" x-show="item.description" x-html="item.description"></span>
+    <!-- Text/URL -->
+    <template x-if="setting.type === 'text' || setting.type === 'url'">
+        <div class="setting-row">
+            <label x-text="setting.title"></label>
+            <input type="text" :type="setting.type" :value="setting.value" 
+                   @input="updateSetting(setting, $event.target.value)">
+            <span class="setting-description" x-show="setting.description" x-html="setting.description"></span>
         </div>
     </template>
 
     <!-- Textarea -->
-    <template x-if="item.type === 'textarea'">
+    <template x-if="setting.type === 'textarea'">
         <div class="setting-row">
-            <label x-text="formatLabel(item.key)"></label>
-            <textarea :value="item.value" @input="$dispatch('change', { key: item.key, value: $event.target.value })" rows="4"></textarea>
-            <span class="setting-description" x-show="item.description" x-html="item.description"></span>
+            <label x-text="setting.title"></label>
+            <textarea :value="setting.value" rows="4" 
+                      @input="updateSetting(setting, $event.target.value)"></textarea>
+            <span class="setting-description" x-show="setting.description" x-html="setting.description"></span>
         </div>
     </template>
 
     <!-- Select -->
-    <template x-if="item.type === 'select'">
+    <template x-if="setting.type === 'select'">
         <div class="setting-row">
-            <label x-text="formatLabel(item.key)"></label>
-            <select :value="item.value" @change="$dispatch('change', { key: item.key, value: $event.target.value })">
-                <template x-for="option in (item.options || [])" :key="option">
-                    <option :value="option" x-text="option"></option>
+            <label x-text="setting.title"></label>
+            <select :value="setting.value" @change="updateSetting(setting, $event.target.value)">
+                <template x-for="[optionKey, optionLabel] in Object.entries(setting.options || {})" :key="optionKey">
+                    <option :value="optionKey" x-text="optionKey"></option>
                 </template>
             </select>
-            <span class="setting-description" x-show="item.description" x-html="item.description"></span>
-        </div>
-    </template>
-
-    <!-- Array -->
-    <template x-if="item.type === 'array'">
-        <div class="setting-row">
-            <label x-text="formatLabel(item.key)"></label>
-            <array-input :item="item" @change="$dispatch('change', $event.value)"></array-input>
-            <span class="setting-description" x-show="item.description" x-html="item.description"></span>
-        </div>
-    </template>
-
-    <!-- Object -->
-    <template x-if="item.type === 'object'">
-        <div class="setting-row">
-            <label x-text="formatLabel(item.key)"></label>
-            <object-input :item="item" @change="$dispatch('change', $event.value)"></object-input>
-            <span class="setting-description" x-show="item.description" x-html="item.description"></span>
-        </div>
-    </template>
-
-    <!-- Model -->
-    <template x-if="item.type === 'model'">
-        <div class="setting-row">
-            <label x-text="formatLabel(item.key)"></label>
-            <select :value="item.value" @change="$dispatch('change', { key: item.key, value: $event.target.value })">
-                <option value="">-- Select Model --</option>
-                <template x-for="model in (cachedModels || [])" :key="model">
-                    <option :value="model" x-text="model"></option>
-                </template>
-            </select>
-            <span class="setting-description" x-show="item.description" x-html="item.description"></span>
-        </div>
-    </template>
-
-    <!-- Toggle List -->
-    <template x-if="item.type === 'toggle_list'">
-        <div class="setting-row">
-            <label x-text="formatLabel(item.key)"></label>
-            <toggle-list :item="item" @change="$dispatch('change', $event.value)"></toggle-list>
-            <span class="setting-description" x-show="item.description" x-html="item.description"></span>
+            <span class="setting-description" x-show="setting.description" x-html="setting.description"></span>
+            <span class="setting-description" x-show="setting.options && setting.options[setting.value]" x-html="setting.options[setting.value]"></span>
         </div>
     </template>
 </div>
+

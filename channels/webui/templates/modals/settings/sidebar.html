@@ -11,9 +11,9 @@
                 </button>
 
                 <!-- Module/Channel sub-lists -->
-                <template x-if="(cat === 'modules' || cat === 'user_modules' || cat === 'channels' || cat === 'user_channels') && expanded[cat] && !activeModule && !activeChannel">
+                <template x-if="(cat === 'modules' || cat === 'user_modules' || cat === 'channels' || cat === 'user_channels') && expanded[cat]">
                     <div class="module-sub-list">
-                        <template x-for="item in visibleItems(cat)" :key="item">
+                        <template x-for="item in categories[cat].enabled" :key="item">
                             <button 
                                 :class="{ active: (cat.includes('module') ? activeModule : activeChannel) === item }"
                                 @click.stop="selectItem(item, cat)"
@@ -26,3 +26,4 @@
         </template>
     </nav>
 </aside>
+

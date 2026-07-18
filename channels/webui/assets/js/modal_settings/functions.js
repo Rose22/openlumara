@@ -1,390 +1,202 @@
-// Check if a setting is a toggle list (has enabled/disabled arrays)
-function isToggleList(data) {
-    if (typeof data !== 'object' || data === null) return false;
-    return Array.isArray(data.enabled) && Array.isArray(data.disabled);
+function formatLabel(key) {
+    if (typeof key !== 'string') return key;
+    return key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-// Get all items from enabled/disabled structure
-function getAllToggleItems(data) {
-    if (!isToggleList(data)) return [];
-    const enabled = Array.isArray(data.enabled) ? data.enabled : [];
-    const disabled = Array.isArray(data.disabled) ? data.disabled : [];
-    return [...new Set([...enabled, ...disabled])].sort();
-}
-
-// Check if a key is a model name field
-function isModelNameField(key) {
-    return key === 'model.name' || key.endsWith('.model.name') || key === 'model_name';
-}
-
-// Detect field type from value
 function detectType(value, key = '') {
     if (key.endsWith('reasoning_effort')) return 'reasoning_effort_slider';
     if (value === null || value === undefined) return 'text';
     if (typeof value === 'boolean') return 'boolean';
     if (typeof value === 'number' && !key.toLowerCase().endsWith('id')) return 'number';
     if (Array.isArray(value)) return 'array';
-    if (typeof value === 'object') return 'object';
     if (typeof value === 'string') {
-        if (key && isModelNameField(key)) return 'model';
-        if (value.includes('\n')) return 'textarea';
         if (value.match(/^https?:\/\//)) return 'url';
+        if (value.includes('\n')) return 'textarea';
     }
     return 'text';
 }
 
-// Format label from key
-function formatLabel(key) {
-    if (typeof key !== 'string') return key;
-    const parts = key.split('.');
-    const lastPart = parts[parts.length - 1];
-    return lastPart.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+function isToggleList(data) {
+    if (typeof data !== 'object' || data === null) return false;
+    return Array.isArray(data.enabled) && Array.isArray(data.disabled);
 }
 
-// Check if settings contain a model field
 function checkForModelField(data, prefix = '') {
     for (const [key, value] of Object.entries(data)) {
-        const fullKey = prefix ? `${prefix}.${key}` : key;
-        if (isModelNameField(fullKey)) return true;
-        if (value && typeof value === 'object' && !Array.isArray(value)) {
-            if (checkForModelField(value, fullKey)) return true;
-        }
+        if (typeof value !== 'object' || value === null) continue;
+        if (key === 'model.name' || key.endsWith('.model.name') || key === 'model_name') return true;
+        if (checkForModelField(value, key)) return true;
     }
     return false;
 }
 
-// Flatten a settings object into dot-notation items
-function flattenSettingsObject(obj, prefix, fieldDescriptions = {}, schema = {}, callback) {
-    for (const [key, value] of Object.entries(obj)) {
-        const fullKey = prefix ? `${prefix}.${key}` : key;
-        const subSchema = (schema && schema[key]) ? schema[key] : {};
-
-        const isDefinition = (typeof value === 'object' && value !== null && !Array.isArray(value) &&
-            ('default' in value || 'description' in value || 'type' in value || 'unsafe' in value));
-
-        if (!isDefinition && !isToggleList(value) && typeof value === 'object' && value !== null && !Array.isArray(value)) {
-            flattenSettingsObject(value, fullKey, fieldDescriptions, subSchema, callback);
-        } else {
-            let actualValue = value;
-            let actualDescription = null;
-            let actualType = null;
-            let actualUnsafe = false;
-
-            if (isDefinition) {
-                actualValue = 'default' in value ? value.default : value;
-                actualDescription = value.description || null;
-                actualUnsafe = value.unsafe || false;
-                if (value.type) {
-                    if (value.type === 'long_text') actualType = 'textarea';
-                    else if (value.type === 'select') actualType = 'select';
-                    else if (value.type === 'number') actualType = 'number';
-                    else if (value.type === 'slider') actualType = 'slider';
-                    else actualType = value.type;
-                }
-            }
-
-            if (!actualType) {
-                if (subSchema.type) {
-                    if (subSchema.type === 'long_text') actualType = 'textarea';
-                    else if (subSchema.type === 'select') actualType = 'select';
-                    else if (subSchema.type === 'number') actualType = 'number';
-                    else if (subSchema.type === 'slider') actualType = 'slider';
-                    else actualType = detectType(actualValue, fullKey);
-                } else if (isToggleList(actualValue)) {
-                    actualType = 'toggle_list';
-                } else {
-                    actualType = detectType(actualValue, fullKey);
-                }
-            }
-
-            if (!actualDescription) {
-                actualDescription = fieldDescriptions[fullKey] || subSchema.description || null;
-            }
-
-            callback({
-                key: fullKey,
-                value: actualValue,
-                type: actualType,
-                description: actualDescription,
-                unsafe: actualUnsafe || subSchema.unsafe || false,
-                min: subSchema.min || (isDefinition ? value.min : undefined),
-                max: subSchema.max || (isDefinition ? value.max : undefined),
-                step: subSchema.step || (isDefinition ? value.step : undefined),
-                options: subSchema.options || (isDefinition ? value.options : null)
-            });
-        }
-    }
-}
-
-// Organize settings into categories, grouping by second-level key (e.g. modules.X)
-function organizeSettingsIntoCategories(originalData, moduleInfo = {}, categoryDescriptions = {}, fieldDescriptions = {}) {
+function buildSettingsStructure(originalData, moduleInfo = {}) {
     const categories = {};
+    let order = 0;
 
-    // Always add appearance first
     categories.appearance = {
         title: 'Appearance',
         description: 'Theme and interface customization',
-        isTheme: true,
-        groups: new Map(),
-        order: 0
+        order: order++,
+        isThemeCategory: true
     };
-
-    let order = 1;
-    const itemDescriptions = {};
 
     for (const [topKey, topValue] of Object.entries(originalData)) {
         if (topKey.toLowerCase() === 'theme' || topKey.toLowerCase() === 'theme_mode') {
             continue;
         }
 
-        const category = topKey;
-        categories[category] = {
-            title: formatLabel(category),
-            description: categoryDescriptions[category] || `Configure ${formatLabel(category).toLowerCase()}`,
-            groups: new Map(),
+        const category = {
+            title: formatLabel(topKey),
+            description: `Configure ${formatLabel(topKey).toLowerCase()}`,
             order: order++
         };
 
-        const addToGroup = (groupKey, groupTitle, item, isDirect = false) => {
-            if (!categories[category].groups.has(groupKey)) {
-                categories[category].groups.set(groupKey, {
-                    title: groupTitle,
-                    items: [],
-                    isDirect: isDirect
-                });
-            }
-            categories[category].groups.get(groupKey).items.push(item);
-        };
-
-        // Special handling for modules and channels
-        if (topKey === 'modules' || topKey === 'user_modules' || topKey === 'channels' || topKey === 'user_channels') {
-            const hasToggleListStructure = isToggleList(topValue);
-            const enabledItems = new Set(topValue.enabled || []);
-            const allItems = hasToggleListStructure ? getAllToggleItems(topValue) : [];
-
+        if (topKey === 'modules' || topKey === 'user_modules' || 
+            topKey === 'channels' || topKey === 'user_channels') {
+            category.isModuleCategory = true;
+            category.enabled = topValue.enabled || [];
+            category.disabled = topValue.disabled || [];
+            
+            const descriptions = {};
             const unsafeModules = {};
-            for (const itemName in moduleInfo) {
-                console.log(moduleInfo[itemName]);
-                if (moduleInfo[itemName].description) {
-                    itemDescriptions[itemName] = moduleInfo[itemName].description;
-                }
-                if (moduleInfo[itemName].unsafe) {
-                    unsafeModules[itemName] = true;
-                }
+            for (const [itemName, info] of Object.entries(moduleInfo)) {
+                if (info.description) descriptions[itemName] = info.description;
+                if (info.unsafe) unsafeModules[itemName] = true;
             }
+            category.descriptions = descriptions;
+            category.unsafeModules = unsafeModules;
 
-            if (hasToggleListStructure) {
-                addToGroup('_direct_', null, {
-                    key: topKey,
-                    value: {
-                        enabled: topValue.enabled || [],
-                        disabled: topValue.disabled || [],
-                        descriptions: itemDescriptions,
-                        unsafeModules: unsafeModules
-                    },
-                    type: 'toggle_list',
-                    isModuleList: true
-                }, true);
-            }
-
+            category.settings = {};
             if (topValue.settings && typeof topValue.settings === 'object') {
-                const allSettingsKeys = hasToggleListStructure ? allItems : Object.keys(topValue.settings);
-
-                for (const itemName of allSettingsKeys) {
-                    const itemSettings = topValue.settings[itemName];
-                    if (itemSettings === undefined) continue;
-
-                    const groupKey = `${topKey}.settings.${itemName}`;
-                    const groupTitle = formatLabel(itemName);
-                    const itemSchema = moduleInfo[itemName]?.settings_schema || {};
-
-                    if (typeof itemSettings === 'object' && itemSettings !== null &&
-                        !Array.isArray(itemSettings) && !isToggleList(itemSettings)) {
-                        flattenSettingsObject(itemSettings, groupKey, fieldDescriptions, itemSchema, (item) => {
-                            addToGroup(groupKey, groupTitle, item);
-                        });
-                    } else {
-                        let type = detectType(itemSettings, groupKey);
-                        if (itemSchema[itemName] && itemSchema[itemName].type) {
-                            type = itemSchema[itemName].type;
-                        }
-
-                        let description = fieldDescriptions[groupKey] || null;
-                        if (!description && itemSchema[itemName] && itemSchema[itemName].description) {
-                            description = itemSchema[itemName].description;
-                        }
-
-                        addToGroup(groupKey, groupTitle, {
-                            key: groupKey,
-                            value: itemSettings,
-                            type: type,
-                            description: description,
-                            unsafe: itemSchema[itemName]?.unsafe || false,
-                            min: itemSchema[itemName]?.min,
-                            max: itemSchema[itemName]?.max,
-                            step: itemSchema[itemName]?.step
-                        });
-                    }
-                }
-            }
-
-            for (const [secondKey, secondValue] of Object.entries(topValue)) {
-                if (secondKey === 'settings' || secondKey === 'enabled' ||
-                    secondKey === 'disabled' || secondKey === 'disabled_prompts') {
-                    continue;
-                }
-                const groupKey = `${topKey}.${secondKey}`;
-                addToGroup('_direct_', null, {
-                    key: groupKey,
-                    value: secondValue,
-                    type: detectType(secondValue, groupKey)
-                }, true);
-            }
-            continue;
-        }
-
-        // Check if this is a toggle list at top level
-        if (isToggleList(topValue)) {
-            addToGroup('_direct_', null, {
-                key: topKey,
-                value: topValue,
-                type: 'toggle_list'
-            }, true);
-
-            if (topValue.settings && typeof topValue.settings === 'object') {
-                const enabledItems = new Set(topValue.enabled || []);
                 for (const [itemName, itemSettings] of Object.entries(topValue.settings)) {
-                    if (!enabledItems.has(itemName)) continue;
-                    const groupKey = `${topKey}.settings.${itemName}`;
-                    const groupTitle = formatLabel(itemName);
-                    const itemSchema = moduleInfo[itemName]?.settings_schema || {};
-
-                    if (typeof itemSettings === 'object' && itemSettings !== null &&
-                        !Array.isArray(itemSettings) && !isToggleList(itemSettings)) {
-                        flattenSettingsObject(itemSettings, groupKey, fieldDescriptions, itemSchema, (item) => {
-                            addToGroup(groupKey, groupTitle, item);
-                        });
-                    } else {
-                        let type = detectType(itemSettings, groupKey);
-                        if (itemSchema[itemName] && itemSchema[itemName].type) {
-                            type = itemSchema[itemName].type;
-                        }
-
-                        let description = fieldDescriptions[groupKey] || null;
-                        if (!description && itemSchema[itemName] && itemSchema[itemName].description) {
-                            description = itemSchema[itemName].description;
-                        }
-
-                        addToGroup(groupKey, groupTitle, {
-                            key: groupKey,
-                            value: itemSettings,
-                            type: type,
-                            description: renderMarkdown(description),
-                            min: itemSchema[itemName]?.min,
-                            max: itemSchema[itemName]?.max,
-                            step: itemSchema[itemName]?.step
-                        });
-                    }
-                }
-            }
-            continue;
-        }
-
-        // Regular object logic
-        if (typeof topValue === 'object' && topValue !== null && !Array.isArray(topValue)) {
-            if (topValue.type === 'group') {
-                const groupKey = `${category}.${topKey}`;
-                const groupTitle = formatLabel(topKey);
-
-                if (!categories[category].groups.has(groupKey)) {
-                    categories[category].groups.set(groupKey, {
-                        title: groupTitle,
-                        items: [],
-                        description: topValue.description || null
-                    });
-                }
-
-                const group = categories[category].groups.get(groupKey);
-
-                for (const [itemKey, itemValue] of Object.entries(topValue.items)) {
-                    let val = itemValue;
-                    let type = detectType(itemValue, `${groupKey}.${itemKey}`);
-                    let desc = null;
-
-                    if (typeof itemValue === 'object' && itemValue !== null && !Array.isArray(itemValue) && 'default' in itemValue) {
-                        val = itemValue.default;
-                        desc = itemValue.description;
-                    }
-
-                    group.items.push({
-                        key: `${groupKey}.${itemKey}`,
-                        value: val,
-                        type: type,
-                        description: desc
-                    });
-                }
-                continue;
-            }
-
-            if (topValue.type || topValue.default !== undefined) {
-                let type = topValue.type || detectType(topValue.default, `${category}.${topKey}`);
-                if (type === 'long_text') type = 'textarea';
-
-                addToGroup('_direct_', null, {
-                    key: `${category}.${topKey}`,
-                    value: topValue.default,
-                    type: type,
-                    description: topValue.description || null,
-                    options: topValue.options || null
-                }, true);
-                continue;
-            }
-
-            const simpleItems = [];
-            const complexItems = [];
-
-            for (const [secondKey, secondValue] of Object.entries(topValue)) {
-                if (isToggleList(secondValue) || Array.isArray(secondValue) || (typeof secondValue === 'object' && secondValue !== null)) {
-                    complexItems.push([secondKey, secondValue]);
-                } else {
-                    simpleItems.push([secondKey, secondValue]);
-                }
-            }
-
-            for (const [key, value] of simpleItems) {
-                addToGroup('_direct_', null, {
-                    key: `${category}.${key}`,
-                    value: value,
-                    type: detectType(value, `${category}.${key}`)
-                }, true);
-            }
-
-            for (const [secondKey, secondValue] of complexItems) {
-                const groupKey = `${topKey}.${secondKey}`;
-                const groupTitle = formatLabel(secondKey);
-
-                if (typeof secondValue === 'object' && secondValue !== null &&
-                    !Array.isArray(secondValue) && !isToggleList(secondValue)) {
-                    flattenSettingsObject(secondValue, groupKey, fieldDescriptions, {}, (item) => {
-                        addToGroup(groupKey, groupTitle, item);
-                    });
-                } else {
-                    addToGroup(groupKey, groupTitle, {
-                        key: groupKey,
-                        value: secondValue,
-                        type: isToggleList(secondValue) ? 'toggle_list' : detectType(secondValue, groupKey),
-                        description: fieldDescriptions[groupKey] || null
-                    });
+                    if (!itemSettings) continue;
+                    const itemInfo = moduleInfo[itemName] || {};
+                    const itemSchema = itemInfo.settings_schema || {};
+                    category.settings[itemName] = {
+                        title: formatLabel(itemName),
+                        description: itemInfo.description || '',
+                        unsafe: itemInfo.unsafe || false,
+                        value: buildFieldSettings(itemSettings, itemSchema, itemName)
+                    };
                 }
             }
         } else {
-            addToGroup(topKey, formatLabel(topKey), {
-                key: topKey,
-                value: topValue,
-                type: detectType(topValue, topKey)
-            });
+            category.settings = (topValue && typeof topValue === 'object') ? 
+                buildFieldSettings(topValue, {}, topKey) : {};
         }
+
+        categories[topKey] = category;
     }
 
     return categories;
 }
+
+function buildFieldSettings(obj, schema, prefix = '') {
+    if (!obj || typeof obj !== 'object') return {};
+    
+    const settings = {};
+
+    for (const [key, value] of Object.entries(obj)) {
+        const fullKey = prefix ? `${prefix}.${key}` : key;
+        const fieldSchema = schema[key] || {};
+
+        // Check if schema defines this field with metadata
+        const hasSchemaDefinition = fieldSchema && (fieldSchema.type !== undefined || fieldSchema.default !== undefined || fieldSchema.description !== undefined);
+
+        if (hasSchemaDefinition) {
+            // Schema defines the field - use schema for metadata, value for current value
+            const schemaValue = fieldSchema.default !== undefined ? fieldSchema.default : value;
+            settings[key] = {
+                title: formatLabel(key),
+                type: fieldSchema.type === 'long_text' ? 'textarea' : (fieldSchema.type || detectType(schemaValue, fullKey)),
+                description: fieldSchema.description || null,
+                unsafe: fieldSchema.unsafe || false,
+                value: value,
+                options: fieldSchema.options || null,
+                min: fieldSchema.min,
+                max: fieldSchema.max,
+                step: fieldSchema.step
+            };
+        } else if (typeof value === 'object' && value !== null && !Array.isArray(value) && !isToggleList(value)) {
+            // Nested object without schema definition - recurse
+            settings[key] = {
+                type: 'object',
+                title: formatLabel(key),
+                description: fieldSchema.description || null,
+                settings: buildFieldSettings(value, fieldSchema, fullKey)
+            };
+        } else if (isToggleList(value)) {
+            settings[key] = {
+                type: 'toggle_list',
+                title: formatLabel(key),
+                description: fieldSchema.description || null,
+                value: value
+            };
+        } else if (Array.isArray(value)) {
+            settings[key] = {
+                type: 'array',
+                title: formatLabel(key),
+                description: fieldSchema.description || null,
+                value: value
+            };
+        } else if (typeof value === 'object') {
+            settings[key] = {
+                type: 'object',
+                title: formatLabel(key),
+                description: fieldSchema.description || null,
+                settings: buildFieldSettings(value, fieldSchema, fullKey)
+            };
+        } else {
+            // Primitive value without schema definition
+            settings[key] = {
+                title: formatLabel(key),
+                type: detectType(value, fullKey),
+                description: fieldSchema.description || null,
+                unsafe: fieldSchema.unsafe || false,
+                value: value,
+                options: fieldSchema.options || null,
+                min: fieldSchema.min,
+                max: fieldSchema.max,
+                step: fieldSchema.step
+            };
+        }
+    }
+
+    return settings;
+}
+
+function flattenForBackend(categories) {
+    const result = {};
+
+    for (const [catKey, category] of Object.entries(categories)) {
+        if (!category.settings && !category.enabled && !category.disabled) continue;
+        
+        result[catKey] = {};
+        if (category.enabled !== undefined) result[catKey].enabled = category.enabled;
+        if (category.disabled !== undefined) result[catKey].disabled = category.disabled;
+        if (category.settings) {
+            result[catKey].settings = {};
+            for (const [name, module] of Object.entries(category.settings)) {
+                if (module.value) {
+                    result[catKey].settings[name] = flattenModuleSettings(module.value);
+                }
+            }
+        }
+    }
+
+    return result;
+}
+
+function flattenModuleSettings(settings) {
+    const result = {};
+    for (const [key, setting] of Object.entries(settings)) {
+        if (setting.type === 'object' && setting.settings) {
+            result[key] = flattenModuleSettings(setting.settings);
+        } else {
+            result[key] = setting.value;
+        }
+    }
+    return result;
+}
+

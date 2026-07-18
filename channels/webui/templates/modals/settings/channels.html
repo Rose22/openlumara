@@ -2,7 +2,8 @@
 <template x-if="(activeCategory === 'channels' || activeCategory === 'user_channels') && !activeChannel">
     <div class="channel-unified-list">
         <h3 x-text="categories[activeCategory].title"></h3>
-        <template x-for="channel in visibleItems(activeCategory)" :key="channel">
+        <p class="settings-section-desc" x-text="categories[activeCategory].description"></p>
+        <template x-for="channel in categories[activeCategory].enabled" :key="channel">
             <button type="button" @click="activeChannel = channel" class="channel-unified-card" x-text="formatLabel(channel)"></button>
         </template>
     </div>
@@ -13,14 +14,19 @@
     <div class="channel-drilldown">
         <button type="button" @click="activeChannel = null" class="mobile-back-btn">← Back</button>
         <h3 x-text="formatLabel(activeChannel)"></h3>
-        <template x-for="[groupKey, group] in sortedGroups(categories[activeCategory].groups)" :key="groupKey">
-            <div class="settings-group" x-show="groupKey.includes('.settings.' + activeChannel)" x-data="{ collapsed: false }">
-                <div x-show="!collapsed" class="settings-group-content">
-                    <template x-for="item in group.items" :key="item.key">
-                        {% include 'modals/settings/fields.html' %}
-                    </template>
+        <p class="settings-section-desc" x-html="categories[activeCategory].descriptions[activeChannel] || ''"></p>
+        
+        <template x-if="categories[activeCategory].settings[activeChannel] && categories[activeCategory].settings[activeChannel].value">
+            <template x-for="[key, setting] in Object.entries(categories[activeCategory].settings[activeChannel].value)" :key="key">
+                <div class="setting-item">
+                    {% include 'modals/settings/fields.html' %}
                 </div>
-            </div>
+            </template>
+        </template>
+        
+        <template x-if="!categories[activeCategory].settings[activeChannel] || !categories[activeCategory].settings[activeChannel].value">
+            <p class="no-settings-msg">This channel has no configurable settings.</p>
         </template>
     </div>
 </template>
+
