@@ -1,0 +1,30 @@
+<template x-if="activeCategory === 'appearance' && !activeModule && !activeChannel">
+    <div class="settings-section">
+        <h3 class="settings-section-title" x-text="categories.appearance.title"></h3>
+        <p class="settings-section-desc" x-text="categories.appearance.description"></p>
+        <div class="theme-section">
+            <h4>Theme</h4>
+            <div class="theme-buttons">
+                <template x-for="theme in ['light', 'dark', 'auto']" :key="theme">
+                    <button type="button" :class="{ active: settings.theme === theme }" @click="handleChange('theme', theme)" x-text="theme"></button>
+                </template>
+            </div>
+            <div class="theme-controls">
+                <label>Font Size: <input type="range" min="12" max="20" x-model.number="settings.fontSize" @input="handleChange('fontSize', $event.target.value)"></label>
+            </div>
+        </div>
+        <template x-for="[groupKey, group] in sortedGroups(categories.appearance.groups)" :key="groupKey">
+            <div class="settings-group" x-data="{ collapsed: false }">
+                <div class="settings-group-header" @click="collapsed = !collapsed">
+                    <span x-text="group.title"></span>
+                    <span x-show="group.items.length > 0" x-text="collapsed ? '▶' : '▼'"></span>
+                </div>
+                <div x-show="!collapsed" class="settings-group-content">
+                    <template x-for="item in group.items" :key="item.key">
+                        {% include 'modals/settings/fields.html' %}
+                    </template>
+                </div>
+            </div>
+        </template>
+    </div>
+</template>

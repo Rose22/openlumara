@@ -8,6 +8,7 @@ function getMainData() {
         user_input: '',
         selectedChat: null,
         selectedCategory: 'general',
+        currentModal: '',
 
         async init() {
             // fetch current chat

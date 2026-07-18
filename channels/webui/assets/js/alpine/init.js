@@ -8,9 +8,6 @@ document.addEventListener('alpine:init', () => {
     // defined in stores.js (stores stream-related data)
     Alpine.store('stream', STREAM_STORE);
 
-    // defined in partial-toolcall-renderer.js
-    Alpine.data('jsonNode', partialToolcallRenderer);
-
     // defined in directives.js
     Alpine.directive('auto-scroll', autoScroll);
 });

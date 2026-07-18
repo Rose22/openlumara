@@ -1,0 +1,26 @@
+<!-- CHANNELS: Unified list -->
+<template x-if="(activeCategory === 'channels' || activeCategory === 'user_channels') && !activeChannel">
+    <div class="channel-unified-list">
+        <h3 x-text="categories[activeCategory].title"></h3>
+        <template x-for="channel in visibleItems(activeCategory)" :key="channel">
+            <button type="button" @click="activeChannel = channel" class="channel-unified-card" x-text="formatLabel(channel)"></button>
+        </template>
+    </div>
+</template>
+
+<!-- CHANNELS: Drill-down -->
+<template x-if="activeChannel && (activeCategory === 'channels' || activeCategory === 'user_channels')">
+    <div class="channel-drilldown">
+        <button type="button" @click="activeChannel = null" class="mobile-back-btn">← Back</button>
+        <h3 x-text="formatLabel(activeChannel)"></h3>
+        <template x-for="[groupKey, group] in sortedGroups(categories[activeCategory].groups)" :key="groupKey">
+            <div class="settings-group" x-show="groupKey.includes('.settings.' + activeChannel)" x-data="{ collapsed: false }">
+                <div x-show="!collapsed" class="settings-group-content">
+                    <template x-for="item in group.items" :key="item.key">
+                        {% include 'modals/settings/fields.html' %}
+                    </template>
+                </div>
+            </div>
+        </template>
+    </div>
+</template>

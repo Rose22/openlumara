@@ -1,0 +1,28 @@
+<aside class="settings-sidebar" x-show="!mobile || activeCategory">
+    <nav class="settings-nav">
+        <template x-for="[cat, data] in sortedCategories" :key="cat">
+            <div>
+                <button 
+                    :class="{ active: activeNavCategory === cat }"
+                    @click="switchCategory(cat)"
+                    class="settings-nav-item"
+                >
+                    <span x-text="data.title"></span>
+                </button>
+
+                <!-- Module/Channel sub-lists -->
+                <template x-if="(cat === 'modules' || cat === 'user_modules' || cat === 'channels' || cat === 'user_channels') && expanded[cat] && !activeModule && !activeChannel">
+                    <div class="module-sub-list">
+                        <template x-for="item in visibleItems(cat)" :key="item">
+                            <button 
+                                :class="{ active: (cat.includes('module') ? activeModule : activeChannel) === item }"
+                                @click.stop="selectItem(item, cat)"
+                                x-text="formatLabel(item)"
+                            ></button>
+                        </template>
+                    </div>
+                </template>
+            </div>
+        </template>
+    </nav>
+</aside>

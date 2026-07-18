@@ -1,0 +1,67 @@
+<div class="settings-modal" x-show="true" x-data="settingsModal()">
+    <!-- Loading State -->
+    <div x-show="loading" class="settings-loading">
+        <div class="spinner"></div>
+        <span>Loading settings...</span>
+    </div>
+
+    <!-- Error State -->
+    <div x-show="error" class="settings-error">
+        <span x-text="error"></span>
+        <button @click="load()">Retry</button>
+    </div>
+
+    <!-- Settings Content -->
+    <div class="settings-body">
+        <!-- SIDEBAR NAV -->
+        {% include 'modals/settings/sidebar.html' %}
+
+        <!-- MAIN CONTENT AREA -->
+        <main class="settings-content">
+            <!-- Mobile: show category list when no category selected -->
+            <template x-if="mobile && !activeCategory">
+                <div class="mobile-category-list">
+                    <template x-for="[cat, data] in sortedCategories" :key="cat">
+                        <button @click="activeCategory = cat" class="mobile-category-btn">
+                            <span x-text="data.title"></span>
+                        </button>
+                    </template>
+                </div>
+            </template>
+
+            <!-- Unsaved changes indicator -->
+            <div x-show="hasChanges" class="settings-unsaved">
+                You have unsaved changes
+            </div>
+
+            {% include 'modals/settings/modules.html' %}
+            {% include 'modals/settings/channels.html' %}
+
+            <!-- ALL OTHER CATEGORIES (appearance, core, advanced, etc.) -->
+            <template x-if="!activeModule && !activeChannel && !['appearance', 'modules', 'user_modules', 'channels', 'user_channels'].includes(activeCategory) && activeCategory">
+                <div class="settings-section">
+                    <h3 class="settings-section-title" x-text="categories[activeCategory].title"></h3>
+                    <p class="settings-section-desc" x-text="categories[activeCategory].description"></p>
+                    <template x-for="[groupKey, group] in sortedGroups(categories[activeCategory].groups)" :key="groupKey">
+                        <div class="settings-group" x-data="{ collapsed: false }">
+                            <div x-show="!collapsed" class="settings-group-content">
+                                <template x-for="item in group.items" :key="item.key">
+                                    {% include 'modals/settings/fields.html' %}
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </template>
+
+            <!-- APPEARANCE (special theme section) -->
+            {% include 'modals/settings/appearance.html' %}
+            
+            <!-- Action Buttons -->
+            <div class="settings-actions">
+                <button type="button" @click="resetSettingsForm()" :disabled="!hasChanges">Reset</button>
+                <button type="button" @click="saveSettings()" :disabled="!hasChanges">Save</button>
+            </div>
+        </main>
+    </div>
+</div>

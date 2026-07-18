@@ -1,0 +1,28 @@
+<!-- MODULES: Unified list (no module selected) -->
+<template x-if="(activeCategory === 'modules' || activeCategory === 'user_modules') && !activeModule">
+    <div class="module-unified-list">
+        <h3 x-text="categories[activeCategory].title"></h3>
+        <template x-for="module in visibleItems(activeCategory)" :key="module">
+            <button type="button" @click="activeModule = module" class="module-unified-card" x-text="formatLabel(module)"></button>
+        </template>
+    </div>
+</template>
+
+<!-- MODULES: Drill-down (module selected) -->
+<template x-if="activeModule && (activeCategory === 'modules' || activeCategory === 'user_modules')">
+    <div class="module-drilldown">
+        <button type="button" @click="activeModule = null" class="mobile-back-btn">← Back</button>
+        <h3 x-text="formatLabel(activeModule)"></h3>
+        
+        <template x-for="[groupKey, group] in sortedGroups(categories[activeCategory].groups)" :key="groupKey">
+            <!-- ONLY show groups that belong to this module -->
+            <div class="settings-group" x-show="groupKey.includes('.settings.' + activeModule)" x-data="{ collapsed: false }" x-init="console.log(group)">
+                <div x-show="!collapsed" class="settings-group-content">
+                    <template x-for="item in group.items" :key="item.key">
+                        {% include 'modals/settings/fields.html' %}
+                    </template>
+                </div>
+            </div>
+        </template>
+    </div>
+</template>
