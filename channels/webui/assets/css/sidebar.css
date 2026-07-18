@@ -118,6 +118,7 @@
             max-height: 10rem;
             max-width: 97%;
             flex-shrink: 0;
+            overflow: hidden;
 
             .title {
                 font-size: 0.9rem;
@@ -157,10 +158,14 @@
                 gap: var(--gap);
 
                 .tag {
+                    font-size: 0.8rem;
                     border: 1px solid var(--border-color);
                     border-radius: var(--radius-sm);
-                    padding: var(--gap);
+                    padding: 4px 4px;
+                    max-height: 2rem;
                     background-color: var(--bg-secondary);
+                    text-overflow: ellipsis;
+                    overflow: hidden;
                 }
             }
 

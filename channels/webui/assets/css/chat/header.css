@@ -1,5 +1,5 @@
 header {
-    padding: 16px 24px;
+    padding: 7px 14px;
     background: linear-gradient(180deg, var(--bg-tertiary) 0%, var(--bg-primary) 100%);
     border-bottom: 1px solid var(--border-color);
     display: flex;
