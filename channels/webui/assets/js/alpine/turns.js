@@ -97,7 +97,8 @@ function getTurns(instance) {
             //     segmentType = 'tool_calls';
             // }
 
-            if (segmentType !== lastSegmentType) {
+            const lastMsg = segments[segments.length - 1];
+            if (segmentType !== lastSegmentType || (segmentType === 'tool' && lastMsg && lastMsg.tool_call_id !== token.tool_call_id)) {
                 // New segment type: start a fresh message
                 if (segmentType === 'reasoning') {
                     segments.push({
@@ -140,13 +141,13 @@ function getTurns(instance) {
                 lastSegmentType = segmentType;
             } else {
                 // Same segment type: append to the last message
-                const lastMsg = segments[segments.length - 1];
                 if (lastMsg) {
                     if (segmentType === 'tool_calls') {
-                        // Merge tool calls (deltas build up, final token completes)
                         if (token.tool_calls) {
                             lastMsg.tool_calls = lastMsg.tool_calls.concat(token.tool_calls);
                         }
+                    } else if (segmentType === 'tool') {
+                        lastMsg.content += (token.content || '');
                     } else {
                         if (segmentType === 'reasoning') {
                             lastMsg.reasoning_content += (token.content || '');
@@ -164,6 +165,14 @@ function getTurns(instance) {
             for (const msg of segments) {
                 if (msg.type === 'tool_response') responseMap[msg.tool_call_id] = msg.content;
             }
+
+            /*
+             * filter out the raw tool responses so we don't display raw
+             * json when the fancy json mapping exists
+             */
+            const displaySegments = segments.filter(s => s.type !== 'tool_response');
+
+            // and merge the responsemap into the tool_calls
             for (const msg of segments) {
                 if (msg.tool_calls) {
                     for (const tool of msg.tool_calls) {
