@@ -1100,7 +1100,7 @@ class Coder(core.module.Module):
         reading_mode = self.config.get("reading_mode")
         writing_mode = self.config.get("writing_mode")
 
-        if reading_mode in ("symbols", "both") or writing_mode in ("symbols", "both"):
+        if reading_mode in ("symbols", "both") and writing_mode in ("symbols", "both"):
             supported_langs = ", ".join(sorted(self.LANGUAGES.keys()))
             output += f"""
 ## Tool Selection Strategy
