@@ -2,6 +2,14 @@
 <div id="category-list" x-ref="category-list">
     <template x-for="category in categories">
         <ul :class="{'item': true, 'active': category == selectedCategory}" @click="selectCategory(category)">
+            <span class="icon">
+                <template x-if="category === 'general'">
+                    {% include 'svg/home.svg' %}
+                </template>
+                <template x-if="category != 'general'">
+                    {% include 'svg/chat.svg' %}
+                </template>
+            </span>
             <span class="title" x-text="category"></span>
         </ul>
     </template>
@@ -29,6 +37,14 @@
                     :class="{'item': true, 'active': chat.id === selectedChat}"
                     @click="active = !active; selectChat(chat.id)"
                     x-transition
+                    x-init="
+                    $nextTick(() => {
+                        // autoscroll to the selected chat
+                        if (chat.id === selectedChat) {
+                            $el.scrollIntoView({ behavior: 'smooth' });
+                        }
+                    })
+                    "
                 >
                     <span class="title" x-text="chat.title || 'New chat'"></span>
                     <ul class="tags" x-data="{ tags: chat.tags }">

@@ -1,0 +1,76 @@
+<div x-data="jsonNode(JSON.parse(tool.response), 0)">
+    yah! iz json!
+
+    <p x-text="jsonNode"></p>
+
+    <!-- Null -->
+    <template x-if="type === 'null'">
+        <span class="tool-response-null">null</span>
+    </template>
+
+    <!-- Scalars -->
+    <template x-if="isScalar">
+        <span class="tool-response-scalar" :class="type" x-text="data"></span>
+    </template>
+
+    <!-- Arrays -->
+    <template x-if="isArray && !hasMore">
+        <span class="tool-response-preview-bracket">[</span>
+        <template x-for="([i, item], idx) in entries" :key="idx">
+            <div x-data="jsonNode(item, depth + 1)">
+                <template x-if="idx > 0"><span>, </span></template>
+                <div x-data="jsonNode(item, depth + 1)">
+                    <template x-if="type === 'null'"><span class="tool-response-null">null</span></template>
+                    <template x-if="isScalar"><span class="tool-response-scalar" :class="type" x-text="data"></span></template>
+                    <template x-if="isArray && !hasMore">
+                        <span class="tool-response-preview-bracket">[</span>
+                        <template x-for="([j, sub], k) in entries" :key="k">
+                            <template x-if="k > 0"><span>, </span></template>
+                            <div x-data="jsonNode(sub, depth + 2)">
+                                <template x-if="type === 'null'"><span class="tool-response-null">null</span></template>
+                                <template x-if="isScalar"><span class="tool-response-scalar" :class="type" x-text="sub"></span></template>
+                                <template x-if="(isArray || isObject) && hasMore" class="tool-response-summary" @click="showFull()">
+                                    <span class="tool-response-summary-icon">[{...}]</span>
+                                </template>
+                            </div>
+                        </template>
+                        <span class="tool-response-preview-bracket">]</span>
+                    </template>
+                </div>
+            </div>
+        </template>
+        <span class="tool-response-preview-bracket">]</span>
+    </template>
+
+    <!-- Truncated arrays/objects -->
+    <template x-if="hasMore">
+        <div :class="{'tool-response-nested': depth > 0, 'tool-response-depth-' + Math.min(depth, 3): true}">
+            <template x-for="([key, value], idx) in visibleEntries" :key="idx">
+                <div x-data="jsonNode(value, depth + 1)">
+                    <template x-if="isArray">
+                        <div class="tool-response-array-item">
+                            <span class="tool-response-index" x-text="key"></span>
+                            <span class="tool-response-value">
+                                <template x-if="type === 'null'"><span class="tool-response-null">null</span></template>
+                                <template x-if="isScalar"><span class="tool-response-scalar" :class="type" x-text="value"></span></template>
+                                <template x-if="(isArray || isObject) && hasMore" @click="showFull()"><span class="tool-response-summary">[+]</span></template>
+                            </span>
+                        </div>
+                    </template>
+                    <template x-if="isObject">
+                        <div class="tool-response-kv">
+                            <span class="tool-response-key" x-text="key"></span>
+                            <span class="tool-response-colon">:</span>
+                            <span class="tool-response-value">
+                                <template x-if="type === 'null'"><span class="tool-response-null">null</span></template>
+                                <template x-if="isScalar"><span class="tool-response-scalar" :class="type" x-text="value"></span></template>
+                                <template x-if="(isArray || isObject) && hasMore" @click="showFull()"><span class="tool-response-summary">[+]</span></template>
+                            </span>
+                        </div>
+                    </template>
+                </template>
+            </div>
+            <span class="tool-response-truncated" @click="showFull()" style="cursor:pointer;">+ {{ remaining }} more</span>
+        </div>
+    </template>
+</div>

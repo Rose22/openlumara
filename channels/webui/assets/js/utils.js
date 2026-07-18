@@ -50,3 +50,37 @@ function formatDate(timestamp) {
     
     return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
+
+function partialJsonParse(str) {
+    if (!str || !str.trim()) return {};
+
+    // Try normal parse first
+    try {
+        return JSON.parse(str);
+    } catch (e) {
+        // Strip trailing commas before parsing
+        let completed = str.trim();
+        completed = completed.replace(/,\s*([}\]])/g, '$1');
+
+        // Close unclosed brackets/braces/strings
+        let openBraces = (completed.match(/{/g) || []).length;
+        let closeBraces = (completed.match(/}/g) || []).length;
+        let openBrackets = (completed.match(/\[/g) || []).length;
+        let closeBrackets = (completed.match(/]/g) || []).length;
+
+        // Close unclosed strings
+        const openQuotes = (completed.match(/"(?<!\\)"/g) || []).length;
+        if (openQuotes % 2 !== 0) {
+            completed += '"';
+        }
+
+        while (closeBraces < openBraces) { completed += '}'; closeBraces++; }
+        while (closeBrackets < openBrackets) { completed += ']'; closeBrackets++; }
+
+        try {
+            return JSON.parse(completed);
+        } catch (e2) {
+            return { _raw: str }; // fallback
+        }
+    }
+}

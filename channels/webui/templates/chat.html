@@ -1,3 +1,6 @@
+{% include 'chat/header.html' %}
+{% include 'chat/titlebar.html' %}
+
 <div id="messages" x-ref="messages" x-auto-scroll>
     <!--
         reload the chat on streaming state change.
@@ -26,7 +29,7 @@
                     <div class="message assistant">
                         <!-- all messages within a turn are displayed within the same message bubble -->
                         <template x-for="message in turn.messages">
-                            <div>
+                            <div class="flex fullwidth">
                                 <!-- render the messages based on message role -->
 
                                 <template x-if="message.role === 'user'">
@@ -34,26 +37,17 @@
                                 </template>
 
                                 <template x-if="message.role === 'assistant'">
-                                    <div>
+                                    <div class="flex fullwidth">
                                         <template x-if="message.type === 'reasoning' || message.type === 'history'">
                                             {% include 'chat/reasoning.html' %}
                                         </template>
                                         <template x-if="message.type === 'content' || message.type === 'history'">
                                             <div class="content" x-html="renderMarkdown(message.content)"></div>
                                         </template>
-                                        <template x-if="message.type === 'tool_call_delta'">
-                                            <div x-show="$store.stream.state === 'calling_tools'">
-                                                <p><i>calling tool..</i></p>
-                                            </div>
-                                        </template>
-                                        <template x-if="message.type === 'tool_calls'">
+                                        <template x-if="message.type === 'tool_calls' || message.type === 'tool_call_delta'">
                                             {% include 'chat/toolcalls.html' %}
                                         </template>
                                     </div>
-                                </template>
-
-                                <template x-if="message.role === 'tool'">
-                                    {% include 'chat/tool.html' %}
                                 </template>
                             </div>
                         </template>

@@ -44,10 +44,10 @@
         <!-- Alpine.js <3 (thank you for making a lightweight framework that fits perfectly with openlumara) -->
         <script src="{{ url_for('assets', path='js/libs/alpine.min.js') }}" defer></script>
 
-        <!-- DOMPurify -->
+        <!-- DOMPurify (XSS protection) -->
         <script src="{{ url_for('assets', path='js/libs/purify.min.js') }}"></script>
 
-        <!-- marked (markdown support -->
+        <!-- marked (markdown support) -->
         <script src="{{ url_for('assets', path='js/libs/marked.min.js') }}"></script>
 
         <!-- 

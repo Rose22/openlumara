@@ -35,7 +35,7 @@
     rows="1"
     x-autosize
     aria-label="Message input"
-    @keyup.enter.prevent="if (!$event.shiftKey) { $event.preventDefault(); await send(user_input); user_input=''; }"
+    @keydown.enter.prevent="if (!$event.shiftKey) { $event.preventDefault(); await send(user_input); user_input=''; }"
 ></textarea>
 
 <button id="send" aria-label="Send message" @click="await send(user_input); user_input='';" x-show="$store.stream.state === 'idle'">Send</button>

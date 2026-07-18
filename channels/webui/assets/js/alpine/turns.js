@@ -50,6 +50,22 @@ function getTurns(instance) {
     }
     if (currentAssistantTurn) turns.push(currentAssistantTurn);
 
+    // Merge tool responses into their tool calls
+    for (const turn of turns) {
+        if (turn.role !== 'assistant') continue;
+        const responseMap = {};
+        for (const msg of turn.messages) {
+            if (msg.role === 'tool') responseMap[msg.tool_call_id] = msg.content;
+        }
+        for (const msg of turn.messages) {
+            if (msg.tool_calls) {
+                for (const tool of msg.tool_calls) {
+                    if (responseMap[tool.id]) tool.response = responseMap[tool.id];
+                }
+            }
+        }
+    }
+
     // 2. Reconstruct streaming turn from token segments
     /*
      * this is the part that handles streaming tokens...
@@ -143,6 +159,19 @@ function getTurns(instance) {
         }
 
         if (segments.length > 0) {
+            // merge tool responses with their toolcalls, even during streaming!
+            const responseMap = {};
+            for (const msg of segments) {
+                if (msg.type === 'tool_response') responseMap[msg.tool_call_id] = msg.content;
+            }
+            for (const msg of segments) {
+                if (msg.tool_calls) {
+                    for (const tool of msg.tool_calls) {
+                        if (responseMap[tool.id]) tool.response = responseMap[tool.id];
+                    }
+                }
+            }
+
             turns.push({
                 role: "assistant",
                 messages: segments

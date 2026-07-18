@@ -174,6 +174,7 @@ async def create_fastapi(channel):
 
         return channel.templates.TemplateResponse(request, "index.html", {
             "version": channel.version,
+            "header_title": channel.config.get("title"),
             "css_files": os.listdir(os.path.join(channel.assets_path, "css")),
             "js_files": js_files
         })

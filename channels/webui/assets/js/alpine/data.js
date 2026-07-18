@@ -27,6 +27,9 @@ function getMainData() {
         async selectChat(chatId) {
             if (this.selectedChat === chatId) { return; }
 
+            // don't allow chat switching if a stream is ongoing
+            if (Alpine.store("stream").state != 'idle') { return; }
+
             this.chat = await simpleApiFetch(`/api/chat/load/${chatId}`);
             this.selectedChat = this.chat.id;
             this.messages = this.chat.messages;
@@ -43,7 +46,8 @@ function getMainData() {
         },
 
         async reloadChat() {
-            if (Alpine.store("stream").state === "streaming") {
+            stream = Alpine.store("stream");
+            if (stream.state != "idle" && stream.state != "sending") {
                 // block chat reload during streaming
                 return;
             }

@@ -1,0 +1,510 @@
+/* =============================================================================
+ *  Tool Calls Container
+ *  ============================================================================= */
+
+.tool-calls-container {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    gap: 14px;
+}
+
+.tool-calls-streaming-container {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    gap: 8px;
+}
+
+/* =============================================================================
+ *  Tool Call Card
+ *  ============================================================================= */
+
+.tool-call-card {
+    background: linear-gradient(135deg, var(--tool-bg) 0%, var(--tool-bg-secondary) 100%);
+    border: 1px solid var(--tool-border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+                box-shadow 0.2s ease;
+    position: relative;
+    box-shadow: var(--shadow-soft);
+    width: 100%;
+
+    .name {
+        font-weight: 600;
+        color: var(--accent);
+        font-size: 0.9rem;
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .streaming {
+        border-left: 3px solid var(--accent);
+        animation: toolCallPulse 1.5s ease-in-out infinite;
+    }
+
+    &:hover {
+        border-color: var(--tool-border-hover);
+    }
+
+    &:last-child {
+        margin-bottom: 0;
+    }
+
+    .header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        cursor: pointer;
+        user-select: none;
+        background: var(--tool-bg);
+        transition: background 0.15s ease;
+    }
+
+    .toggle {
+        width: 14px;
+        height: 14px;
+        color: var(--text-muted);
+        transition: transform 0.2s ease;
+        flex-shrink: 0;
+    }
+
+    &:not(.collapsed) .toggle {
+        transform: rotate(90deg);
+    }
+
+    .icon {
+        width: 16px;
+        height: 16px;
+        color: var(--accent);
+        flex-shrink: 0;
+    }
+
+    .inline-arg {
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    
+    .arg-count {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 22px;
+        height: 22px;
+        padding: 0 6px;
+        border-radius: var(--radius-full);
+        background: var(--bg-tertiary);
+        color: var(--text-muted);
+        font-size: 0.7rem;
+        font-weight: 600;
+        margin-left: 8px;
+        flex-shrink: 0;
+    }
+
+    .status {
+        font-size: 0.7rem;
+        padding: 3px 8px;
+        border-radius: var(--radius-full);
+        font-weight: 500;
+        flex-shrink: 0;
+
+        &.streaming {
+            background: rgba(99, 102, 241, 0.2);
+            color: var(--accent);
+        }
+        &.pending {
+            background: var(--tool-pending-bg);
+            color: var(--tool-pending-color);
+            animation: statusPulse 1.5s ease-in-out infinite;
+        }
+        &.completed {
+            background: var(--tool-completed-bg);
+            color: var(--tool-completed-color);
+        }
+        &.error {
+            background: var(--error-bg);
+            color: var(--error);
+        }
+    }
+
+    .streaming-dots {
+        display: inline-flex;
+        gap: 2px;
+
+        span {
+            display: inline-block;
+            animation: streamingDot 1.4s infinite ease-in-out;
+
+            &:nth-child(1) { animation-delay: -0.32s; }
+            &:nth-child(2) { animation-delay: -0.16s; }
+            &:nth-child(3) { animation-delay: 0s; }
+        }
+    }
+
+    .body {
+        max-height: none;
+        overflow-y: auto;
+        transition: max-height 0.3s ease, opacity 0.2s ease, padding 0.2s ease;
+    }
+    
+    .section {
+        padding: 12px 14px;
+        border-top: 1px solid var(--border-color);
+
+        .title {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+    }
+
+    .args {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+
+        .raw-response {
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-break: break-word;
+            height: 120px;
+            overflow-y: auto;
+        }
+    }
+    .arg-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 6px 10px;
+        border-radius: var(--radius-sm);
+        font-size: 0.85rem;
+
+        &.partial {
+            opacity: 0.7;
+        }
+    }
+    .arg-name {
+        color: var(--accent);
+        min-width: 80px;
+        flex-shrink: 0;
+        font-weight: 500;
+
+        &:after {
+            content: ':';
+            margin-left: 2px;
+        }
+    }
+    .arg-value {
+        color: var(--text-primary);
+        word-break: break-word;
+        white-space: pre-wrap;
+        flex: 1;
+
+        &.streaming {
+            font-family: var(--code-font);
+        }
+    }
+    .no-args {
+        color: var(--text-muted);
+        font-style: italic;
+        text-align: center;
+        padding: 8px;
+        font-size: 0.85rem;
+    }
+    .args-streaming {
+        font-family: var(--code-font);
+        padding: 8px 12px;
+        border-radius: var(--radius-sm);
+        word-break: break-all;
+    }
+
+    &.collapsed {
+        .body {
+            max-height: 0;
+            opacity: 0;
+            padding-top: 0;
+            padding-bottom: 0;
+            overflow: hidden;
+        }
+    }
+}
+
+@keyframes toolCallPulse {
+    0%, 100% { border-left-color: var(--accent); }
+    50% { border-left-color: var(--accent-glow); }
+}
+
+
+@keyframes statusPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+
+@keyframes streamingDot {
+    0%, 80%, 100% { opacity: 0.3; }
+    40% { opacity: 1; }
+}
+
+.tool-call-arg-value.streaming {
+}
+
+/* =============================================================================
+ *  Tool Response Section - Compact & Clean
+ *  ============================================================================= */
+
+/* 
+ * AI SLOP BELOW - needs refactor!
+ */
+
+.tool-response-section {
+    background: transparent;
+
+    .content {
+        font-size: 0.85rem;
+        max-height: 300px;
+        overflow-y: auto;
+        gap: var(--gap);
+
+        .string {
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-word;
+            border-radius: var(--radius-sm);
+            color: var(--text-primary);
+        }
+
+        .empty {
+            font-style: italic;
+            color: var(--text-muted);
+            padding: 8px 10px;
+        }
+
+        .summary {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 8px;
+            border-radius: var(--radius-sm);
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: background 0.15s ease;
+
+            .icon {
+                font-size: 0.75rem;
+            }
+
+            .text {
+                color: var(--text-secondary);
+                max-width: 200px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+        }
+
+        .preview-bracket {
+            opacity: 0.5;
+            color: var(--text-muted);
+        }
+
+        .kv-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            border-radius: var(--radius-sm);
+            padding: 6px 10px;
+
+            .key {
+                color: var(--accent);
+                font-weight: 500;
+                font-size: 0.85rem;
+                flex-shrink: 0;
+                max-width: 150px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .colon {
+                color: var(--text-muted);
+                opacity: 0.4;
+            }
+
+            .value {
+                color: var(--text-primary);
+                font-size: 0.85rem;
+                word-break: break-word;
+                flex: 1;
+                min-width: 0;
+            }
+
+            .nested {
+                margin-left: 10px;
+                padding-left: 8px;
+                border-left: 1px solid var(--border-color);
+            }
+
+            .array-item {
+                display: flex;
+                align-items: flex-start;
+                gap: 8px;
+                padding: 3px 6px;
+                border-radius: var(--radius-sm);
+            }
+
+            .index {
+                color: var(--text-muted);
+                font-size: 0.7rem;
+                font-weight: 500;
+                min-width: 20px;
+                opacity: 0.6;
+            }
+
+            .truncated {
+                color: var(--text-muted);
+                font-size: 0.75rem;
+                padding: 4px 6px;
+                font-style: italic;
+                opacity: 0.8;
+            }
+        }
+    }
+}
+
+/* =============================================================================
+ *  Tool Processing Indicator - Enhanced Fancy Style
+ *  ============================================================================= */
+
+
+.tool-processing-indicator {
+    animation: processingFadeIn 0.2s ease-out;
+}
+
+@keyframes processingFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.tool-processing-content {
+    position: relative;
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, var(--bg-tertiary) 0%, var(--bg-secondary) 100%);
+    border-radius: var(--radius-md);
+    z-index: 0;
+    box-shadow: 0 4px 15px -5px rgba(0, 0, 0, 0.3);
+}
+
+/* The beloved border animation */
+.tool-processing-content::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: conic-gradient(from var(--angle), transparent, var(--tool-border), var(--accent), transparent);
+    z-index: -1;
+    animation: rotate 2s linear infinite;
+    padding: 1px;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    -webkit-mask-composite: xor;
+    opacity: 0.8;
+}
+
+@property --angle {
+    syntax: '<angle>';
+    initial-value: 0deg;
+    inherits: false;
+}
+
+@keyframes rotate {
+    to { --angle: 360deg; }
+}
+
+.tool-processing-spinner {
+    width: 16px;
+    height: 16px;
+    color: var(--accent);
+    animation: processingSpin 1s linear infinite;
+    filter: drop-shadow(0 0 4px var(--accent-glow));
+}
+
+@keyframes processingSpin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.tool-processing-text {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    background: linear-gradient(90deg, var(--text-secondary) 0%, var(--accent) 50%, var(--text-secondary) 100%);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: textShimmer 3s linear infinite;
+}
+
+@keyframes textShimmer {
+    to { background-position: 200% center; }
+}
+
+/* The container for the bar */
+.tool-progress-bar {
+    height: 6px;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    display: flex; /* Or block */
+    align-items: center;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+    margin-bottom: 4px;
+    width: 100%; /* Forces it to break the line inside inline-flex */
+}
+
+/* The filling animation */
+.tool-progress-bar-fill {
+    height: 100%;
+    width: 0%; /* Start at 0% */
+    background: var(--accent);
+    border-radius: inherit;
+    transition: width 0.1s ease-out;
+    box-shadow: 0 0 10px var(--accent-glow);
+}
+
+/* Ensure the percentage text inside is visible (overriding the transparent parent fill) */
+.tool-processing-percent {
+    font-weight: 700;
+    -webkit-text-fill-color: var(--accent);
+    color: var(--accent);
+    margin-left: 4px;
+}
+
+/* Shimmer keyframes for the bar fill */
+@keyframes shimmer {
+    to { background-position: 200% center; }
+}
