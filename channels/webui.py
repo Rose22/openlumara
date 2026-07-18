@@ -64,11 +64,15 @@ class Webui(core.channel.Channel):
             "default": True
         },
         "enable_sidebar": {
-            "description": "Whether or not to enable the sidebar at the left of the screen. Without it, you can\'t switch chats the graphical way, so be careful with this",
+            "description": "Whether to enable the sidebar at the left of the screen. Without it, you can\'t switch chats the graphical way, but you can still use commands like `/chat`!",
             "default": True
         },
         "enable_chat_header": {
             "description": "Whether to enable the header at the top of a chat. Disabling this removes access to all graphical controls, and strips the interface down to a very basic chat. You might want this for public instances!",
+            "default": True
+        },
+        "enable_streaming_state_display": {
+            "description": "Whether to show an indicator in the header that tells you what the AI is currently doing. Very useful!",
             "default": True
         },
         "enable_chat_titlebar": {
@@ -160,6 +164,23 @@ def serialize_for_json(obj):
     else:
         return str(obj)
 
+def get_recursive_assets(assets_path, ext, skip: list = []):
+    """Recursively list asset files with paths relative to server root."""
+    files = []
+    
+    for root, dirs, filenames in os.walk(assets_path):
+        # Skip files and directories marked for skipping
+        filenames[:] = [f for f in filenames if os.path.basename(f) not in skip]
+        dirs[:] = [d for d in dirs if d not in skip]
+        
+        for filename in filenames:
+            if filename.endswith(f".{ext}"):
+                full_path = os.path.join(root, filename)
+                rel_path = os.path.relpath(full_path, assets_path)
+                files.append(rel_path)
+    
+    return sorted(files)
+
 # -------------------
 # FastAPI creator (contains routes and so on)
 # -------------------
@@ -182,16 +203,13 @@ async def create_fastapi(channel):
 
     @app.get("/")
     async def root(request: fastapi.Request):
-        js_files = os.listdir(os.path.join(channel.assets_path, "js"))
-        js_files.remove("libs")
-
-        # the alpine script loading order is manually hardcoded in index.html
-        js_files.remove("alpine")
+        css_files = get_recursive_assets(os.path.join(channel.assets_path, "css"), "css")
+        js_files = get_recursive_assets(os.path.join(channel.assets_path, "js"), "js", skip=["alpine", "libs", "utils.js"])
 
         return channel.templates.TemplateResponse(request, "index.html", {
             "version": channel.version,
             "config": channel.config,
-            "css_files": os.listdir(os.path.join(channel.assets_path, "css")),
+            "css_files": css_files,
             "js_files": js_files
         })
 
@@ -253,6 +271,28 @@ async def create_fastapi(channel):
     async def chat_delete(id: str):
         await channel.context.chat.delete(id)
         return api_result(success=True)
+
+    # --- Settings
+    # -- GET
+    @app.get("/api/settings/load")
+    async def settings_load():
+        return api_result(core.config.config)
+
+    @app.get("/api/settings/get_module_info")
+    async def get_module_info():
+        module_info = {}
+        for module_name, module_data in core.config.get_module_structure().items():
+            metadata = module_data.get("metadata", {})
+            settings_schema = module_data.get("settings", {})
+
+            if module_name not in module_info.keys():
+                module_info[module_name] = {
+                    "description": metadata.get("doc", ""),
+                    "unsafe": metadata.get("unsafe", False),
+                    "settings_schema": settings_schema
+                }
+
+        return api_result(module_info)
 
     # ------------------
     # WebSocket endpoint
