@@ -88,7 +88,7 @@ async function scheduleWsReconnect() {
                      store.processing = token_content;
                      break;
                  case "reasoning":
-                     store.state = 'streaming';
+                     store.state = 'thinking';
                      break;
                  case "content":
                      store.state = 'streaming';

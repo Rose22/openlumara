@@ -59,6 +59,22 @@ class Webui(core.channel.Channel):
             "description": "What port to run the WebUI on. Set this to 80 to be able to access it like a normal website, and anything else to access it on that port (for example http://yourdomain.org:3000)",
             "default": 3000
         },
+        "allow_admin_commands": {
+            "description": "Whether to allow /commands that control the openlumara server. Turn this off if you expose your openlumara instance to the internet without a login!",
+            "default": True
+        },
+        "enable_sidebar": {
+            "description": "Whether or not to enable the sidebar at the left of the screen. Without it, you can\'t switch chats the graphical way, so be careful with this",
+            "default": True
+        },
+        "enable_chat_header": {
+            "description": "Whether to enable the header at the top of a chat. Disabling this removes access to all graphical controls, and strips the interface down to a very basic chat. You might want this for public instances!",
+            "default": True
+        },
+        "enable_chat_titlebar": {
+            "description": "Whether to show the name of the chat below the header",
+            "default": False
+        },
         "log_level": {
             "type": "select",
             "description": "How detailed the HTTP logs should be in the console. You can usually leave this as default, unless you want to see details about all the incoming/outgoing traffic to/from the webserver",
@@ -174,7 +190,7 @@ async def create_fastapi(channel):
 
         return channel.templates.TemplateResponse(request, "index.html", {
             "version": channel.version,
-            "header_title": channel.config.get("title"),
+            "config": channel.config,
             "css_files": os.listdir(os.path.join(channel.assets_path, "css")),
             "js_files": js_files
         })
@@ -272,10 +288,10 @@ async def create_fastapi(channel):
                             if channel:
                                 await channel.manager.API.cancel()
                                 ws_mgr.stream_buffer.clear()
-                        case "cancel":
-                            stream_id = data.get("id")
-                            if stream_id:
-                                channel.stream_cancellations.add(stream_id)
+
+                                stream_id = data.get("id")
+                                if stream_id:
+                                    channel.stream_cancellations.add(stream_id)
                         case "reload_messages":
                             await ws_mgr.broadcast({
                                 "type": "messages_updated",
@@ -462,7 +478,7 @@ class WebSocketManager:
     async def _stream_task(self, message: dict, index: int):
         user_message_confirmed = False
 
-        async for token in self.channel.send_stream(message, commands_authorized=True):
+        async for token in self.channel.send_stream(message, commands_authorized=self.channel.config.get("allow_admin_commands")):
             if isinstance(token, dict):
                 payload = serialize_for_json(token)
                 token_type = token.get("type")

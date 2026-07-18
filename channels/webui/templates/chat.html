@@ -1,5 +1,9 @@
-{% include 'chat/header.html' %}
-{% include 'chat/titlebar.html' %}
+{% if config.get('enable_chat_header') %}
+    {% include 'chat/header.html' %}
+{% endif %}
+{% if config.get('enable_chat_titlebar') %}
+    {% include 'chat/titlebar.html' %}
+{% endif %}
 
 <div id="messages" x-ref="messages" x-auto-scroll>
     <!--

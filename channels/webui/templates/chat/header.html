@@ -5,9 +5,13 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
             </svg>
         </button>
-        <h1>{{ header_title }}</h1>
+        <h1>{{ config.get("title") }}</h1>
     </div>
     <div class="right">
+        {% if config.get("enable_streaming_state_display") %}
+            <span x-text="$store.stream.state.replace('_', ' ')" class="stream-state"></span>
+        {% endif %}
+
         <button class="btn" id="search-btn" title="Search messages (Ctrl+F)">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="11" cy="11" r="8"></circle>

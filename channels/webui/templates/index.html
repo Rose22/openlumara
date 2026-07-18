@@ -60,9 +60,11 @@
     <body>
         <!-- the x-data is defined in js/alpine/data.js -->
         <section id="main-wrapper" x-data="main">
-            <section id="sidebar">
-                {% include 'sidebar.html' %}
-            </section>
+            {% if config.get("enable_sidebar") %}
+                <section id="sidebar">
+                    {% include 'sidebar.html' %}
+                </section>
+            {% endif %}
 
             <section id="chat-window">
                 {% include 'chat.html' %}

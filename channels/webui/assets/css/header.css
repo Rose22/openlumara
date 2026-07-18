@@ -16,6 +16,19 @@ header {
         display: flex;
         align-items: center;
         gap: 8px;
+
+        .stream-state {
+            font-size: 0.90rem;
+            padding: 4px 17px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+        }
     }
 
     h1 {

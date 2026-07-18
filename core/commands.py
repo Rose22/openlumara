@@ -312,7 +312,7 @@ class Commands:
         result = await self._process_input(message)
 
         # insert command result into context, flagging as temporary if needed
-        await self.channel.context.chat.add({"role": "assistant", "content": f"[Command Output]:\n{result}"}, ghost=use_temporary)
+        await self.channel.context.chat.add({"role": "assistant", "content": f"{result}"}, ghost=use_temporary)
 
         return result
 

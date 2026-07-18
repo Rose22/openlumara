@@ -4,10 +4,18 @@
  */
 async function send(text) {
     // send it via websocket, and let it be received by websocket events
-    window.socket.send(JSON.stringify({
+    await simpleSocketSend({
         "type": "user_message",
         "content": {"role": "user", "content": text}
-    }))
+    })
 
     Alpine.store("stream").state = "sending";
+}
+
+async function stopStream() {
+    await simpleSocketSend({
+        "type": "stop"
+    });
+
+    Alpine.store("stream").state = "idle";
 }

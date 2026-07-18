@@ -23,6 +23,10 @@ async function simpleApiPost(url, content=null) {
     return raw_data.data;
 }
 
+async function simpleSocketSend(data) {
+    return window.socket.send(JSON.stringify(data));
+}
+
 function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str;

@@ -73,7 +73,7 @@ function getTurns(instance) {
      */
     const stream = Alpine.store('stream');
     if (
-        stream.state === 'streaming' || stream.state === 'calling_tools' || stream.state === 'processing_tools'
+        stream.state != 'idle'
         && stream.tokens
         && stream.tokens.length > 0
     ) {

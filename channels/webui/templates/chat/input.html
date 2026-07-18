@@ -19,13 +19,7 @@
     id="user-input" 
     x-ref="user-input"
     x-model="user_input"
-    :placeholder="
-        if ($store.stream.state == 'idle') {
-            return 'Type a message...';
-        } else {
-            return $store.stream.state+'..';
-        }
-    " 
+    placeholder="Type a message.." 
     :disabled="$store.stream.state != 'idle'"
     x-effect="
         if ($store.stream.state === 'idle') {
@@ -39,7 +33,7 @@
 ></textarea>
 
 <button id="send" aria-label="Send message" @click="await send(user_input); user_input='';" x-show="$store.stream.state === 'idle'">Send</button>
-<button id="stop" aria-label="Stop generation" x-show="$store.stream.state != 'idle'">
+<button id="stop" aria-label="Stop generation" x-show="$store.stream.state != 'idle'" @click="await stopStream()">
     <span class="stop-text">Stop</span>
     <!--
     <span class="streaming-icon">
