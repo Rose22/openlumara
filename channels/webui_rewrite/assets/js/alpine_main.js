@@ -14,12 +14,12 @@ document.addEventListener('alpine:init', () => {
             this.chat = await simpleApiFetch('/api/chat/current');
             if (this.chat) {
                 this.selectedChat = this.chat.id;
+                this.messages = this.chat.messages;
             }
 
             // fetch all other data
             this.chats = await simpleApiFetch('/api/chats');
             this.categories = await simpleApiFetch('/api/chats/categories');
-            this.messages = await simpleApiFetch('/api/chat/messages');
 
             await connectWebSocket();
         },
@@ -28,7 +28,7 @@ document.addEventListener('alpine:init', () => {
             if (this.selectedChat === chatId) { return; }
 
             this.chat = await simpleApiFetch(`/api/chat/load/${chatId}`);
-            this.selectedChat = chatId;
+            this.selectedChat = this.chat.id;
             this.messages = this.chat.messages;
         },
 
@@ -39,6 +39,7 @@ document.addEventListener('alpine:init', () => {
             this.selectedChat = this.chat.id;
 
             await this.reloadChats();
+            await this.reloadChat();
         },
 
         async reloadChat() {
@@ -57,7 +58,6 @@ document.addEventListener('alpine:init', () => {
         },
 
         async reloadChats() {
-            console.log("reloading chats..");
             this.chats = await simpleApiFetch('/api/chats');
         },
 

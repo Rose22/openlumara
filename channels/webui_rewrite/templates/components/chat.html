@@ -1,4 +1,11 @@
-<div id="messages" x-ref="messages" x-auto-scroll x-effect="reloadChat()">
+<div id="messages" x-ref="messages" x-auto-scroll>
+    <!--
+        reload the chat on streaming state change.
+        reloadChat() automatically rejects when streaming is ongoing,
+        so this essentially just takes care of all stages before/after streaming
+    -->
+    <template x-data="{ state: $store.stream.state }" x-effect="await reloadChat()"></template>
+
     <template x-for="turn in turns">
         <div>
             <!-- user messages get rendered seperately -->
@@ -11,6 +18,8 @@
             <!-- 
                 assistant messages get collected into turns for display in the UI,
                 by the turn() getter in js/alpine_main.js
+
+                oh and it also contains the streaming message as the last message in the array
             -->
             <template x-if="turn.role === 'assistant'">
                 <div class="message-wrapper assistant">
@@ -27,7 +36,7 @@
                                 <template x-if="message.role === 'assistant'">
                                     <div>
                                         <template x-if="message.type === 'reasoning' || message.type === 'history'">
-                                            {% include 'components/reasoning.html' %}
+                                            {% include 'components/chat/reasoning.html' %}
                                         </template>
                                         <template x-if="message.type === 'content' || message.type === 'history'">
                                             <div class="content" x-html="renderMarkdown(message.content)"></div>
@@ -38,13 +47,13 @@
                                             </div>
                                         </template>
                                         <template x-if="message.type === 'tool_calls'">
-                                            {% include 'components/toolcalls.html' %}
+                                            {% include 'components/chat/toolcalls.html' %}
                                         </template>
                                     </div>
                                 </template>
 
                                 <template x-if="message.role === 'tool'">
-                                    {% include 'components/tool.html' %}
+                                    {% include 'components/chat/tool.html' %}
                                 </template>
                             </div>
                         </template>
@@ -63,10 +72,10 @@
 
     <!-- prompt processing indicator (works with llama.cpp) -->
     <template x-if="$store.stream.state === 'processing'">
-        {% include 'components/prompt_processing.html' %}
+        {% include 'components/chat/prompt_processing.html' %}
     </template>
 </div>
 
 <div id="input">
-    {% include 'components/input.html' %}
+    {% include 'components/chat/input.html' %}
 </div>
