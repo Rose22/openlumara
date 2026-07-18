@@ -15,7 +15,7 @@
         {% endfor %}
     </head>
     <body>
-        <!-- the x-data is defined in assets/js/alpine_main.js -->
+        <!-- the x-data is defined in js/alpine/data.js -->
         <section id="main-wrapper" x-data="main">
             <section id="sidebar">
                 {% include 'components/sidebar.html' %}
@@ -31,6 +31,7 @@
         <script src="{{ url_for('assets', path='js/'+file) }}"></script>
         {% endfor %}
 
+        <script src="{{ url_for('assets', path='js/alpine/data.js') }}"></script>
         <script src="{{ url_for('assets', path='js/alpine/stores.js') }}"></script>
         <script src="{{ url_for('assets', path='js/alpine/directives.js') }}"></script>
         <script src="{{ url_for('assets', path='js/alpine/turns.js') }}"></script>
