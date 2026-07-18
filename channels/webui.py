@@ -145,145 +145,6 @@ def serialize_for_json(obj):
         return str(obj)
 
 # -------------------
-# Websocket Manager
-# -------------------
-class WebSocketManager:
-    def __init__(self, channel):
-        self.channel = channel
-
-        self.active_connections = []
-
-        self.log_buffer = []
-        self.max_log_buffer = 1000
-
-        self.stream_buffer = []
-        self.active_stream_task = None
-        self.active_chat_id = None
-        self.webui_ready = False
-
-    async def connect(self, websocket: fastapi.WebSocket):
-        await websocket.accept()
-        self.active_connections.append(websocket)
-
-        current_chat_id = await self.channel.context.chat.get_id()
-
-        if self.log_buffer:
-            await websocket.send_json({
-                "type": "log_history",
-                "logs": self.log_buffer
-            })
-
-        if current_chat_id:
-            await websocket.send_json({
-                "type": "sync_state",
-                "active_chat_id": current_chat_id,
-                "buffer": self.stream_buffer
-            })
-
-        asyncio.create_task(self.queue_ready_signal())
-
-    def disconnect(self, websocket: WebSocket):
-        if websocket in self.active_connections:
-            self.active_connections.remove(websocket)
-
-    async def queue_ready_signal(self):
-        while not self.webui_ready:
-            await asyncio.sleep(0.1)
-        await self.broadcast({"type": "ready"})
-
-    def send_ready_signal(self):
-        self.webui_ready = True
-
-    async def broadcast(self, message: dict):
-        if self.channel.config.get("debug_mode"):
-            self.channel.log(self.channel.name, f"WS Broadcast: {message}")
-
-        disconnected = []
-        for connection in self.active_connections:
-            try:
-                if connection.client_state == starlette.websockets.WebSocketState.CONNECTED:
-                    await connection.send_json(message)
-            except Exception:
-                raise
-                #disconnected.append(connection)
-
-        for conn in disconnected:
-            self.disconnect(conn)
-
-    def add_log(self, category: str, message: str):
-        self.log_buffer.append({
-            "category": category,
-            "message": message
-        })
-        if len(self.log_buffer) > self.max_log_buffer:
-            self.log_buffer = self.log_buffer[-self.max_log_buffer:]
-
-    async def _stream_task(self, message: dict, index: int):
-        user_message_confirmed = False
-
-        async for token in self.channel.send_stream(message, commands_authorized=True):
-            if isinstance(token, dict):
-                payload = serialize_for_json(token)
-                token_type = token.get("type")
-                self.stream_buffer.append(payload)
-
-                match token_type:
-                    case "user_message":
-                        try:
-                            user_msg_payload = token.copy()
-                            user_msg_payload['index'] = index
-                            await self.broadcast({
-                                "type": "user_message_added",
-                                "message": user_msg_payload,
-                            })
-                        except Exception as e:
-                            self.channel.log(self.channel.name, f"error sending user message: {core.detail_error(e)}")
-                            return
-                    case 'error':
-                        await self.broadcast({
-                            "type": "user_message_confirmed",
-                            "index": index
-                        })
-                        return
-                    case _:
-                        if not user_message_confirmed:
-                            user_message_confirmed = True
-                            await self.broadcast({
-                                "type": "user_message_confirmed",
-                                "index": index
-                            })
-
-                        await self.broadcast({
-                            "type": "token",
-                            "content": payload
-                        })
-
-        await self.broadcast({
-            "type": "stream_complete",
-            "buffer": self.stream_buffer,
-            "index": index
-        })
-
-    async def start_stream(self, channel, chat_id: str, message: dict):
-        if self.active_stream_task and not self.active_stream_task.done():
-            self.active_stream_task.cancel()
-
-        self.active_chat_id = chat_id
-        self.stream_buffer = []
-        next_index = len(await channel.context.chat.get())
-
-        try:
-            self.active_stream_task = asyncio.create_task(self._stream_task(message, next_index))
-            self.stream_buffer = []
-            self.active_chat_id = None
-        except asyncio.CancelledError:
-            pass
-        except Exception as e:
-            channel.log("webui", f"Background stream error: {core.detail_error(e)}")
-            self.stream_buffer = []
-            self.active_chat_id = None
-
-# -------------------
 # FastAPI creator (contains routes and so on)
 # -------------------
 def api_result(obj = None, success: bool = True):
@@ -307,6 +168,9 @@ async def create_fastapi(channel):
     async def root(request: fastapi.Request):
         js_files = os.listdir(os.path.join(channel.assets_path, "js"))
         js_files.remove("libs")
+
+        # the alpine script loading order is manually hardcoded in index.html
+        js_files.remove("alpine")
 
         return channel.templates.TemplateResponse(request, "index.html", {
             "version": channel.version,
@@ -519,3 +383,143 @@ async def create_fastapi(channel):
             ws_mgr.disconnect(websocket)
 
     return app
+
+# -------------------
+# Websocket Manager
+# -------------------
+class WebSocketManager:
+    def __init__(self, channel):
+        self.channel = channel
+
+        self.active_connections = []
+
+        self.log_buffer = []
+        self.max_log_buffer = 1000
+
+        self.stream_buffer = []
+        self.active_stream_task = None
+        self.active_chat_id = None
+        self.webui_ready = False
+
+    async def connect(self, websocket: fastapi.WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+        current_chat_id = await self.channel.context.chat.get_id()
+
+        if self.log_buffer:
+            await websocket.send_json({
+                "type": "log_history",
+                "logs": self.log_buffer
+            })
+
+        if current_chat_id:
+            await websocket.send_json({
+                "type": "sync_state",
+                "active_chat_id": current_chat_id,
+                "buffer": self.stream_buffer
+            })
+
+        asyncio.create_task(self.queue_ready_signal())
+
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+
+    async def queue_ready_signal(self):
+        while not self.webui_ready:
+            await asyncio.sleep(0.1)
+        await self.broadcast({"type": "ready"})
+
+    def send_ready_signal(self):
+        self.webui_ready = True
+
+    async def broadcast(self, message: dict):
+        if self.channel.config.get("debug_mode"):
+            self.channel.log(self.channel.name, f"WS Broadcast: {message}")
+
+        disconnected = []
+        for connection in self.active_connections:
+            try:
+                if connection.client_state == starlette.websockets.WebSocketState.CONNECTED:
+                    await connection.send_json(message)
+            except Exception:
+                raise
+                #disconnected.append(connection)
+
+        for conn in disconnected:
+            self.disconnect(conn)
+
+    def add_log(self, category: str, message: str):
+        self.log_buffer.append({
+            "category": category,
+            "message": message
+        })
+        if len(self.log_buffer) > self.max_log_buffer:
+            self.log_buffer = self.log_buffer[-self.max_log_buffer:]
+
+    async def _stream_task(self, message: dict, index: int):
+        user_message_confirmed = False
+
+        async for token in self.channel.send_stream(message, commands_authorized=True):
+            if isinstance(token, dict):
+                payload = serialize_for_json(token)
+                token_type = token.get("type")
+                self.stream_buffer.append(payload)
+
+                match token_type:
+                    case "user_message":
+                        try:
+                            user_msg_payload = token.copy()
+                            user_msg_payload['index'] = index
+                            await self.broadcast({
+                                "type": "user_message_added",
+                                "message": user_msg_payload,
+                            })
+                        except Exception as e:
+                            self.channel.log(self.channel.name, f"error sending user message: {core.detail_error(e)}")
+                            return
+                    case 'error':
+                        await self.broadcast({
+                            "type": "user_message_confirmed",
+                            "index": index
+                        })
+                        return
+                    case _:
+                        if not user_message_confirmed:
+                            user_message_confirmed = True
+                            await self.broadcast({
+                                "type": "user_message_confirmed",
+                                "index": index
+                            })
+
+                        await self.broadcast({
+                            "type": "token",
+                            "content": payload
+                        })
+
+        await self.broadcast({
+            "type": "stream_complete",
+            "buffer": self.stream_buffer,
+            "index": index
+        })
+
+    async def start_stream(self, channel, chat_id: str, message: dict):
+        if self.active_stream_task and not self.active_stream_task.done():
+            self.active_stream_task.cancel()
+
+        self.active_chat_id = chat_id
+        self.stream_buffer = []
+        next_index = len(await channel.context.chat.get())
+
+        try:
+            self.active_stream_task = asyncio.create_task(self._stream_task(message, next_index))
+            self.stream_buffer = []
+            self.active_chat_id = None
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            channel.log("webui", f"Background stream error: {core.detail_error(e)}")
+            self.stream_buffer = []
+            self.active_chat_id = None
+

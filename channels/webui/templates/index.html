@@ -30,5 +30,10 @@
         {% for file in js_files %}
         <script src="{{ url_for('assets', path='js/'+file) }}"></script>
         {% endfor %}
+
+        <script src="{{ url_for('assets', path='js/alpine/stores.js') }}"></script>
+        <script src="{{ url_for('assets', path='js/alpine/directives.js') }}"></script>
+        <script src="{{ url_for('assets', path='js/alpine/turns.js') }}"></script>
+        <script src="{{ url_for('assets', path='js/alpine/init.js') }}"></script>
     </body>
 </html>
