@@ -1,15 +1,58 @@
 <!DOCTYPE html>
-<!-- OpenLumara WebUI v{{ version }} by Rose22 -->
+<!-- 
+    OpenLumara WebUI v{{ version }} by Rose22 (https://github.com/Rose22)
+    Copyright (C) 2026  Rose22
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+    ---
+
+    A manually written frontend for openlumara, re-coded from the ground up using libraries
+    such as Alpine.js. I chose alpine.js due to its lightweight-ness, and still being capable enough
+    to power this WebUI. You won't find React bloat here!
+
+    Uses FastAPI and Jinja2 on the backend, and separates HTML files into different components
+    that get included using Jinja2's include statement.
+    For a nice, clean codebase.
+
+    OpenLumara used to have a WebUI that was mostly AI-coded, but that's finally no longer the case!
+-->
 <html>
     <head>
         <title>{{ title }}</title>
         
-        <!-- libraries -->
+        <!-- 
+            ### libraries ###
+        -->
+        <!-- text area autoresize plugin for Alpine.js -->
+        <script src="{{ url_for('assets', path='js/libs/alpine-autosize.min.js') }}" defer></script>
+
+        <!-- automatic animation plugin for Alpine.js -->
+        <script src="{{ url_for('assets', path='js/libs/alpine-animation.min.js') }}" defer></script>
+
+        <!-- Alpine.js <3 (thank you for making a lightweight framework that fits perfectly with openlumara) -->
         <script src="{{ url_for('assets', path='js/libs/alpine.min.js') }}" defer></script>
+
+        <!-- DOMPurify -->
         <script src="{{ url_for('assets', path='js/libs/purify.min.js') }}"></script>
+
+        <!-- marked (markdown support -->
         <script src="{{ url_for('assets', path='js/libs/marked.min.js') }}"></script>
 
-        <!-- stylesheets -->
+        <!-- 
+            ### stylesheets ### 
+        -->
         {% for file in css_files %}
         <link rel="stylesheet" href="{{ url_for('assets', path='css/'+file) }}" />
         {% endfor %}

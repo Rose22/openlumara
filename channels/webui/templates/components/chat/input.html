@@ -16,7 +16,9 @@
 
 <!-- user_input is defined over in index.html, so that we have access to it everywhere -->
 <textarea 
-    id="text-input" 
+    id="user-input" 
+    x-ref="user-input"
+    x-model="user_input"
     :placeholder="
         if ($store.stream.state == 'idle') {
             return 'Type a message...';
@@ -24,10 +26,16 @@
             return $store.stream.state+'..';
         }
     " 
-    :disabled="$store.stream.state != 'idle';"
-    rows="1" aria-label="Message input"
-    x-model="user_input"
-    @keyup.enter="await send(user_input); user_input='';"
+    :disabled="$store.stream.state != 'idle'"
+    x-effect="
+        if ($store.stream.state === 'idle') {
+            $nextTick(() => $refs['user-input'].focus());
+        }
+    "
+    rows="1"
+    x-autosize
+    aria-label="Message input"
+    @keyup.enter.prevent="if (!$event.shiftKey) { $event.preventDefault(); await send(user_input); user_input=''; }"
 ></textarea>
 
 <button id="send" aria-label="Send message" @click="await send(user_input)" x-show="$store.stream.state === 'idle'">Send</button>
