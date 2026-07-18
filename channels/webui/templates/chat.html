@@ -36,7 +36,7 @@
                                 <template x-if="message.role === 'assistant'">
                                     <div>
                                         <template x-if="message.type === 'reasoning' || message.type === 'history'">
-                                            {% include 'components/chat/reasoning.html' %}
+                                            {% include 'chat/reasoning.html' %}
                                         </template>
                                         <template x-if="message.type === 'content' || message.type === 'history'">
                                             <div class="content" x-html="renderMarkdown(message.content)"></div>
@@ -47,13 +47,13 @@
                                             </div>
                                         </template>
                                         <template x-if="message.type === 'tool_calls'">
-                                            {% include 'components/chat/toolcalls.html' %}
+                                            {% include 'chat/toolcalls.html' %}
                                         </template>
                                     </div>
                                 </template>
 
                                 <template x-if="message.role === 'tool'">
-                                    {% include 'components/chat/tool.html' %}
+                                    {% include 'chat/tool.html' %}
                                 </template>
                             </div>
                         </template>
@@ -72,10 +72,10 @@
 
     <!-- prompt processing indicator (works with llama.cpp) -->
     <template x-if="$store.stream.state === 'processing'">
-        {% include 'components/chat/prompt_processing.html' %}
+        {% include 'chat/prompt_processing.html' %}
     </template>
 </div>
 
 <div id="input">
-    {% include 'components/chat/input.html' %}
+    {% include 'chat/input.html' %}
 </div>
