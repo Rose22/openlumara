@@ -9,6 +9,9 @@ let STREAM_STORE = {
     // stores the final message after the stream has finished
     finalMessage: [],
 
+    // tracks the id of a pending (not confirmed received by backend) message
+    pendingMessageId: null,
+
     async clearTokens() {
         console.log("clearTokens called");
 

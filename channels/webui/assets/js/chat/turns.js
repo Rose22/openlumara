@@ -223,7 +223,7 @@ function streamedTokensToMessages(tokens) {
         }
 
         if (!current) {
-            current = { role: "assistant", content: '', reasoning_content: '' };
+            current = { ...token, role: "assistant", content: '', reasoning_content: '' };
         }
 
         if (token.type === 'reasoning') {

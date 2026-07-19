@@ -27,7 +27,13 @@ async function simpleApiPost(url, content=null) {
 }
 
 async function simpleSocketSend(data) {
-    return window.socket.send(JSON.stringify(data));
+    try {
+        return window.socket.send(JSON.stringify(data));
+    } catch (e) {
+        return false
+    }
+
+    return true
 }
 
 /*

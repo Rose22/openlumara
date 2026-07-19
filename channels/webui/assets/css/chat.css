@@ -21,6 +21,13 @@
         background-size: var(--bg-pattern-size);
         min-height: 0;
     }
+
+    .notice {
+        text-align: center;
+        height: auto;
+        color: var(--important);
+        border: 1px solid var(--important);
+    }
 }
 
 .message-wrapper {
@@ -196,22 +203,21 @@
         animation: messageSlideIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
     }
 
-    .placeholder {
+    .pending {
+        border: 1px dashed var(--border-user);
         opacity: 0.7;
 
-        .message {
-            border: 1px dashed var(--border-user);
-            gap: 0px !important;
-
-            .status {
-                font-size: 0.75rem;
-                color: var(--text-muted);
-                font-style: italic;
-            }
+        .status {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-style: italic;
         }
     }
 }
 
+.command {
+    font-family: monospace;
+}
 
 /* message bubble alignment */
 .message-wrapper.user {

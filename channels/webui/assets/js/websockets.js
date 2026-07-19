@@ -27,6 +27,7 @@ async function connectWebSocket() {
 
     wsSocket.onopen = async () => {
         console.log('WebSocket connected');
+        getMain().notice = null;
         isWsConnected = true;
         wsReconnecting = false;
         await getMain().reloadChat();
@@ -47,6 +48,9 @@ async function connectWebSocket() {
             wsSocket = null;
             window.socket = null;
             isWsConnected = false;
+
+            getMain().notice = "Not connected to the backend server! Is OpenLumara running?"
+
             await scheduleWsReconnect();
         }
     };
@@ -79,9 +83,33 @@ async function handleWebSocketMessage(data) {
     // process based on broadcast type
     switch (data_type) {
         case "sync_state":
-            // use the token buffer from the backend
-            // to load into the frontend
+            /*
+             * use the token buffer from the backend
+             * to load into the frontend
+             *
+             * fun lil comment about this... this used to take me ages to get right in the old webUI
+             * i had to basically simulate a replay of the entire token stream
+             * here it's just a simple assignment!
+             * thanks alpine.js
+             */
+        
             stream.tokens = data.buffer;
+            break;
+        case "user_message_added":
+            // show the message, with a special "pending" status
+            let msgId = Date.now();
+            console.log(data.message);
+            getMain().messages.push({
+                ...data.message,
+                role: 'user',
+                msgId: msgId
+            });
+            stream.pendingMessageId = msgId;
+            break;
+        case "user_message_confirmed":
+            // aaand now we remove the pending status
+            stream.pendingMessageId = null;
+            stream.state = 'received';
             break;
 
         case "token":
@@ -127,10 +155,6 @@ async function handleWebSocketMessage(data) {
         case "chat_switched":
             // make sure we sync chat switches across instances
             await getMain().loadChat(data.id);
-            break;
-
-        case "user_message_confirmed":
-            stream.state = 'received';
             break;
 
         case "stream_complete":

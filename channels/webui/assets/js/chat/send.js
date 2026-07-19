@@ -4,18 +4,14 @@
  */
 async function send(text) {
     // send it via websocket, and let it be received by websocket events
-    await simpleSocketSend({
+    const success = await simpleSocketSend({
         "type": "user_message",
         "content": {"role": "user", "content": text}
     })
 
-    Alpine.store("stream").state = "sending";
-
-    // add user message to messages array so it renders immediately
-    getMain().messages.push({
-        role: "user",
-        content: text
-    });
+    if (success) {
+        Alpine.store("stream").state = "sending";
+    }
 }
 
 async function stopStream() {

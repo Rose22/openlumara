@@ -11,6 +11,12 @@ function getMainData() {
         selectedCategory: 'general',
         currentModal: '',
 
+        /* 
+         * a special notification to be used in case of important information,
+         * such as "not connected to backend" (websockets)
+         */
+        notice: null,
+
         async init() {
             // fetch current chat
             this.chat = await simpleApiFetch('/api/chat/current');
