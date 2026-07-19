@@ -111,6 +111,10 @@ async function handleWebSocketMessage(data) {
             stream.pendingMessageId = null;
             stream.state = 'received';
             break;
+        case "push":
+            // it's a push messsage (like a scheduler reminder)
+            getMain().messages.push(data.content);
+            break;
 
         case "token":
             token = data_content;

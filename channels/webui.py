@@ -151,6 +151,19 @@ class Webui(core.channel.Channel):
 
         await self.server.serve()
 
+    async def on_push(self, message):
+        await self.websocket_manager.broadcast({
+            "type": "push",
+            "content": message
+        })
+
+    async def on_log(self, category, content):
+        await self.websocket_manager.broadcast({
+            "type": "log",
+            "category": category,
+            "content": content
+        })
+
 # -------------------
 # Helper Functions
 # -------------------
