@@ -316,6 +316,27 @@ async def create_fastapi(channel):
 
         return api_result(success=True)
 
+    # ----------------------------
+    # Dynamically generated files
+    # ----------------------------
+    @app.get("/themes.js")
+    async def get_themes():
+        themes_dir = os.path.join(channel.path, "themes")
+        all_themes = {}
+
+        for f in os.listdir(themes_dir):
+            if f.endswith('.json'):
+                filepath = os.path.join(themes_dir, f)
+                with open(filepath, 'r', encoding='utf-8') as fh:
+                    all_themes[f[:-5]] = json.load(fh)
+
+        js_parts = []
+        for key in sorted(all_themes.keys()):
+            js_parts.append(f"'{key}': {json.dumps(all_themes[key])}")
+
+        themes_script = f"window.themes = {{ {', '.join(js_parts)} }};"
+        return fastapi.Response(themes_script, media_type="application/javascript")
+
     # ------------------
     # WebSocket endpoint
     # ------------------

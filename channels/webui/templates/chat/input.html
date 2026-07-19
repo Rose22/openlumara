@@ -29,11 +29,33 @@
     rows="1"
     x-autosize
     aria-label="Message input"
-    @keydown.enter.prevent="if (!$event.shiftKey) { $event.preventDefault(); await send(user_input); user_input=''; }"
+    @keydown.enter="
+        if (!$event.shiftKey) {
+            $event.preventDefault();
+            if (!user_input) { return; }
+
+            await send(user_input);
+            user_input='';
+            $el.style.height = '48px';
+        }
+    "
 ></textarea>
 
-<button id="send" aria-label="Send message" @click="await send(user_input); user_input='';" x-show="$store.stream.state === 'idle'">Send</button>
-<button id="stop" aria-label="Stop generation" x-show="$store.stream.state != 'idle'" @click="await stopStream()">
+<button id="send" aria-label="Send message"
+    @click="
+    if (!$event.shiftKey) {
+        $event.preventDefault();
+        if (!user_input) { return; }
+
+        await send(user_input);
+        user_input='';
+        $el.style.height = '48px';
+    }
+    "
+    x-show="$store.stream.state === 'idle'"
+>Send</button>
+
+<button id="stop" aria-label="Stop generation" x-show="$store.stream.state != 'idle'" @click="await stopStream(); await reloadChat();">
     <span class="stop-text">Stop</span>
     <!--
     <span class="streaming-icon">

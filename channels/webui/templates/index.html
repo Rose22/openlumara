@@ -87,6 +87,16 @@
         <script src="{{ url_for('assets', path='js/'+file) }}"></script>
         {% endfor %}
 
+        <!--
+            dynamically generated themes file
+
+            uses json files for individual themes,
+            and then generates this one themes.js file from them.
+
+            it's easy to make your own theme!
+        -->
+        <script src="/themes.js"></script>
+
         <script src="{{ url_for('assets', path='js/alpine/init.js') }}"></script>
     </body>
 </html>

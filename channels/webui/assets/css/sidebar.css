@@ -30,7 +30,7 @@
         padding: 10px 12px;
         background: transparent;
         border: none;
-        border-radius: var(--radius-md);
+        border-radius: var(--radius-sm);
         color: var(--text-secondary);
         font-size: 0.9rem;
         cursor: pointer;
@@ -105,7 +105,7 @@
             padding: 12px 14px;
             background: var(--bg-tertiary);
             border: 1px solid transparent;
-            border-radius: var(--radius-md);
+            border-radius: var(--radius-sm);
             cursor: pointer;
             transition: background-color 0.2s ease,
                         border-color 0.2s ease,

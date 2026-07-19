@@ -13,8 +13,6 @@ html, body {
     font-family: var(--font-family);
     font-size: var(--font-size-base);
     background-color: var(--bg-primary);
-    background-image: var(--bg-pattern);
-    background-size: var(--bg-pattern-size);
     color: var(--text-primary);
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;

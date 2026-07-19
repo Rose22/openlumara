@@ -35,11 +35,6 @@
                     </div>
                 </template>
 
-                <!-- Unsaved changes indicator -->
-                <div x-show="hasChanges" class="settings-unsaved">
-                    You have unsaved changes
-                </div>
-
                 <!-- MODULES CONTENT -->
                 {% include 'modals/settings/modules.html' %}
 
@@ -69,6 +64,10 @@
 
         <!-- Action Buttons -->
         <div class="settings-actions">
+            <div x-show="hasChanges" class="settings-unsaved">
+                You have unsaved changes
+            </div>
+
             <button type="button" @click="resetSettingsForm()" :disabled="!hasChanges">Reset</button>
             <button type="button" @click="saveSettings()" :disabled="!hasChanges">Save</button>
         </div>

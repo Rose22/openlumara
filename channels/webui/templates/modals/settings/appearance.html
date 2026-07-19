@@ -3,30 +3,118 @@
         <h3 class="settings-section-title" x-text="categories.appearance.title"></h3>
         <p class="settings-section-desc" x-text="categories.appearance.description"></p>
         
-        <div class="theme-section">
-            <h4>Theme</h4>
-            <div class="theme-buttons">
-                <template x-for="theme in ['light', 'dark', 'auto']" :key="theme">
-                    <button type="button" :class="{ active: settings.theme === theme }" @click="handleChange('theme', theme)" x-text="theme"></button>
-                </template>
+        <!-- Typography Settings -->
+        <div class="typography-section">
+            <h4>Typography</h4>
+            
+            <!-- Font Family -->
+            <div class="setting-item">
+                <label>Font Family</label>
+                <select x-model="fontFamily" @change="handleFontChange($event.target.value)">
+                    <option value="default">System Default</option>
+                    <option value="Arial">Arial</option>
+                    <option value="Helvetica">Helvetica</option>
+                    <option value="Calibri">Calibri</option>
+                    <option value="Segoe UI">Segoe UI</option>
+                    <option value="Georgia">Georgia</option>
+                    <option value="Verdana">Verdana</option>
+                    <option value="Consolas">Consolas</option>
+                    <option value="Courier New">Courier New</option>
+                    <option value="Inter">Inter</option>
+                    <option value="Roboto">Roboto</option>
+                    <option value="Roboto Mono">Roboto Mono</option>
+                    <option value="Lato">Lato</option>
+                    <option value="Open Sans">Open Sans</option>
+                    <option value="Ubuntu">Ubuntu</option>
+                    <option value="Poppins">Poppins</option>
+                    <option value="Montserrat">Montserrat</option>
+                    <option value="Nunito">Nunito</option>
+                    <option value="Source Sans 3">Source Sans 3</option>
+                    <option value="Inconsolata">Inconsolata</option>
+                    <option value="Raleway">Raleway</option>
+                    <option value="Quicksand">Quicksand</option>
+                    <option value="Comfortaa">Comfortaa</option>
+                    <option value="Fredoka">Fredoka</option>
+                    <option value="Pacifico">Pacifico</option>
+                    <option value="Lobster">Lobster</option>
+                    <option value="Dancing Script">Dancing Script</option>
+                    <option value="Caveat">Caveat</option>
+                </select>
             </div>
-            <div class="theme-controls">
-                <label>Font Size: <input type="range" min="12" max="20" x-model.number="settings.fontSize" @input="handleChange('fontSize', $event.target.value)"></label>
+            
+            <!-- Font Size Slider -->
+            <div class="setting-item">
+                <div class="slider-header">
+                    <span class="slider-label">Font Size</span>
+                    <span class="slider-value" x-text="fontSize + 'px'"></span>
+                </div>
+                <input type="range" 
+                       x-model.number="fontSize" 
+                       min="12" 
+                       max="24"
+                       @input="handleFontSize($event.target.value)">
+            </div>
+            
+            <!-- Chat Width Slider -->
+            <div class="setting-item">
+                <div class="slider-header">
+                    <span class="slider-label">Chat Width</span>
+                    <span class="slider-value" x-text="chatWidth + '%'"></span>
+                </div>
+                <input type="range" 
+                       x-model.number="chatWidth" 
+                       min="20" 
+                       max="100"
+                       @input="handleChatWidth($event.target.value)">
+            </div>
+            
+            <!-- Message Width Slider -->
+            <div class="setting-item">
+                <div class="slider-header">
+                    <span class="slider-label">Message Width</span>
+                    <span class="slider-value" x-text="messageWidth + '%'"></span>
+                </div>
+                <input type="range" 
+                       x-model.number="messageWidth" 
+                       min="30" 
+                       max="100"
+                       @input="handleMessageWidth($event.target.value)">
             </div>
         </div>
+
+        <!-- Mode Toggle -->
+        <div class="theme-mode-toggle">
+            <span class="mode-label">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+                Dark
+            </span>
+            <label class="theme-switch">
+                <input type="checkbox" 
+                       :checked="themeMode === 'light'"
+                       @change="toggleThemeMode($event.target.checked)">
+                <span class="theme-slider"></span>
+            </label>
+            <span class="mode-label">
+                Light
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+            </span>
+        </div>
         
-        <!-- Appearance settings from data -->
-        <template x-if="categories.appearance.data && Object.keys(categories.appearance.data).length > 0">
-            <template x-for="[key, value] in Object.entries(categories.appearance.data)" :key="key">
-                <div class="settings-group" x-data="{ collapsed: false }">
-                    <div x-show="!collapsed" class="settings-group-content">
-                        <template x-for="[nestedKey, nestedValue] in Object.entries(value)" :key="nestedKey">
-                            {% include 'modals/settings/fields.html' %}
-                        </template>
-                    </div>
-                </div>
-            </template>
-        </template>
+        <!-- Color Theme Grid -->
+        <div class="color-theme-section">
+            <h4>Color Theme</h4>
+            <div class="theme-grid">
+                <template x-for="[family, variants] in Object.entries(getThemeFamilies())" :key="family">
+                    <button type="button" 
+                            :class="{ 'active': themeFamily === family }"
+                            @click="selectThemeFamily(family)"
+                            class="theme-btn">
+                        <div class="theme-preview" 
+                             :style="getThemePreviewStyle(family)"></div>
+                        <span class="theme-name" x-text="formatThemeName(family)"></span>
+                    </button>
+                </template>
+            </div>
+        </div>
     </div>
 </template>
-

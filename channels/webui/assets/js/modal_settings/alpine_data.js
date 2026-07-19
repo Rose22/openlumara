@@ -34,6 +34,16 @@ function settingsModal() {
         // --- Viewport ---
         mobile: window.innerWidth <= 768,
 
+        // Theme state (synced with Alpine store)
+        themeFamily: null,
+        themeMode: null,
+
+        // Font settings
+        fontFamily: localStorage.getItem('fontFamily') || 'default',
+        fontSize: localStorage.getItem('fontSize') || '16',
+        chatWidth: localStorage.getItem('chatContentWidth') || '100',
+        messageWidth: localStorage.getItem('messageMaxWidth') || '60',
+
         // --- Computed Getters ---
         get hasChanges() {
             return JSON.stringify(this.categories) !== JSON.stringify(this.originalCategories);
@@ -59,6 +69,16 @@ function settingsModal() {
                         this.mobile = newMobile;
                     }
                 }, 150);
+            });
+
+            // Sync theme state with Alpine store
+            this.themeFamily = Alpine.store('theme').family;
+            this.themeMode = Alpine.store('theme').mode;
+            
+            // Listen for theme changes from other parts of the app
+            document.addEventListener('theme-changed', (e) => {
+                this.themeFamily = e.detail.family;
+                this.themeMode = e.detail.mode;
             });
 
             await this.load();
@@ -180,6 +200,67 @@ function settingsModal() {
                 this.activeChannel = item;
                 this.activeModule = null;
             }
+        },
+
+        /*
+         * ### THEME SETTINGS ###
+         */
+        // Alpine-reactive theme toggle
+        toggleThemeMode(isLight) {
+            Alpine.store('theme').apply(this.themeFamily, isLight ? 'light' : 'dark');
+        },
+        
+        // Alpine-reactive font change
+        handleFontChange(font) {
+            this.fontFamily = font;
+            Alpine.store('theme').setFont(font);
+        },
+        
+        // Alpine-reactive font size change
+        handleFontSize(size) {
+            this.fontSize = size;
+            localStorage.setItem('fontSize', size);
+            document.documentElement.style.setProperty('--font-size-base', `${size}px`);
+        },
+        
+        // Alpine-reactive chat width change
+        handleChatWidth(width) {
+            this.chatWidth = width;
+            localStorage.setItem('chatContentWidth', width);
+            document.documentElement.style.setProperty('--chat-content-width', `${width}%`);
+        },
+        
+        // Alpine-reactive message width change
+        handleMessageWidth(width) {
+            this.messageWidth = width;
+            localStorage.setItem('messageMaxWidth', width);
+            document.documentElement.style.setProperty('--message-max-width', `${width}%`);
+        },
+        
+        // Alpine-reactive theme family selection
+        selectThemeFamily(family) {
+            this.themeFamily = family;
+            Alpine.store('theme').apply(family, this.themeMode);
+        },
+        
+        // Get theme families for x-for loop
+        getThemeFamilies() {
+            return Alpine.store('theme').getFamilies();
+        },
+
+        // Helper to get theme preview gradient
+        getThemePreviewStyle(family) {
+            if (!window.themes || !window.themes[family]) return '';
+            const theme = window.themes[family];
+            const colors = theme[this.themeMode] || theme['dark'];
+            const bg = colors['--bg-primary'] || '#000';
+            const accent = colors['--accent'] || '#fff';
+            return `background: linear-gradient(135deg, ${bg} 50%, ${accent} 50%);`;
+        },
+
+        // Helper to format theme name
+        formatThemeName(family) {
+            return family.charAt(0).toUpperCase() + family.slice(1);
         }
     };
 }

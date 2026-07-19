@@ -45,12 +45,12 @@
     <template x-if="setting.type === 'select'">
         <div class="setting-row">
             <label x-text="setting.title"></label>
+            <span class="setting-description" x-show="setting.description" x-html="setting.description"></span>
             <select :value="setting.value" @change="updateSetting(setting, $event.target.value)">
                 <template x-for="[optionKey, optionLabel] in Object.entries(setting.options || {})" :key="optionKey">
                     <option :value="optionKey" x-text="optionKey"></option>
                 </template>
             </select>
-            <span class="setting-description" x-show="setting.description" x-html="setting.description"></span>
             <span class="setting-description" x-show="setting.options && setting.options[setting.value]" x-html="setting.options[setting.value]"></span>
         </div>
     </template>
