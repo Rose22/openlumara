@@ -21,20 +21,27 @@ function getMainData() {
 
             // fetch all other data
             this.chats = await simpleApiFetch('/api/chats');
+            
+            // sort it in descending order
+            this.chats.reverse();
+
             this.categories = await simpleApiFetch('/api/chats/categories');
 
             await connectWebSocket();
         },
 
-        async selectChat(chatId) {
+        async loadChat(chatId) {
             if (this.selectedChat === chatId) { return; }
 
             // don't allow chat switching if a stream is ongoing
             if (Alpine.store("stream").state != 'idle') { return; }
 
-            this.chat = await simpleApiFetch(`/api/chat/load/${chatId}`);
-            this.selectedChat = this.chat.id;
-            this.messages = this.chat.messages;
+            result = await simpleApiFetch(`/api/chat/load/${chatId}`);
+            if (!result) { return; }
+
+            this.chat = result;
+            this.selectedChat = chatId;
+            this.messages = result.messages;
         },
 
         async newChat() {
@@ -49,22 +56,25 @@ function getMainData() {
 
         async reloadChat() {
             stream = Alpine.store("stream");
-            if (stream.state != "idle" && stream.state != "sending" && stream.state != 'received') {
-                // block chat reload during streaming
-                return;
-            }
 
             if (!this.selectedChat) {
                 console.log("tried to reload the chat, but no chat is loaded!");
                 return;
             }
 
-            this.chat = await simpleApiFetch(`/api/chat/load/${this.selectedChat}`);
-            this.messages = this.chat.messages;
+            result = await simpleApiFetch(`/api/chat/load/${this.selectedChat}`);
+            if (!result) { return }
+
+            this.chat = result;
+            this.selectedChat = result.id;
+            this.messages = result.messages;
         },
 
         async reloadChats() {
             this.chats = await simpleApiFetch('/api/chats');
+
+            // sort it in descending order
+            this.chats = this.chats.reverse();
         },
 
         async selectCategory(category) {

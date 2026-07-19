@@ -29,6 +29,7 @@ async function connectWebSocket() {
         console.log('WebSocket connected');
         isWsConnected = true;
         wsReconnecting = false;
+        await reloadChatGlobal();
     };
 
     wsSocket.onmessage = async (event) => {
@@ -70,6 +71,10 @@ async function scheduleWsReconnect() {
  
      data_type = data.type;
      data_content = data.content;
+
+     if (data_type != 'token') {
+         console.log(data);
+     }
  
      // process based on broadcast type
      switch (data_type) {
@@ -108,24 +113,21 @@ async function scheduleWsReconnect() {
                      break;
              }
 
-             console.log(token);
              store.tokens.push(token);
+             break;
+         case "chat_switched":
+             // make sure we sync chat switches across instances
+             await loadChatGlobal(data.id);
              break;
          case "user_message_confirmed":
              store.state = 'received';
-
-             // reload the chat by directly accessing the data of the main element
-             main = document.getElementById("main");
-             await Alpine.$data(main).reloadChat();
+             await reloadChatGlobal();
 
              break;
          case "stream_complete":
              store.state = 'idle';
              await store.clearTokens();
-
-             // reload the chat by directly accessing the data of the main element
-             main = document.getElementById("main");
-             await Alpine.$data(main).reloadChat();
+             await reloadChatGlobal();
              break;
      }
  }

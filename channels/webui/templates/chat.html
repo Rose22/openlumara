@@ -55,9 +55,12 @@
     </template>
 
     <!-- user message placeholder to display while the message is being sent to the API -->
-    <template x-if="$store.stream.state === 'sending'">
+    <template x-if="$store.stream.state === 'sending' || $store.stream.state === 'received'">
         <div class="message-wrapper user placeholder">
-            <div class="message user placeholder" x-text="last_user_input"></div>
+            <div class="message user placeholder">
+                <span x-text="last_user_input"></span>
+                <span class="placeholder-status">Sending..</span>
+            </div>
         </div>
     </template>
 

@@ -22,7 +22,7 @@
     </div>
 
     <div class="chats">
-        <template x-for="chat in chats.reverse()">
+        <template x-for="chat in chats">
             <!-- only show if it matches the current category and search query -->
             <template
                 x-if="
@@ -36,7 +36,7 @@
                     x-data="{ active: false }"
                     :id="`chat-${chat.id}`"
                     :class="{'item': true, 'active': chat.id === selectedChat}"
-                    @click="active = !active; selectChat(chat.id)"
+                    @click="active = !active; loadChat(chat.id)"
                     x-init="
                         $nextTick(() => {
                             // autoscroll to the selected chat
@@ -58,9 +58,7 @@
     </div>
 
     <button class="new-chat-btn" @click="newChat()">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-        </svg>
+        {% include 'svg/add.svg' %}
         New Chat
     </button>
 </div>

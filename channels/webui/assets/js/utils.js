@@ -31,6 +31,20 @@ async function simpleSocketSend(data) {
 }
 
 /*
+ * stuff to access Alpine stuff outside Alpine
+ */
+async function loadChatGlobal(id) {
+    // reload the chat by directly accessing the data of the main element
+    main = document.getElementById("main");
+    await Alpine.$data(main).loadChat(id);
+}
+async function reloadChatGlobal() {
+    // reload the chat by directly accessing the data of the main element
+    main = document.getElementById("main");
+    await Alpine.$data(main).reloadChat();
+}
+
+/*
  * --- formatting stuff
  */
 function escapeHtml(str) {
