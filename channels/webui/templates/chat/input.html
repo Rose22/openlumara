@@ -39,7 +39,7 @@
             $el.style.height = '48px';
 
             // force scroll to the bottom
-            $refs.messages.scrollTop = $refs.messages.scrollHeight;
+            await forceScrollDown($refs.messages);
         }
     "
 ></textarea>
@@ -54,8 +54,7 @@
         await clearInput();
         $el.style.height = '48px';
 
-        // force scroll to the bottom
-        $refs.messages.scrollTop = $refs.messages.scrollHeight;
+        await forceScrollDown($refs.messages);
     }
     "
     x-show="$store.stream.state === 'idle'"

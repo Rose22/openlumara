@@ -28,14 +28,9 @@
                         <template x-for="(message, msgIndex) in turn.messages">
                             <div class="flex fullwidth">
                                 <!-- render the messages based on message role -->
-
-                                <template x-if="message.role === 'user'">
-                                    <div class="content normal" x-text="message.content"></div>
-                                </template>
-
                                 <template x-if="message.role === 'assistant'">
                                     <div class="flex fullwidth">
-                                        <template x-if="message.type === 'reasoning' || message.type === 'history' || message.type === 'tool_calls'">
+                                        <template x-if="(message.type === 'reasoning') || (message.type === 'history' && message.reasoning_content && message.reasoning_content.trim().length > 0) || (message.type === 'tool_calls' && message.reasoning_content && message.reasoning_content.trim().length > 0)">
                                             {% include 'chat/reasoning.html' %}
                                         </template>
                                         <template x-if="message.type === 'content' || message.type === 'history'">
@@ -55,6 +50,7 @@
     </template>
 
     <!-- user message placeholder to display while the message is being sent to the API -->
+    <!--
     <template x-if="$store.stream.state === 'sending'">
         <div class="message-wrapper user placeholder">
             <div class="message user placeholder">
@@ -63,6 +59,7 @@
             </div>
         </div>
     </template>
+    -->
 
     <!-- typing indicator -->
     <template x-if="$store.stream.state === 'received'">

@@ -6,6 +6,9 @@ let STREAM_STORE = {
     tokens: [],
     processing: {},
 
+    // stores the final message after the stream has finished
+    finalMessage: [],
+
     async clearTokens() {
         console.log("clearTokens called");
 

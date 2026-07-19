@@ -43,7 +43,6 @@ function getMainData() {
             this.selectedChat = chatId;
             this.selectedCategory = result.category;
             this.messages = result.messages;
-
         },
 
         async newChat() {

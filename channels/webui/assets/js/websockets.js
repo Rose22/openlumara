@@ -65,79 +65,82 @@ async function scheduleWsReconnect() {
     }, 1000);
 }
 
- async function handleWebSocketMessage(data) {
-     // we store all the stream-related data in an Alpine store
-     const store = Alpine.store("stream");
- 
-     data_type = data.type;
-     data_content = data.content;
+async function handleWebSocketMessage(data) {
+    // we store all the stream-related data in an Alpine store
+    const stream = Alpine.store("stream");
 
-     if (data_type != 'token') {
-         console.log(data);
-     }
- 
-     // process based on broadcast type
-     switch (data_type) {
-         case "token":
-             token = data_content;
-             token_type = token.type;
-             token_content = token.content;
- 
-             // process tokens based on their type
-             switch (token_type) {
-                 case "prompt_progress":
-                     if (store.state != "processing_tools") {
-                         // let it stay in that state if it's been set
-                         store.state = 'processing';
-                     }
+    data_type = data.type;
+    data_content = data.content;
 
-                     store.processing = token_content;
-                     break;
-                 case "reasoning":
-                     store.state = 'thinking';
-                     store.processing = {};
-                     break;
-                 case "content":
-                     store.state = 'streaming';
-                     store.processing = {};
-                     break;
-                 case "tool_call_delta":
-                     store.state = 'calling_tools';
-                     store.processing = {};
-                     break;
-                 case "tool_calls":
-                     store.state = 'calling_tools';
-                     break;
-                 case "tool":
-                     store.state = 'processing_tools';
-                     break;
-             }
+    if (data_type != 'token') {
+        console.log(data);
+    }
 
-             store.tokens.push(token);
-             break;
-         case "chat_switched":
-             // make sure we sync chat switches across instances
-             await getMain().loadChat(data.id);
-             break;
-         case "user_message_confirmed":
-             store.state = 'received';
+    // process based on broadcast type
+    switch (data_type) {
+        case "sync_state":
+            // use the token buffer from the backend
+            // to load into the frontend
+            stream.tokens = data.buffer;
+            break;
 
-             break;
-         case "stream_complete":
-             // Materialize accumulated tokens into proper messages
-             if (store.tokens.length > 0) {
-                 const messages = getMain().messages;
-                 const assistantMessages = streamedTokensToMessages(store.tokens);
-                 console.log(assistantMessages);
-                
-                 // Push finalized assistant messages into the messages array
-                 messages.push(...assistantMessages);
-                
-                 // Clear the stream tokens so getTurns() stops reconstructing
-                 await store.clearTokens();
-             }
+        case "token":
+            token = data_content;
+            token_type = token.type;
+            token_content = token.content;
 
-             store.state = 'idle';
-             break;
-     }
- }
+            // process tokens based on their type
+            switch (token_type) {
+                case "prompt_progress":
+                    if (stream.state != "processing_tools") {
+                        // let it stay in that state if it's been set
+                        stream.state = 'processing';
+                    }
+
+                    stream.processing = token_content;
+                    break;
+                case "reasoning":
+                    stream.state = 'thinking';
+                    stream.processing = {};
+                    break;
+                case "content":
+                    stream.state = 'streaming';
+                    stream.processing = {};
+                    break;
+                case "tool_call_delta":
+                    stream.state = 'calling_tools';
+                    stream.processing = {};
+                    break;
+                case "tool_calls":
+                    stream.state = 'calling_tools';
+                    break;
+                case "tool":
+                    stream.state = 'processing_tools';
+                    break;
+            }
+
+            stream.tokens.push(token);
+            break;
+
+        case "chat_switched":
+            // make sure we sync chat switches across instances
+            await getMain().loadChat(data.id);
+            break;
+
+        case "user_message_confirmed":
+            stream.state = 'received';
+            break;
+
+        case "stream_complete":
+            /*
+             * Reconstruct an entire assistant turn from the raw tokens
+             * and then push it to the messages array
+             */
+            lastTurn = streamedTokensToMessages(stream.tokens);
+            getMain().messages.push(...lastTurn);
+            await stream.clearTokens();
+
+            stream.state = 'idle';
+            break;
+    }
+}
