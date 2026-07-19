@@ -60,7 +60,12 @@
     x-show="$store.stream.state === 'idle'"
 >Send</button>
 
-<button id="stop" aria-label="Stop generation" x-show="$store.stream.state != 'idle'" @click="await stopStream(); await reloadChat();">
+<button id="stop" aria-label="Stop generation" x-show="$store.stream.state != 'idle'" @click="
+await simpleSocketSend({
+    'type': 'user_message',
+    'content': {'role': 'user', 'content': '/stop'}
+})
+">
     <span class="stop-text">Stop</span>
     <!--
     <span class="streaming-icon">
