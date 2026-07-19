@@ -13,8 +13,6 @@ let STREAM_STORE = {
     pendingMessageId: null,
 
     async clearTokens() {
-        console.log("clearTokens called");
-
         this.tokens = [];
         this.processing = [];
     }

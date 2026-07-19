@@ -24,7 +24,7 @@ function settingsModal() {
         },
         
         // --- Feature Flags ---
-        showUnsafe: localStorage.getItem('showUnsafeSettings') === 'true',
+        showUnsafe: false,
         
         // --- Model Cache ---
         cachedModels: null,
@@ -57,6 +57,16 @@ function settingsModal() {
         get sortedCategories() {
             return Object.entries(this.categories)
                 .sort(([a, catA], [b, catB]) => (catA.order || 0) - (catB.order || 0));
+        },
+
+        get filteredSubItems() {
+            return (cat) => {
+                const catData = this.categories[cat];
+                if (!catData || !catData.enabled) return [];
+                return catData.enabled.filter(item => 
+                    this.showUnsafe || !catData.unsafeModules[item]
+                );
+            };
         },
 
         // --- Init & Load ---
@@ -101,6 +111,8 @@ function settingsModal() {
                 this.categories = buildSettingsStructure(rawSettings, this.moduleInfoCache);
                 this.originalCategories = JSON.parse(JSON.stringify(this.categories));
                 this.changedModuleSettings.clear();
+
+                this.showUnsafe = this.settings.channels.settings.webui.show_unsafe_settings;
 
                 await this.fetchModels();
 

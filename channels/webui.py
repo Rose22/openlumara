@@ -79,6 +79,11 @@ class Webui(core.channel.Channel):
             "description": "Whether to show the name of the chat below the header",
             "default": False
         },
+        "show_unsafe_settings": {
+            "description": "Whether to show unsafe settings. This setting has to be manually toggled via `/config` or by editing the config file, because if you want access to the unsafe features, you hopefully know what you're doing!",
+            "default": False,
+            "unsafe": True
+        },
         "log_level": {
             "type": "select",
             "description": "How detailed the HTTP logs should be in the console. You can usually leave this as default, unless you want to see details about all the incoming/outgoing traffic to/from the webserver",
@@ -223,7 +228,7 @@ async def create_fastapi(channel):
     # --- chats
     # -- GET
     @app.get("/api/chat/load/{id}")
-    async def chat_load(id: str):
+    async def chat_load(id: str, request: fastapi.Request):
         """Loads a specific chat by its id"""
         success = await channel.context.chat.load(id)
         if not success:
@@ -448,8 +453,7 @@ async def create_fastapi(channel):
                             if content:
                                 try:
                                     chat_id = await channel.context.chat.get_id() or "default"
-                                    payload = content if isinstance(content, dict) else {"role": "user", "content": content}
-                                    await ws_mgr.start_stream(channel, chat_id, payload)
+                                    await ws_mgr.start_stream(channel, chat_id, content)
                                 except Exception as e:
                                     channel.log(channel.name, f"WebSocket user_message error: {core.detail_error(e)}")
                                     await ws_mgr.broadcast({
@@ -596,9 +600,22 @@ class WebSocketManager:
                             self.channel.log(self.channel.name, f"error sending user message: {core.detail_error(e)}")
                             return
                     case 'error':
+                        # for an error, just send an entire stream with the error as a content token
+                        # so that it shows up as a normal message
                         await self.broadcast({
                             "type": "user_message_confirmed",
                             "index": index
+                        })
+                        await self.broadcast({
+                            "type": "token",
+                            "content": {
+                                "type": "content",
+                                "content": f"Error: {payload.get('content')}"
+                            }
+                        })
+                        await self.broadcast({
+                            "type": "stream_complete",
+                            "buffer": []
                         })
                         return
                     case _:
@@ -620,6 +637,9 @@ class WebSocketManager:
             "index": index
         })
 
+        self.stream_buffer = []
+        self.active_chat_id = None
+
     async def start_stream(self, channel, chat_id: str, message: dict):
         if self.active_stream_task and not self.active_stream_task.done():
             self.active_stream_task.cancel()
@@ -630,8 +650,6 @@ class WebSocketManager:
 
         try:
             self.active_stream_task = asyncio.create_task(self._stream_task(message, next_index))
-            self.stream_buffer = []
-            self.active_chat_id = None
         except asyncio.CancelledError:
             pass
         except Exception as e:

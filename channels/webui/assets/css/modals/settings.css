@@ -915,20 +915,29 @@
     }
 }
 
-        .settings-section-title {
-            font-size: 20px;
-            font-weight: 600;
-            color: var(--text-primary);
-            margin: 0 0 4px 0;
-            letter-spacing: -0.02em;
-        }
+.settings-section-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 4px 0;
+    letter-spacing: -0.02em;
+}
 
-        .settings-section-desc {
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-            margin: 0 0 20px 0;
-            line-height: 1.5;
-        }
+.settings-section-desc {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin: 0 0 20px 0;
+    line-height: 1.5;
+}
+
+.unsafe {
+    background: rgba(255, 107, 107, 0.05) !important;
+    border: none !important;
+    border-radius: var(--radius-sm);
+    padding: 4px;
+    color: var(--important) !important;
+    box-shadow: 0px 0px 20px var(--error);
+}
 
 /* Model input styles */
 .model-setting-row {
