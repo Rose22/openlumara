@@ -29,7 +29,7 @@ async function connectWebSocket() {
         console.log('WebSocket connected');
         isWsConnected = true;
         wsReconnecting = false;
-        await reloadChatGlobal();
+        await getMain().reloadChat();
     };
 
     wsSocket.onmessage = async (event) => {
@@ -117,17 +117,27 @@ async function scheduleWsReconnect() {
              break;
          case "chat_switched":
              // make sure we sync chat switches across instances
-             await loadChatGlobal(data.id);
+             await getMain().loadChat(data.id);
              break;
          case "user_message_confirmed":
              store.state = 'received';
-             await reloadChatGlobal();
 
              break;
          case "stream_complete":
+             // Materialize accumulated tokens into proper messages
+             if (store.tokens.length > 0) {
+                 const messages = getMain().messages;
+                 const assistantMessages = streamedTokensToMessages(store.tokens);
+                 console.log(assistantMessages);
+                
+                 // Push finalized assistant messages into the messages array
+                 messages.push(...assistantMessages);
+                
+                 // Clear the stream tokens so getTurns() stops reconstructing
+                 await store.clearTokens();
+             }
+
              store.state = 'idle';
-             await store.clearTokens();
-             await reloadChatGlobal();
              break;
      }
  }

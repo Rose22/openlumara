@@ -41,7 +41,9 @@ function getMainData() {
 
             this.chat = result;
             this.selectedChat = chatId;
+            this.selectedCategory = result.category;
             this.messages = result.messages;
+
         },
 
         async newChat() {
@@ -67,7 +69,17 @@ function getMainData() {
 
             this.chat = result;
             this.selectedChat = result.id;
+            this.selectedCategory = result.category;
+
             this.messages = result.messages;
+
+            /*
+             * since the AI can move chats to different categories,
+             * the category might have changed
+             * or a new one might have been created
+             */
+            await this.reloadCategories();
+            await this.reloadChats();
         },
 
         async reloadChats() {
@@ -75,6 +87,10 @@ function getMainData() {
 
             // sort it in descending order
             this.chats = this.chats.reverse();
+        },
+
+        async reloadCategories() {
+            this.categories = await simpleApiFetch('/api/chats/categories');
         },
 
         async selectCategory(category) {

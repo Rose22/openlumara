@@ -47,8 +47,8 @@
                     "
                 >
                     <span class="title" x-text="chat.title || 'New chat'"></span>
-                    <ul class="tags" x-data="{ tags: chat.tags }">
-                        <template x-for="tag in tags.slice(0,3)">
+                    <ul class="tags">
+                        <template x-for="tag in chat.tags.slice(0,3)">
                             <li x-text="tag" class="tag"></li>
                         </template>
                     </ul>

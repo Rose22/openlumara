@@ -23,7 +23,7 @@
             {% include 'modals/settings/sidebar.html' %}
 
             <!-- MAIN CONTENT AREA -->
-            <main class="settings-content">
+            <main class="settings-content" x-animate.duration.170ms>
                 <!-- Mobile: show category list when no category selected -->
                 <template x-if="mobile && !activeCategory">
                     <div class="mobile-category-list">

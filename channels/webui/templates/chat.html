@@ -5,7 +5,7 @@
     {% include 'chat/titlebar.html' %}
 {% endif %}
 
-<div id="messages" x-ref="messages" x-auto-scroll>
+<div id="messages" x-ref="messages" x-auto-scroll x-animate.ease-out>
     <template x-for="(turn, turnIndex) in turns">
         <div>
             <!-- user messages get rendered seperately -->
@@ -35,7 +35,7 @@
 
                                 <template x-if="message.role === 'assistant'">
                                     <div class="flex fullwidth">
-                                        <template x-if="message.type === 'reasoning' || message.type === 'history'">
+                                        <template x-if="message.type === 'reasoning' || message.type === 'history' || message.type === 'tool_calls'">
                                             {% include 'chat/reasoning.html' %}
                                         </template>
                                         <template x-if="message.type === 'content' || message.type === 'history'">
@@ -55,7 +55,7 @@
     </template>
 
     <!-- user message placeholder to display while the message is being sent to the API -->
-    <template x-if="$store.stream.state === 'sending' || $store.stream.state === 'received'">
+    <template x-if="$store.stream.state === 'sending'">
         <div class="message-wrapper user placeholder">
             <div class="message user placeholder">
                 <span x-text="last_user_input"></span>

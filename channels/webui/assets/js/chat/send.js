@@ -11,6 +11,11 @@ async function send(text) {
 
     Alpine.store("stream").state = "sending";
 
+    // add user message to messages array so it renders immediately
+    getMain().messages.push({
+        role: "user",
+        content: text
+    });
 }
 
 async function stopStream() {

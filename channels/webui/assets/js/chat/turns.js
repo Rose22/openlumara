@@ -191,3 +191,50 @@ function getTurns(instance) {
      * have been tainted by AI, and which haven't
      */
 }
+
+function streamedTokensToMessages(tokens) {
+    const messages = [];
+    let current = null;
+
+    for (const token of tokens) {
+        if (token.type === 'prompt_progress' || token.type === 'token_usage' || token.type === 'timings') {
+            continue;
+        }
+
+        // Tool responses are separate messages with role 'tool'
+        if (token.type === 'tool') {
+            if (current) {
+                messages.push(current);
+                current = null;
+            }
+            messages.push({
+                role: "tool",
+                type: "tool_response",
+                tool_call_id: token.tool_call_id || '',
+                content: token.content || ''
+            });
+            continue;
+        }
+
+        if (!current) {
+            current = { role: "assistant", content: '', reasoning_content: '' };
+        }
+
+        if (token.type === 'reasoning') {
+            current.type = "reasoning";
+            current.reasoning_content += (token.content || '');
+        } else if (token.type === 'content') {
+            current.type = "content";
+            current.content += (token.content || '');
+        } else if (token.type === 'tool_call_delta' || token.type === 'tool_calls') {
+            current.type = "tool_calls";
+            current.tool_calls = token.tool_calls || [];
+        }
+    }
+
+    if (current && (current.content || current.reasoning_content || (current.tool_calls && current.tool_calls.length > 0))) {
+        messages.push(current);
+    }
+
+    return messages;
+}

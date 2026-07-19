@@ -7,6 +7,8 @@ let STREAM_STORE = {
     processing: {},
 
     async clearTokens() {
+        console.log("clearTokens called");
+
         this.tokens = [];
         this.processing = [];
     }

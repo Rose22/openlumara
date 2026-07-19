@@ -22,17 +22,19 @@
 <!-- CHANNELS: Drill-down -->
 <template x-if="activeChannel && (activeCategory === 'channels' || activeCategory === 'user_channels')">
     <div class="channel-drilldown">
-        <button type="button" @click="activeChannel = null" class="mobile-back-btn">← Back</button>
-        <h3 x-text="formatLabel(activeChannel)"></h3>
-        <p class="settings-section-desc" x-html="renderMarkdown(categories[activeCategory].descriptions[activeChannel]) || ''"></p>
-        
-        <template x-if="categories[activeCategory].settings[activeChannel] && categories[activeCategory].settings[activeChannel].value">
-            <template x-for="[key, setting] in Object.entries(categories[activeCategory].settings[activeChannel].value)" :key="key">
-                <div class="setting-item">
-                    {% include 'modals/settings/fields.html' %}
-                </div>
+        <div x-animate.duration.120ms>
+            <button type="button" @click="activeChannel = null" class="mobile-back-btn">← Back</button>
+            <h3 x-text="formatLabel(activeChannel)"></h3>
+            <p class="settings-section-desc" x-html="renderMarkdown(categories[activeCategory].descriptions[activeChannel]) || ''"></p>
+            
+            <template x-if="categories[activeCategory].settings[activeChannel] && categories[activeCategory].settings[activeChannel].value">
+                <template x-for="[key, setting] in Object.entries(categories[activeCategory].settings[activeChannel].value)" :key="key">
+                    <div class="setting-item">
+                        {% include 'modals/settings/fields.html' %}
+                    </div>
+                </template>
             </template>
-        </template>
+        </div>
         
         <template x-if="!categories[activeCategory].settings[activeChannel] || !categories[activeCategory].settings[activeChannel].value">
             <p class="no-settings-msg">This channel has no configurable settings.</p>
