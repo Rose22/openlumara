@@ -49,6 +49,9 @@ function getMainData() {
             this.selectedChat = chatId;
             this.selectedCategory = result.category;
             this.messages = result.messages;
+
+            // make sure it always shows the bottom of the chat
+            await forceScrollDown(document.getElementById("messages"));
         },
 
         async newChat() {

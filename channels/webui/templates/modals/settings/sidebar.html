@@ -1,7 +1,7 @@
 <aside class="settings-sidebar" x-show="!mobile || activeCategory">
     <nav class="settings-nav">
         <template x-for="[cat, data] in sortedCategories" :key="cat">
-            <div x-animate x-animate.duration.150ms>
+            <div x-animate.duration.150ms>
                 <button 
                     :class="{ active: activeNavCategory === cat }"
                     @click="switchCategory(cat)"

@@ -9,7 +9,7 @@
     <div class="notice" x-html="notice"></div>
 </template>
 
-<div id="messages" x-ref="messages" x-auto-scroll x-animate.ease-out>
+<div id="messages" x-ref="messages" x-auto-scroll>
     <template x-for="(turn, turnIndex) in turns">
         <div>
             <!-- user messages get rendered seperately -->
