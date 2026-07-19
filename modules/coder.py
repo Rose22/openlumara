@@ -1130,6 +1130,10 @@ For these languages, these instructions apply:
 ❌ WRONG: "I'll read the file to understand the function." -> `read_file` (Should use `get_symbol`)
 ❌ WRONG: "I'll edit the file directly." -> `edit` (Should use `edit_symbol`)
 """.strip()
+        elif writing_mode == "read-only":
+            output += "IMPORTANT: The coder is in read-only mode. You cannot write to files. Provide code to the user directly.\n\n"
+
+        
 
         if self.config.get("add_project_list_to_system_prompt"):
             try:
