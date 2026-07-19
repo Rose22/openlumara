@@ -93,9 +93,9 @@ function getTurns(instance) {
 
             let segmentType = token.type;
             // Normalize tool call types into a single segment type
-            // if (token.type === 'tool_call_delta' || token.type === 'tool_calls') {
-            //     segmentType = 'tool_calls';
-            // }
+            if (token.type === 'tool_call_delta' || token.type === 'tool_calls') {
+                segmentType = 'tool_calls';
+            }
 
             const lastMsg = segments[segments.length - 1];
             if (segmentType !== lastSegmentType || (segmentType === 'tool' && lastMsg && lastMsg.tool_call_id !== token.tool_call_id)) {
@@ -144,7 +144,7 @@ function getTurns(instance) {
                 if (lastMsg) {
                     if (segmentType === 'tool_calls') {
                         if (token.tool_calls) {
-                            lastMsg.tool_calls = lastMsg.tool_calls.concat(token.tool_calls);
+                            lastMsg.tool_calls = token.tool_calls;  // replace with accumulated
                         }
                     } else if (segmentType === 'tool') {
                         lastMsg.content += (token.content || '');

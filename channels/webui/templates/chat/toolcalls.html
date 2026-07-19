@@ -22,9 +22,10 @@
 
                 <div class="body" x-show="!collapsed">
                     <div class="section">
-                        <div class="args">
-                            <div class="title">Arguments</div>
-                            <template x-for="(value, key) in partialJsonParse(tool.function.arguments)">
+                        <div class="args" x-data="{
+                            parseArgs() { return partialJsonParse(tool.function.arguments); }
+                        }">
+                            <template x-for="(value, key) in parseArgs()" x-if="key !== '_raw'">
                                 <div class="arg-row">
                                     <span class="arg-name" x-text="key"></span>
                                     <span class="arg-value" x-text="value"></span>
