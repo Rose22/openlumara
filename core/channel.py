@@ -381,7 +381,11 @@ class Channel:
                     # return the entire thing as one token so that it's instant
 
                     # we don't add to context here because process_input already does that! oopsie..
-                    yield {"type": "content", "content": str(cmd_response)}
+                    yield {"type": "content", "content": str(cmd_response), "is_cmd": True}
+                    # we add a special is_cmd field so that channels can pick up on it and display it in a special way
+                    # (the old webui used to just check for the presence of a '/' at the start of the string..)
+                    # which obviously is really bad lol
+                    # especially since everything is supposed to work across the core, NOT just the webui
                     return
 
         # run user message module event hooks

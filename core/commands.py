@@ -307,12 +307,12 @@ class Commands:
         if args:
             args_display += " "
             args_display += " ".join(args)
-        await self.channel.context.chat.add({"role": "user", "content": f"{cmd_prefix}{cmd[0]}{args_display}"}, ghost=use_temporary)
+        await self.channel.context.chat.add({"role": "user", "content": f"{cmd_prefix}{cmd[0]}{args_display}"}, cmd=True, ghost=use_temporary)
 
         result = await self._process_input(message)
 
         # insert command result into context, flagging as temporary if needed
-        await self.channel.context.chat.add({"role": "assistant", "content": f"{result}"}, ghost=use_temporary)
+        await self.channel.context.chat.add({"role": "assistant", "content": f"{result}"}, cmd=True, ghost=use_temporary)
 
         return result
 

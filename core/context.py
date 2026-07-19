@@ -157,8 +157,10 @@ class Context:
                     if content and isinstance(content, str):
                         message["content"] += f"\n\n{message['injection']}"
 
-                # remove the field from all messages so that it's clean for the API
-                del message["injection"]
+        # remove any non-standard (metadata) fields from the messages
+        # so that we can cleanly send it to the API
+        approved_keys = ["role", "content", "reasoning_content", "tool_calls", "tool_call_id", "function_call", "tool"]
+        messages = [{k: v for k, v in msg.items() if k in approved_keys} for msg in messages]
 
         # 2. Build and Trim Context
         # We combine them to check the total token count

@@ -5,6 +5,8 @@ import os
 
 import tiktoken
 
+# TODO: split chat index from messages array into two seperate files, to vastly improve speed when saving/loading chats
+
 class Chat:
     DEFAULT_DATA = {
         "title": "",
@@ -363,7 +365,7 @@ class Chat:
         await self.save()
         return True
 
-    async def add(self, message: dict, ghost = False):
+    async def add(self, message: dict, cmd=False, ghost = False):
         """add message to current chat"""
         if self.current is None:
             await self.new()
@@ -384,6 +386,10 @@ class Chat:
         # ghost messages are invisible to the AI
         if ghost:
             new_message["ghost"] = True
+
+        if cmd:
+            # if the message is a command (or command response), mark it as such
+            new_message["is_cmd"] = True
 
         # inject any special messages coming from on_message_inject() in modules, such as timestamps
         injections = []
