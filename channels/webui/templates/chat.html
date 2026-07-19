@@ -18,8 +18,7 @@
                     <div :class="{
                         'message': true,
                         'user': message.role === 'user',
-                        'pending': message.msgId === $store.stream.pendingMessageId,
-                        'command': message.is_cmd
+                        'pending': message.msgId === $store.stream.pendingMessageId
                     }">
                         <div style="display: flex;" x-html="renderMarkdown(message.content)"></div>
                         <template x-if="message.msgId === $store.stream.pendingMessageId">

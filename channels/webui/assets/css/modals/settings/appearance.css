@@ -59,8 +59,6 @@ input:checked + .theme-slider::before {
 
 .color-theme-section h4,
 .typography-section h4 {
-    font-size: 16px;
-    font-weight: 600;
     color: var(--text-primary);
     margin: 0 0 12px 0;
 }

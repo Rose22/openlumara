@@ -28,7 +28,12 @@
         <button class="btn" title="Storage Editor">
             {% include 'svg/folder.svg' %}
         </button>
-        <button class="btn" title="Clear chat">
+        <button class="btn" title="Clear chat" @click="
+            await simpleSocketSend({
+                'type': 'user_message',
+                'content': {'role': 'user', 'content': '/clear'}
+            })
+        ">
             {% include 'svg/trash.svg' %}
         </button>
     </div>
