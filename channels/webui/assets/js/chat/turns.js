@@ -28,7 +28,7 @@ function getTurns(instance) {
             }
             turns.push({
                 role: "user",
-                messages: [{"role": "user", "content": msg.content}]
+                messages: [Object.assign({}, msg)]  // copy the message object
             });
         } else {
             if (!currentAssistantTurn) {
@@ -95,8 +95,10 @@ function getTurns(instance) {
             const lastMsg = segments[segments.length - 1];
             if (segmentType !== lastSegmentType || (segmentType === 'tool' && lastMsg && lastMsg.tool_call_id !== token.tool_call_id)) {
                 // New segment type: start a fresh message
+                // Copy the original token and override only what needs changing
                 if (segmentType === 'reasoning') {
                     segments.push({
+                        ...token,
                         role: "assistant",
                         type: "reasoning",
                         reasoning_content: token.content || '',
@@ -104,6 +106,7 @@ function getTurns(instance) {
                     });
                 } else if (segmentType === 'content') {
                     segments.push({
+                        ...token,
                         role: "assistant",
                         type: "content",
                         content: token.content || '',
@@ -111,6 +114,7 @@ function getTurns(instance) {
                     });
                 } else if (segmentType === 'tool_calls') {
                     segments.push({
+                        ...token,
                         role: "assistant",
                         type: "tool_calls",
                         tool_calls: token.tool_calls || [],
@@ -118,6 +122,7 @@ function getTurns(instance) {
                     });
                 } else if (segmentType === 'tool_call_delta') {
                     segments.push({
+                        ...token,
                         role: "assistant",
                         type: "tool_call_delta",
                         tool_calls: token.tool_calls || [],
@@ -125,6 +130,7 @@ function getTurns(instance) {
                     });
                 } else if (segmentType === 'tool') {
                     segments.push({
+                        ...token,
                         role: "tool",
                         type: "tool_response",
                         content: token.content || '',
@@ -208,9 +214,9 @@ function streamedTokensToMessages(tokens) {
                 current = null;
             }
             messages.push({
+                ...token,
                 role: "tool",
                 type: "tool_response",
-                tool_call_id: token.tool_call_id || '',
                 content: token.content || ''
             });
             continue;

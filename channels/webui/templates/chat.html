@@ -26,7 +26,7 @@
                     <div class="message assistant">
                         <!-- all messages within a turn are displayed within the same message bubble -->
                         <template x-for="(message, msgIndex) in turn.messages">
-                            <div class="flex fullwidth">
+                            <div :class="{'flex': true, 'fullwidth': true, 'command': message.is_cmd}" x-init="console.log(message)">
                                 <!-- render the messages based on message role -->
                                 <template x-if="message.role === 'assistant'">
                                     <div class="flex fullwidth">

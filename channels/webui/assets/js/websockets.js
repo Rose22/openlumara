@@ -89,6 +89,8 @@ async function handleWebSocketMessage(data) {
             token_type = token.type;
             token_content = token.content;
 
+            console.log(token);
+
             // process tokens based on their type
             switch (token_type) {
                 case "prompt_progress":
