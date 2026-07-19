@@ -21,15 +21,6 @@ function isToggleList(data) {
     return Array.isArray(data.enabled) && Array.isArray(data.disabled);
 }
 
-function checkForModelField(data, prefix = '') {
-    for (const [key, value] of Object.entries(data)) {
-        if (typeof value !== 'object' || value === null) continue;
-        if (key === 'model.name' || key.endsWith('.model.name') || key === 'model_name') return true;
-        if (checkForModelField(value, key)) return true;
-    }
-    return false;
-}
-
 function buildSettingsStructure(originalData, moduleInfo = {}) {
     const categories = {};
     let order = 0;

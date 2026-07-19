@@ -929,3 +929,55 @@
             margin: 0 0 20px 0;
             line-height: 1.5;
         }
+
+/* Model input styles */
+.model-setting-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.model-input-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.model-select {
+    flex: 1;
+}
+
+.model-refresh-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    color: var(--text-primary);
+    transition: all 0.15s ease;
+    min-width: 36px;
+    height: 36px;
+}
+
+.model-refresh-btn:hover:not(:disabled) {
+    background: var(--bg-tertiary);
+    border-color: var(--accent);
+}
+
+.model-refresh-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.model-refresh-btn.loading {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+

@@ -102,13 +102,10 @@ function settingsModal() {
                 this.originalCategories = JSON.parse(JSON.stringify(this.categories));
                 this.changedModuleSettings.clear();
 
+                await this.fetchModels();
+
                 const firstCategory = Object.keys(this.categories)[0];
                 this.activeCategory = firstCategory;
-
-                if (checkForModelField(this.settings)) {
-                    this.fetchModels().catch(e => console.warn("Model fetch failed:", e));
-                }
-
             } catch (err) {
                 console.error('Failed to load settings:', err);
                 this.error = err.message || 'Failed to load settings';
@@ -119,9 +116,11 @@ function settingsModal() {
 
         async fetchModels() {
             try {
-                const data = simpleApiFetch('/api/models');
-                this.cachedModels = data.models || [];
-                this.modelsLoadError = null;
+                this.cachedModels = await simpleApiFetch('/api/models');
+                // Re-render any model inputs if settings are already loaded
+                if (Object.keys(this.categories).length > 0) {
+                    this.$dispatch('settings-loaded');
+                }
             } catch (err) {
                 console.error('Failed to fetch models:', err);
                 this.modelsLoadError = err.message || 'Failed to fetch models';

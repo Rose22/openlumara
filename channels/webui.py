@@ -293,6 +293,11 @@ async def create_fastapi(channel):
                 }
 
         return api_result(module_info)
+
+    @app.get("/api/models")
+    async def models_get():
+        return api_result(await channel.manager.API.list_models())
+
     # -- POST
     @app.post("/api/settings/save")
     async def settings_save(request: fastapi.Request):

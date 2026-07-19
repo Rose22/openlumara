@@ -7,7 +7,7 @@
                 <button type="button" :class="{ active: setting.value }" @click="updateSetting(setting, !setting.value)">
                 </button>
             </div>
-            <span class="setting-description" x-show="setting.description" x-html="setting.description"></span>
+            <span class="setting-description" x-show="setting.description" x-html="renderMarkdown(setting.description)"></span>
         </div>
     </template>
 
@@ -17,17 +17,21 @@
             <label x-text="setting.title"></label>
             <input type="number" :value="setting.value" :min="setting.min" :max="setting.max" :step="setting.step || 1" 
                    @input="updateSetting(setting, parseFloat($event.target.value))">
-            <span class="setting-description" x-show="setting.description" x-html="setting.description"></span>
+            <span class="setting-description" x-show="setting.description" x-html="renderMarkdown(setting.description)"></span>
         </div>
     </template>
 
     <!-- Text/URL -->
-    <template x-if="setting.type === 'text' || setting.type === 'url'">
+    <template x-if="
+        (setting.type === 'text' || setting.type === 'url')
+        &&
+        (activeCategory != 'model' && setting.title != 'Name')
+    ">
         <div class="setting-row">
             <label x-text="setting.title"></label>
             <input type="text" :type="setting.type" :value="setting.value" 
                    @input="updateSetting(setting, $event.target.value)">
-            <span class="setting-description" x-show="setting.description" x-html="setting.description"></span>
+            <span class="setting-description" x-show="setting.description" x-html="renderMarkdown(setting.description)"></span>
         </div>
     </template>
 
@@ -37,7 +41,7 @@
             <label x-text="setting.title"></label>
             <textarea :value="setting.value" rows="4" 
                       @input="updateSetting(setting, $event.target.value)"></textarea>
-            <span class="setting-description" x-show="setting.description" x-html="setting.description"></span>
+            <span class="setting-description" x-show="setting.description" x-html="renderMarkdown(setting.description)"></span>
         </div>
     </template>
 
@@ -45,13 +49,49 @@
     <template x-if="setting.type === 'select'">
         <div class="setting-row">
             <label x-text="setting.title"></label>
-            <span class="setting-description" x-show="setting.description" x-html="setting.description"></span>
+            <span class="setting-description" x-show="setting.description" x-html="renderMarkdown(setting.description)"></span>
             <select :value="setting.value" @change="updateSetting(setting, $event.target.value)">
                 <template x-for="[optionKey, optionLabel] in Object.entries(setting.options || {})" :key="optionKey">
                     <option :value="optionKey" x-text="optionKey"></option>
                 </template>
             </select>
-            <span class="setting-description" x-show="setting.options && setting.options[setting.value]" x-html="setting.options[setting.value]"></span>
+            <span class="setting-description" x-show="setting.options && setting.options[setting.value]" x-html="renderMarkdown(setting.options[setting.value])"></span>
+        </div>
+    </template>
+
+    <!-- Model Dropdown -->
+    <!-- very hacky way of detecting it for now.. but it'll have to do -->
+    <template x-if="activeCategory === 'model' && setting.title === 'Name'">
+        <div class="setting-row model-setting-row">
+            <label x-text="setting.title"></label>
+            <div class="model-input-container">
+                <template x-if="cachedModels && cachedModels.length > 0">
+                    <select :value="setting.value" @change="updateSetting(setting, $event.target.value)" class="model-select">
+                        <option value="" disabled>-- Select a model --</option>
+                        <template x-for="model in cachedModels" :key="model">
+                            <option :value="model" x-text="model" :selected="model === setting.value"></option>
+                        </template>
+                        <!-- Custom option if current value not in list -->
+                        <template x-if="setting.value && !cachedModels.find(m => m === setting.value)">
+                            <option :value="setting.value" x-text="setting.value + ' (custom)'" selected></option>
+                        </template>
+                    </select>
+                </template>
+                <template x-if="!cachedModels || cachedModels.length === 0">
+                    <input type="text" :value="setting.value" placeholder="Enter model name" 
+                           @input="updateSetting(setting, $event.target.value)">
+                </template>
+                <button type="button" @click="fetchModels()" class="model-refresh-btn" :disabled="loading"
+                        :title="cachedModels && cachedModels.length > 0 ? 'Refresh model list' : 'Load models from API'">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path>
+                        <path d="M21 3v5h-5"></path>
+                    </svg>
+                </button>
+            </div>
+            <span class="setting-description" x-show="setting.description" x-html="renderMarkdown(setting.description)"></span>
+            <!-- Error message if fetch failed -->
+            <p class="model-error-msg" x-show="modelsLoadError" x-text="'Could not load models: ' + modelsLoadError"></p>
         </div>
     </template>
 </div>
