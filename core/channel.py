@@ -367,8 +367,6 @@ class Channel:
             if is_cmd and message.get("role", "user") == "user":
                 # immediately yield the user's message for display in frontend channels
                 yield {"type": "user_message", "content": user_message.get("content")}
-                # and add to context
-                await self.context.chat.add({"role": "user", "content": user_message.get("content")})
 
                 # then process
                 try:
@@ -380,11 +378,14 @@ class Channel:
 
                 if cmd_response:
                     # insert and return the command response without sending it to the AI
-                    for word in cmd_response:
-                        yield {"type": "content", "content": word}
-                    await self.context.chat.add({"role": "user", "content": cmd_response})
+                    # return the entire thing as one token so that it's instant
 
+                    # we don't add to context here because process_input already does that! oopsie..
+                    yield {"type": "content", "content": str(cmd_response)}
                     return
+
+        # and add to context
+        await self.context.chat.add({"role": "user", "content": user_message.get("content")})
 
         # run user message module event hooks
         # before we even send to the API, so that we can immediately yield the message for display in frontend channels
