@@ -72,7 +72,7 @@ function getMainData() {
                 return;
             }
 
-            result = await simpleApiFetch(`/api/chat/load/${this.selectedChat}`);
+            result = await simpleApiFetch(`/api/chat/current`);
             if (!result) { return }
 
             this.chat = result;

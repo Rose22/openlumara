@@ -149,6 +149,11 @@ async function handleWebSocketMessage(data) {
                     break;
             }
 
+            if (token.is_cmd) {
+                // reload the global state in case something changed due to the command
+                await getMain().reloadChat();
+            }
+
             stream.tokens.push(token);
             break;
 
