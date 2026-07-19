@@ -86,11 +86,6 @@ function getTurns(instance) {
                 continue;
             }
 
-            // Skip tokens with no actual content (prevents blank segments)
-            if (token.type === 'reasoning' && (!token.content || token.content.trim() === '')) {
-                continue;
-            }
-
             let segmentType = token.type;
             // Normalize tool call types into a single segment type
             if (token.type === 'tool_call_delta' || token.type === 'tool_calls') {
