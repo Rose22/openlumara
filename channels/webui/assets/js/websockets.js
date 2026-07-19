@@ -50,6 +50,9 @@ async function connectWebSocket() {
             isWsConnected = false;
 
             getMain().notice = "Not connected to the backend server! Is OpenLumara running?"
+            stream = Alpine.store("stream")
+            stream.state = 'idle';
+            stream.pendingMessageId = null;
 
             await scheduleWsReconnect();
         }
