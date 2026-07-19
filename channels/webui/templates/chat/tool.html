@@ -1,9 +1,0 @@
-<div>
-    <h3>tool response</h3>
-    <pre x-text="message.content" style="height: 100px; overflow-y: auto;"></pre>
-
-    <!-- prompt processing indicator (works with llama.cpp) -->
-    <template x-if="$store.stream.state === 'processing_tools'">
-        {% include 'chat/prompt_processing.html' %}
-    </template>
-</div>

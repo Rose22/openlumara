@@ -1,3 +1,6 @@
+/* 
+ * --- useful functions for sending/receiving to/from the backend API and websockets
+ */
 async function simpleApiFetch(url) {
     // fetches something from the API and returns the data extracted from the JSON response
     raw_data = await(
@@ -27,52 +30,29 @@ async function simpleSocketSend(data) {
     return window.socket.send(JSON.stringify(data));
 }
 
+/*
+ * --- formatting stuff
+ */
 function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
 }
 
-// Escape special regex characters in a string.
-function escapeRegex(str) {
-    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function formatDate(timestamp) {
-    if (!timestamp) return '';
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffMs = now - date;
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    
-    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-}
-
 function partialJsonParse(str) {
     if (!str || !str.trim()) return {};
 
-    // Try normal parse first
     try {
         return JSON.parse(str);
     } catch (e) {
-        // Strip trailing commas before parsing
         let completed = str.trim();
         completed = completed.replace(/,\s*([}\]])/g, '$1');
 
-        // Close unclosed brackets/braces/strings
         let openBraces = (completed.match(/{/g) || []).length;
         let closeBraces = (completed.match(/}/g) || []).length;
         let openBrackets = (completed.match(/\[/g) || []).length;
         let closeBrackets = (completed.match(/]/g) || []).length;
 
-        // Close unclosed strings
         const openQuotes = (completed.match(/"(?<!\\)"/g) || []).length;
         if (openQuotes % 2 !== 0) {
             completed += '"';
@@ -84,7 +64,7 @@ function partialJsonParse(str) {
         try {
             return JSON.parse(completed);
         } catch (e2) {
-            return { _raw: str }; // fallback
+            return { _raw: str };
         }
     }
 }

@@ -10,6 +10,7 @@ async function send(text) {
     })
 
     Alpine.store("stream").state = "sending";
+
 }
 
 async function stopStream() {

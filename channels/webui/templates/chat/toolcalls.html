@@ -1,31 +1,28 @@
 <div class="flex fullwidth">
     <template x-for="tool in message.tool_calls">
-        <div class="tool-calls-container" x-data="{ collapsed: tool.response }">
+        <div class="tool-calls-container" x-data="{ collapsed: false }">
             <div class="tool-call-card">
                 <div class="header" @click="collapsed = !collapsed">
-                    <!--
-                        <svg class="toggle" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="9 18 15 12 9 6"></polyline>
-                        </svg>
-                    -->
+                    <svg :class="{'toggle': true, 'toggle-expanded': !collapsed}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
                     <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
                     </svg>
                     <span class="name" x-text="tool.function.name"></span>
                     <template x-if="tool.response">
-                        <span class="status completed">done</span>
+                        <span class="status completed" x-init="collapsed = true">done</span>
                     </template>
-                    <template x-else>
-                        <span class="status pending" x-show="$store.stream.state === 'calling_tools'">calling...</span>
+                    <template x-if="!tool.response">
+                        <span class="status pending">calling...</span>
                     </template>
                 </div>
 
                 <div class="body" x-show="!collapsed">
                     <div class="section">
-                        <div class="args" x-data="{
-                            parseArgs() { return partialJsonParse(tool.function.arguments); }
-                        }">
-                            <template x-for="(value, key) in parseArgs()" x-if="key !== '_raw'">
+                        <div class="args">
+                            <div class="title">Arguments</div>
+                            <template x-for="(value, key) in partialJsonParse(tool.function.arguments)">
                                 <div class="arg-row">
                                     <span class="arg-name" x-text="key"></span>
                                     <span class="arg-value" x-text="value"></span>
@@ -48,7 +45,7 @@
                                             }">
                                              <!-- if it's json, use our complex function to show the response in a fancy way -->
                                             <template x-if="isJson">
-                                                <div class="content" x-html="partialToolcallRenderer(JSON.parse(tool.response), 0)"></div>
+                                                <div class="content" x-html="toolResultsRenderer(JSON.parse(tool.response), 0)"></div>
                                             </template>
                                             <!-- if not, show it as a raw string, formatted nicely -->
                                             <template x-if="!isJson">
@@ -65,8 +62,8 @@
         </div>
     </template>
 
-    <!-- show the prompt processing indicator -->
-    <template x-if="$store.stream.state === 'processing_tools'">
+    <!-- show the prompt processing indicator.. but only below the last toolcall in the message -->
+    <template x-if="$store.stream.state === 'processing_tools' && turnIndex === turns.length - 1 && msgIndex >= turn.messages.length - (message.tool_calls.length+1)">
         {% include 'chat/prompt_processing.html' %}
     </template>
 </div>

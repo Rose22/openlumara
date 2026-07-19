@@ -35,7 +35,7 @@
             if (!user_input) { return; }
 
             await send(user_input);
-            user_input='';
+            await clearInput();
             $el.style.height = '48px';
         }
     "
@@ -48,7 +48,7 @@
         if (!user_input) { return; }
 
         await send(user_input);
-        user_input='';
+        await clearInput();
         $el.style.height = '48px';
     }
     "

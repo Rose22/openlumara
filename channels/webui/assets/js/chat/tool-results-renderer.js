@@ -1,4 +1,4 @@
-function partialToolcallRenderer(data, depth = 0) {
+function toolResultsRenderer(data, depth = 0) {
     /*
      * apparently HTML generation couldn't be avoided for this, and Alpine wasn't up to the task..
      * or at least so my AI said, but this is to be continued.
@@ -20,7 +20,7 @@ function partialToolcallRenderer(data, depth = 0) {
 
         if (!hasMore) {
             const items = visible.map((item, i) =>
-                (i > 0 ? ', ' : '') + partialToolcallRenderer(item, depth + 1)
+                (i > 0 ? ', ' : '') + toolResultsRenderer(item, depth + 1)
             );
             return `<span class="preview-bracket">[</span> ${items.join('')} <span class="preview-bracket">]</span>`;
         }
@@ -29,10 +29,10 @@ function partialToolcallRenderer(data, depth = 0) {
         visible.forEach((item, i) => {
             html += `<div class="array-item">`;
             html += `<span class="index">${i}</span>`;
-            html += `<span class="value">${partialToolcallRenderer(item, depth + 1)}</span>`;
+            html += `<span class="value">${toolResultsRenderer(item, depth + 1)}</span>`;
             html += `</div>`;
         });
-        html += `<span class="truncated" onclick="showFullJsonModal(${JSON.stringify(data)}, 'Array[${data.length}]')" style="cursor:pointer;">+ ${remaining} more</span>`;
+        html += `<span class="truncated" style="cursor:pointer;">+ ${remaining} more</span>`;
         html += `</div>`;
         return html;
     }
@@ -48,7 +48,7 @@ function partialToolcallRenderer(data, depth = 0) {
 
         if (!hasMore) {
             const kvs = visible.map(([k, v]) =>
-                `<div class="kv-row"><span class="key">${escapeHtml(k)}</span><span class="colon">: </span>${partialToolcallRenderer(v, depth + 1)}</div>`
+                `<div class="kv-row"><span class="key">${escapeHtml(k)}</span><span class="colon">: </span>${toolResultsRenderer(v, depth + 1)}</div>`
             );
             return kvs.join('');
         }
@@ -58,10 +58,10 @@ function partialToolcallRenderer(data, depth = 0) {
             html += `<div class="kv-row">`;
             html += `<span class="key">${escapeHtml(key)}</span>`;
             html += `<span class="colon">:</span>`;
-            html += `<span class="value">${partialToolcallRenderer(value, depth + 1)}</span>`;
+            html += `<span class="value">${toolResultsRenderer(value, depth + 1)}</span>`;
             html += `</div>`;
         });
-        html += `<span class="truncated" onclick="showFullJsonModal(${JSON.stringify(data)}, 'Object[${entries.length} keys]')" style="cursor:pointer;">+ ${remaining} more keys</span>`;
+        html += `<span class="truncated" style="cursor:pointer;">+ ${remaining} more keys</span>`;
         html += `</div>`;
         return html;
     }

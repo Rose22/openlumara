@@ -9,37 +9,39 @@
             
             <!-- Font Family -->
             <div class="setting-item">
-                <label>Font Family</label>
-                <select x-model="fontFamily" @change="handleFontChange($event.target.value)">
-                    <option value="default">System Default</option>
-                    <option value="Arial">Arial</option>
-                    <option value="Helvetica">Helvetica</option>
-                    <option value="Calibri">Calibri</option>
-                    <option value="Segoe UI">Segoe UI</option>
-                    <option value="Georgia">Georgia</option>
-                    <option value="Verdana">Verdana</option>
-                    <option value="Consolas">Consolas</option>
-                    <option value="Courier New">Courier New</option>
-                    <option value="Inter">Inter</option>
-                    <option value="Roboto">Roboto</option>
-                    <option value="Roboto Mono">Roboto Mono</option>
-                    <option value="Lato">Lato</option>
-                    <option value="Open Sans">Open Sans</option>
-                    <option value="Ubuntu">Ubuntu</option>
-                    <option value="Poppins">Poppins</option>
-                    <option value="Montserrat">Montserrat</option>
-                    <option value="Nunito">Nunito</option>
-                    <option value="Source Sans 3">Source Sans 3</option>
-                    <option value="Inconsolata">Inconsolata</option>
-                    <option value="Raleway">Raleway</option>
-                    <option value="Quicksand">Quicksand</option>
-                    <option value="Comfortaa">Comfortaa</option>
-                    <option value="Fredoka">Fredoka</option>
-                    <option value="Pacifico">Pacifico</option>
-                    <option value="Lobster">Lobster</option>
-                    <option value="Dancing Script">Dancing Script</option>
-                    <option value="Caveat">Caveat</option>
-                </select>
+                <label>
+                    Font Family
+                    <select name="font-family" x-model="fontFamily" @change="handleFontChange($event.target.value)">
+                        <option value="default">System Default</option>
+                        <option value="Arial">Arial</option>
+                        <option value="Helvetica">Helvetica</option>
+                        <option value="Calibri">Calibri</option>
+                        <option value="Segoe UI">Segoe UI</option>
+                        <option value="Georgia">Georgia</option>
+                        <option value="Verdana">Verdana</option>
+                        <option value="Consolas">Consolas</option>
+                        <option value="Courier New">Courier New</option>
+                        <option value="Inter">Inter</option>
+                        <option value="Roboto">Roboto</option>
+                        <option value="Roboto Mono">Roboto Mono</option>
+                        <option value="Lato">Lato</option>
+                        <option value="Open Sans">Open Sans</option>
+                        <option value="Ubuntu">Ubuntu</option>
+                        <option value="Poppins">Poppins</option>
+                        <option value="Montserrat">Montserrat</option>
+                        <option value="Nunito">Nunito</option>
+                        <option value="Source Sans 3">Source Sans 3</option>
+                        <option value="Inconsolata">Inconsolata</option>
+                        <option value="Raleway">Raleway</option>
+                        <option value="Quicksand">Quicksand</option>
+                        <option value="Comfortaa">Comfortaa</option>
+                        <option value="Fredoka">Fredoka</option>
+                        <option value="Pacifico">Pacifico</option>
+                        <option value="Lobster">Lobster</option>
+                        <option value="Dancing Script">Dancing Script</option>
+                        <option value="Caveat">Caveat</option>
+                    </select>
+                </label>
             </div>
             
             <!-- Font Size Slider -->

@@ -59,7 +59,7 @@
     </head>
     <body>
         <!-- the x-data is defined in js/alpine/data.js -->
-        <div x-data="main" style="display: inline">
+        <div id="main" x-data="main" style="display: inline">
             <section id="main-wrapper">
                 {% if config.get("enable_sidebar") %}
                     <section id="sidebar">
@@ -81,7 +81,6 @@
         <script src="{{ url_for('assets', path='js/alpine/data.js') }}"></script>
         <script src="{{ url_for('assets', path='js/alpine/stores.js') }}"></script>
         <script src="{{ url_for('assets', path='js/alpine/directives.js') }}"></script>
-        <script src="{{ url_for('assets', path='js/alpine/turns.js') }}"></script>
 
         {% for file in js_files %}
         <script src="{{ url_for('assets', path='js/'+file) }}"></script>

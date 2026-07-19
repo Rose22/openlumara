@@ -74,7 +74,7 @@
         flex-shrink: 0;
     }
 
-    &:not(.collapsed) .toggle {
+    .toggle-expanded {
         transform: rotate(90deg);
     }
 

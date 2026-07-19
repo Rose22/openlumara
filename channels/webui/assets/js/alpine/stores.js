@@ -13,7 +13,6 @@ let STREAM_STORE = {
 }
 
 THEME_STORE = {
-    // Reactive state
     family: localStorage.getItem('themeFamily') || 'monochrome',
     mode: localStorage.getItem('themeMode') || 'dark',
 
@@ -21,7 +20,7 @@ THEME_STORE = {
     async init() {
         if (!window.themes) {
             try {
-                const response = await fetch('/api/themes');
+                const response = await fetch('/themes.js');
                 const text = await response.text();
                 eval(text);
             } catch (e) {

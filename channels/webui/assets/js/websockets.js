@@ -1,7 +1,8 @@
 let isWsConnected = false;
 let wsReconnecting = false;
 
-// Send queue: messages waiting to be sent while disconnected
+// intended to be used to queue up messages for sending to the backend in case the
+// websocket isn't connected. it's a stub for now
 let sendQueue = [];
 
 async function connectWebSocket() {
@@ -89,12 +90,15 @@ async function scheduleWsReconnect() {
                      break;
                  case "reasoning":
                      store.state = 'thinking';
+                     store.processing = {};
                      break;
                  case "content":
                      store.state = 'streaming';
+                     store.processing = {};
                      break;
                  case "tool_call_delta":
                      store.state = 'calling_tools';
+                     store.processing = {};
                      break;
                  case "tool_calls":
                      store.state = 'calling_tools';
@@ -107,9 +111,21 @@ async function scheduleWsReconnect() {
              console.log(token);
              store.tokens.push(token);
              break;
+         case "user_message_confirmed":
+             store.state = 'received';
+
+             // reload the chat by directly accessing the data of the main element
+             main = document.getElementById("main");
+             await Alpine.$data(main).reloadChat();
+
+             break;
          case "stream_complete":
              store.state = 'idle';
              await store.clearTokens();
+
+             // reload the chat by directly accessing the data of the main element
+             main = document.getElementById("main");
+             await Alpine.$data(main).reloadChat();
              break;
      }
  }

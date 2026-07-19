@@ -16,9 +16,9 @@
 </div>
 
 <!-- list of chats -->
-<div id="chat-list" x-ref="chat-list" x-data="{query: ''}">
+<div id="chat-list" x-ref="chat-list" x-data="{query: ''}" >
     <div class="search">
-        <input type="text" placeholder="Search through your chats.." x-model="query">
+        <input name="search" type="text" placeholder="Search through your chats.." x-model="query">
     </div>
 
     <div class="chats">
@@ -34,16 +34,16 @@
                 <!-- give selected chats a nice border via the CSS class -->
                 <div
                     x-data="{ active: false }"
+                    :id="`chat-${chat.id}`"
                     :class="{'item': true, 'active': chat.id === selectedChat}"
                     @click="active = !active; selectChat(chat.id)"
-                    x-transition
                     x-init="
-                    $nextTick(() => {
-                        // autoscroll to the selected chat
-                        if (chat.id === selectedChat) {
-                            $el.scrollIntoView({ behavior: 'smooth' });
-                        }
-                    })
+                        $nextTick(() => {
+                            // autoscroll to the selected chat
+                            if (chat.id === selectedChat) {
+                                $el.scrollIntoView({ behavior: 'smooth' });
+                            }
+                        })
                     "
                 >
                     <span class="title" x-text="chat.title || 'New chat'"></span>

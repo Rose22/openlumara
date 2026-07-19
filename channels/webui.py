@@ -309,7 +309,7 @@ async def create_fastapi(channel):
         core.config.config.save()
 
         if not result:
-            return api_result(success=Falsed)
+            return api_result(success=False)
 
         # Reload modules that had their settings changed
         # if changed_modules:
@@ -349,11 +349,6 @@ async def create_fastapi(channel):
     async def websocket_endpoint(websocket: fastapi.WebSocket):
         if debug:
             channel.log(channel.name, "Attempting to connect websocket..")
-
-        # await websocket.accept()
-        # while True:
-        #     data = await websocket.receive_text()
-        #     await websocket.send_text(f"Message text was: {data}")
 
         ws_mgr = channel.websocket_manager
         await ws_mgr.connect(websocket)
@@ -467,7 +462,7 @@ async def create_fastapi(channel):
                                         "type": "messages_updated",
                                         "messages": await channel.context.chat.get()
                                     })
-                                    await start_ai_stream_task(channel, await channel.context.chat.get_id(), user_message)
+                                    await start_stream(channel, await channel.context.chat.get_id(), user_message)
                                 else:
                                     await ws_mgr.broadcast({
                                         "type": "error",
@@ -549,8 +544,7 @@ class WebSocketManager:
                 if connection.client_state == starlette.websockets.WebSocketState.CONNECTED:
                     await connection.send_json(message)
             except Exception:
-                raise
-                #disconnected.append(connection)
+                disconnected.append(connection)
 
         for conn in disconnected:
             self.disconnect(conn)

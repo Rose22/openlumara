@@ -6,6 +6,7 @@ function getMainData() {
         chat: {},
         messages: [],
         user_input: '',
+        last_user_input: '',
         selectedChat: null,
         selectedCategory: 'general',
         currentModal: '',
@@ -48,7 +49,7 @@ function getMainData() {
 
         async reloadChat() {
             stream = Alpine.store("stream");
-            if (stream.state != "idle" && stream.state != "sending") {
+            if (stream.state != "idle" && stream.state != "sending" && stream.state != 'received') {
                 // block chat reload during streaming
                 return;
             }
@@ -68,6 +69,12 @@ function getMainData() {
 
         async selectCategory(category) {
             this.selectedCategory = category;
+        },
+
+        async clearInput() {
+            // store the last user input for use in things like placeholder message bubbles
+            this.last_user_input = this.user_input;
+            this.user_input = '';
         },
 
         get promptprogress() {
@@ -95,7 +102,7 @@ function getMainData() {
         },
 
         get turns() {
-            // defined in turns.js
+            // defined in chat/turns.js
             return getTurns(this);
         }
     }

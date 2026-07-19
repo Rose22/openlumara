@@ -6,14 +6,7 @@
 {% endif %}
 
 <div id="messages" x-ref="messages" x-auto-scroll>
-    <!--
-        reload the chat on streaming state change.
-        reloadChat() automatically rejects when streaming is ongoing,
-        so this essentially just takes care of all stages before/after streaming
-    -->
-    <template x-data="{ state: $store.stream.state }" x-effect="await reloadChat()"></template>
-
-    <template x-for="turn in turns">
+    <template x-for="(turn, turnIndex) in turns">
         <div>
             <!-- user messages get rendered seperately -->
             <template x-if="turn.role === 'user'">
@@ -32,7 +25,7 @@
                 <div class="message-wrapper assistant">
                     <div class="message assistant">
                         <!-- all messages within a turn are displayed within the same message bubble -->
-                        <template x-for="message in turn.messages">
+                        <template x-for="(message, msgIndex) in turn.messages">
                             <div class="flex fullwidth">
                                 <!-- render the messages based on message role -->
 
@@ -61,8 +54,15 @@
         </div>
     </template>
 
-    <!-- typing indicator -->
+    <!-- user message placeholder to display while the message is being sent to the API -->
     <template x-if="$store.stream.state === 'sending'">
+        <div class="message-wrapper user placeholder">
+            <div class="message user placeholder" x-text="last_user_input"></div>
+        </div>
+    </template>
+
+    <!-- typing indicator -->
+    <template x-if="$store.stream.state === 'received'">
         <div class="typing-indicator" id="typing" aria-label="AI is typing" x-ignore>
             <span></span><span></span><span></span>
         </div>
