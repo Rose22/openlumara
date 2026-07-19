@@ -37,6 +37,9 @@
             await send(user_input);
             await clearInput();
             $el.style.height = '48px';
+
+            // force scroll to the bottom
+            $refs.messages.scrollTop = $refs.messages.scrollHeight;
         }
     "
 ></textarea>
@@ -50,6 +53,9 @@
         await send(user_input);
         await clearInput();
         $el.style.height = '48px';
+
+        // force scroll to the bottom
+        $refs.messages.scrollTop = $refs.messages.scrollHeight;
     }
     "
     x-show="$store.stream.state === 'idle'"
