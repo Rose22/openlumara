@@ -384,9 +384,6 @@ class Channel:
                     yield {"type": "content", "content": str(cmd_response)}
                     return
 
-        # and add to context
-        await self.context.chat.add({"role": "user", "content": user_message.get("content")})
-
         # run user message module event hooks
         # before we even send to the API, so that we can immediately yield the message for display in frontend channels
         usr_msg_result = None
