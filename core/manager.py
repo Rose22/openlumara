@@ -345,6 +345,8 @@ class Manager:
         user_modules = core.config.config["user_modules"]
 
         toggled = False
+        new_state = False
+
         for module_list in [modules, user_modules]:
             enabled = module_list["enabled"]
             disabled = module_list["disabled"]
@@ -353,10 +355,12 @@ class Manager:
                 enabled.remove(module_name)
                 disabled.append(module_name)
                 toggled = True
+                new_state = False
             elif module_name in disabled:
                 disabled.remove(module_name)
                 enabled.append(module_name)
                 toggled = True
+                new_state = True
             else:
                 continue
 
@@ -365,7 +369,7 @@ class Manager:
 
             if autorestart:
                 if self.channel:
-                    await self.channel.push("restarting to apply module change..")
+                    await self.channel.push(f"{module_name.capitalize()} module {'enabled' if new_state else 'disabled'}. Restarting to apply module change..")
                 await asyncio.sleep(0.1)
                 await self.channel.manager.restart()
 
