@@ -1,18 +1,18 @@
 <!-- CHANNELS: Unified list -->
 <template x-if="(activeCategory === 'channels' || activeCategory === 'user_channels') && !activeChannel">
-    <div class="channel-unified-list">
+    <div class="unified-list">
         <h3 x-text="categories[activeCategory].title"></h3>
-        <p class="settings-section-desc" x-text="categories[activeCategory].description"></p>
+        <p class="section-desc" x-text="categories[activeCategory].description"></p>
         
         <!-- All channels (enabled first, then disabled) -->
         <template x-for="channel in [...categories[activeCategory].enabled, ...categories[activeCategory].disabled]" :key="channel">
             <template x-if="showUnsafe || !categories[activeCategory].unsafeModules[channel]">
-                <div class="channel-unified-card" :class="{ 'disabled': !categories[activeCategory].enabled.includes(channel), 'unsafe': categories[activeCategory].unsafeModules[channel] }" @click="activeChannel = channel">
-                    <div class="channel-info">
+                <div class="unified-card" :class="{ 'disabled': !categories[activeCategory].enabled.includes(channel), 'unsafe': categories[activeCategory].unsafeModules[channel] }" @click="activeChannel = channel">
+                    <div class="info">
                         <span type="button" class="channel-name-btn" x-text="formatLabel(channel)"></span>
-                        <p class="channel-description" x-html="renderMarkdown(categories[activeCategory].descriptions[channel]) || ''"></p>
+                        <p class="description" x-html="renderMarkdown(categories[activeCategory].descriptions[channel]) || ''"></p>
                     </div>
-                    <button type="button" :class="{'toggle-active': true, 'toggle-off': categories[activeCategory].disabled.includes(channel), 'toggle-on': categories[activeCategory].enabled.includes(channel) }" 
+                    <button type="button" :class="{'toggle': true, 'toggle-off': categories[activeCategory].disabled.includes(channel), 'toggle-on': categories[activeCategory].enabled.includes(channel) }" 
                             @click="toggleEnabled(activeCategory, channel)">
                     </button>
                 </div>
@@ -25,9 +25,9 @@
 <template x-if="activeChannel && (activeCategory === 'channels' || activeCategory === 'user_channels')">
     <div class="channel-drilldown">
         <div x-animate.duration.120ms>
-            <button type="button" @click="activeChannel = null" class="mobile-back-btn">← Back</button>
+            <button type="button" @click="activeChannel = null" class="back-btn">← Back</button>
             <h3 x-text="formatLabel(activeChannel)"></h3>
-            <p class="settings-section-desc" x-html="renderMarkdown(categories[activeCategory].descriptions[activeChannel]) || ''"></p>
+            <p class="section-desc" x-html="renderMarkdown(categories[activeCategory].descriptions[activeChannel]) || ''"></p>
             
             <template x-if="categories[activeCategory].settings[activeChannel] && categories[activeCategory].settings[activeChannel].value">
                 <template x-for="[key, setting] in Object.entries(categories[activeCategory].settings[activeChannel].value)" :key="key">

@@ -174,7 +174,6 @@
             }
 
             .streaming-icon {
-                display: none;
                 align-items: center;
                 justify-content: center;
                 flex-shrink: 0;

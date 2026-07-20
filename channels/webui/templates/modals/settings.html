@@ -1,8 +1,8 @@
 <div x-show="currentModal === 'settings'" x-cloak>
     <div class="settings-modal modal" x-data="settingsModal()">
-        <div class="modal-header">
-            <h2 id="settings-title">Settings</h2>
-            <button class="modal-close" @click="currentModal = null" aria-label="Close settings">×</button>
+        <div class="header">
+            <h2 id="title">Settings</h2>
+            <button class="close" @click="currentModal = null" aria-label="Close settings">×</button>
         </div>
 
         <!-- Loading State -->
@@ -18,12 +18,12 @@
         </div>
 
         <!-- Settings Content -->
-        <div class="settings-body" x-show="!loading && !error">
+        <div class="body" x-show="!loading && !error">
             <!-- SIDEBAR NAV -->
             {% include 'modals/settings/sidebar.html' %}
 
             <!-- MAIN CONTENT AREA -->
-            <main class="settings-content" x-animate.duration.170ms>
+            <main class="content" x-animate.duration.170ms>
                 <!-- Mobile: show category list when no category selected -->
                 <template x-if="mobile && !activeCategory">
                     <div class="mobile-category-list">
@@ -43,14 +43,17 @@
 
                 <!-- APPEARANCE (special theme section) -->
                 {% include 'modals/settings/appearance.html' %}
+
+                <!-- AUDIO -->
+                {% include 'modals/settings/audio.html' %}
                 
-                <!-- ALL OTHER CATEGORIES -->
+                <!-- ALL OTHER CATEGORIES (core and so on) -->
                 <template x-if="!activeModule && !activeChannel && 
-                                 !['appearance', 'modules', 'user_modules', 'channels', 'user_channels'].includes(activeCategory) && 
+                                 !['appearance', 'audio', 'modules', 'user_modules', 'channels', 'user_channels'].includes(activeCategory) && 
                                  activeCategory">
-                    <div class="settings-section">
-                        <h3 class="settings-section-title" x-text="categories[activeCategory].title"></h3>
-                        <p class="settings-section-desc" x-text="categories[activeCategory].description"></p>
+                    <div class="section">
+                        <h3 class="title" x-text="categories[activeCategory].title"></h3>
+                        <p class="desc" x-text="categories[activeCategory].description"></p>
                         
                         <template x-for="[key, setting] in Object.entries(categories[activeCategory].settings)" :key="key">
                             {% include 'modals/settings/fields.html' %}
@@ -63,7 +66,7 @@
         </div>
 
         <!-- Action Buttons -->
-        <div class="settings-actions">
+        <div class="actions">
             <div x-show="hasChanges" class="settings-unsaved">
                 You have unsaved changes
             </div>

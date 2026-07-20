@@ -31,62 +31,56 @@
     transition: opacity 0.2s ease-out, visibility 0.2s ease-out, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
     font-family: var(--font-primary);
     color: var(--text-primary);
-}
 
-.modal.show {
-    opacity: 1;
-    visibility: visible;
-    transform: translateZ(0) translateY(0);
-}
+    .header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 4px 12px;
+        border-bottom: 1px solid var(--border-color);
+        background: var(--bg-tertiary);
 
-.modal-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 4px 12px;
-    border-bottom: 1px solid var(--border-color);
-    background: var(--bg-tertiary);
-}
+        h2 {
+            margin: 0;
+            font-size: 1.1rem;
+            color: var(--text-primary);
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            margin-left: 3px;
+        }
+    }
 
-.modal-header h2 {
-    margin: 0;
-    font-size: 1.1rem;
-    color: var(--text-primary);
-    font-weight: 600;
-    letter-spacing: -0.02em;
-    margin-left: 3px;
-}
+    .close {
+        padding: 0px 4px;
+        background: transparent;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-sm);
+        font-size: 1.25rem;
+        line-height: 1;
+        color: var(--text-secondary);
+        cursor: pointer;
+        transition: all 0.15s ease;
+        font-family: var(--font-primary);
 
-.modal-close {
-    padding: 0px 4px;
-    background: transparent;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-sm);
-    font-size: 1.25rem;
-    line-height: 1;
-    color: var(--text-secondary);
-    cursor: pointer;
-    transition: all 0.15s ease;
-    font-family: var(--font-primary);
-}
+        &:hover {
+            background: var(--button-bg);
+            color: var(--text-primary);
+            border-color: var(--accent);
+        }
 
-.modal-close:hover {
-    background: var(--button-bg);
-    color: var(--text-primary);
-    border-color: var(--accent);
-}
+        .content {
+            padding: 24px;
 
-.modal-content {
-    padding: 24px;
-}
-
-.modal-content h3 {
-    margin-bottom: 12px;
-    font-size: 0.85rem;
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
-    color: var(--text-secondary);
-    font-weight: 600;
+            h3 {
+                margin-bottom: 12px;
+                font-size: 0.85rem;
+                text-transform: uppercase;
+                letter-spacing: 0.6px;
+                color: var(--text-secondary);
+                font-weight: 600;
+            }
+        }
+    }
 }
 
 /* Confirmation Dialog Styling */
@@ -123,60 +117,60 @@
     gap: 18px;
     animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     font-family: var(--font-primary);
+
+    .message {
+        margin: 0;
+        font-size: 0.95rem;
+        line-height: 1.6;
+        color: var(--text-primary);
+    }
+
+    .actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+        margin-top: 8px;
+    }
+
+    .btn {
+        padding: 10px 20px;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-sm);
+        font-size: 14px;
+        font-weight: 500;
+        font-family: var(--font-primary);
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .cancel {
+        background: var(--button-bg);
+        color: var(--text-primary);
+
+        &:hover {
+            background: var(--button-hover);
+            border-color: var(--accent);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-soft);
+        }
+    }
+
+    .confirm {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: var(--bg-primary);
+        font-weight: 600;
+
+        &:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 0 16px var(--accent-glow);
+        }
+    }
 }
 
 @keyframes slideUp {
     from { transform: translateY(20px); opacity: 0; }
     to { transform: translateY(0); opacity: 1; }
-}
-
-.confirm-message {
-    margin: 0;
-    font-size: 0.95rem;
-    line-height: 1.6;
-    color: var(--text-primary);
-}
-
-.confirm-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 12px;
-    margin-top: 8px;
-}
-
-.confirm-btn {
-    padding: 10px 20px;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-sm);
-    font-size: 14px;
-    font-weight: 500;
-    font-family: var(--font-primary);
-    cursor: pointer;
-    transition: all 0.15s ease;
-}
-
-.confirm-btn.cancel {
-    background: var(--button-bg);
-    color: var(--text-primary);
-}
-
-.confirm-btn.cancel:hover {
-    background: var(--button-hover);
-    border-color: var(--accent);
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-soft);
-}
-
-.confirm-btn.confirm {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: var(--bg-primary);
-    font-weight: 600;
-}
-
-.confirm-btn.confirm:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 0 16px var(--accent-glow);
 }
 
 #export-modal {
@@ -189,3 +183,53 @@
     height: 650px;
 }
 
+
+/* --- Actions Bar --- */
+.actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    padding-top: 7px;
+    padding-bottom: 7px;
+    padding-right: 7px;
+    border-top: 1px solid var(--border-color);
+    background: var(--bg-tertiary);
+
+    button {
+        padding: 7px 24px;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-sm);
+        background: var(--button-bg);
+        color: var(--text-primary);
+        font-size: 14px;
+        font-weight: 500;
+        font-family: var(--font-primary);
+        cursor: pointer;
+        transition: all 0.15s ease;
+
+        &:hover:not(:disabled) {
+            border-color: var(--accent);
+            box-shadow: var(--shadow-soft);
+        }
+
+        &:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        &:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        &:nth-child(2) {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: var(--bg-primary);
+            font-weight: 600;
+
+            &:hover:not(:disabled) {
+                box-shadow: 0 0 16px var(--accent-glow);
+            }
+        }
+    }
+}

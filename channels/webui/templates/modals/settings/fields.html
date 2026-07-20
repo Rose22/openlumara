@@ -1,24 +1,24 @@
 <template x-if="showUnsafe || !setting.unsafe">
-    <div class="setting-item" :class="{ 'unsafe': setting.unsafe }">
+    <div class="item" :class="{ 'unsafe': setting.unsafe }">
         <!-- Boolean -->
         <template x-if="setting.type === 'boolean'">
             <div>
                 <div class="toggle-row">
                     <label x-text="setting.title"></label>
-                    <button type="button" :class="{ active: setting.value }" @click="updateSetting(setting, !setting.value)">
+                    <button class="toggle" type="button" :class="{ active: setting.value }" @click="updateSetting(setting, !setting.value)">
                     </button>
                 </div>
-                <span class="setting-description" x-show="setting.description" x-html="renderMarkdown(setting.description)"></span>
+                <span class="description" x-show="setting.description" x-html="renderMarkdown(setting.description)"></span>
             </div>
         </template>
 
         <!-- Number -->
         <template x-if="setting.type === 'number'">
-            <div class="setting-row">
+            <div class="row">
                 <label x-text="setting.title"></label>
                 <input type="number" :value="setting.value" :min="setting.min" :max="setting.max" :step="setting.step || 1" 
                        @input="updateSetting(setting, parseFloat($event.target.value))">
-                <span class="setting-description" x-show="setting.description" x-html="renderMarkdown(setting.description)"></span>
+                <span class="description" x-show="setting.description" x-html="renderMarkdown(setting.description)"></span>
             </div>
         </template>
 
@@ -28,27 +28,27 @@
             &&
             (activeCategory != 'model' && setting.title != 'Name')
         ">
-            <div class="setting-row">
+            <div class="row">
                 <label x-text="setting.title"></label>
                 <input type="text" :type="setting.type" :value="setting.value" 
                        @input="updateSetting(setting, $event.target.value)">
-                <span class="setting-description" x-show="setting.description" x-html="renderMarkdown(setting.description)"></span>
+                <span class="description" x-show="setting.description" x-html="renderMarkdown(setting.description)"></span>
             </div>
         </template>
 
         <!-- Textarea -->
         <template x-if="setting.type === 'textarea'">
-            <div class="setting-row">
+            <div class="row">
                 <label x-text="setting.title"></label>
                 <textarea :value="setting.value" rows="4" 
                           @input="updateSetting(setting, $event.target.value)"></textarea>
-                <span class="setting-description" x-show="setting.description" x-html="renderMarkdown(setting.description)"></span>
+                <span class="description" x-show="setting.description" x-html="renderMarkdown(setting.description)"></span>
             </div>
         </template>
 
         <!-- Select -->
         <template x-if="setting.type === 'select'">
-            <div class="setting-row">
+            <div class="row">
                 <label x-text="setting.title"></label>
                 <span class="setting-description" x-show="setting.description" x-html="renderMarkdown(setting.description)"></span>
                 <select :value="setting.value" @change="updateSetting(setting, $event.target.value)">
@@ -56,14 +56,14 @@
                         <option :value="optionKey" x-text="optionKey" :selected="setting.value === optionKey"></option>
                     </template>
                 </select>
-                <span class="setting-description" x-show="setting.options && setting.options[setting.value]" x-html="renderMarkdown(setting.options[setting.value])"></span>
+                <span class="description" x-show="setting.options && setting.options[setting.value]" x-html="renderMarkdown(setting.options[setting.value])"></span>
             </div>
         </template>
 
         <!-- Model Dropdown -->
         <!-- very hacky way of detecting it for now.. but it'll have to do -->
         <template x-if="activeCategory === 'model' && setting.title === 'Name'">
-            <div class="setting-row model-setting-row">
+            <div class="row model-setting-row">
                 <label x-text="setting.title"></label>
                 <div class="model-input-container">
                     <template x-if="cachedModels && cachedModels.length > 0">
@@ -87,9 +87,9 @@
                             {% include 'svg/reload.svg' %}
                     </button>
                 </div>
-                <span class="setting-description" x-show="setting.description" x-html="renderMarkdown(setting.description)"></span>
+                <span class="description" x-show="setting.description" x-html="renderMarkdown(setting.description)"></span>
                 <!-- Error message if fetch failed -->
-                <p class="model-error-msg" x-show="modelsLoadError" x-text="'Could not load models: ' + modelsLoadError"></p>
+                <p class="error" x-show="modelsLoadError" x-text="'Could not load models: ' + modelsLoadError"></p>
             </div>
         </template>
     </div>
