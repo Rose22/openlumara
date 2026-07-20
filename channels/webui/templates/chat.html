@@ -29,13 +29,13 @@
 
                         <template x-if="turn.messages[0].msgId !== $store.stream.pendingMessageId && editingMessageIndex != turn.messages[0].index">
                             <div class="message-buttons">
-                                    <button @click="startEdit(turn.messages[0].index)" title="Edit">
+                                    <button @click="startEdit(turn.messages[0].index)" title="Edit" :disabled="$store.stream.state != 'idle'">
                                         {% include 'svg/edit.svg' %}
                                     </button>
-                                    <button @click="regenerateMessage(turn.messages[0].index)" title="Regenerate">
+                                    <button @click="regenerateMessage(turn.messages[0].index)" title="Regenerate" :disabled="$store.stream.state != 'idle'">
                                         {% include 'svg/reload.svg' %}
                                     </button>
-                                    <button @click="deleteMessage(turn.messages[0].index)" title="Delete">
+                                    <button @click="deleteMessage(turn.messages[0].index)" title="Delete" :disabled="$store.stream.state != 'idle'">
                                         {% include 'svg/trash.svg' %}
                                     </button>
                                 </div>
@@ -86,10 +86,10 @@
                             </template>
 
                             <div class="message-buttons">
-                                    <button @click="regenerateMessage(turn.index)" title="Regenerate">
+                                    <button @click="regenerateMessage(turn.index)" title="Regenerate" :disabled="$store.stream.state != 'idle'">
                                         {% include 'svg/reload.svg' %}
                                     </button>
-                                    <button @click="deleteMessage(turn.index)" title="Delete">
+                                    <button @click="deleteMessage(turn.index)" title="Delete" :disabled="$store.stream.state != 'idle'">
                                         {% include 'svg/trash.svg' %}
                                     </button>
                                 </div>
