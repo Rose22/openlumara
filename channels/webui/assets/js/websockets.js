@@ -113,6 +113,9 @@ async function handleWebSocketMessage(data) {
         case "user_message_confirmed":
             // aaand now we remove the pending status
             stream.pendingMessageId = null;
+
+            // and track the index of it so we can know the index of the next assistant message
+            stream.userMessageId = data.index;
             stream.state = 'received';
             break;
         case "push":
@@ -183,6 +186,11 @@ async function handleWebSocketMessage(data) {
             }
 
             stream.tokens.push(token);
+            break;
+
+        case "messages_updated":
+            // make sure we sync chat
+            await getMain().reloadChat();
             break;
 
         case "chat_switched":

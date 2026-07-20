@@ -120,6 +120,24 @@ function getMainData() {
         },
 
         /* ----------------------
+         * message actions
+         * ----------------------- */
+        async deleteMessage(index) {
+            await simpleSocketSend({
+                "type": "message_delete",
+                "index": index
+            });
+        },
+
+        async regenerateMessage(index) {
+            console.log(`attempting regenerate ${index}`);
+            await simpleSocketSend({
+                "type": "message_regenerate",
+                "index": index
+            });
+        },
+
+        /* ----------------------
          * chat-specific getters
          * ----------------------- */
         get promptprogress() {

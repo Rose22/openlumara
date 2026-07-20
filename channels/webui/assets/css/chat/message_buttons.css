@@ -1,0 +1,78 @@
+.message-buttons {
+    display: flex;
+    justify-content: flex-end;
+    width: 100%;
+    margin-top: 4px;
+    border-top: 1px dashed var(--text-muted);
+    gap: var(--gap);
+
+    button {
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        color: var(--text-secondary);
+        cursor: pointer;
+        transition: all 0.15s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0.2;
+        transition: opacity 0.2s ease;
+
+        margin-top: 7px;
+
+        &:hover {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border-color: var(--accent);
+            opacity: 1;
+        }
+
+        &:active {
+            transform: scale(0.95);
+        }
+        
+        &:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        &.delete {
+            border-color: var(--error);
+            color: var(--error);
+        }
+
+        &.regenerate {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        svg {
+            width: 14px;
+            height: 14px;
+        }
+    }
+
+    .stats {
+        margin-left: auto;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        opacity: 1 !important; /* Stats stay visible */
+    }
+}
+
+/* 
+.user .message-buttons {
+    justify-content: flex-start;
+}
+.assistant .message-buttons {
+    justify-content: flex-end;
+}
+*/

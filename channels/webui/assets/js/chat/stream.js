@@ -12,6 +12,9 @@ let STREAM_STORE = {
     // tracks the id of a pending (not confirmed received by backend) message
     pendingMessageId: null,
 
+    // tracks the index of a confirmed user message
+    userMessageId: null,
+
     async clearTokens() {
         this.tokens = [];
         this.processing = [];

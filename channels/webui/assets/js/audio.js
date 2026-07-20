@@ -209,7 +209,6 @@ const AudioManager = {
         try {
             if (typeof localStorage !== 'undefined') {
                 const stored = localStorage.getItem(`${id}SoundEnabled`);
-                console.log(`${id}: ${stored}`)
                 if (stored !== null) {
                     isEnabled = stored === 'true';
                 } else {

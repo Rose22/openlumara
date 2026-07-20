@@ -34,6 +34,7 @@ function getTurns(instance) {
             if (!currentAssistantTurn) {
                 currentAssistantTurn = {
                     role: "assistant",
+                    index: msg.index, // id of the first message of a turn, used for message regeneration etc
                     messages: []
                 };
             }
@@ -184,10 +185,13 @@ function getTurns(instance) {
 
             turns.push({
                 role: "assistant",
-                messages: segments
+                messages: segments,
+                index: stream.userMessageIndex+1
             });
         }
     }
+
+    console.log(turns);
 
     return turns;
 

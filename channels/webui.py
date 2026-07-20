@@ -199,6 +199,22 @@ def get_recursive_assets(assets_path, ext, skip: list = []):
     
     return sorted(files)
 
+def inject_indexes_into_messages(lst: list):
+    """speaks for itself lol"""
+    return [{**dickt, 'index': index} for index, dickt in enumerate(lst)]
+
+def inject_indexes_into_chat(chat):
+    """injects indexes into a chat's messages"""
+    # copy it so we dont mutate it when injecting indexes
+    chat_copy = dict(chat)
+
+    # insert indexes into the messages array
+    # so that the UI can track them for things like
+    # editing messages, regenerating, deleting, etc
+    chat_copy["messages"] = inject_indexes_into_messages(chat["messages"])
+
+    return chat_copy
+
 # -------------------
 # FastAPI creator (contains routes and so on)
 # -------------------
@@ -249,12 +265,12 @@ async def create_fastapi(channel):
             if not channel.context.chat.current:
                 return api_result(success=False)
 
-            return api_result(channel.context.chat.data[channel.context.chat.current], success=True)
+            return api_result(inject_indexes_into_chat(await channel.context.chat.get_chat()), success=True)
 
         # broadcast the switch to any connected clients
         await channel.websocket_manager.broadcast({"type": "chat_switched", "id": id})
 
-        return api_result(channel.context.chat.data[channel.context.chat.current], success=True)
+        return api_result(inject_indexes_into_chat(await channel.context.chat.get_chat()), success=True)
 
     @app.get("/api/chat/current")
     async def chat_get_current():
@@ -262,14 +278,7 @@ async def create_fastapi(channel):
         if not channel.context.chat.current:
             return api_result(success=False)
 
-        return api_result(channel.context.chat.data[channel.context.chat.current])
-
-    @app.get("/api/chat/messages")
-    async def chat_messages():
-        """Returns a list of all messages within the currently loaded chat"""
-
-        messages = await channel.context.chat.get() 
-        return api_result(messages, success=(len(messages)>0))
+        return api_result(inject_indexes_into_chat(await channel.context.chat.get_chat()))
 
     @app.get("/api/chats")
     async def get_chats(request: fastapi.Request):
@@ -413,7 +422,7 @@ async def create_fastapi(channel):
                         case "reload_messages":
                             await ws_mgr.broadcast({
                                 "type": "messages_updated",
-                                "messages": await channel.context.chat.get()
+                                "messages": inject_indexes_into_messages(await channel.context.chat.get())
                             })
                         case "rename":
                             new_title = data.get("title")
@@ -481,7 +490,7 @@ async def create_fastapi(channel):
                             await channel.context.chat.delete_from(index-1)
                             await ws_mgr.broadcast({
                                 "type": "messages_updated",
-                                "messages": await channel.context.chat.get()
+                                "messages": inject_indexes_into_messages(await channel.context.chat.get())
                             })
                         case "message_regenerate":
                             index = data.get("index")
@@ -496,7 +505,7 @@ async def create_fastapi(channel):
                                         "type": "messages_updated",
                                         "messages": await channel.context.chat.get()
                                     })
-                                    await start_stream(channel, await channel.context.chat.get_id(), user_message)
+                                    await ws_mgr.start_stream(channel, await channel.context.chat.get_id(), user_message)
                                 else:
                                     await ws_mgr.broadcast({
                                         "type": "error",

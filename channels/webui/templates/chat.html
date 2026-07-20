@@ -24,6 +24,21 @@
                         <template x-if="message.msgId === $store.stream.pendingMessageId">
                             <span class="status">Sending..</span>
                         </template>
+
+                        <template x-if="message.msgId !== $store.stream.pendingMessageId">
+                            <div class="message-buttons">
+                                    <button @click="editMessage(message.index)" title="Edit">
+                                        {% include 'svg/edit.svg' %}
+                                    </button>
+                                    <button @click="regenerateMessage(message.index)" title="Regenerate">
+                                        {% include 'svg/reload.svg' %}
+                                    </button>
+                                    <button @click="deleteMessage(message.index)" title="Delete">
+                                        {% include 'svg/trash.svg' %}
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
                     </div>
                 </div>
             </template>
@@ -35,27 +50,38 @@
                 oh and it also contains the streaming message as the last message in the array
             -->
             <template x-if="turn.role === 'assistant'">
-                <div class="message-wrapper assistant">
-                    <div class="message assistant">
-                        <!-- all messages within a turn are displayed within the same message bubble -->
-                        <template x-for="(message, msgIndex) in turn.messages">
-                            <div :class="{'flex': true, 'fullwidth': true, 'command': message.is_cmd}">
-                                <!-- render the messages based on message role -->
-                                <template x-if="message.role === 'assistant'">
-                                    <div class="flex fullwidth">
-                                        <template x-if="(message.type === 'reasoning') || (message.type === 'history' && message.reasoning_content && message.reasoning_content.trim().length > 0) || (message.type === 'tool_calls' && message.reasoning_content && message.reasoning_content.trim().length > 0)">
-                                            {% include 'chat/reasoning.html' %}
-                                        </template>
-                                        <template x-if="message.type === 'content' || message.type === 'history'">
-                                            <div class="content" x-html="renderMarkdown(message.content)"></div>
-                                        </template>
-                                        <template x-if="message.type === 'tool_calls' || message.type === 'tool_call_delta'">
-                                            {% include 'chat/toolcalls.html' %}
-                                        </template>
-                                    </div>
-                                </template>
+                <div>
+                    <div class="message-wrapper assistant" x-data="{ messageActionId: turn.index }">
+                        <div class="message assistant">
+                            <!-- all messages within a turn are displayed within the same message bubble -->
+                            <template x-for="(message, msgIndex) in turn.messages">
+                                <div :class="{'flex': true, 'fullwidth': true, 'command': message.is_cmd}">
+                                    <!-- render the messages based on message role -->
+                                    <template x-if="message.role === 'assistant'">
+                                        <div class="flex fullwidth">
+                                            <template x-if="(message.type === 'reasoning') || (message.type === 'history' && message.reasoning_content && message.reasoning_content.trim().length > 0) || (message.type === 'tool_calls' && message.reasoning_content && message.reasoning_content.trim().length > 0)">
+                                                {% include 'chat/reasoning.html' %}
+                                            </template>
+                                            <template x-if="message.type === 'content' || message.type === 'history'">
+                                                <div class="content" x-html="renderMarkdown(message.content)"></div>
+                                            </template>
+                                            <template x-if="message.type === 'tool_calls' || message.type === 'tool_call_delta'">
+                                                {% include 'chat/toolcalls.html' %}
+                                            </template>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+
+                            <div class="message-buttons">
+                                    <button @click="regenerateMessage(turn.index)" title="Regenerate">
+                                        {% include 'svg/reload.svg' %}
+                                    </button>
+                                    <button @click="deleteMessage(turn.index)" title="Delete">
+                                        {% include 'svg/trash.svg' %}
+                                    </button>
+                                </div>
                             </div>
-                        </template>
                     </div>
                 </div>
             </template>
