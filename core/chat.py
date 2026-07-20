@@ -287,7 +287,7 @@ class Chat:
         and so, will break all over the place if i remove .get() in favor of .messages.get()
         """
         if self.current is None:
-            return None
+            await self.new()
 
         return self.data[self.current]
 
@@ -311,7 +311,7 @@ class Chat:
 
     async def get_message(self, index: int):
         if not self.current:
-            return None
+            await self.new()
 
         messages = self.data[self.current]["messages"]
 

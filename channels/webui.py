@@ -262,9 +262,6 @@ async def create_fastapi(channel):
         success = await channel.context.chat.load(id)
         if not success:
             # that likely means this is already the loaded chat
-            if not channel.context.chat.current:
-                return api_result(success=False)
-
             return api_result(inject_indexes_into_chat(await channel.context.chat.get_chat()), success=True)
 
         # broadcast the switch to any connected clients
@@ -275,9 +272,6 @@ async def create_fastapi(channel):
     @app.get("/api/chat/current")
     async def chat_get_current():
         """Gives you the currently loaded chat's data"""
-        if not channel.context.chat.current:
-            return api_result(success=False)
-
         return api_result(inject_indexes_into_chat(await channel.context.chat.get_chat()))
 
     @app.get("/api/chats")
