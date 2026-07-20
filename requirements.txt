@@ -3,6 +3,7 @@ tiktoken
 msgpack
 pyyaml
 json-repair
+regex
 python-ulid
 requests
 httpx

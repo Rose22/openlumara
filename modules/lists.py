@@ -1,5 +1,6 @@
 import core
 import random
+import regex
 
 class Lists(core.module.Module):
     """
@@ -153,6 +154,9 @@ class Lists(core.module.Module):
         return self.result(output)
 
     def _find_item(self, items: list, starts_with: str):
+        # Remove leading number prefix like "1. ", "2. ", etc.
+        clean_prefix = regex.sub(r'^\d+\.\s*', '', starts_with.strip().lower())
+
         for index, item in enumerate(items):
             if item.strip().lower().startswith(starts_with.strip().lower()):
                 return index
