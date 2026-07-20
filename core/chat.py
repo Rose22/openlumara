@@ -279,15 +279,6 @@ class Chat:
 
         return False
 
-    async def get(self, index = None):
-        """get message history of current chat"""
-        if self.current is None:
-            await self.new()
-
-        messages = self.data[self.current].get("messages", [])
-
-        return messages
-
     async def get_chat(self):
         """
         gets the entire current chat. this is why i need to split the messages into a seperate object... this is getting confusing
@@ -306,6 +297,18 @@ class Chat:
 
         return self.data[self.current].get("id", None)
 
+    # ----------------------------
+    # new, more sane method names
+    # just aliases for now
+    # as a final structure i want chat.messages.add, chat.messages.edit, and so on,
+    # but there's no time right now
+    # ----------------------------
+    async def get_messages(self):
+        await self.get()
+
+    async def set_messages(self, messages):
+        await self.set(messages)
+
     async def get_message(self, index: int):
         if not self.current:
             return None
@@ -316,6 +319,18 @@ class Chat:
             return None
 
         return messages[index]
+
+    async def add_message(self, message: dict, cmd=False, ghost = False):
+        return await self.add(message, cmd=cmd, ghost=ghost)
+
+    async def edit_message(self, index, message: dict):
+        return self.edit(index, message)
+
+    async def delete_message(self, index):
+        return self.pop(index)
+
+    async def delete_all_messages_after(self, index):
+        return await self.delete_from(index)
 
     async def get_last_message_with_role(self, role: str, cutoff_index: int = None):
         if not self.current:
@@ -351,6 +366,26 @@ class Chat:
                 return index
 
         return -1
+
+    # ----------------------------------------------------------------------------
+    # OLD, DEPRECATED METHODS BELOW
+    # ----------------------------------------------------------------------------
+    # these all apply to messages, not the chat itself,
+    # and yet i named them in a way where it's really confusing whether you're
+    # interacting with a chat or with the messages
+    # so i'm keeping these for now, to maintain compatibility
+    # with user modules and some parts of the framework,
+    # but i plan to slowly migrate to more sane names
+    # ----------------------------------------------------------------------------
+
+    async def get(self, index = None):
+        """get message history of current chat"""
+        if self.current is None:
+            await self.new()
+
+        messages = self.data[self.current].get("messages", [])
+
+        return messages
 
     async def delete_from(self, index: int):
         """

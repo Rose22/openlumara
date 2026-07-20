@@ -422,7 +422,7 @@ async def create_fastapi(channel):
                         case "reload_messages":
                             await ws_mgr.broadcast({
                                 "type": "messages_updated",
-                                "messages": inject_indexes_into_messages(await channel.context.chat.get())
+                                "messages": inject_indexes_into_messages(await channel.context.chat.get_messages())
                             })
                         case "rename":
                             new_title = data.get("title")
@@ -489,11 +489,11 @@ async def create_fastapi(channel):
 
                             message = await channel.context.chat.get_message(index)
                             message["content"] = data.get("content")
-                            await channel.context.chat.edit(index, message)
+                            await channel.context.chat.edit_message(index, message)
 
                             await ws_mgr.broadcast({
                                 "type": "messages_updated",
-                                "messages": inject_indexes_into_messages(await channel.context.chat.get())
+                                "messages": inject_indexes_into_messages(await channel.context.chat.get_messages())
                             })
                         case "message_delete":
                             index = data.get("index")
@@ -503,7 +503,7 @@ async def create_fastapi(channel):
                             await channel.context.chat.delete_from(index-1)
                             await ws_mgr.broadcast({
                                 "type": "messages_updated",
-                                "messages": inject_indexes_into_messages(await channel.context.chat.get())
+                                "messages": inject_indexes_into_messages(await channel.context.chat.get_messages())
                             })
                         case "message_regenerate":
                             index = data.get("index")
@@ -516,7 +516,7 @@ async def create_fastapi(channel):
                                 if user_message:
                                     await ws_mgr.broadcast({
                                         "type": "messages_updated",
-                                        "messages": await channel.context.chat.get()
+                                        "messages": await channel.context.chat.get_messages()
                                     })
                                     await ws_mgr.start_stream(channel, await channel.context.chat.get_id(), user_message)
                                 else:
@@ -681,7 +681,7 @@ class WebSocketManager:
 
         self.active_chat_id = chat_id
         self.stream_buffer = []
-        next_index = len(await channel.context.chat.get())
+        next_index = len(await channel.context.chat.get_messages())
 
         try:
             self.active_stream_task = asyncio.create_task(self._stream_task(message, next_index))

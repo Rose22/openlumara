@@ -14,7 +14,9 @@ import sys
 class Cli(core.channel.Channel):
     """Talk to your AI from the terminal! Auto-disables itself when ran as a background server."""
 
-    dependencies = ["prompt_toolkit"]
+    dependencies = ["prompt_toolkit", "partial-json-parser"]
+
+    # TODO: use partial-json-parser for the streaming toolcalls :D yayyy!!
 
     running = True
 
