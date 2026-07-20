@@ -413,16 +413,16 @@ class Channel:
         # yield user message as a special token for display in UI's (because user message can be modified by module hooks)
         yield {"type": "user_message", "content": user_message.get("content")}
         
+        # add user's message to context
+        add_success = await self.context.chat.add(user_message)
+        if not add_success:
+            return
+
         # reconnect if needed
         result = await self.manager.API.attempt_connect()
         if result is not True:
             yield {"type": "error", "content": str(result)}
             self.log("API", str(result))
-            return
-
-        # add user's message to context
-        add_success = await self.context.chat.add(user_message)
-        if not add_success:
             return
 
         # estimate tokens used for user message
