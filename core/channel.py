@@ -485,7 +485,13 @@ class Channel:
         fetched_token_usage = False
 
         # and stream the response to the caller of this method
-        async for token in self.manager.API.send_stream(context):
+        try:
+            stream = self.manager.API.send_stream(context)
+        except Exception as e:
+            yield self.throw_stream_error(f"Error while starting stream: {core.detail_error(e)}")
+            return
+
+        async for token in stream:
             # always yield the token to the caller
             yield token
 
