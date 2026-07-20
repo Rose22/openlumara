@@ -9,7 +9,7 @@ async function send(text) {
         "content": {"role": "user", "content": text}
     })
 
-    await AudioManager.play("send");
+    await AudioManager.play("send_message");
 
     if (success) {
         Alpine.store("stream").state = "sending";

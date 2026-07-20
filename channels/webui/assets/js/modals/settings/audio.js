@@ -1,16 +1,17 @@
-const SOUND_IDS = ['error', 'warning', 'success', 'info', 'message', 'reply'];
+const SOUND_IDS = ['send_message', 'response_start', 'processing', 'typewriter', 'typing', 'token', 'completion', 'reasoning_end'];
 
 const soundDefaults = {};
 SOUND_IDS.forEach(id => {
-    soundDefaults[`${id}Enabled`] = true;
+    soundDefaults[`${id}SoundEnabled`] = false;
     soundDefaults[`${id}SoundData`] = null;
     soundDefaults[`${id}SoundName`] = null;
 });
 
 AUDIO_STORE = {
     // Master controls
-    volume: parseFloat(localStorage.getItem('typewriterVolume') || '0.7'),
-    tokenVolume: parseFloat(localStorage.getItem('tokenVolume') || '0.6'),
+    volume: parseFloat(localStorage.getItem('sfxVolume') || '1.0'),
+    tokenVolume: parseFloat(localStorage.getItem('sfxTokenVolume') || '0.6'),
+    tokenFreq: parseInt(localStorage.getItem('sfxTokenFreq') || '9000'),
 
     // Sound effect states
     sounds: { ...soundDefaults },
@@ -18,36 +19,40 @@ AUDIO_STORE = {
     init() {
         // Load sound states from localStorage
         SOUND_IDS.forEach(id => {
-            const enabled = localStorage.getItem(`${id}Enabled`);
-            if (enabled !== null) this.sounds[`${id}Enabled`] = enabled === 'true';
+            const enabled = localStorage.getItem(`${id}SoundEnabled`);
+            if (enabled !== null) this.sounds[`${id}SoundEnabled`] = enabled === 'true';
+
+            const soundData = localStorage.getItem(`${id}SoundData`);
+            const soundName = localStorage.getItem(`${id}SoundName`);
+            if (soundData) {
+                this.sounds[`${id}SoundData`] = soundData;
+                this.sounds[`${id}SoundName`] = soundName;
+            }
         });
 
-        // Sync with AudioManager if available
-        if (typeof AudioManager !== 'undefined') {
-            AudioManager.setVolume(this.volume);
-            // AudioManager.setTokenVolume(this.tokenVolume);
-        }
+        // Sync with AudioManager
+        AudioManager.setVolume(this.volume);
     },
 
     setVolume(val) {
         this.volume = val;
-        localStorage.setItem('typewriterVolume', val);
-        if (typeof AudioManager !== 'undefined') {
-            AudioManager.setVolume(val);
-        }
+        localStorage.setItem('sfxVolume', val);
+        AudioManager.setVolume(val);
+    },
+    setTokenVolume(val) {
+        this.tokenVolume = val;
+        localStorage.setItem('sfxTokenVolume', val);
+        AudioManager.setTokenVolume(val);
+    },
+    setTokenFreq(val) {
+        this.tokenFreq = val;
+        localStorage.setItem('sfxTokenFreq', val);
+        AudioManager.setTokenFreq(val);
     },
 
-    // setTokenVolume(val) {
-    //     this.tokenVolume = val;
-    //     localStorage.setItem('tokenVolume', val);
-    //     if (typeof AudioManager !== 'undefined' && AudioManager.setTokenVolume) {
-    //         AudioManager.setTokenVolume(val);
-    //     }
-    // },
-
     setSoundEnabled(id, enabled) {
-        this.sounds[`${id}Enabled`] = enabled;
-        localStorage.setItem(`${id}Enabled`, String(enabled));
+        this.sounds[`${id}SoundEnabled`] = enabled;
+        localStorage.setItem(`${id}SoundEnabled`, String(enabled));
     },
 
     setSoundData(id, dataUrl, name) {
@@ -57,7 +62,7 @@ AUDIO_STORE = {
         localStorage.setItem(`${id}SoundName`, name);
         
         // Load into AudioManager
-        AudioManager.loadSound(id, dataUrl, name);
+        AudioManager.loadFromDataURL(id, dataUrl);
     },
 
     clearSound(id) {
@@ -66,23 +71,30 @@ AUDIO_STORE = {
         localStorage.removeItem(`${id}SoundData`);
         localStorage.removeItem(`${id}SoundName`);
         
-        if (typeof AudioManager !== 'undefined') {
-            AudioManager.clearSound(id);
-        }
+        AudioManager.deleteFile(id);
     },
 
-    hasAudio(id) {
-        return !!this.sounds[`${id}SoundData`];
+    handleSoundUpload(event, id) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const dataUrl = e.target.result;
+            this.setSoundData(id, dataUrl, file.name);
+        };
+        reader.readAsDataURL(file);
+    },
+
+    previewSound(id) {
+        AudioManager.play(id);
     },
 
     reset() {
-        this.volume = 0.7;
+        this.volume = 1.0;
         this.tokenVolume = 0.6;
-        localStorage.setItem('typewriterVolume', '0.7');
-        localStorage.setItem('tokenVolume', '0.6');
-        if (typeof AudioManager !== 'undefined') {
-            AudioManager.setVolume(0.7);
-            // AudioManager.setTokenVolume(0.6);
-        }
+        localStorage.setItem('sfxVolume', '1.0');
+        localStorage.setItem('sfxTokenVolume', '0.6');
+        AudioManager.setVolume(1.0);
     }
 };

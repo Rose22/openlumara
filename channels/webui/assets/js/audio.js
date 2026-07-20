@@ -13,6 +13,7 @@ const AudioManager = {
         reasoning_end: null
     },
     volume: 1.0, // Default volume (0.0 to 1.0)
+    tokenVolume: 0.7,
     isReasoningPlaying: false, // Track reasoning chime state
     processingSound: null, // Track processing sound state
     processingStartTime: 0, // Track when processing started
@@ -33,7 +34,7 @@ const AudioManager = {
     init: function() {
         return new Promise((resolve, reject) => {
             // Load volume from storage
-            this.volume = parseFloat(localStorage.getItem('typewriterVolume') || '1.0');
+            this.volume = parseFloat(localStorage.getItem('sfxVolume') || '1.0');
 
             // 1. Open IndexedDB
             const request = indexedDB.open('TypewriterSoundsDB', 1);
@@ -109,12 +110,25 @@ const AudioManager = {
     // Set volume (0.0 to 1.0)
     setVolume: function(vol) {
         this.volume = vol;
-        localStorage.setItem('typewriterVolume', vol);
+        localStorage.setItem('sfxVolume', vol);
 
         // Update the master gain node immediately if it exists
         if (this.masterGainNode) {
             this.masterGainNode.gain.value = vol;
         }
+    },
+    setTokenVolume: function(vol) {
+        this.tokenVolume = vol;
+        localStorage.setItem('sfxTokenVolume', vol);
+
+        // Update the master gain node immediately if it exists
+        if (this.masterGainNode) {
+            this.masterGainNode.gain.value = vol;
+        }
+    },
+    setTokenFreq: function(freq) {
+        this.tokenFreq = freq;
+        localStorage.setItem('sfxTokenFreq', freq);
     },
 
     // Save a file to IndexedDB
@@ -194,7 +208,8 @@ const AudioManager = {
         let isEnabled = true;
         try {
             if (typeof localStorage !== 'undefined') {
-                const stored = localStorage.getItem(`${id}Enabled`);
+                const stored = localStorage.getItem(`${id}SoundEnabled`);
+                console.log(`${id}: ${stored}`)
                 if (stored !== null) {
                     isEnabled = stored === 'true';
                 } else {
@@ -286,8 +301,8 @@ const AudioManager = {
             };
 
             if (id === 'token') {
-                const tokenFreq = Number(localStorage.getItem('tokenFreq')) || 400;
-                const tokenVol = parseFloat(localStorage.getItem('tokenVolume')) || 0.6; // New independent volume setting
+                const tokenFreq = Number(localStorage.getItem('sfxTokenFreq')) || 400;
+                const tokenVol = parseFloat(localStorage.getItem('sfxTokenVolume')) || 0.7; // New independent volume setting
                 ctx.resume();
 
                 const osc1 = ctx.createOscillator();
@@ -416,7 +431,7 @@ const AudioManager = {
     },
 
     playProcessingSound: function() {
-        if (localStorage.getItem(`processingEnabled`) !== 'true') {
+        if (localStorage.getItem(`processingSoundEnabled`) !== 'true') {
             return;
         }
 

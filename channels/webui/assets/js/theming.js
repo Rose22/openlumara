@@ -1,23 +1,3 @@
-let STREAM_STORE = {
-    // one of: idle, sending, processing, streaming
-    state: 'idle',
-
-    // stores raw token data
-    tokens: [],
-    processing: {},
-
-    // stores the final message after the stream has finished
-    finalMessage: [],
-
-    // tracks the id of a pending (not confirmed received by backend) message
-    pendingMessageId: null,
-
-    async clearTokens() {
-        this.tokens = [];
-        this.processing = [];
-    }
-}
-
 THEME_STORE = {
     family: localStorage.getItem('themeFamily') || 'monochrome',
     mode: localStorage.getItem('themeMode') || 'dark',

@@ -1,3 +1,6 @@
+/* alpine.js directive that adds autoscrolling to any element
+ * by adding x-auto-scroll to your element
+ */
 function autoScroll(el) {
   let isAtBottom = true;
 

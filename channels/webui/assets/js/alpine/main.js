@@ -1,4 +1,9 @@
-// main data used by index.html's x-data attribute
+/*
+ * main data used by index.html's x-data attribute
+ * i want to figure out some way to split this up into multiple files,
+ * since that would make the code even cleaner,
+ * but for now this will have to do
+ */
 function getMainData() {
     return {
         chats: [],
@@ -36,13 +41,16 @@ function getMainData() {
             await connectWebSocket();
         },
 
+        /* ----------------------
+         * chat-specific functions
+         * ----------------------- */
         async loadChat(chatId) {
             if (this.selectedChat === chatId) { return; }
 
             // don't allow chat switching if a stream is ongoing
             if (Alpine.store("stream").state != 'idle') { return; }
 
-            result = await simpleApiFetch(`/api/chat/load/${chatId}`);
+            const result = await simpleApiFetch(`/api/chat/load/${chatId}`);
             if (!result) { return; }
 
             this.chat = result;
@@ -72,7 +80,7 @@ function getMainData() {
                 return;
             }
 
-            result = await simpleApiFetch(`/api/chat/current`);
+            const result = await simpleApiFetch(`/api/chat/current`);
             if (!result) { return }
 
             this.chat = result;
@@ -94,7 +102,7 @@ function getMainData() {
             this.chats = await simpleApiFetch('/api/chats');
 
             // sort it in descending order
-            this.chats = this.chats.reverse();
+            this.chats.reverse();
         },
 
         async reloadCategories() {
@@ -111,6 +119,9 @@ function getMainData() {
             this.user_input = '';
         },
 
+        /* ----------------------
+         * chat-specific getters
+         * ----------------------- */
         get promptprogress() {
             // does the math for the prompt processing indicator over in components/promptprocess.html
             // the math was ported straight over from the old webUI because, well, it works, and it's clean code
