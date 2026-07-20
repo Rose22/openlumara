@@ -264,16 +264,16 @@ class APIClient():
             # easily through the high-level chat.completions.create, we use a task
             # so we can actually cancel the task itself.
 
-            # monitor the task and the cancel_request flag
             while not request_task.done():
-                #if self.cancel_request or self.cancel_prompt_warmup:
                 if self.cancel_request:
                     request_task.cancel()
-                    raise asyncio.CancelledError("Request cancelled")
-
                 await asyncio.sleep(0.1)
 
-            response = await request_task
+            try:
+                response = await request_task
+            except asyncio.CancelledError:
+                self.cancel_request = False
+                raise asyncio.CancelledError("Request cancelled")
 
         except asyncio.CancelledError as e:
             # fully kill the connection because ive been debuggging this for like 5 hours and im tired
@@ -544,7 +544,6 @@ class APIClient():
         token_usage = None
         total_prompt_tokens = 0
         total_completion_tokens = 0
-        has_usage_data = False
         last_token_time = 0
 
         if not response:

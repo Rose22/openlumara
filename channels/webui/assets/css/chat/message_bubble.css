@@ -17,7 +17,7 @@
         width: fit-content;
         backdrop-filter: blur(10px);
 
-        &.command {
+        .command {
             font-family: monospace;
         }
 

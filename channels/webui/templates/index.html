@@ -77,9 +77,7 @@
 
         <!-- javascript files -->
         <script src="{{ url_for('assets', path='js/utils.js') }}"></script>
-
         <script src="{{ url_for('assets', path='js/alpine/main.js') }}"></script>
-        <script src="{{ url_for('assets', path='js/alpine/directives.js') }}"></script>
 
         {% for file in js_files %}
         <script src="{{ url_for('assets', path='js/'+file) }}"></script>

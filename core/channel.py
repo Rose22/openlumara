@@ -362,6 +362,16 @@ class Channel:
 
         return assistant_message
 
+    async def throw_stream_error(self, error):
+        """
+        helper method to make throwing errors during a stream consistent
+        since it's easy to forget to add an error to context in addition to yielding it..
+        """
+        # add the error message to context
+        await self.context.chat.add({"role": "assistant", "content": f"Error: {error}"})
+
+        # and pass it on to yield
+        return {"type": "error", "content": error}
 
     async def send_stream(self, message: dict, commands_authorized=False):
         """sends a message to the AI from within the current channel, streaming version"""
@@ -386,8 +396,10 @@ class Channel:
                 try:
                     cmd_response = await self.commands.process_input(user_message, authorized=commands_authorized)
                 except Exception as e:
-                    self.log_error("error while executing command", e)
-                    yield {"type": "content", "content": str(e)}
+                    self.log_error("error while executing command", core.detail_error(e))
+
+                    await self.context.chat.add(user_message)
+                    yield await self.throw_stream_error(str(core.detail_error(e)))
                     return
 
                 if cmd_response:
@@ -431,12 +443,13 @@ class Channel:
         # add user's message to context
         add_success = await self.context.chat.add(user_message)
         if not add_success:
+            yield await self.throw_stream_error("Unknown error while adding user message to context")
             return
 
         # reconnect if needed
         result = await self.manager.API.attempt_connect()
         if result is not True:
-            yield {"type": "error", "content": str(result)}
+            yield await self.throw_stream_error(str(result))
             self.log("API", str(result))
             return
 
@@ -455,6 +468,7 @@ class Channel:
                 user_message_token_estimation = await self.context.chat.count_tokens()
             except Exception as e:
                 self.log_error("Error while trying to estimate token use", e)
+                yield await self.throw_stream_error(f"Error while trying to estimate token use: {core.detail_error(e)}")
                 # abort
                 return
 
@@ -479,7 +493,7 @@ class Channel:
 
             # handle any errors
             if token_type == "error":
-                self.log("api", f"Error: {token.get('content')}")
+                self.log(self.name, f"Error: {token.get('content')}")
                 yield token
 
                 # add the content that has been accumulated so far, so that we don't lose incomplete messages
@@ -538,7 +552,6 @@ class Channel:
                         else:
                             module.on_assistant_message(assistant_message.get("content", ""))
                     except Exception as e:
-                        # Always log full traceback for easier debugging
                         self.log("module error", f"{module_name}: in on_assistant_message(): {core.detail_error(e)}")
 
     def _render_tool_token(self, name: str, args_str: str) -> str:

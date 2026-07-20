@@ -157,12 +157,27 @@ class Webui(core.channel.Channel):
             "content": message
         })
 
-    async def on_log(self, category, content):
-        await self.websocket_manager.broadcast({
+    def on_log(self, category, message):
+        if not hasattr(self, 'websocket_manager'):
+            # not initialized yet
+            return False
+
+        # Store log in buffer for history
+        self.websocket_manager.add_log(category, message)
+        
+        # Broadcast log messages to all connected webui clients
+        # Since on_log is sync but manager.broadcast is async, we schedule it as a task
+        log_message = {
             "type": "log",
             "category": category,
-            "content": content
-        })
+            "message": message
+        }
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(self.websocket_manager.broadcast(log_message))
+        except RuntimeError:
+            # No event loop running - create one for this task
+            asyncio.ensure_future(self.websocket_manager.broadcast(log_message))
 
 # -------------------
 # Helper Functions
@@ -628,28 +643,18 @@ class WebSocketManager:
                         except Exception as e:
                             self.channel.log(self.channel.name, f"error sending user message: {core.detail_error(e)}")
                             return
-                    case 'error':
-                        # for an error, just send an entire stream with the error as a content token
-                        # so that it shows up as a normal message
+                    case "error":
+                        # for an error, just force a chat reload so that it shows up (core/channel takes care of adding it to context)
                         await self.broadcast({
                             "type": "user_message_confirmed",
                             "index": index
                         })
                         await self.broadcast({
-                            "type": "token",
-                            "content": {
-                                "type": "content",
-                                "content": f"Error: {payload.get('content')}"
-                            }
-                        })
-
-                        # add it to the chat so that when the frontend syncs with the backend messages,
-                        # the error doesnt just suddenly disappear smh
-                        await self.channel.context.chat.add_message({"role": "assistant", "content": f"Error {payload.get('content')}"})
-
-                        await self.broadcast({
                             "type": "stream_complete",
                             "buffer": []
+                        })
+                        await self.broadcast({
+                            "type": "messages_updated"
                         })
                         return
                     case _:

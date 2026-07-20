@@ -21,7 +21,7 @@
                         'pending': turn.messages[0].msgId === $store.stream.pendingMessageId
                     }">
                         <template x-if="editingMessageIndex != turn.messages[0].index">
-                            <div x-html="renderMarkdown(turn.messages[0].content)"></div>
+                            <div x-html="renderMarkdown(turn.messages[0].content)" :class="{'command': turn.messages[0].is_cmd}"></div>
                             <template x-if="turn.messages[0].msgId === $store.stream.pendingMessageId">
                                 <span class="status">Sending..</span>
                             </template>

@@ -70,6 +70,7 @@ class Manager:
                 # reload config
                 core.config.load()
 
+        is_user_str = "user " if is_user_channels else ""
         channels_to_load = list(core.modules.load(channels, core.channel.Channel, filter=enabled_channels, reload=True))
 
         for channel in channels_to_load:
@@ -82,11 +83,9 @@ class Manager:
                 if channel_name in newly_installed_channels:
                     await storage[channel_name].on_install()
 
+                self.log("core", f"loaded {is_user_str}channel : {channel_name}")
             except Exception as e:
                 self.log(channel_name, f"failed to load channel: {core.detail_error(e)}")
-
-            is_user_str = "user " if is_user_channels else ""
-            self.log("core", f"loaded {is_user_str}channel : {channel_name}")
 
     async def _load_modules(self, storage, modules, enabled_modules, is_user_modules=False):
         # install dependencies
@@ -193,6 +192,7 @@ class Manager:
             await self._load_channels(self.channels, user_channels, enabled_user_channels, is_user_channels=True)
 
         # make our instance accessible even without a reference
+        global global_instance
         global_instance = self
 
         # display any error messages that were emitted
@@ -323,6 +323,7 @@ class Manager:
                     self.log_error(f"Error shutting down {channel_name}", e)
 
         # remove the global instance
+        global global_instance
         global_instance = None
 
         # Cancel all running tasks so gather() returns
@@ -556,41 +557,6 @@ class Manager:
             return "\n\n".join(histend_prompt)
         else:
             return ""
-
-    async def get_status(self):
-        status_list = []
-        status_list.append("== server ==")
-
-        # API status section
-        api_status = self.get_api_status()
-        if api_status["connected"]:
-            status_list.append("API Status: Connected")
-        else:
-            status_list.append("API Status: Disconnected")
-            if api_status["error"]:
-                status_list.append(f"  Error: {api_status['error']}")
-            if not api_status["url_configured"]:
-                status_list.append("  Warning: API URL not configured")
-            if not api_status["key_configured"]:
-                status_list.append("  Warning: API key not configured")
-
-        status_list.append("API server: " + str(core.config.get("api").get("url", "Not configured")))
-        if "webui" in self.channels.keys():
-            webui_cfg = self.channels['webui'].config
-            status_list.append(f"WebUI: {webui_cfg.get('host')}:{webui_cfg.get('port')}")
-        status_list.append("AI model: " + str(self.API.get_model() or "Not set"))
-
-        if self.channel is not None:
-            status_list.append("")
-
-            status_list.append("== context size ==")
-            ctx_string = ""
-            context_size = await self.channel.context.get_size()
-            for key, value in context_size.items():
-                ctx_string += f"{key}: {value}\n"
-            status_list.append(ctx_string)
-
-        return status_list
 
     async def get_settings_structure(self):
         if not self.modules:
