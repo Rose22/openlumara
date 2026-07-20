@@ -123,7 +123,7 @@ class APIClient():
         
         return True
 
-    def get_connection_status(self):
+    def get_status(self):
         api_config = core.config.get("api", {})
         model_config = core.config.get("model", {})
 
@@ -154,10 +154,6 @@ class APIClient():
     def set_model(self, name: str):
         self._model = name
         return self._model
-
-    def get_last_error(self):
-        """returns the last connection error message"""
-        return self._connection_error
 
     async def _request(self, context, tools=None, stream=False, use_thinking=True, **kwargs):
         """send a request to the LLM and return the response object"""
@@ -445,7 +441,7 @@ class APIClient():
         connected = await self.attempt_connect()
         if connected is not True:
             # that's an error
-            yield {"type": "error", "content": str(reconnected)}
+            yield {"type": "error", "content": str(connected)}
             return
 
         # drain progress tokens while waiting for warmup to finish
@@ -533,8 +529,8 @@ class APIClient():
         if tool_calls:
             result["tool_calls"] = tool_calls
 
-            # role is always assistant, so we force it if for some reason its not present
-            result["role"] = "assistant"
+        # role is always assistant, so we force it if for some reason its not present
+        result["role"] = "assistant"
 
         return result
 

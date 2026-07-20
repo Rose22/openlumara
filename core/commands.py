@@ -417,7 +417,7 @@ class Commands:
                 await self.channel.manager.API.disconnect()
                 return "Disconnected from API"
             case "status":
-                status = self.channel.manager.API.get_connection_status()
+                status = self.channel.manager.API.get_status()
                 lines = ["== API Status =="]
 
                 lines.append(f"Connected: {'Yes' if status['connected'] else 'No'}")

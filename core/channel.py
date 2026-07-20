@@ -124,8 +124,10 @@ class Channel:
         # fallback
         return ""
 
-    def format_message(self, message: dict):
+    def format_message(self, orig_message: dict):
         formatted = ""
+
+        message = dict(orig_message)
 
         role = message.get("role")
 
@@ -257,13 +259,6 @@ class Channel:
                 else:
                     return {"role": "assistant", "content": "BLANK"}
 
-        # if not a command, send the message to the AI and return it's response
-        # reconnect if needed
-        result = await self.manager.API.attempt_connect()
-        if result is not True:
-            self.log("API", str(result))
-            return result
-
         # run module event hooks
         usr_msg_result = None
         for module_name, module in self.manager.modules.items():
@@ -280,6 +275,7 @@ class Channel:
                     # when returning False from the user message hook,
                     # we stop the chain here, allowing the hook to basically intercept the message
                     # and prevent the AI from returning its own response to the message
+                    await self.context.chat.add(user_message)
                     return
                 elif usr_msg_result is not None:
                     # allow modifying user message by returning the modified message as a string
@@ -291,6 +287,13 @@ class Channel:
         if not add_success:
             return None
 
+        # if not a command, send the message to the AI and return it's response
+        # reconnect if needed
+        result = await self.manager.API.attempt_connect()
+        if result is not True:
+            self.log("API", str(result))
+            return {"role": "assistant", "content": str(result)}
+
         # then get the full context window
         context = await self.context.get(system_prompt=True, end_prompt=True)
 
@@ -299,7 +302,6 @@ class Channel:
 
         # handle any errors
         if isinstance(response, core.api.APIError):
-            await self.context.chat.pop()  # remove the user message we just added
             self.log("api", response)
             return {"role": "assistant", "content": str(response)}
 
@@ -348,6 +350,18 @@ class Channel:
             return None
 
         return self.format_message(assistant_message)
+
+    def _build_final_assistant_message(self, final_content = [], final_reasoning = []):
+        assistant_message = {
+            "role": "assistant",
+            "content": "".join(final_content)
+        }
+
+        if final_reasoning:
+            assistant_message["reasoning_content"] = "".join(final_reasoning)
+
+        return assistant_message
+
 
     async def send_stream(self, message: dict, commands_authorized=False):
         """sends a message to the AI from within the current channel, streaming version"""
@@ -405,6 +419,7 @@ class Channel:
                     # when returning False from the user message hook,
                     # we stop the chain here, allowing the hook to basically intercept the message
                     # and prevent the AI from returning its own response to the message
+                    await self.context.chat.add(user_message)
                     return
                 elif usr_msg_result is not None:
                     # allow modifying user message by returning the modified message as a string
@@ -466,6 +481,11 @@ class Channel:
             if token_type == "error":
                 self.log("api", f"Error: {token.get('content')}")
                 yield token
+
+                # add the content that has been accumulated so far, so that we don't lose incomplete messages
+                assistant_message = self._build_final_assistant_message(final_content, final_reasoning)
+                await self.context.chat.add(assistant_message)
+
                 return
 
             if token_type == "content":
@@ -506,15 +526,7 @@ class Channel:
             yield {"type": "token_usage", "content": await self.context.chat.count_tokens(), "source": "estimation"}
 
         if not tool_calls_occurred and final_content: # don't add an extra message at the end of a toolcalling chain
-            # add the assistant's response to context
-            assistant_message = {
-                "role": "assistant",
-                "content": "".join(final_content)
-            }
-
-            if final_reasoning:
-                assistant_message["reasoning_content"] = "".join(final_reasoning)
-
+            assistant_message = self._build_final_assistant_message(final_content, final_reasoning)
             await self.context.chat.add(assistant_message)
 
             # run module event hooks

@@ -223,7 +223,6 @@ class Chat:
         for chat in self.data:
             if chat.get("category") not in collected_categories:
                 collected_categories.append(chat.get("category"))
-            continue
         return collected_categories
 
     async def get_data(self, data_key: str = None):
@@ -464,7 +463,7 @@ class Chat:
         if self.current is None:
             return False
 
-        if index < len(self.data[self.current]["messages"]):
+        if index >= len(self.data[self.current]["messages"]):
             return False
 
         self.data[self.current]["messages"][index] = message
