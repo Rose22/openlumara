@@ -10,94 +10,96 @@
 </template>
 
 <div id="messages" x-ref="messages" x-auto-scroll>
-    <template x-for="(turn, turnIndex) in turns">
-        <div>
-            <!-- user messages get rendered seperately -->
-            <template x-if="turn.role === 'user'">
-                <div class="message-wrapper user">
-                    <div :class="{
-                        'message': true,
-                        'user': turn.messages[0].role === 'user',
-                        'pending': turn.messages[0].msgId === $store.stream.pendingMessageId
-                    }">
-                        <template x-if="editingMessageIndex != turn.messages[0].index">
-                            <div x-html="renderMarkdown(turn.messages[0].content)"></div>
-                            <template x-if="turn.messages[0].msgId === $store.stream.pendingMessageId">
-                                <span class="status">Sending..</span>
+    <template x-if="turns">
+        <template x-for="(turn, turnIndex) in turns">
+            <div>
+                <!-- user messages get rendered seperately -->
+                <template x-if="turn.role === 'user'">
+                    <div class="message-wrapper user">
+                        <div :class="{
+                            'message': true,
+                            'user': turn.messages[0].role === 'user',
+                            'pending': turn.messages[0].msgId === $store.stream.pendingMessageId
+                        }">
+                            <template x-if="editingMessageIndex != turn.messages[0].index">
+                                <div x-html="renderMarkdown(turn.messages[0].content)"></div>
+                                <template x-if="turn.messages[0].msgId === $store.stream.pendingMessageId">
+                                    <span class="status">Sending..</span>
+                                </template>
                             </template>
-                        </template>
 
-                        <template x-if="turn.messages[0].msgId !== $store.stream.pendingMessageId && editingMessageIndex != turn.messages[0].index">
-                            <div class="message-buttons">
-                                    <button @click="startEdit(turn.messages[0].index)" title="Edit" :disabled="$store.stream.state != 'idle'">
-                                        {% include 'svg/edit.svg' %}
-                                    </button>
-                                    <button @click="regenerateMessage(turn.messages[0].index)" title="Regenerate" :disabled="$store.stream.state != 'idle'">
-                                        {% include 'svg/reload.svg' %}
-                                    </button>
-                                    <button @click="deleteMessage(turn.messages[0].index)" title="Delete" :disabled="$store.stream.state != 'idle'">
-                                        {% include 'svg/trash.svg' %}
-                                    </button>
-                                </div>
-                            </div>
-                        </template>
-
-                        <template x-if="editingMessageIndex === turn.messages[0].index">
-                            <div class="flex fullwidth editing">
-                                <textarea x-model="editContent" rows="3"></textarea>
-                                <div class="edit-actions">
-                                    <button @click="saveEdit(editingMessageIndex)">Save</button>
-                                    <button @click="cancelEdit()">Cancel</button>
-                                </div>
-                            </div>
-                        </template>
-                    </div>
-                </div>
-            </template>
-
-            <!-- 
-                assistant messages get collected into turns for display in the UI,
-                by the turn() getter in js/alpine_main.js
-
-                oh and it also contains the streaming message as the last message in the array
-            -->
-            <template x-if="turn.role === 'assistant'">
-                <div>
-                    <div class="message-wrapper assistant" x-data="{ messageActionId: turn.index }">
-                        <div class="message assistant">
-                            <!-- all messages within a turn are displayed within the same message bubble -->
-                            <template x-for="(message, msgIndex) in turn.messages">
-                                <div :class="{'flex': true, 'fullwidth': true, 'command': message.is_cmd}">
-                                    <!-- render the messages based on message role -->
-                                    <template x-if="message.role === 'assistant'">
-                                        <div class="flex fullwidth">
-                                            <template x-if="(message.type === 'reasoning') || (message.type === 'history' && message.reasoning_content && message.reasoning_content.trim().length > 0) || (message.type === 'tool_calls' && message.reasoning_content && message.reasoning_content.trim().length > 0)">
-                                                {% include 'chat/reasoning.html' %}
-                                            </template>
-                                            <template x-if="message.type === 'content' || message.type === 'history'">
-                                                <div class="content" x-html="renderMarkdown(message.content)"></div>
-                                            </template>
-                                            <template x-if="message.type === 'tool_calls' || message.type === 'tool_call_delta'">
-                                                {% include 'chat/toolcalls.html' %}
-                                            </template>
-                                        </div>
-                                    </template>
+                            <template x-if="turn.messages[0].msgId !== $store.stream.pendingMessageId && editingMessageIndex != turn.messages[0].index">
+                                <div class="message-buttons">
+                                        <button @click="startEdit(turn.messages[0].index)" title="Edit" :disabled="$store.stream.state != 'idle'">
+                                            {% include 'svg/edit.svg' %}
+                                        </button>
+                                        <button @click="regenerateMessage(turn.messages[0].index)" title="Regenerate" :disabled="$store.stream.state != 'idle'">
+                                            {% include 'svg/reload.svg' %}
+                                        </button>
+                                        <button @click="deleteMessage(turn.messages[0].index)" title="Delete" :disabled="$store.stream.state != 'idle'">
+                                            {% include 'svg/trash.svg' %}
+                                        </button>
+                                    </div>
                                 </div>
                             </template>
 
-                            <div class="message-buttons">
-                                    <button @click="regenerateMessage(turn.index)" title="Regenerate" :disabled="$store.stream.state != 'idle'">
-                                        {% include 'svg/reload.svg' %}
-                                    </button>
-                                    <button @click="deleteMessage(turn.index)" title="Delete" :disabled="$store.stream.state != 'idle'">
-                                        {% include 'svg/trash.svg' %}
-                                    </button>
+                            <template x-if="editingMessageIndex === turn.messages[0].index">
+                                <div class="flex fullwidth editing">
+                                    <textarea x-model="editContent" rows="3"></textarea>
+                                    <div class="edit-actions">
+                                        <button @click="saveEdit(editingMessageIndex)">Save</button>
+                                        <button @click="cancelEdit()">Cancel</button>
+                                    </div>
                                 </div>
-                            </div>
+                            </template>
+                        </div>
                     </div>
-                </div>
-            </template>
-        </div>
+                </template>
+
+                <!-- 
+                    assistant messages get collected into turns for display in the UI,
+                    by the turn() getter in js/alpine_main.js
+
+                    oh and it also contains the streaming message as the last message in the array
+                -->
+                <template x-if="turn.role === 'assistant'">
+                    <div>
+                        <div class="message-wrapper assistant" x-data="{ messageActionId: turn.index }">
+                            <div class="message assistant">
+                                <!-- all messages within a turn are displayed within the same message bubble -->
+                                <template x-for="(message, msgIndex) in turn.messages">
+                                    <div :class="{'flex': true, 'fullwidth': true, 'command': message.is_cmd}">
+                                        <!-- render the messages based on message role -->
+                                        <template x-if="message.role === 'assistant'">
+                                            <div class="flex fullwidth">
+                                                <template x-if="(message.type === 'reasoning') || (message.type === 'history' && message.reasoning_content && message.reasoning_content.trim().length > 0) || (message.type === 'tool_calls' && message.reasoning_content && message.reasoning_content.trim().length > 0)">
+                                                    {% include 'chat/reasoning.html' %}
+                                                </template>
+                                                <template x-if="message.type === 'content' || message.type === 'history'">
+                                                    <div class="content" x-html="renderMarkdown(message.content)"></div>
+                                                </template>
+                                                <template x-if="message.type === 'tool_calls' || message.type === 'tool_call_delta'">
+                                                    {% include 'chat/toolcalls.html' %}
+                                                </template>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </template>
+
+                                <div class="message-buttons">
+                                        <button @click="regenerateMessage(turn.index)" title="Regenerate" :disabled="$store.stream.state != 'idle'">
+                                            {% include 'svg/reload.svg' %}
+                                        </button>
+                                        <button @click="deleteMessage(turn.index)" title="Delete" :disabled="$store.stream.state != 'idle'">
+                                            {% include 'svg/trash.svg' %}
+                                        </button>
+                                    </div>
+                                </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </template>
     </template>
 
     <!-- user message placeholder to display while the message is being sent to the API -->
