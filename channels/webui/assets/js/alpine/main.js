@@ -26,26 +26,22 @@ function getMainData() {
         notice: null,
 
         async init() {
+            self.notice = "Please wait, connecting to backend server..";
             await connectWebSocket();
-
-            // fetch all chats
-            this.chats = await simpleApiFetch('/api/chats');
-
-            // sort them in descending order
-            this.chats.reverse();
-
-            this.categories = await simpleApiFetch('/api/chats/categories');
 
             // fetch current chat
             const chat = await simpleApiFetch('/api/chat/current');
-            if (!chat.success) {
-                // don't crash and burn if no data is available
-                return;
-            }
-
             this.chat = chat;
-            this.selectedChat = this.chat.id;
-            this.messages = this.chat.messages;
+            this.selectedChat = chat.id;
+            this.messages = chat.messages;
+
+            // fetch all other data
+            this.chats = await simpleApiFetch('/api/chats');
+            
+            // sort it in descending order
+            this.chats.reverse();
+
+            this.categories = await simpleApiFetch('/api/chats/categories');
         },
 
         /* ----------------------

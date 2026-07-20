@@ -149,7 +149,6 @@
             border: 1px solid var(--border-user);
             border-bottom-right-radius: var(--radius-sm);
             color: var(--text-primary);
-            white-space: pre-wrap;
             word-break: break-word;
 
             .editing {

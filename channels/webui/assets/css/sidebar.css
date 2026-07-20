@@ -218,6 +218,10 @@
             outline: none;
             transition: all 0.2s ease;
             height: 36px;
+
+            &::placeholder {
+                color: var(--text-muted);
+            }
         }
         input:focus {
             border-color: var(--accent);

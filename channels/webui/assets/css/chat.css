@@ -45,7 +45,7 @@
         text-align: center;
         height: auto;
         color: var(--important);
-        border: 1px solid var(--important);
+        border: 1px dashed var(--important);
     }
 }
 
