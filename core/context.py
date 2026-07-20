@@ -81,14 +81,13 @@ class Context:
                 # TODO: i really need to make a more user friendly UI for core settings, that matches the UX of module/channel settings...
                 # that name is ridiculous
 
-                if core.config.get("model", "only_preserve_reasoning_for_current_agentic_loop"):
-                    # strip reasoning from tool calls prior to the current agentic loop
-                    loop_idx = self.channel.agentic_loop_start
-                    messages[:loop_idx] = [
-                        {k: v for k, v in m.items() if k != "reasoning_content"}
-                        if "tool_calls" in m else m
-                        for m in messages[:loop_idx]
-                    ]
+                # strip reasoning from tool calls prior to the current agentic loop
+                loop_idx = self.channel.agentic_loop_start
+                messages[:loop_idx] = [
+                    {k: v for k, v in m.items() if k != "reasoning_content"}
+                    if "tool_calls" in m else m
+                    for m in messages[:loop_idx]
+                ]
 
             # Apply max_messages limit to history first
             if len(messages) > max_messages:
@@ -157,8 +156,10 @@ class Context:
                     if content and isinstance(content, str):
                         message["content"] += f"\n\n{message['injection']}"
 
-                # remove the field from all messages so that it's clean for the API
-                del message["injection"]
+        # remove any non-standard (metadata) fields from the messages
+        # so that we can cleanly send it to the API
+        approved_keys = ["role", "content", "reasoning_content", "tool_calls", "tool_call_id", "function_call", "tool"]
+        messages = [{k: v for k, v in msg.items() if k in approved_keys} for msg in messages]
 
         # 2. Build and Trim Context
         # We combine them to check the total token count

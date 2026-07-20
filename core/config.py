@@ -26,7 +26,7 @@ default_config = {
     "api": {
         "url": "http://localhost:5001/v1",
         "key": "KEY_HERE",
-        "max_context": 8192,
+        "max_context": 16768,
         "max_output_tokens": 8192,
         "max_messages": 200,
         "use_developer_role": False,

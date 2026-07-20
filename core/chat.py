@@ -5,6 +5,8 @@ import os
 
 import tiktoken
 
+# TODO: split chat index from messages array into two seperate files, to vastly improve speed when saving/loading chats
+
 class Chat:
     DEFAULT_DATA = {
         "title": "",
@@ -221,7 +223,6 @@ class Chat:
         for chat in self.data:
             if chat.get("category") not in collected_categories:
                 collected_categories.append(chat.get("category"))
-            continue
         return collected_categories
 
     async def get_data(self, data_key: str = None):
@@ -277,13 +278,17 @@ class Chat:
 
         return False
 
-    async def get(self, index = None):
-        """get message history of current chat"""
+    async def get_chat(self):
+        """
+        gets the entire current chat. this is why i need to split the messages into a seperate object... this is getting confusing
+        unfortunately i need to finish work on the webui first before i improve chat.py, because
+        a lot of stuff across the framework depends on the chat class
+        and so, will break all over the place if i remove .get() in favor of .messages.get()
+        """
         if self.current is None:
             await self.new()
 
-        messages = self.data[self.current].get("messages", [])
-        return messages
+        return self.data[self.current]
 
     async def get_id(self):
         if self.current is None:
@@ -291,9 +296,21 @@ class Chat:
 
         return self.data[self.current].get("id", None)
 
+    # ----------------------------
+    # new, more sane method names
+    # just aliases for now
+    # as a final structure i want chat.messages.add, chat.messages.edit, and so on,
+    # but there's no time right now
+    # ----------------------------
+    async def get_messages(self):
+        return await self.get()
+
+    async def set_messages(self, messages):
+        return await self.set(messages)
+
     async def get_message(self, index: int):
         if not self.current:
-            return None
+            await self.new()
 
         messages = self.data[self.current]["messages"]
 
@@ -301,6 +318,18 @@ class Chat:
             return None
 
         return messages[index]
+
+    async def add_message(self, message: dict, cmd=False, ghost = False):
+        return await self.add(message, cmd=cmd, ghost=ghost)
+
+    async def edit_message(self, index, message: dict):
+        return self.edit(index, message)
+
+    async def delete_message(self, index):
+        return self.pop(index)
+
+    async def delete_all_messages_after(self, index):
+        return await self.delete_from(index)
 
     async def get_last_message_with_role(self, role: str, cutoff_index: int = None):
         if not self.current:
@@ -337,6 +366,26 @@ class Chat:
 
         return -1
 
+    # ----------------------------------------------------------------------------
+    # OLD, DEPRECATED METHODS BELOW
+    # ----------------------------------------------------------------------------
+    # these all apply to messages, not the chat itself,
+    # and yet i named them in a way where it's really confusing whether you're
+    # interacting with a chat or with the messages
+    # so i'm keeping these for now, to maintain compatibility
+    # with user modules and some parts of the framework,
+    # but i plan to slowly migrate to more sane names
+    # ----------------------------------------------------------------------------
+
+    async def get(self, index = None):
+        """get message history of current chat"""
+        if self.current is None:
+            await self.new()
+
+        messages = self.data[self.current].get("messages", [])
+
+        return messages
+
     async def delete_from(self, index: int):
         """
         Deletes all messages below a certain index
@@ -363,7 +412,7 @@ class Chat:
         await self.save()
         return True
 
-    async def add(self, message: dict, ghost = False):
+    async def add(self, message: dict, cmd=False, ghost = False):
         """add message to current chat"""
         if self.current is None:
             await self.new()
@@ -385,6 +434,10 @@ class Chat:
         if ghost:
             new_message["ghost"] = True
 
+        if cmd:
+            # if the message is a command (or command response), mark it as such
+            new_message["is_cmd"] = True
+
         # inject any special messages coming from on_message_inject() in modules, such as timestamps
         injections = []
         for module_name, module in self.channel.manager.modules.items():
@@ -404,6 +457,17 @@ class Chat:
         index = len(self.data[self.current]["messages"]) - 1
         await self.save()
         return True
+
+    async def edit(self, index: int, message):
+        """edit message by its index"""
+        if self.current is None:
+            return False
+
+        if index >= len(self.data[self.current]["messages"]):
+            return False
+
+        self.data[self.current]["messages"][index] = message
+        await self.save()
 
     async def pop(self, index: int = None):
         """pop message from current chat"""

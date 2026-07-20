@@ -123,7 +123,7 @@ class APIClient():
         
         return True
 
-    def get_connection_status(self):
+    def get_status(self):
         api_config = core.config.get("api", {})
         model_config = core.config.get("model", {})
 
@@ -154,10 +154,6 @@ class APIClient():
     def set_model(self, name: str):
         self._model = name
         return self._model
-
-    def get_last_error(self):
-        """returns the last connection error message"""
-        return self._connection_error
 
     async def _request(self, context, tools=None, stream=False, use_thinking=True, **kwargs):
         """send a request to the LLM and return the response object"""
@@ -268,16 +264,16 @@ class APIClient():
             # easily through the high-level chat.completions.create, we use a task
             # so we can actually cancel the task itself.
 
-            # monitor the task and the cancel_request flag
             while not request_task.done():
-                #if self.cancel_request or self.cancel_prompt_warmup:
                 if self.cancel_request:
                     request_task.cancel()
-                    raise asyncio.CancelledError("Request cancelled")
-
                 await asyncio.sleep(0.1)
 
-            response = await request_task
+            try:
+                response = await request_task
+            except asyncio.CancelledError:
+                self.cancel_request = False
+                raise asyncio.CancelledError("Request cancelled")
 
         except asyncio.CancelledError as e:
             # fully kill the connection because ive been debuggging this for like 5 hours and im tired
@@ -445,7 +441,7 @@ class APIClient():
         connected = await self.attempt_connect()
         if connected is not True:
             # that's an error
-            yield {"type": "error", "content": str(reconnected)}
+            yield {"type": "error", "content": str(connected)}
             return
 
         # drain progress tokens while waiting for warmup to finish
@@ -533,8 +529,8 @@ class APIClient():
         if tool_calls:
             result["tool_calls"] = tool_calls
 
-            # role is always assistant, so we force it if for some reason its not present
-            result["role"] = "assistant"
+        # role is always assistant, so we force it if for some reason its not present
+        result["role"] = "assistant"
 
         return result
 
@@ -548,7 +544,6 @@ class APIClient():
         token_usage = None
         total_prompt_tokens = 0
         total_completion_tokens = 0
-        has_usage_data = False
         last_token_time = 0
 
         if not response:

@@ -70,6 +70,7 @@ class Manager:
                 # reload config
                 core.config.load()
 
+        is_user_str = "user " if is_user_channels else ""
         channels_to_load = list(core.modules.load(channels, core.channel.Channel, filter=enabled_channels, reload=True))
 
         for channel in channels_to_load:
@@ -82,11 +83,9 @@ class Manager:
                 if channel_name in newly_installed_channels:
                     await storage[channel_name].on_install()
 
+                self.log("core", f"loaded {is_user_str}channel : {channel_name}")
             except Exception as e:
                 self.log(channel_name, f"failed to load channel: {core.detail_error(e)}")
-
-            is_user_str = "user " if is_user_channels else ""
-            self.log("core", f"loaded {is_user_str}channel : {channel_name}")
 
     async def _load_modules(self, storage, modules, enabled_modules, is_user_modules=False):
         # install dependencies
@@ -193,6 +192,7 @@ class Manager:
             await self._load_channels(self.channels, user_channels, enabled_user_channels, is_user_channels=True)
 
         # make our instance accessible even without a reference
+        global global_instance
         global_instance = self
 
         # display any error messages that were emitted
@@ -323,6 +323,7 @@ class Manager:
                     self.log_error(f"Error shutting down {channel_name}", e)
 
         # remove the global instance
+        global global_instance
         global_instance = None
 
         # Cancel all running tasks so gather() returns
@@ -345,6 +346,8 @@ class Manager:
         user_modules = core.config.config["user_modules"]
 
         toggled = False
+        new_state = False
+
         for module_list in [modules, user_modules]:
             enabled = module_list["enabled"]
             disabled = module_list["disabled"]
@@ -353,10 +356,12 @@ class Manager:
                 enabled.remove(module_name)
                 disabled.append(module_name)
                 toggled = True
+                new_state = False
             elif module_name in disabled:
                 disabled.remove(module_name)
                 enabled.append(module_name)
                 toggled = True
+                new_state = True
             else:
                 continue
 
@@ -365,7 +370,7 @@ class Manager:
 
             if autorestart:
                 if self.channel:
-                    await self.channel.push("restarting to apply module change..")
+                    await self.channel.push(f"{module_name.capitalize()} module {'enabled' if new_state else 'disabled'}. Restarting to apply module change..")
                 await asyncio.sleep(0.1)
                 await self.channel.manager.restart()
 
@@ -554,6 +559,8 @@ class Manager:
             return ""
 
     async def get_status(self):
+        # this is legacy code
+        # that needs to be removed as soon as the webui rewrite is done
         status_list = []
         status_list.append("== server ==")
 

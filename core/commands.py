@@ -272,14 +272,15 @@ class Commands:
     async def _extract_cmd(self, message_text):
         message_content = message_text.strip()
         cmd_prefix = core.config.get("core").get("cmd_prefix", "/")
-        cmd_prefix_index = message_content.lower().find(cmd_prefix.lower())+len(cmd_prefix)
-
+        
+        if not message_content.startswith(cmd_prefix):
+            return None, None, []
+        
         try:
-            cmd = shlex.split(message_content[cmd_prefix_index:])
+            cmd = shlex.split(message_content[len(cmd_prefix):])
             args = cmd[1:]
             return (cmd_prefix, cmd, args)
         except ValueError as e:
-            # Handle malformed shell syntax gracefully
             return None, None, []
 
     async def process_input(self, message: dict, authorized=False):
@@ -307,12 +308,12 @@ class Commands:
         if args:
             args_display += " "
             args_display += " ".join(args)
-        await self.channel.context.chat.add({"role": "user", "content": f"{cmd_prefix}{cmd[0]}{args_display}"}, ghost=use_temporary)
+        await self.channel.context.chat.add({"role": "user", "content": f"{cmd_prefix}{cmd[0]}{args_display}"}, cmd=True, ghost=use_temporary)
 
         result = await self._process_input(message)
 
         # insert command result into context, flagging as temporary if needed
-        await self.channel.context.chat.add({"role": "assistant", "content": f"[Command Output]:\n{result}"}, ghost=use_temporary)
+        await self.channel.context.chat.add({"role": "assistant", "content": f"{result}"}, cmd=True, ghost=use_temporary)
 
         return result
 
@@ -417,7 +418,7 @@ class Commands:
                 await self.channel.manager.API.disconnect()
                 return "Disconnected from API"
             case "status":
-                status = self.channel.manager.API.get_connection_status()
+                status = self.channel.manager.API.get_status()
                 lines = ["== API Status =="]
 
                 lines.append(f"Connected: {'Yes' if status['connected'] else 'No'}")

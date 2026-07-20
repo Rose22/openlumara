@@ -147,7 +147,7 @@ class StorageList(list):
         if not TEMPORARY:
             self.load()
 
-        return super().get(*args)
+        return super().__getitem__(args[0])
 
 class StorageDict(dict):
     """subclassed dict that handles storage of data. supports a variety of storage formats."""
