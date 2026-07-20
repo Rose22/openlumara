@@ -174,10 +174,16 @@ async function handleWebSocketMessage(data) {
             /*
              * Reconstruct an entire assistant turn from the raw tokens
              * and then push it to the messages array
+             *
+             * (so that the UI won't flicker when syncing from the backend)
              */
+
             lastTurn = streamedTokensToMessages(stream.tokens);
             getMain().messages.push(...lastTurn);
             await stream.clearTokens();
+
+            // then sync from the backend to make sure we're completely synced up
+            await getMain().reloadChat();
 
             stream.state = 'idle';
             break;
