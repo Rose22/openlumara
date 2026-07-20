@@ -5,13 +5,15 @@
         label {
             font-size: 0.9rem;
             color: var(--text-primary);
+
         }
     }
 
     /* --- Text Inputs --- */
     input[type="text"],
     input[type="url"],
-    input[type="number"] {
+    input[type="number"],
+    input[type="file"] {
         width: 100%;
         padding: 10px 12px;
         border: 1px solid var(--border-color);
@@ -31,6 +33,23 @@
 
         &::placeholder {
             color: var(--text-muted);
+        }
+
+        &:hover {
+            border-color: var(--accent);
+        }
+
+        &::file-selector-button {
+            padding: 6px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            font-size: 14px;
+            font-family: var(--font-primary);
+            cursor: pointer;
+            transition: border-color 0.15s, box-shadow 0.15s;
+            margin-right: 12px;
         }
     }
 
@@ -84,7 +103,6 @@
 
     /* --- Range Sliders --- */
     input[type="range"] {
-        width: 140px;
         height: 4px;
         background: var(--border-color);
         border-radius: var(--radius-full);
@@ -110,6 +128,25 @@
             cursor: pointer;
             border: none;
             box-shadow: 0 0 8px var(--accent-glow);
+        }
+    }
+
+    /* --- Row --- */
+    .row {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+
+        label {
+            font-size: 14px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        &:last-child {
+            margin-bottom: 0;
         }
     }
 
@@ -193,6 +230,14 @@
         font-size: 14px;
         font-weight: 500;
         color: var(--text-primary);
+
+        &.left {
+            text-align: left;
+        }
+
+        &.right {
+            text-align: right;
+        }
     }
 
     /* --- Field Descriptions --- */

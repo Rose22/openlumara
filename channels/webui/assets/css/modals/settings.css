@@ -326,26 +326,6 @@
         }
     }
 
-    /* --- Setting Rows --- */
-    .row {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-
-        label {
-            font-size: 14px;
-            color: var(--text-secondary);
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        &:last-child {
-            margin-bottom: 0;
-        }
-    }
-
-
     /* --- Model Input --- */
     .model-row {
         display: flex;
