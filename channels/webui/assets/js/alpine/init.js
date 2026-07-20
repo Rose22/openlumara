@@ -8,6 +8,7 @@ document.addEventListener('alpine:init', () => {
     // defined in stores.js (stores stream-related data)
     Alpine.store('stream', STREAM_STORE);
     Alpine.store('theme', THEME_STORE);
+    Alpine.store('audio', AUDIO_STORE);
 
     // defined in directives.js
     Alpine.directive('auto-scroll', autoScroll);

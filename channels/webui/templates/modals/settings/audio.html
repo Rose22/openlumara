@@ -1,65 +1,71 @@
 <!-- AUDIO SETTINGS -->
 <template x-if="activeCategory === 'audio' && !activeModule && !activeChannel">
-    <div class="settings-section" x-data="{
+    <div x-data="{
         get vol() { return Alpine.store('audio').volume; },
         get tokenVol() { return Alpine.store('audio').tokenVolume; },
         get sounds() { return Alpine.store('audio').sounds }
     }">
-        <h3 class="settings-section-title">Sound Effects</h3>
-        <p class="settings-section-desc">Configure typewriter audio</p>
+        <!-- Sound Effects Section -->
+        <h3 class="section-title" x-text="categories.audio.title"></h3>
+        <p class="section-desc" x-text="categories.audio.description"></p>
 
-        <!-- VOLUME -->
-        <div class="setting-item">
-            <div class="setting-row">
-                <label>Volume</label>
+        <hr>
+
+        <!-- Volume -->
+        <div class="item">
+            <div class="toggle-row">
+                <label class="label">Volume</label>
                 <input type="range" min="0" max="100" value="0"
                        @input="Alpine.store('audio').setVolume(parseInt($event.target.value) / 100)">
-                <span class="setting-description" x-text="Math.round(vol * 100) + '%'"></span>
+                <span class="label" style="min-width: 45px; text-align: right;" x-text="Math.round(vol * 100) + '%'"></span>
             </div>
         </div>
 
-        <!-- TOKEN VOLUME -->
+        <!-- Token Generation Volume -->
         <!--
-        <div class="setting-item">
-            <div class="setting-row">
-                <label>Token Generation Volume</label>
+        <div class="item">
+            <div class="toggle-row">
+                <label class="label">Token Generation Volume</label>
                 <input type="range" min="0" max="100" value="0"
                        @input="Alpine.store('audio').setTokenVolume(parseInt($event.target.value) / 100)">
-                <span class="setting-description" x-text="Math.round(tokenVol * 100) + '%'"></span>
+                <span class="label" style="min-width: 45px; text-align: right;" x-text="Math.round(tokenVol * 100) + '%'"></span>
             </div>
         </div>
         -->
 
-        <!-- SOUND FILES -->
-        <template x-for="soundId in ['error', 'warning', 'success', 'info', 'message', 'reply']" :key="soundId">
-            <div class="setting-item">
+        <!-- Sound Files -->
+        <template x-for="soundId in ['send_message', 'response_start', 'processing', 'typewriter', 'typing', 'token', 'completion', 'reasoning_end']" :key="soundId">
+            <div class="item">
                 <div class="toggle-row">
-                    <label x-text="soundId.charAt(0).toUpperCase() + soundId.slice(1) + ' Sound'"></label>
-                    <button type="button" :class="{ active: sounds[soundId + 'Enabled'] }"
+                    <label class="label" x-text="soundId.charAt(0).toUpperCase() + soundId.slice(1).replace('_', ' ',) + ' Sound'"></label>
+                    <button type="button" :class="['toggle', sounds[soundId + 'Enabled'] ? 'toggle-on' : 'toggle-off']"
                             @click="Alpine.store('audio').setSoundEnabled(soundId, !sounds[soundId + 'Enabled'])">
                     </button>
                 </div>
 
-                <div class="setting-row">
-                    <span class="setting-description" x-text="sounds[soundId + 'SoundName'] || 'Using generated sound'"></span>
+                <div class="item">
+                    <p class="description" x-text="sounds[soundId + 'SoundName'] || 'Using generated sound'"></p>
                 </div>
 
-                <div class="setting-row">
-                    <label class="btn-secondary">
+                <div class="item">
+                    <label class="btn">
                         <span>Upload</span>
                         <input type="file" accept="audio/*" hidden
                                @change="handleSoundUpload($event, soundId)">
                     </label>
-                    <button type="button" x-show="sounds[soundId + 'SoundData']"
-                            @click="previewSound(soundId)">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                        </svg>
-                    </button>
-                    <button type="button" x-show="sounds[soundId + 'SoundData']"
-                            @click="Alpine.store('audio').clearSound(soundId)">
-                        Clear
-                    </button>
+                    <div class="actions" style="display: inline-flex; gap: 8px; vertical-align: middle;">
+                        <button type="button" class="btn" x-show="sounds[soundId + 'SoundData']"
+                                @click="previewSound(soundId)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                            </svg>
+                            <span>Play</span>
+                        </button>
+                        <button type="button" class="btn" x-show="sounds[soundId + 'SoundData']"
+                                @click="Alpine.store('audio').clearSound(soundId)">
+                            Clear
+                        </button>
+                    </div>
                 </div>
             </div>
         </template>

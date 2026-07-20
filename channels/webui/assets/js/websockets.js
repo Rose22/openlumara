@@ -1,5 +1,6 @@
 let isWsConnected = false;
 let wsReconnecting = false;
+let responseSoundPlayed = false;
 
 // intended to be used to queue up messages for sending to the backend in case the
 // websocket isn't connected. it's a stub for now
@@ -135,14 +136,32 @@ async function handleWebSocketMessage(data) {
                     }
 
                     stream.processing = token_content;
+
+                    AudioManager.playProcessingSound();
                     break;
                 case "reasoning":
                     stream.state = 'thinking';
                     stream.processing = {};
+
+                    AudioManager.stopProcessingSound();
+                    AudioManager.play("token");
+
+                    if (!responseSoundPlayed) {
+                        AudioManager.play("response_start");
+                        responseSoundPlayed = true;
+                    }
                     break;
                 case "content":
                     stream.state = 'streaming';
                     stream.processing = {};
+
+                    AudioManager.stopProcessingSound();
+                    AudioManager.play("token");
+
+                    if (!responseSoundPlayed) {
+                        AudioManager.play("response_start");
+                        responseSoundPlayed = true;
+                    }
                     break;
                 case "tool_call_delta":
                     stream.state = 'calling_tools';
@@ -153,6 +172,7 @@ async function handleWebSocketMessage(data) {
                     break;
                 case "tool":
                     stream.state = 'processing_tools';
+                    AudioManager.playProcessingSound();
                     break;
             }
 
@@ -184,6 +204,8 @@ async function handleWebSocketMessage(data) {
 
             // then sync from the backend to make sure we're completely synced up
             await getMain().reloadChat();
+
+            AudioManager.play("completion");
 
             stream.state = 'idle';
             break;

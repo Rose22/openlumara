@@ -224,25 +224,6 @@
         color: var(--text-secondary);
     }
 
-    /* --- Sections --- */
-    .section {
-        margin-bottom: 48px;
-        animation: fade-in 0.2s ease;
-    }
-
-    .section-title {
-        color: var(--text-primary);
-        margin: 0 0 4px 0;
-        letter-spacing: -0.02em;
-    }
-
-    .section-desc {
-        font-size: 0.85rem;
-        color: var(--text-secondary);
-        margin: 0 0 20px 0;
-        line-height: 1.5;
-    }
-
     /* --- Theme Section --- */
     .theme-section {
         margin-bottom: 24px;
@@ -350,8 +331,6 @@
         display: flex;
         flex-direction: column;
         gap: 6px;
-        padding: 12px 0 0 0;
-        border-top: 1px solid var(--border-color);
 
         label {
             font-size: 14px;

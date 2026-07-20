@@ -31,6 +31,12 @@ function buildSettingsStructure(originalData, moduleInfo = {}) {
         order: order++,
         isThemeCategory: true
     };
+    categories.audio = {
+        title: 'Audio',
+        description: 'Audio settings',
+        order: order++,
+        isThemeCategory: true
+    };
 
     for (const [topKey, topValue] of Object.entries(originalData)) {
         if (topKey.toLowerCase() === 'theme' || topKey.toLowerCase() === 'theme_mode') {

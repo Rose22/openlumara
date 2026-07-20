@@ -81,7 +81,36 @@
             }
         }
     }
+
+    hr {
+        margin-top: 24px;
+        padding-top: 20px;
+        border-top: 1px solid var(--border-color);
+        border-left: none;
+        border-right: none;
+        border-bottom: none;
+    }
+
+    /* --- Sections --- */
+    .section {
+        margin-bottom: 48px;
+        animation: fade-in 0.2s ease;
+    }
+
+    .section-title {
+        color: var(--text-primary);
+        margin: 0 0 4px 0;
+        letter-spacing: -0.02em;
+    }
+
+    .section-desc {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        margin: 0 0 20px 0;
+        line-height: 1.5;
+    }
 }
+
 
 /* Confirmation Dialog Styling */
 .confirm-overlay {

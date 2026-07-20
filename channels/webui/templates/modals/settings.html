@@ -52,8 +52,8 @@
                                  !['appearance', 'audio', 'modules', 'user_modules', 'channels', 'user_channels'].includes(activeCategory) && 
                                  activeCategory">
                     <div class="section">
-                        <h3 class="title" x-text="categories[activeCategory].title"></h3>
-                        <p class="desc" x-text="categories[activeCategory].description"></p>
+                        <h3 class="section-title" x-text="categories[activeCategory].title"></h3>
+                        <p class="section-desc" x-text="categories[activeCategory].description"></p>
                         
                         <template x-for="[key, setting] in Object.entries(categories[activeCategory].settings)" :key="key">
                             {% include 'modals/settings/fields.html' %}

@@ -109,12 +109,6 @@ input:checked + .theme-slider::before {
     text-transform: capitalize;
 }
 
-.typography-section {
-    margin-top: 24px;
-    padding-top: 20px;
-    border-top: 1px solid var(--border-color);
-}
-
 .setting-item {
     margin-bottom: 16px;
 }

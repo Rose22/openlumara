@@ -26,7 +26,7 @@
     <div class="channel-drilldown">
         <div x-animate.duration.120ms>
             <button type="button" @click="activeChannel = null" class="back-btn">← Back</button>
-            <h3 x-text="formatLabel(activeChannel)"></h3>
+            <h3 class="section-title" x-text="formatLabel(activeChannel)"></h3>
             <p class="section-desc" x-html="renderMarkdown(categories[activeCategory].descriptions[activeChannel]) || ''"></p>
             
             <template x-if="categories[activeCategory].settings[activeChannel] && categories[activeCategory].settings[activeChannel].value">
