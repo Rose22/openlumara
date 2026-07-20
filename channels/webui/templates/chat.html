@@ -14,28 +14,40 @@
         <div>
             <!-- user messages get rendered seperately -->
             <template x-if="turn.role === 'user'">
-                <div class="message-wrapper user" x-data="{ message: turn.messages[0] }">
+                <div class="message-wrapper user">
                     <div :class="{
                         'message': true,
-                        'user': message.role === 'user',
-                        'pending': message.msgId === $store.stream.pendingMessageId
+                        'user': turn.messages[0].role === 'user',
+                        'pending': turn.messages[0].msgId === $store.stream.pendingMessageId
                     }">
-                        <div style="display: flex;" x-html="renderMarkdown(message.content)"></div>
-                        <template x-if="message.msgId === $store.stream.pendingMessageId">
-                            <span class="status">Sending..</span>
+                        <template x-if="editingMessageIndex != turn.messages[0].index">
+                            <div x-html="renderMarkdown(turn.messages[0].content)"></div>
+                            <template x-if="turn.messages[0].msgId === $store.stream.pendingMessageId">
+                                <span class="status">Sending..</span>
+                            </template>
                         </template>
 
-                        <template x-if="message.msgId !== $store.stream.pendingMessageId">
+                        <template x-if="turn.messages[0].msgId !== $store.stream.pendingMessageId && editingMessageIndex != turn.messages[0].index">
                             <div class="message-buttons">
-                                    <button @click="editMessage(message.index)" title="Edit">
+                                    <button @click="startEdit(turn.messages[0].index)" title="Edit">
                                         {% include 'svg/edit.svg' %}
                                     </button>
-                                    <button @click="regenerateMessage(message.index)" title="Regenerate">
+                                    <button @click="regenerateMessage(turn.messages[0].index)" title="Regenerate">
                                         {% include 'svg/reload.svg' %}
                                     </button>
-                                    <button @click="deleteMessage(message.index)" title="Delete">
+                                    <button @click="deleteMessage(turn.messages[0].index)" title="Delete">
                                         {% include 'svg/trash.svg' %}
                                     </button>
+                                </div>
+                            </div>
+                        </template>
+
+                        <template x-if="editingMessageIndex === turn.messages[0].index">
+                            <div class="flex fullwidth editing">
+                                <textarea x-model="editContent" rows="3"></textarea>
+                                <div class="edit-actions">
+                                    <button @click="saveEdit(editingMessageIndex)">Save</button>
+                                    <button @click="cancelEdit()">Cancel</button>
                                 </div>
                             </div>
                         </template>

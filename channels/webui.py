@@ -482,6 +482,19 @@ async def create_fastapi(channel):
                                         "type": "error",
                                         "error": str(e)
                                     })
+                        case "message_edit":
+                            index = data.get("index")
+                            if index < 0:
+                                return False
+
+                            message = await channel.context.chat.get_message(index)
+                            message["content"] = data.get("content")
+                            await channel.context.chat.edit(index, message)
+
+                            await ws_mgr.broadcast({
+                                "type": "messages_updated",
+                                "messages": inject_indexes_into_messages(await channel.context.chat.get())
+                            })
                         case "message_delete":
                             index = data.get("index")
                             if not index:

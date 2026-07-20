@@ -143,46 +143,109 @@
         code {
             font-family: var(--code-font);
         }
-    }
 
-    .message.user {
-        background: var(--bg-message-user);
-        border: 1px solid var(--border-user);
-        border-bottom-right-radius: var(--radius-sm);
-        color: var(--text-primary);
-        white-space: pre-wrap;
-        word-break: break-word;
-    }
+        &.user {
+            background: var(--bg-message-user);
+            border: 1px solid var(--border-user);
+            border-bottom-right-radius: var(--radius-sm);
+            color: var(--text-primary);
+            white-space: pre-wrap;
+            word-break: break-word;
 
-    .message.assistant {
-        background: var(--bg-message-ai);
-        border: 1px solid var(--border-message);
-        border-bottom-left-radius: var(--radius-sm);
-        color: var(--text-primary);
-        min-width: 80px;
+            .editing {
+                display: flex;
+                flex-direction: column;
+                gap: var(--gap);
+                
+                textarea {
+                    width: 100%;
+                    min-height: 60px;
+                    padding: 8px;
+                    background: var(--bg-input);
+                    color: var(--text-primary);
+                    border: 1px solid var(--border-color);
+                    border-radius: var(--radius-sm);
+                    resize: vertical;
+                    font-family: inherit;
+                    font-size: inherit;
+                }
 
-        gap: var(--gap);
+                .edit-actions {
+                    display: flex;
+                    gap: 4px;
+                    justify-content: center;
 
-        .content.reasoning {
-            font-family: monospace;
+                    button {
+                        padding: 7px 20px;
+                        border: 1px solid var(--border-color);
+                        border-radius: var(--radius-sm);
+                        background: var(--button-bg);
+                        color: var(--text-primary);
+                        font-size: 14px;
+                        font-weight: 500;
+                        font-family: var(--font-primary);
+                        cursor: pointer;
+                        transition: all 0.15s ease;
+
+                        &:hover:not(:disabled) {
+                            border-color: var(--accent);
+                            box-shadow: var(--shadow-soft);
+                        }
+
+                        &:active:not(:disabled) {
+                            transform: translateY(0);
+                        }
+
+                        &:disabled {
+                            opacity: 0.4;
+                            cursor: not-allowed;
+                        }
+
+                        &:nth-child(2) {
+                            background: var(--accent);
+                            border-color: var(--accent);
+                            color: var(--bg-primary);
+                            font-weight: 600;
+
+                            &:hover:not(:disabled) {
+                                box-shadow: 0 0 16px var(--accent-glow);
+                            }
+                        }
+                    }
+                }
+            }
         }
 
-        .content.normal {
+        &.assistant {
+            background: var(--bg-message-ai);
+            border: 1px solid var(--border-message);
+            border-bottom-left-radius: var(--radius-sm);
+            color: var(--text-primary);
+            min-width: 80px;
+
+            gap: var(--gap);
+
+            .content.reasoning {
+                font-family: monospace;
+            }
+
+            .content.normal {
+            }
         }
-    }
 
-    .animate-in {
-        animation: messageSlideIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-    }
+        &.animate-in {
+            animation: messageSlideIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
 
-    .pending {
-        border: 1px dashed var(--border-user);
-        opacity: 0.7;
+        &.pending {
+            border: 1px dashed var(--border-user);
+            opacity: 0.7;
 
-        .status {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            font-style: italic;
+            .status {
+                font-size: 0.75rem;
+                color: var(--text-muted);
+                font-style: italic;
+            }
         }
     }
 }

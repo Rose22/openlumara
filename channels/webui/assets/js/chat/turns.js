@@ -191,8 +191,6 @@ function getTurns(instance) {
         }
     }
 
-    console.log(turns);
-
     return turns;
 
     /*

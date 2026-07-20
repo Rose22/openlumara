@@ -9,12 +9,15 @@ function getMainData() {
         chats: [],
         categories: [],
         chat: {},
-        messages: [],
         user_input: '',
         last_user_input: '',
         selectedChat: null,
         selectedCategory: 'general',
         currentModal: '',
+
+        messages: [],
+        editingMessageIndex: null,
+        editContent: '',
 
         /* 
          * a special notification to be used in case of important information,
@@ -130,11 +133,33 @@ function getMainData() {
         },
 
         async regenerateMessage(index) {
-            console.log(`attempting regenerate ${index}`);
             await simpleSocketSend({
                 "type": "message_regenerate",
                 "index": index
             });
+        },
+
+        async startEdit(index) {
+            const msg = this.messages[index]
+            if (msg) {
+                this.editingMessageIndex = index;
+                this.editContent = msg.content || msg.reasoning_content || '';
+            }
+        },
+
+        async cancelEdit() {
+            this.editingMessageIndex = null;
+            this.editContent = '';
+        },
+
+        async saveEdit(index) {
+            await simpleSocketSend({
+                "type": "message_edit",
+                "index": index,
+                "content": this.editContent
+            });
+            this.editingMessageIndex = null;
+            this.editContent = '';
         },
 
         /* ----------------------

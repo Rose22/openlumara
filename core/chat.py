@@ -285,7 +285,20 @@ class Chat:
             await self.new()
 
         messages = self.data[self.current].get("messages", [])
+
         return messages
+
+    async def get_chat(self):
+        """
+        gets the entire current chat. this is why i need to split the messages into a seperate object... this is getting confusing
+        unfortunately i need to finish work on the webui first before i improve chat.py, because
+        a lot of stuff across the framework depends on the chat class
+        and so, will break all over the place if i remove .get() in favor of .messages.get()
+        """
+        if self.current is None:
+            return None
+
+        return self.data[self.current]
 
     async def get_id(self):
         if self.current is None:
@@ -410,6 +423,17 @@ class Chat:
         index = len(self.data[self.current]["messages"]) - 1
         await self.save()
         return True
+
+    async def edit(self, index: int, message):
+        """edit message by its index"""
+        if self.current is None:
+            return False
+
+        if index < len(self.data[self.current]["messages"]):
+            return False
+
+        self.data[self.current]["messages"][index] = message
+        await self.save()
 
     async def pop(self, index: int = None):
         """pop message from current chat"""
