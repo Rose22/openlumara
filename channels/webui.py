@@ -477,7 +477,7 @@ async def create_fastapi(channel):
                                     chat_id = await channel.context.chat.get_id() or "default"
                                     await ws_mgr.start_stream(channel, chat_id, content)
                                 except Exception as e:
-                                    channel.log(channel.name, f"WebSocket user_message error: {core.detail_error(e)}")
+                                    channel.log(channel.name, f"WebSocket start_stream error: {core.detail_error(e)}")
                                     await ws_mgr.broadcast({
                                         "type": "error",
                                         "error": str(e)
@@ -648,6 +648,11 @@ class WebSocketManager:
                                 "content": f"Error: {payload.get('content')}"
                             }
                         })
+
+                        # add it to the chat so that when the frontend syncs with the backend messages,
+                        # the error doesnt just suddenly disappear smh
+                        await self.channel.context.chat.add_message({"role": "assistant", "content": f"Error {payload.get('content')}"})
+
                         await self.broadcast({
                             "type": "stream_complete",
                             "buffer": []
