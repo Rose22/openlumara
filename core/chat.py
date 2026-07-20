@@ -304,10 +304,10 @@ class Chat:
     # but there's no time right now
     # ----------------------------
     async def get_messages(self):
-        await self.get()
+        return await self.get()
 
     async def set_messages(self, messages):
-        await self.set(messages)
+        return await self.set(messages)
 
     async def get_message(self, index: int):
         if not self.current:
