@@ -31,7 +31,6 @@ class APIClient():
         self.connected = False
         self._AI = None # replaced later using .connect()
 
-        self._model = None
         self._messages = []
 
         self.cancel_request = False
@@ -50,7 +49,6 @@ class APIClient():
         if self.connected:
             return True
 
-        self._model = core.config.get("model", "name")
         api_config = core.config.get("api", {})
 
         # infinite timeout
@@ -130,7 +128,7 @@ class APIClient():
         return {
             "connected": self.connected,
             "url": api_config.get("url"),
-            "model": self._model
+            "model": core.config.get("model", "name")
         }
 
     async def disconnect(self):
@@ -149,11 +147,13 @@ class APIClient():
         return await self.connect()
 
     def get_model(self):
-        return self._model
+        return core.config.get("model", "name")
 
     def set_model(self, name: str):
-        self._model = name
-        return self._model
+        core.config.config["model"]["name"] = name
+        core.config.save()
+
+        return True
 
     async def _request(self, context, tools=None, stream=False, use_thinking=True, **kwargs):
         """send a request to the LLM and return the response object"""
@@ -176,7 +176,7 @@ class APIClient():
             tools = None
 
         req = {
-            "model": self._model,
+            "model": core.config.get("model", "name"),
             "messages": context,
             "tools": tools,
             "stream": stream,
@@ -236,7 +236,7 @@ class APIClient():
                 "debug:request",
                 json.dumps({
                     "base_url": api_config.get("url"),
-                    "model": self._model,
+                    "model": core.config.get("model", "name"),
                     "stream": stream,
                     "use_thinking": use_thinking,
                     "message_count": len(context),
