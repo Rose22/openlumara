@@ -408,12 +408,12 @@ class Commands:
 
                 return "Connected!"
             case "reconnect":
-                    result = await self.channel.manager.API.reconnect()
+                result = await self.channel.manager.API.reconnect()
 
-                    if isinstance(result, core.api.APIError):
-                        return f"Error while reconnecting: {result}"
+                if isinstance(result, core.api.APIError):
+                    return f"Error while reconnecting: {result}"
 
-                    return "Reconnected"
+                return "Reconnected"
             case "disconnect":
                 await self.channel.manager.API.disconnect()
                 return "Disconnected from API"

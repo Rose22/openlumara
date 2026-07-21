@@ -25,7 +25,11 @@ async function simpleApiPost(url, content=null) {
         })
     ).json()
 
-    // console.log(raw_data.data);
+    if (!raw_data.success) {
+        throw raw_data.data;
+    }
+
+    console.log(raw_data);
 
     return raw_data.data;
 }

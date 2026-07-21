@@ -74,6 +74,18 @@
                     <span :class="{'status-dot': true, 'connected': apiStatus, 'disconnected': !apiStatus}"></span>
                     <span x-text="apiStatus ? 'connected' : 'not connected'"></span>
                 </div>
+                <template x-if="apiError">
+                    <p class="error" x-text="'Could not connect: ' + apiError"></p>
+                </template>
+            </div>
+        </template>
+
+        <!-- API key field -->
+        <template x-if="setting.type === 'api_key'">
+            <div class="row">
+                <label x-text="setting.title"></label>
+                <input type="text" :value="setting.value" 
+                       @blur="updateSetting(setting, $event.target.value); await checkApiConnection();">
             </div>
         </template>
 

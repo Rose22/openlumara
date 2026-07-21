@@ -7,6 +7,7 @@ function detectType(value, key = '') {
     // special keys that should be displayed in a special way
     if (key === 'model.name') return 'model_select';
     if (key === 'api.url') return 'api_url';
+    if (key === 'api.key') return 'api_key';
     if (key.endsWith('reasoning_effort')) return 'reasoning_effort_slider';
 
     // standard types

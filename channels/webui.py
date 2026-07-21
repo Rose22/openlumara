@@ -388,7 +388,11 @@ async def create_fastapi(channel):
     @app.post("/api/reconnect")
     async def reconnect():
         """Disconnects and then reconnects the API."""
-        return api_result(success=await channel.manager.API.reconnect())
+        result = await channel.manager.API.reconnect()
+        if isinstance(result, core.api.APIError):
+            return api_result(str(result), success=False)
+
+        return api_result(success=True)
 
     # ----------------------------
     # Dynamically generated files

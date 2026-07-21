@@ -4,6 +4,7 @@ function settingsModal() {
         loading: false,
         error: null,
         apiStatus: false,
+        apiError: false,
         
         // --- Settings Data ---
         settings: {},
@@ -174,7 +175,9 @@ function settingsModal() {
                     try {
                         console.log("reconnecting API");
                         await simpleApiPost('/api/reconnect', {});
+                        this.apiError = null;
                     } catch (reconnectErr) {
+                        this.apiError = reconnectErr;
                         console.warn('Reconnect failed:', reconnectErr);
                     }
                 }
