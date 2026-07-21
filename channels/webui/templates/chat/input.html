@@ -18,7 +18,7 @@
 <textarea 
     id="user-input" 
     x-ref="user-input"
-    x-model="user_input"
+    x-model="$store.chat.user_input"
     placeholder="Type a message.." 
     :disabled="$store.stream.state != 'idle'"
     x-effect="
@@ -32,10 +32,10 @@
     @keydown.enter="
         if (!$event.shiftKey) {
             $event.preventDefault();
-            if (!user_input) { return; }
+            if (!$store.chat.user_input) { return; }
 
-            await send(user_input);
-            await clearInput();
+            await send($store.chat.user_input);
+            await $store.chat.clearInput();
             $el.style.height = '48px';
 
             // force scroll to the bottom
@@ -48,9 +48,9 @@
     @click="
     if (!$event.shiftKey) {
         $event.preventDefault();
-        if (!user_input) { return; }
+        if (!$store.chat.user_input) { return; }
 
-        await send(user_input);
+        await send($store.chat.user_input);
         await clearInput();
         $el.style.height = '48px';
 

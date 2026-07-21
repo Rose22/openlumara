@@ -31,7 +31,6 @@
 <html>
     <head>
         <title>{{ title }}</title>
-        
         <!-- 
             ### libraries ###
         -->
@@ -41,14 +40,14 @@
         <!-- automatic animation plugin for Alpine.js -->
         <script src="{{ url_for('assets', path='js/libs/alpine-animation.min.js') }}" defer></script>
 
-        <!-- Alpine.js <3 (thank you for making a lightweight framework that fits perfectly with openlumara) -->
-        <script src="{{ url_for('assets', path='js/libs/alpine.min.js') }}" defer></script>
-
         <!-- DOMPurify (XSS protection) -->
         <script src="{{ url_for('assets', path='js/libs/purify.min.js') }}"></script>
 
         <!-- marked (markdown support) -->
         <script src="{{ url_for('assets', path='js/libs/marked.min.js') }}"></script>
+
+        <!-- Alpine.js <3 (thank you for making a lightweight framework that fits perfectly with openlumara) -->
+        <script src="{{ url_for('assets', path='js/libs/alpine.min.js') }}" defer></script>
 
         <!-- 
             ### stylesheets ### 
@@ -58,8 +57,11 @@
         {% endfor %}
     </head>
     <body>
-        <!-- the x-data is defined in js/alpine/data.js -->
-        <div id="main" x-data="main" style="display: inline">
+        <!-- 
+            we use alpine stores for data access across the app,
+            as putting every possible thing in one massive data object was no fun
+        -->
+        <div id="main" x-data="{}" style="display: inline">
             <section id="main-wrapper">
                 {% if config.get("enable_sidebar") %}
                     <section id="sidebar">
@@ -75,10 +77,12 @@
             {% include 'modals.html' %}
         </div>
 
-        <!-- javascript files -->
-        <script src="{{ url_for('assets', path='js/utils.js') }}"></script>
-        <script src="{{ url_for('assets', path='js/alpine/main.js') }}"></script>
+        <!-- utility functions used by everything else -->
+        {% for file in js_utils %}
+        <script src="{{ url_for('assets', path='js/utils/'+file) }}"></script>
+        {% endfor %}
 
+        <!-- javascript files -->
         {% for file in js_files %}
         <script src="{{ url_for('assets', path='js/'+file) }}"></script>
         {% endfor %}
@@ -93,6 +97,12 @@
         -->
         <script src="/themes.js"></script>
 
-        <script src="{{ url_for('assets', path='js/alpine/init.js') }}"></script>
+        <!-- Alpine stores -->
+        {% for js_file in alpine_stores %}
+            <script src="{{ url_for('assets', path='js/stores/'+js_file) }}"></script>
+        {% endfor %}
+
+        <!-- and finally, initialize! -->
+        <script src="{{ url_for('assets', path='js/init.js') }}"></script>
     </body>
 </html>

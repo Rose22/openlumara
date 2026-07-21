@@ -1,4 +1,4 @@
-<div x-show="currentModal === 'settings'" x-cloak>
+<div x-show="$store.ui.currentModal === 'settings'" x-cloak>
     <div class="settings-modal modal" x-data="settingsModal()">
         <div class="header">
             <h2 id="title">Settings</h2>
@@ -19,16 +19,16 @@
             <!-- MAIN CONTENT AREA -->
             <main class="content" x-animate.duration.170ms>
                 <!-- Loading State -->
-                <div x-show="loading" class="loading">
+                <div x-show="$store.settings.loading" class="loading">
                     <div class="spinner"></div>
                 </div>
 
-                <template x-if="!loading">
+                <template x-if="!$store.settings.loading">
                     <div>
                         <!-- Mobile: show category list when no category selected -->
                         <template x-if="mobile && !activeCategory">
                             <div class="mobile-category-list">
-                                <template x-for="[cat, data] in sortedCategories" :key="cat">
+                                <template x-for="[cat, data] in $store.settings.sorted$store.settings.categories" :key="cat">
                                     <button @click="activeCategory = cat" class="mobile-category-btn">
                                         <span x-text="data.title"></span>
                                     </button>
@@ -48,15 +48,15 @@
                         <!-- AUDIO -->
                         {% include 'modals/settings/audio.html' %}
                         
-                        <!-- ALL OTHER CATEGORIES (core and so on) -->
+                        <!-- ALL OTHER $store.settings.categories (core and so on) -->
                         <template x-if="!activeModule && !activeChannel && 
                                          !['appearance', 'audio', 'modules', 'user_modules', 'channels', 'user_channels'].includes(activeCategory) && 
                                          activeCategory">
                             <div class="section">
-                                <h3 class="section-title" x-text="categories[activeCategory].title"></h3>
-                                <p class="section-desc" x-text="categories[activeCategory].description"></p>
+                                <h3 class="section-title" x-text="$store.settings.categories[activeCategory].title"></h3>
+                                <p class="section-desc" x-text="$store.settings.categories[activeCategory].description"></p>
                                 
-                                <template x-for="[key, setting] in Object.entries(categories[activeCategory].settings)" :key="key">
+                                <template x-for="[key, setting] in Object.entries($store.settings.categories[activeCategory].settings)" :key="key">
                                     {% include 'modals/settings/fields.html' %}
                                 </template>
                             </div>

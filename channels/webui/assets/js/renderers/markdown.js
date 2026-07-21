@@ -1,12 +1,3 @@
-// =============================================================================
-// Markdown Rendering
-// =============================================================================
-
-marked.setOptions({
-    breaks: true,
-    gfm: true
-});
-
 function renderMarkdown(text) {
     // handle undefined or null safely
     if (!text) return '';
@@ -19,3 +10,4 @@ function renderMarkdown(text) {
 
     return clean;
 }
+

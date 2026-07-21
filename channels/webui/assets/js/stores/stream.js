@@ -17,6 +17,6 @@ let STREAM_STORE = {
 
     async clearTokens() {
         this.tokens = [];
-        this.processing = [];
+        this.processing = {};
     }
 }

@@ -2,11 +2,11 @@
     <div
         class="prompt-processing-indicator">
         <div class="progress-header">
-            <span class="prompt-processing-percent" x-text="promptprogress.percent_str"></span>
-            <span class="prompt-processing-eta" style="opacity: 0.7" x-text="promptprogress.remaining_str">(ETA: 0s)</span>
+            <span class="prompt-processing-percent" x-text="$store.chat.promptprogress.percent_str"></span>
+            <span class="prompt-processing-eta" style="opacity: 0.7" x-text="$store.chat.promptprogress.remaining_str">(ETA: 0s)</span>
         </div>
         <div class="prompt-progress-bar">
-            <div class="prompt-progress-bar-fill" :style="{'width': promptprogress.percent_str}"></div>
+            <div class="prompt-progress-bar-fill" :style="{'width': $store.chat.promptprogress.percent_str}"></div>
         </div>
     </div>
 </div>

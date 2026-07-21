@@ -5,12 +5,12 @@
     {% include 'chat/titlebar.html' %}
 {% endif %}
 
-<template x-if="notice">
-    <div class="notice" x-html="notice"></div>
+<template x-if="$store.ui.notice">
+    <div class="notice" x-html="$store.ui.notice"></div>
 </template>
 
 <div id="messages" x-ref="messages" x-auto-scroll>
-    <template x-for="(turn, turnIndex) in turns">
+    <template x-for="(turn, turnIndex) in $store.chat.turns">
         <div>
             <!-- user messages get rendered seperately -->
             <template x-if="turn.role === 'user'">
@@ -20,34 +20,34 @@
                         'user': turn.messages[0].role === 'user',
                         'pending': turn.messages[0].msgId === $store.stream.pendingMessageId
                     }">
-                        <template x-if="editingMessageIndex != turn.messages[0].index">
+                        <template x-if="$store.chat.editingMessageIndex != turn.messages[0].index">
                             <div x-html="renderMarkdown(turn.messages[0].content)" :class="{'command': turn.messages[0].is_cmd}"></div>
                             <template x-if="turn.messages[0].msgId === $store.stream.pendingMessageId">
                                 <span class="status">Sending..</span>
                             </template>
                         </template>
 
-                        <template x-if="turn.messages[0].msgId !== $store.stream.pendingMessageId && editingMessageIndex != turn.messages[0].index">
+                        <template x-if="turn.messages[0].msgId !== $store.stream.pendingMessageId && $store.chat.editingMessageIndex != turn.messages[0].index">
                             <div class="message-buttons">
-                                    <button @click="startEdit(turn.messages[0].index)" title="Edit" :disabled="$store.stream.state != 'idle'">
+                                    <button @click="$store.chat.startEdit(turn.messages[0].index)" title="Edit" :disabled="$store.stream.state != 'idle'">
                                         {% include 'svg/edit.svg' %}
                                     </button>
-                                    <button @click="regenerateMessage(turn.messages[0].index)" title="Regenerate" :disabled="$store.stream.state != 'idle'">
+                                    <button @click="$store.chat.regenerateMessage(turn.messages[0].index)" title="Regenerate" :disabled="$store.stream.state != 'idle'">
                                         {% include 'svg/reload.svg' %}
                                     </button>
-                                    <button @click="deleteMessage(turn.messages[0].index)" title="Delete" :disabled="$store.stream.state != 'idle'">
+                                    <button @click="$store.chat.deleteMessage(turn.messages[0].index)" title="Delete" :disabled="$store.stream.state != 'idle'">
                                         {% include 'svg/trash.svg' %}
                                     </button>
                                 </div>
                             </div>
                         </template>
 
-                        <template x-if="editingMessageIndex === turn.messages[0].index">
+                        <template x-if="$store.chat.editingMessageIndex === turn.messages[0].index">
                             <div class="flex fullwidth editing">
                                 <textarea x-model="editContent" rows="3"></textarea>
                                 <div class="edit-actions">
-                                    <button @click="saveEdit(editingMessageIndex)">Save</button>
-                                    <button @click="cancelEdit()">Cancel</button>
+                                    <button @click="$store.chat.saveEdit($store.chat.editingMessageIndex)">Save</button>
+                                    <button @click="$store.chat.cancelEdit()">Cancel</button>
                                 </div>
                             </div>
                         </template>
@@ -86,10 +86,10 @@
                             </template>
 
                             <div class="message-buttons">
-                                    <button @click="regenerateMessage(turn.index)" title="Regenerate" :disabled="$store.stream.state != 'idle'">
+                                    <button @click="$store.chat.regenerateMessage(turn.index)" title="Regenerate" :disabled="$store.stream.state != 'idle'">
                                         {% include 'svg/reload.svg' %}
                                     </button>
-                                    <button @click="deleteMessage(turn.index)" title="Delete" :disabled="$store.stream.state != 'idle'">
+                                    <button @click="$store.chat.deleteMessage(turn.index)" title="Delete" :disabled="$store.stream.state != 'idle'">
                                         {% include 'svg/trash.svg' %}
                                     </button>
                                 </div>

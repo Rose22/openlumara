@@ -28,10 +28,10 @@ async function connectWebSocket() {
 
     wsSocket.onopen = async () => {
         console.log('WebSocket connected');
-        getMain().notice = null;
+        Alpine.store('ui').notice = null;
         isWsConnected = true;
         wsReconnecting = false;
-        await getMain().reloadChat();
+        await Alpine.store("chat").reloadChat();
     };
 
     wsSocket.onmessage = async (event) => {
@@ -50,7 +50,7 @@ async function connectWebSocket() {
             window.socket = null;
             isWsConnected = false;
 
-            getMain().notice = "Not connected to the backend server! Is OpenLumara running?"
+            Alpine.store('ui').notice = "Not connected to the backend server! Is OpenLumara running?"
             stream = Alpine.store("stream")
             stream.state = 'idle';
             stream.pendingMessageId = null;
@@ -76,6 +76,8 @@ async function scheduleWsReconnect() {
 async function handleWebSocketMessage(data) {
     // we store all the stream-related data in an Alpine store
     const stream = Alpine.store("stream");
+
+    const chat = Alpine.store("chat");
 
     data_type = data.type;
     data_content = data.content;
@@ -103,7 +105,7 @@ async function handleWebSocketMessage(data) {
             // show the message, with a special "pending" status
             let msgId = Date.now();
             console.log(data.message);
-            getMain().messages.push({
+            chat.messages.push({
                 ...data.message,
                 role: 'user',
                 msgId: msgId
@@ -120,7 +122,7 @@ async function handleWebSocketMessage(data) {
             break;
         case "push":
             // it's a push messsage (like a scheduler reminder)
-            getMain().messages.push(data.content);
+            chat.messages.push(data.content);
             break;
 
         case "token":
@@ -181,7 +183,7 @@ async function handleWebSocketMessage(data) {
 
             if (token.is_cmd) {
                 // reload the global state in case something changed due to the command
-                await getMain().reloadChat();
+                await chat.reloadChat();
                 return
             }
 
@@ -190,12 +192,12 @@ async function handleWebSocketMessage(data) {
 
         case "messages_updated":
             // make sure we sync chat
-            await getMain().reloadChat();
+            await chat.reloadChat();
             break;
 
         case "chat_switched":
             // make sure we sync chat switches across instances
-            await getMain().loadChat(data.id);
+            await chat.loadChat(data.id);
             break;
 
         case "stream_complete":
@@ -207,11 +209,11 @@ async function handleWebSocketMessage(data) {
              */
 
             lastTurn = streamedTokensToMessages(stream.tokens);
-            getMain().messages.push(...lastTurn);
+            chat.messages.push(...lastTurn);
             await stream.clearTokens();
 
             // then sync from the backend to make sure we're completely synced up
-            await getMain().reloadChat();
+            await chat.reloadChat();
 
             AudioManager.play("completion");
 

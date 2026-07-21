@@ -1,4 +1,4 @@
-<template x-if="showUnsafe || !setting.unsafe">
+<template x-if="$store.settings.showUnsafe || !setting.unsafe">
     <div class="item" :class="{ 'unsafe': setting.unsafe }">
         <!-- Boolean -->
         <template x-if="setting.type === 'boolean'">
@@ -69,13 +69,13 @@
             <div class="row">
                 <label x-text="setting.title.toUpperCase()"></label>
                 <input type="text" :value="setting.value" 
-                       @blur="updateSetting(setting, $event.target.value); await saveSettings(); await checkApiConnection();">
+                       @blur="updateSetting(setting, $event.target.value); await $store.settings.saveSettings(); await $store.settings.checkApiConnection();">
                 <div class="api-status">
-                    <span :class="{'status-dot': true, 'connected': apiStatus, 'disconnected': !apiStatus}"></span>
-                    <span x-text="apiStatus ? 'connected' : 'not connected'"></span>
+                    <span :class="{'status-dot': true, 'connected': $store.settings.apiStatus, 'disconnected': !$store.settings.apiStatus}"></span>
+                    <span x-text="$store.settings.apiStatus ? 'connected' : 'not connected'"></span>
                 </div>
-                <template x-if="apiError">
-                    <p class="error" x-text="'Could not connect: ' + apiError"></p>
+                <template x-if="$store.settings.apiError">
+                    <p class="error" x-text="'Could not connect: ' + $store.settings.apiError"></p>
                 </template>
             </div>
         </template>
@@ -85,7 +85,7 @@
             <div class="row">
                 <label x-text="setting.title"></label>
                 <input type="text" :value="setting.value" 
-                       @blur="updateSetting(setting, $event.target.value); await saveSettings(); await checkApiConnection();">
+                       @blur="updateSetting(setting, $event.target.value); await $store.settings.saveSettings(); await $store.settings.checkApiConnection();">
             </div>
         </template>
 
@@ -94,31 +94,31 @@
             <div class="row model-setting-row">
                 <label x-text="setting.title"></label>
                 <div class="model-input-container">
-                    <template x-if="cachedModels && cachedModels.length > 0">
+                    <template x-if="$store.settings.cachedModels && $store.settings.cachedModels.length > 0">
                         <select :value="setting.value" @change="updateSetting(setting, $event.target.value)" class="model-select">
                             <option value="" disabled>-- Select a model --</option>
-                            <template x-for="model in cachedModels" :key="model">
+                            <template x-for="model in $store.settings.cachedModels" :key="model">
                                 <option :value="model" x-text="model" :selected="model === setting.value"></option>
                             </template>
                             <!-- Custom option if current value not in list -->
-                            <template x-if="setting.value && !cachedModels.find(m => m === setting.value)">
+                            <template x-if="setting.value && !$store.settings.cachedModels.find(m => m === setting.value)">
                                 <option :value="setting.value" x-text="setting.value + ' (custom)'" selected></option>
                             </template>
                         </select>
                     </template>
-                    <template x-if="!cachedModels || cachedModels.length === 0">
+                    <template x-if="!$store.settings.cachedModels || $store.settings.cachedModels.length === 0">
                         <input type="text" :value="setting.value" placeholder="Enter model name" 
                                @input="updateSetting(setting, $event.target.value)">
                     </template>
-                    <button type="button" @click="fetchModels()" class="model-refresh-btn" :disabled="loading"
-                            :title="cachedModels && cachedModels.length > 0 ? 'Refresh model list' : 'Load models from API'">
+                    <button type="button" @click="fetchModels()" class="model-refresh-btn"
+                            :title="$store.settings.cachedModels && $store.settings.cachedModels.length > 0 ? 'Refresh model list' : 'Load models from API'">
                             {% include 'svg/reload.svg' %}
                     </button>
                 </div>
                 <span class="description" x-show="setting.description" x-html="renderMarkdown(setting.description)"></span>
                 <!-- Error message if fetch failed -->
-                <template x-if="modelsLoadError">
-                    <p class="error" x-text="'Could not load models: ' + modelsLoadError"></p>
+                <template x-if="$store.settings.modelsLoadError">
+                    <p class="error" x-text="'Could not load models: ' + $store.settings.modelsLoadError"></p>
                 </template>
             </div>
         </template>

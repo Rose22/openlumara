@@ -1,18 +1,18 @@
 <!-- MODULES: Unified list (no module selected) -->
 <template x-if="(activeCategory === 'modules' || activeCategory === 'user_modules') && !activeModule">
     <div class="unified-list">
-        <h3 x-text="categories[activeCategory].title"></h3>
-        <p class="section-desc" x-text="categories[activeCategory].description"></p>
+        <h3 x-text="$store.settings.categories[activeCategory].title"></h3>
+        <p class="section-desc" x-text="$store.settings.categories[activeCategory].description"></p>
         
         <!-- All modules (enabled first, then disabled) -->
-        <template x-for="module in [...categories[activeCategory].enabled, ...categories[activeCategory].disabled]" :key="module">
-            <template x-if="showUnsafe || !categories[activeCategory].unsafeModules[module]">
-                <div class="unified-card" :class="{ 'disabled': !categories[activeCategory].enabled.includes(module), 'unsafe': categories[activeCategory].unsafeModules[module] }">
+        <template x-for="module in [...$store.settings.categories[activeCategory].enabled, ...$store.settings.categories[activeCategory].disabled]" :key="module">
+            <template x-if="$store.settings.showUnsafe || !$store.settings.categories[activeCategory].unsafeModules[module]">
+                <div class="unified-card" :class="{ 'disabled': !$store.settings.categories[activeCategory].enabled.includes(module), 'unsafe': $store.settings.categories[activeCategory].unsafeModules[module] }">
                     <div class="info" @click="activeModule = module">
                         <span type="button" class="btn" x-text="formatLabel(module)"></span>
-                        <p class="description" x-html="renderMarkdown(categories[activeCategory].descriptions[module]) || ''"></p>
+                        <p class="description" x-html="renderMarkdown($store.settings.categories[activeCategory].descriptions[module]) || ''"></p>
                     </div>
-                    <button type="button" :class="{'toggle': true, 'toggle-off': categories[activeCategory].disabled.includes(module), 'toggle-on': categories[activeCategory].enabled.includes(module) }" 
+                    <button type="button" :class="{'toggle': true, 'toggle-off': $store.settings.categories[activeCategory].disabled.includes(module), 'toggle-on': $store.settings.categories[activeCategory].enabled.includes(module) }" 
                             @click="toggleEnabled(activeCategory, module)">
                     </button>
                 </div>
@@ -27,11 +27,11 @@
         <div x-animate.duration.120ms>
             <button type="button" @click="activeModule = null" class="back-btn">← Back</button>
             <h3 class="section-title" x-text="formatLabel(activeModule)"></h3>
-            <p class="section-desc" x-html="renderMarkdown(categories[activeCategory].descriptions[activeModule]) || ''"></p>
+            <p class="section-desc" x-html="renderMarkdown($store.settings.categories[activeCategory].descriptions[activeModule]) || ''"></p>
             
-            <template x-if="categories[activeCategory].settings[activeModule] && categories[activeCategory].settings[activeModule].value">
-                <template x-for="[key, setting] in Object.entries(categories[activeCategory].settings[activeModule].value)" :key="key">
-                    <template x-if="showUnsafe || !setting.unsafe">
+            <template x-if="$store.settings.categories[activeCategory].settings[activeModule] && $store.settings.categories[activeCategory].settings[activeModule].value">
+                <template x-for="[key, setting] in Object.entries($store.settings.categories[activeCategory].settings[activeModule].value)" :key="key">
+                    <template x-if="$store.settings.showUnsafe || !setting.unsafe">
                         <div class="setting-item" :class="{ 'unsafe': setting.unsafe }">
                             {% include 'modals/settings/fields.html' %}
                         </div>
@@ -40,7 +40,7 @@
             </template>
         </div>
         
-        <template x-if="!categories[activeCategory].settings[activeModule] || !categories[activeCategory].settings[activeModule].value">
+        <template x-if="!$store.settings.categories[activeCategory].settings[activeModule] || !$store.settings.categories[activeCategory].settings[activeModule].value">
             <p class="no-settings-msg">This module has no configurable settings.</p>
         </template>
     </div>

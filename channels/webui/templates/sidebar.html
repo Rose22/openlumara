@@ -1,7 +1,7 @@
 <!-- list of categories -->
 <div id="category-list" x-ref="category-list">
-    <template x-for="category in categories">
-        <ul :class="{'item': true, 'active': category == selectedCategory}" @click="selectCategory(category)">
+    <template x-for="category in $store.chat.categories">
+        <ul :class="{'item': true, 'active': category == $store.chat.selectedCategory}" @click="$store.chat.selectCategory(category)">
             <span class="icon">
                 <template x-if="category === 'general'">
                     {% include 'svg/home.svg' %}
@@ -22,11 +22,11 @@
     </div>
 
     <div class="chats">
-        <template x-for="chat in chats">
+        <template x-for="chat in $store.chat.chats">
             <!-- only show if it matches the current category and search query -->
             <template
                 x-if="
-                    chat.category === selectedCategory
+                    chat.category === $store.chat.selectedCategory
                     &&
                     chat.title.toLowerCase().includes(query.toLowerCase())
                 "
@@ -35,12 +35,12 @@
                 <div
                     x-data="{ active: false }"
                     :id="`chat-${chat.id}`"
-                    :class="{'item': true, 'active': chat.id === selectedChat}"
-                    @click="active = !active; loadChat(chat.id)"
+                    :class="{'item': true, 'active': chat.id === $store.chat.selectedChat}"
+                    @click="active = !active; $store.chat.loadChat(chat.id)"
                     x-init="
                         $nextTick(() => {
                             // autoscroll to the selected chat
-                            if (chat.id === selectedChat) {
+                            if (chat.id === $store.chat.selectedChat) {
                                 $el.scrollIntoView({ behavior: 'smooth' });
                             }
                         })
@@ -57,7 +57,7 @@
         </template>
     </div>
 
-    <button class="new-chat-btn" @click="newChat()">
+    <button class="new-chat-btn" @click="$store.chat.newChat()">
         {% include 'svg/add.svg' %}
         New Chat
     </button>

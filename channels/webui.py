@@ -139,6 +139,9 @@ class Webui(core.channel.Channel):
         self.port = self.config.get("port")
         self.url = f"http://{self.host}:{self.port}"
 
+        # stores logs from channel.log()
+        self.logs = []
+
         # initialize the websocket manager
         self.websocket_manager = WebSocketManager(self)
 
@@ -163,7 +166,7 @@ class Webui(core.channel.Channel):
             return False
 
         # Store log in buffer for history
-        self.websocket_manager.add_log(category, message)
+        self.logs.append({"category": category, "message": message})
         
         # Broadcast log messages to all connected webui clients
         # Since on_log is sync but manager.broadcast is async, we schedule it as a task
@@ -254,12 +257,16 @@ async def create_fastapi(channel):
     async def root(request: fastapi.Request):
         """The main page. This returns HTML, not JSON"""
         css_files = get_recursive_assets(os.path.join(channel.assets_path, "css"), "css")
-        js_files = get_recursive_assets(os.path.join(channel.assets_path, "js"), "js", skip=["alpine", "libs", "utils.js"])
+        alpine_stores = os.listdir(os.path.join(channel.assets_path, "js", "stores"))
+        js_utils = os.listdir(os.path.join(channel.assets_path, "js", "utils"))
+        js_files = get_recursive_assets(os.path.join(channel.assets_path, "js"), "js", skip=["init.js", "stores", "libs", "utils"])
 
         return channel.templates.TemplateResponse(request, "index.html", {
             "version": channel.version,
             "config": channel.config,
             "css_files": css_files,
+            "alpine_stores": alpine_stores,
+            "js_utils": js_utils,
             "js_files": js_files
         })
 
@@ -394,6 +401,13 @@ async def create_fastapi(channel):
             return api_result(str(result), success=False)
 
         return api_result(success=True)
+
+    # ----------------------------
+    # System.. stuff
+    # ----------------------------
+    @app.get("/api/logs")
+    async def get_logs():
+        return api_result(channel.logs)
 
     # ----------------------------
     # Dynamically generated files
@@ -580,9 +594,6 @@ class WebSocketManager:
 
         self.active_connections = []
 
-        self.log_buffer = []
-        self.max_log_buffer = 1000
-
         self.stream_buffer = []
         self.active_stream_task = None
         self.active_chat_id = None
@@ -593,12 +604,6 @@ class WebSocketManager:
         self.active_connections.append(websocket)
 
         current_chat_id = await self.channel.context.chat.get_id()
-
-        if self.log_buffer:
-            await websocket.send_json({
-                "type": "log_history",
-                "logs": self.log_buffer
-            })
 
         if current_chat_id:
             await websocket.send_json({
@@ -635,14 +640,6 @@ class WebSocketManager:
 
         for conn in disconnected:
             self.disconnect(conn)
-
-    def add_log(self, category: str, message: str):
-        self.log_buffer.append({
-            "category": category,
-            "message": message
-        })
-        if len(self.log_buffer) > self.max_log_buffer:
-            self.log_buffer = self.log_buffer[-self.max_log_buffer:]
 
     async def _stream_task(self, message: dict, index: int):
         user_message_confirmed = False

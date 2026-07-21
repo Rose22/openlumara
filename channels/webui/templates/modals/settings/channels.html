@@ -1,18 +1,18 @@
 <!-- CHANNELS: Unified list -->
 <template x-if="(activeCategory === 'channels' || activeCategory === 'user_channels') && !activeChannel">
     <div class="unified-list">
-        <h3 x-text="categories[activeCategory].title"></h3>
-        <p class="section-desc" x-text="categories[activeCategory].description"></p>
+        <h3 x-text="$store.settings.categories[activeCategory].title"></h3>
+        <p class="section-desc" x-text="$store.settings.categories[activeCategory].description"></p>
         
         <!-- All channels (enabled first, then disabled) -->
-        <template x-for="channel in [...categories[activeCategory].enabled, ...categories[activeCategory].disabled]" :key="channel">
-            <template x-if="showUnsafe || !categories[activeCategory].unsafeModules[channel]">
-                <div class="unified-card" :class="{ 'disabled': !categories[activeCategory].enabled.includes(channel), 'unsafe': categories[activeCategory].unsafeModules[channel] }" @click="activeChannel = channel">
+        <template x-for="channel in [...$store.settings.categories[activeCategory].enabled, ...$store.settings.categories[activeCategory].disabled]" :key="channel">
+            <template x-if="$store.settings.showUnsafe || !$store.settings.categories[activeCategory].unsafeModules[channel]">
+                <div class="unified-card" :class="{ 'disabled': !$store.settings.categories[activeCategory].enabled.includes(channel), 'unsafe': $store.settings.categories[activeCategory].unsafeModules[channel] }" @click="activeChannel = channel">
                     <div class="info">
                         <span type="button" class="channel-name-btn" x-text="formatLabel(channel)"></span>
-                        <p class="description" x-html="renderMarkdown(categories[activeCategory].descriptions[channel]) || ''"></p>
+                        <p class="description" x-html="renderMarkdown($store.settings.categories[activeCategory].descriptions[channel]) || ''"></p>
                     </div>
-                    <button type="button" :class="{'toggle': true, 'toggle-off': categories[activeCategory].disabled.includes(channel), 'toggle-on': categories[activeCategory].enabled.includes(channel) }" 
+                    <button type="button" :class="{'toggle': true, 'toggle-off': $store.settings.categories[activeCategory].disabled.includes(channel), 'toggle-on': $store.settings.categories[activeCategory].enabled.includes(channel) }" 
                             @click="toggleEnabled(activeCategory, channel)">
                     </button>
                 </div>
@@ -27,11 +27,11 @@
         <div x-animate.duration.120ms>
             <button type="button" @click="activeChannel = null" class="back-btn">← Back</button>
             <h3 class="section-title" x-text="formatLabel(activeChannel)"></h3>
-            <p class="section-desc" x-html="renderMarkdown(categories[activeCategory].descriptions[activeChannel]) || ''"></p>
+            <p class="section-desc" x-html="renderMarkdown($store.settings.categories[activeCategory].descriptions[activeChannel]) || ''"></p>
             
-            <template x-if="categories[activeCategory].settings[activeChannel] && categories[activeCategory].settings[activeChannel].value">
-                <template x-for="[key, setting] in Object.entries(categories[activeCategory].settings[activeChannel].value)" :key="key">
-                    <template x-if="showUnsafe || !setting.unsafe">
+            <template x-if="$store.settings.categories[activeCategory].settings[activeChannel] && $store.settings.categories[activeCategory].settings[activeChannel].value">
+                <template x-for="[key, setting] in Object.entries($store.settings.categories[activeCategory].settings[activeChannel].value)" :key="key">
+                    <template x-if="$store.settings.showUnsafe || !setting.unsafe">
                         <div class="setting-item" :class="{ 'unsafe': setting.unsafe }">
                             {% include 'modals/settings/fields.html' %}
                         </div>
@@ -40,7 +40,7 @@
             </template>
         </div>
         
-        <template x-if="!categories[activeCategory].settings[activeChannel] || !categories[activeCategory].settings[activeChannel].value">
+        <template x-if="!$store.settings.categories[activeCategory].settings[activeChannel] || !$store.settings.categories[activeCategory].settings[activeChannel].value">
             <p class="no-settings-msg">This channel has no configurable settings.</p>
         </template>
     </div>

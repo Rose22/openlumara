@@ -15,7 +15,7 @@
         <button class="btn" id="search-btn" title="Search messages (Ctrl+F)">
             {% include 'svg/search.svg' %}
         </button>
-        <button class="btn" id="settings-btn" title="Settings (Ctrl+S)" @click="currentModal = 'settings'">
+        <button class="btn" id="settings-btn" title="Settings (Ctrl+S)" @click="await $store.ui.openModal('settings')">
             {% include 'svg/gear.svg' %}
         </button>
         <button class="btn" title="Export chat">

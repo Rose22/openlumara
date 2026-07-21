@@ -2,8 +2,8 @@
 <template x-if="activeCategory === 'audio' && !activeModule && !activeChannel">
     <div>
         <!-- Sound Effects Section -->
-        <h3 class="section-title" x-text="categories.audio.ttle"></h3>
-        <p class="section-desc" x-text="categories.audio.description"></p>
+        <h3 class="section-title" x-text="$store.settings.categories.audio.title"></h3>
+        <p class="section-desc" x-text="$store.settings.categories.audio.description"></p>
 
         <hr>
 
