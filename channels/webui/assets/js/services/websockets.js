@@ -127,7 +127,7 @@ async function handleWebSocketMessage(data) {
             break;
 
         case "log":
-            Alpine.store('ui').systemLogs.push(data);
+            Alpine.store('system').logs.push(data);
             break;
 
         case "ready":
