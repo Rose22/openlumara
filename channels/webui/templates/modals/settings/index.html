@@ -17,14 +17,14 @@
             {% include 'modals/settings/sidebar.html' %}
 
             <!-- MAIN CONTENT AREA -->
-            <main class="content" x-animate.duration.170ms>
+            <main :class="{'content-wrapper': true, 'nopadding': activeCategory === 'system_logs'}" x-animate.duration.170ms>
                 <!-- Loading State -->
                 <div x-show="$store.settings.loading" class="loading">
                     <div class="spinner"></div>
                 </div>
 
                 <template x-if="!$store.settings.loading">
-                    <div>
+                    <div class="content">
                         <!-- Mobile: show category list when no category selected -->
                         <template x-if="mobile && !activeCategory">
                             <div class="mobile-category-list">
@@ -47,10 +47,13 @@
 
                         <!-- AUDIO -->
                         {% include 'modals/settings/audio.html' %}
+
+                        <!-- SYSTEM LOGS -->
+                        {% include 'modals/settings/logs.html' %}
                         
                         <!-- ALL OTHER $store.settings.categories (core and so on) -->
                         <template x-if="!activeModule && !activeChannel && 
-                                         !['appearance', 'audio', 'modules', 'user_modules', 'channels', 'user_channels'].includes(activeCategory) && 
+                                         !['appearance', 'audio', 'modules', 'user_modules', 'channels', 'user_channels', 'system_logs'].includes(activeCategory) && 
                                          activeCategory">
                             <div class="section">
                                 <h3 class="section-title" x-text="$store.settings.categories[activeCategory].title"></h3>

@@ -1,0 +1,40 @@
+.system-logs {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    background: var(--bg-primary);
+
+    .entry {
+        padding: 4px 14px;
+        white-space: pre-wrap;
+        word-break: break-word;
+        display: flex;
+        flex-direction: row;
+        align-items: flex-start;
+
+        &:nth-child(odd) {
+            background: var(--bg-secondary);
+        }
+
+        &:nth-child(even) {
+            background: transparent;
+        }
+    }
+
+    .category {
+        flex-shrink: 0;
+        min-width: 150px;
+        color: var(--accent);
+        font-weight: 600;
+        padding-right: 8px;
+    }
+
+    .message {
+        flex-grow: 1;
+        color: var(--text-primary);
+    }
+}

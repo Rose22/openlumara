@@ -164,27 +164,35 @@
         }
 
         /* --- Content Area --- */
-        .content {
-            flex: 1;
-            overflow-y: auto;
-            padding: 24px 32px;
-            scrollbar-width: thin;
-            scrollbar-color: var(--scrollbar) transparent;
+        .content-wrapper {
+                flex: 1;
+                overflow-y: auto;
+                padding: 24px 32px;
+                scrollbar-width: thin;
+                scrollbar-color: var(--scrollbar) transparent;
 
-            &::-webkit-scrollbar {
-                width: 6px;
+                &::-webkit-scrollbar {
+                    width: 6px;
 
-                &-track {
-                    background: transparent;
+                    &-track {
+                        background: transparent;
+                    }
+
+                    &-thumb {
+                        background: var(--scrollbar);
+                        border-radius: var(--radius-full);
+
+                        &:hover {
+                            background: var(--scrollbar-hover);
+                        }
+                    }
                 }
 
-                &-thumb {
-                    background: var(--scrollbar);
-                    border-radius: var(--radius-full);
-
-                    &:hover {
-                        background: var(--scrollbar-hover);
-                    }
+                .content {
+                    display: flex;
+                    flex-direction: column;
+                    min-height: 100%;
+                    height: 100%;
                 }
             }
         }

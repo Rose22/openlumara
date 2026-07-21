@@ -1,0 +1,10 @@
+<template x-if="activeCategory === 'system_logs' && !activeModule && !activeChannel">
+    <div class="system-logs" id="log-container" x-ref="logContainer" x-auto-scroll>
+        <template x-for="(entry, index) in $store.system.logs" :key="index">
+            <div class="entry">
+                <div class="category" x-text="entry.category"></div>
+                <div class="message" x-text="entry.message"></div>
+            </div>
+        </template>
+    </div>
+</template>

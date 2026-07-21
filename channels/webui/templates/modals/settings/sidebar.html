@@ -30,12 +30,6 @@
 
         <button 
             class="item" 
-            @click="$store.ui.openModal('logs')"
-        >
-            <span>System Logs</span>
-        </button>
-        <button 
-            class="item" 
             @click="await $store.system.restart()"
         >
             <span>Restart Server</span>

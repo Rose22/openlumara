@@ -24,6 +24,12 @@ function buildSettingsStructure(originalData, moduleInfo = {}) {
         order: order++,
         isThemeCategory: true
     };
+    categories.system_logs = {
+        title: 'System Logs',
+        description: 'Peek into the great unknown',
+        order: 999,
+        isThemeCategory: true
+    };
 
     for (const [topKey, topValue] of Object.entries(originalData)) {
         if (topKey.toLowerCase() === 'theme' || topKey.toLowerCase() === 'theme_mode') {
