@@ -174,6 +174,7 @@ function settingsModal() {
 
             try {
                 const backendData = flattenForBackend(this.categories);
+                backendData.changed_modules = Array.from(this.changedModuleSettings);
 
                 await simpleApiPost('/api/settings/save', backendData);
 
