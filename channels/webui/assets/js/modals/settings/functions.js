@@ -4,16 +4,21 @@ function formatLabel(key) {
 }
 
 function detectType(value, key = '') {
+    // special keys that should be displayed in a special way
+    if (key === 'model.name') return 'model_select';
     if (key.endsWith('reasoning_effort')) return 'reasoning_effort_slider';
+
+    // standard types
     if (value === null || value === undefined) return 'text';
-    if (typeof value === 'boolean') return 'boolean';
-    if (typeof value === 'number' && !key.toLowerCase().endsWith('id')) return 'number';
-    if (Array.isArray(value)) return 'array';
-    if (typeof value === 'string') {
+    else if (typeof value === 'boolean') return 'boolean';
+    else if (typeof value === 'number' && !key.toLowerCase().endsWith('id')) return 'number';
+    else if (Array.isArray(value)) return 'array';
+    else if (typeof value === 'string') {
         if (value.match(/^https?:\/\//)) return 'url';
-        if (value.includes('\n')) return 'textarea';
+        else if (value.includes('\n')) return 'textarea';
+    } else {
+        return 'text';
     }
-    return 'text';
 }
 
 function isToggleList(data) {

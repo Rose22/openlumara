@@ -114,8 +114,6 @@ function settingsModal() {
 
                 this.showUnsafe = this.settings.channels.settings.webui.show_unsafe_settings;
 
-                await this.fetchModels();
-
                 const firstCategory = Object.keys(this.categories)[0];
                 this.activeCategory = firstCategory;
             } catch (err) {
@@ -127,16 +125,25 @@ function settingsModal() {
         },
 
         async fetchModels() {
+            console.log("fetching models..");
+
+            this.loading = true;
+
             try {
                 this.cachedModels = await simpleApiFetch('/api/models');
                 // Re-render any model inputs if settings are already loaded
                 if (Object.keys(this.categories).length > 0) {
                     this.$dispatch('settings-loaded');
                 }
+                this.modelsLoadError = null;
+
             } catch (err) {
                 console.error('Failed to fetch models:', err);
                 this.modelsLoadError = err.message || 'Failed to fetch models';
+                this.cachedModels = null;
             }
+
+            this.loading = false;
         },
 
         async saveSettings() {
@@ -145,7 +152,21 @@ function settingsModal() {
 
             try {
                 const backendData = flattenForBackend(this.categories);
+
                 await simpleApiPost('/api/settings/save', backendData);
+
+                // Reconnect API if API settings changed
+                if (
+                    (JSON.stringify(this.categories.api) !== JSON.stringify(this.originalCategories.api))
+                ) {
+                    try {
+                        console.log("reconnecting API");
+                        await simpleApiPost('/api/reconnect', {});
+                    } catch (reconnectErr) {
+                        console.warn('Reconnect failed:', reconnectErr);
+                    }
+                }
+
                 this.settings = backendData;
                 this.originalCategories = JSON.parse(JSON.stringify(this.categories));
                 this.changedModuleSettings.clear();
@@ -193,7 +214,17 @@ function settingsModal() {
             }
         },
 
-        switchCategory(cat) {
+        async switchCategory(cat) {
+            // Auto-save API settings when switching away
+            if (this.activeCategory === 'api' && cat !== 'api' && this.hasChanges) {
+                await this.saveSettings();
+            }
+
+            // Auto-fetch models if switching to the model category
+            if (cat === 'model') {
+                await this.fetchModels();
+            }
+
             this.activeCategory = cat;
             this.activeModule = null;
             this.activeChannel = null;

@@ -322,8 +322,6 @@
         }
 
         .kv-row {
-            display: flex;
-            align-items: flex-start;
             gap: 8px;
             border-radius: var(--radius-sm);
             padding: 6px 10px;

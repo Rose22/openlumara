@@ -61,8 +61,7 @@
         </template>
 
         <!-- Model Dropdown -->
-        <!-- very hacky way of detecting it for now.. but it'll have to do -->
-        <template x-if="activeCategory === 'model' && setting.title === 'Name'">
+        <template x-if="setting.type === 'model_select'">
             <div class="row model-setting-row">
                 <label x-text="setting.title"></label>
                 <div class="model-input-container">
@@ -89,7 +88,9 @@
                 </div>
                 <span class="description" x-show="setting.description" x-html="renderMarkdown(setting.description)"></span>
                 <!-- Error message if fetch failed -->
-                <p class="error" x-show="modelsLoadError" x-text="'Could not load models: ' + modelsLoadError"></p>
+                <template x-if="modelsLoadError">
+                    <p class="error" x-text="'Could not load models: ' + modelsLoadError"></p>
+                </template>
             </div>
         </template>
     </div>

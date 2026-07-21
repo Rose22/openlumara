@@ -7,7 +7,12 @@ async function simpleApiFetch(url) {
         await fetch(url)
     ).json()
 
-    console.log(raw_data.data);
+    console.log(raw_data);
+
+    if (!raw_data.success) {
+        console.log("error");
+        throw raw_data.data.error;
+    }
 
     return raw_data.data;
 }

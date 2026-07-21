@@ -347,7 +347,11 @@ async def create_fastapi(channel):
     @app.get("/api/models")
     async def models_get():
         """Returns a list of all available AI models"""
-        return api_result(await channel.manager.API.list_models())
+        result = await channel.manager.API.list_models()
+        if isinstance(result, core.api.APIError):
+            return api_result({"error": str(result)}, success=False)
+
+        return api_result(result)
 
     # -- POST
     @app.post("/api/settings/save")
@@ -372,6 +376,11 @@ async def create_fastapi(channel):
         #             channel.log(self.name, f"Error reloading module {module_name}: {core.detail_error(e)}")
 
         return api_result(success=True)
+    
+    @app.post("/api/reconnect")
+    async def reconnect():
+        """Disconnects and then reconnects the API."""
+        return api_result(success=await channel.manager.API.reconnect())
 
     # ----------------------------
     # Dynamically generated files

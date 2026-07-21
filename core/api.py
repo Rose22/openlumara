@@ -95,6 +95,9 @@ class APIClient():
 
         except Exception as e:
             #await self.disconnect()
+            import traceback
+            if core.debug:
+                traceback.print_exc()
             return APIError("Unknown error while attempting to connect", e)
 
         self.connected = True
@@ -689,7 +692,7 @@ class APIClient():
         if not self.connected:
             result = await self.attempt_connect()
             if result is not True:
-                return []
+                return APIError("No models found on the server! Are you connected to the right API?")
 
         try:
             # get alphabetically sorted model list

@@ -5,12 +5,6 @@
             <button class="close" @click="currentModal = null" aria-label="Close settings">×</button>
         </div>
 
-        <!-- Loading State -->
-        <div x-show="loading" class="settings-loading">
-            <div class="spinner"></div>
-            <span>Loading settings...</span>
-        </div>
-
         <!-- Error State -->
         <div x-show="error" class="settings-error">
             <span x-text="error"></span>
@@ -18,49 +12,57 @@
         </div>
 
         <!-- Settings Content -->
-        <div class="body" x-show="!loading && !error">
+        <div class="body" x-show="!error">
             <!-- SIDEBAR NAV -->
             {% include 'modals/settings/sidebar.html' %}
 
             <!-- MAIN CONTENT AREA -->
             <main class="content" x-animate.duration.170ms>
-                <!-- Mobile: show category list when no category selected -->
-                <template x-if="mobile && !activeCategory">
-                    <div class="mobile-category-list">
-                        <template x-for="[cat, data] in sortedCategories" :key="cat">
-                            <button @click="activeCategory = cat" class="mobile-category-btn">
-                                <span x-text="data.title"></span>
-                            </button>
+                <!-- Loading State -->
+                <div x-show="loading" class="loading">
+                    <div class="spinner"></div>
+                </div>
+
+                <template x-if="!loading">
+                    <div>
+                        <!-- Mobile: show category list when no category selected -->
+                        <template x-if="mobile && !activeCategory">
+                            <div class="mobile-category-list">
+                                <template x-for="[cat, data] in sortedCategories" :key="cat">
+                                    <button @click="activeCategory = cat" class="mobile-category-btn">
+                                        <span x-text="data.title"></span>
+                                    </button>
+                                </template>
+                            </div>
                         </template>
-                    </div>
-                </template>
 
-                <!-- MODULES CONTENT -->
-                {% include 'modals/settings/modules.html' %}
+                        <!-- MODULES CONTENT -->
+                        {% include 'modals/settings/modules.html' %}
 
-                <!-- CHANNELS CONTENT -->
-                {% include 'modals/settings/channels.html' %}
+                        <!-- CHANNELS CONTENT -->
+                        {% include 'modals/settings/channels.html' %}
 
-                <!-- APPEARANCE (special theme section) -->
-                {% include 'modals/settings/appearance.html' %}
+                        <!-- APPEARANCE (special theme section) -->
+                        {% include 'modals/settings/appearance.html' %}
 
-                <!-- AUDIO -->
-                {% include 'modals/settings/audio.html' %}
-                
-                <!-- ALL OTHER CATEGORIES (core and so on) -->
-                <template x-if="!activeModule && !activeChannel && 
-                                 !['appearance', 'audio', 'modules', 'user_modules', 'channels', 'user_channels'].includes(activeCategory) && 
-                                 activeCategory">
-                    <div class="section">
-                        <h3 class="section-title" x-text="categories[activeCategory].title"></h3>
-                        <p class="section-desc" x-text="categories[activeCategory].description"></p>
+                        <!-- AUDIO -->
+                        {% include 'modals/settings/audio.html' %}
                         
-                        <template x-for="[key, setting] in Object.entries(categories[activeCategory].settings)" :key="key">
-                            {% include 'modals/settings/fields.html' %}
+                        <!-- ALL OTHER CATEGORIES (core and so on) -->
+                        <template x-if="!activeModule && !activeChannel && 
+                                         !['appearance', 'audio', 'modules', 'user_modules', 'channels', 'user_channels'].includes(activeCategory) && 
+                                         activeCategory">
+                            <div class="section">
+                                <h3 class="section-title" x-text="categories[activeCategory].title"></h3>
+                                <p class="section-desc" x-text="categories[activeCategory].description"></p>
+                                
+                                <template x-for="[key, setting] in Object.entries(categories[activeCategory].settings)" :key="key">
+                                    {% include 'modals/settings/fields.html' %}
+                                </template>
+                            </div>
                         </template>
                     </div>
                 </template>
-                
             </main>
 
         </div>

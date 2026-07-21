@@ -10,7 +10,8 @@
     /* --- Loading & Error States --- */
     .loading {
         display: flex;
-        flex-direction: column;
+        flex-direction: center;
+        height: 100%;
         align-items: center;
         justify-content: center;
         gap: 16px;
@@ -24,7 +25,7 @@
             border: 3px solid var(--border-color);
             border-top-color: var(--accent);
             border-radius: 50%;
-            animation: settings-spin 0.8s linear infinite;
+            animation: spin 0.8s linear infinite;
         }
     }
 
@@ -34,7 +35,7 @@
         align-items: center;
         justify-content: center;
         gap: 16px;
-        padding: 80px 20px;
+        padding: 7px;
         color: var(--error);
         font-size: 15px;
         background: var(--error-bg);

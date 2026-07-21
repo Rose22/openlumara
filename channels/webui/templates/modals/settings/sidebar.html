@@ -4,7 +4,7 @@
             <div x-animate.duration.150ms>
                 <button 
                     :class="{ active: activeNavCategory === cat }"
-                    @click="switchCategory(cat)"
+                    @click="await switchCategory(cat)"
                     class="item"
                 >
                     <span x-text="data.title"></span>
