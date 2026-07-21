@@ -60,6 +60,23 @@
             </div>
         </template>
 
+        <!--
+            special fields can be defined in the detectType() function
+            over in js/modals/settings/fields.js
+        -->
+        <!-- API url field -->
+        <template x-if="setting.type === 'api_url'">
+            <div class="row">
+                <label x-text="setting.title.toUpperCase()"></label>
+                <input type="text" :value="setting.value" 
+                       @blur="updateSetting(setting, $event.target.value); await checkApiConnection();">
+                <div class="api-status">
+                    <span :class="{'status-dot': true, 'connected': apiStatus, 'disconnected': !apiStatus}"></span>
+                    <span x-text="apiStatus ? 'connected' : 'not connected'"></span>
+                </div>
+            </div>
+        </template>
+
         <!-- Model Dropdown -->
         <template x-if="setting.type === 'model_select'">
             <div class="row model-setting-row">

@@ -10,8 +10,7 @@ async function simpleApiFetch(url) {
     console.log(raw_data);
 
     if (!raw_data.success) {
-        console.log("error");
-        throw raw_data.data.error;
+        throw raw_data.data;
     }
 
     return raw_data.data;

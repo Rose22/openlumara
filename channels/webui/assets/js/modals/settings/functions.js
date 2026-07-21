@@ -6,6 +6,7 @@ function formatLabel(key) {
 function detectType(value, key = '') {
     // special keys that should be displayed in a special way
     if (key === 'model.name') return 'model_select';
+    if (key === 'api.url') return 'api_url';
     if (key.endsWith('reasoning_effort')) return 'reasoning_effort_slider';
 
     // standard types
@@ -16,6 +17,7 @@ function detectType(value, key = '') {
     else if (typeof value === 'string') {
         if (value.match(/^https?:\/\//)) return 'url';
         else if (value.includes('\n')) return 'textarea';
+        else return 'text';
     } else {
         return 'text';
     }

@@ -3,6 +3,7 @@ function settingsModal() {
         // --- UI State ---
         loading: false,
         error: null,
+        apiStatus: false,
         
         // --- Settings Data ---
         settings: {},
@@ -92,6 +93,7 @@ function settingsModal() {
             });
 
             await this.load();
+            await this.checkApiConnection();
         },
 
         async load() {
@@ -121,6 +123,16 @@ function settingsModal() {
                 this.error = err.message || 'Failed to load settings';
             } finally {
                 this.loading = false;
+            }
+        },
+
+        async checkApiConnection() {
+            // get API connection status
+            try {
+                await this.saveSettings();
+                this.apiStatus = await simpleApiFetch("/api/check_connection");
+            } catch (e) {
+                this.apiStatus = false;
             }
         },
 

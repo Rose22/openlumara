@@ -1,0 +1,30 @@
+.api-status {
+    margin-left: 2px;
+
+    display: flex;
+    align-items: center;
+    gap: var(--gap);
+    
+    .status-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        transition: all 0.3s ease;
+
+        &.connected {
+            background: #4ade80;
+            box-shadow: 0 0 8px rgba(74, 222, 128, 0.6);
+        }
+
+        &.disconnected {
+            background: #f87171;
+            box-shadow: 0 0 8px rgba(248, 113, 113, 0.6);
+        }
+
+        &.connecting {
+            background: #fbbf24;
+            box-shadow: 0 0 8px rgba(251, 191, 36, 0.6);
+            animation: pulse 1s infinite;
+        }
+    }
+}

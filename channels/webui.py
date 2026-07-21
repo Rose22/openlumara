@@ -344,12 +344,20 @@ async def create_fastapi(channel):
 
         return api_result(module_info)
 
+    @app.get("/api/check_connection")
+    async def check_connection():
+        """returns True if the backend is connected to the AI API, else False"""
+        if channel.manager.API.connected:
+            return api_result(True, success=True)
+        else:
+            return api_result("not connected", success=False)
+
     @app.get("/api/models")
     async def models_get():
         """Returns a list of all available AI models"""
         result = await channel.manager.API.list_models()
         if isinstance(result, core.api.APIError):
-            return api_result({"error": str(result)}, success=False)
+            return api_result(str(result), success=False)
 
         return api_result(result)
 
