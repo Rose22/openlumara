@@ -16,6 +16,10 @@ document.addEventListener('alpine:init', async () => {
     Alpine.store('theme', THEME_STORE);
     Alpine.store('audio', AUDIO_STORE);
 
+    // start the browser notification system
+    Alpine.store('notifications', NOTIFY_STORE);
+    await Alpine.store('notifications').init();
+
     // defined in directives/
     Alpine.directive('auto-scroll', autoScroll);
 

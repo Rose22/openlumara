@@ -82,10 +82,6 @@ async function handleWebSocketMessage(data) {
     data_type = data.type;
     data_content = data.content;
 
-    if (data_type != 'token') {
-        console.log(data);
-    }
-
     // process based on broadcast type
     switch (data_type) {
         case "sync_state":
@@ -104,7 +100,6 @@ async function handleWebSocketMessage(data) {
         case "user_message_added":
             // show the message, with a special "pending" status
             let msgId = Date.now();
-            console.log(data.message);
             chat.messages.push({
                 ...data.message,
                 role: 'user',
@@ -124,6 +119,8 @@ async function handleWebSocketMessage(data) {
         case "push":
             // it's a push messsage (like a scheduler reminder)
             chat.messages.push(data.content);
+            await AudioManager.play('response_start');
+            await Alpine.store('notifications').send(data.content.content);
             break;
 
         case "log":
@@ -148,8 +145,6 @@ async function handleWebSocketMessage(data) {
             token = data_content;
             token_type = token.type;
             token_content = token.content;
-
-            console.log(token);
 
             // process tokens based on their type
             switch (token_type) {
