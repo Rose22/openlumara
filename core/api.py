@@ -8,7 +8,7 @@ import inspect
 
 class APIError:
     """Simple class that holds an error message, used for passing on to channels"""
-    def __init__(self, message: str, exc = None):
+    def __init__(self, message: str = None, exc = None):
         self.message = message
         
         # store exception if relevant
@@ -17,8 +17,15 @@ class APIError:
             self.exc = exc
 
     def __str__(self):
-        exc_str = f": {core.detail_error(self.exc)}" if self.exc is not None else ""
-        return f"{self.message}{exc_str}"
+        err_str = ""
+        if self.message:
+            err_str += self.message
+        if self.exc:
+            if self.message:
+                err_str += ": "
+            err_str += core.detail_error(self.exc)
+
+        return err_str
 
 class APIClient():
     """
@@ -98,7 +105,7 @@ class APIClient():
             import traceback
             if core.debug:
                 traceback.print_exc()
-            return APIError("Unknown error while attempting to connect", e)
+            return APIError(None, e)
 
         self.connected = True
         self.supports_developer_role = core.config.get("api", "use_developer_role", default=False)
@@ -316,7 +323,7 @@ class APIClient():
 
         except Exception as e:
             #await self.disconnect()
-            return APIError("Unknown error while sending request to the API", e)
+            return APIError(None, e)
 
         finally:
             self.cancel_request = False
@@ -691,8 +698,7 @@ class APIClient():
     async def list_models(self):
         if not self.connected:
             result = await self.attempt_connect()
-            if result is not True:
-                return APIError("No models found on the server! Are you connected to the right API?")
+            return result
 
         try:
             # get alphabetically sorted model list

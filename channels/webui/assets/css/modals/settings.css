@@ -6,6 +6,7 @@
     color: var(--text-primary);
     font-family: var(--font-primary);
     overflow: hidden;
+    max-height: 90vh;
 
     /* --- Loading & Error States --- */
     .loading {

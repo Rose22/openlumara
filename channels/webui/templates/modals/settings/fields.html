@@ -69,7 +69,7 @@
             <div class="row">
                 <label x-text="setting.title.toUpperCase()"></label>
                 <input type="text" :value="setting.value" 
-                       @blur="updateSetting(setting, $event.target.value); await checkApiConnection();">
+                       @blur="updateSetting(setting, $event.target.value); await saveSettings(); await checkApiConnection();">
                 <div class="api-status">
                     <span :class="{'status-dot': true, 'connected': apiStatus, 'disconnected': !apiStatus}"></span>
                     <span x-text="apiStatus ? 'connected' : 'not connected'"></span>
@@ -85,7 +85,7 @@
             <div class="row">
                 <label x-text="setting.title"></label>
                 <input type="text" :value="setting.value" 
-                       @blur="updateSetting(setting, $event.target.value); await checkApiConnection();">
+                       @blur="updateSetting(setting, $event.target.value); await saveSettings(); await checkApiConnection();">
             </div>
         </template>
 

@@ -119,6 +119,8 @@ function settingsModal() {
 
                 const firstCategory = Object.keys(this.categories)[0];
                 this.activeCategory = firstCategory;
+
+                await this.checkApiConnection();
             } catch (err) {
                 console.error('Failed to load settings:', err);
                 this.error = err.message || 'Failed to load settings';
@@ -127,10 +129,15 @@ function settingsModal() {
             }
         },
 
+        async closeAndSave() {
+            // close the modal and save settings
+            await this.saveSettings();
+            getMain().currentModal = null;
+        },
+
         async checkApiConnection() {
             // get API connection status
             try {
-                await this.saveSettings();
                 this.apiStatus = await simpleApiFetch("/api/check_connection");
             } catch (e) {
                 this.apiStatus = false;
@@ -152,7 +159,7 @@ function settingsModal() {
 
             } catch (err) {
                 console.error('Failed to fetch models:', err);
-                this.modelsLoadError = err.message || 'Failed to fetch models';
+                this.modelsLoadError = err || 'Failed to fetch models';
                 this.cachedModels = null;
             }
 
@@ -162,6 +169,8 @@ function settingsModal() {
         async saveSettings() {
             this.loading = true;
             this.error = null;
+
+            console.log("saving settings to server..");
 
             try {
                 const backendData = flattenForBackend(this.categories);
@@ -230,10 +239,8 @@ function settingsModal() {
         },
 
         async switchCategory(cat) {
-            // Auto-save API settings when switching away
-            if (this.activeCategory === 'api' && cat !== 'api' && this.hasChanges) {
-                await this.saveSettings();
-            }
+            // Auto-save settings to the backend when switching categories
+            await this.saveSettings();
 
             // Auto-fetch models if switching to the model category
             if (cat === 'model') {

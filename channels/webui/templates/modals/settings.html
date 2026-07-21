@@ -2,7 +2,7 @@
     <div class="settings-modal modal" x-data="settingsModal()">
         <div class="header">
             <h2 id="title">Settings</h2>
-            <button class="close" @click="currentModal = null" aria-label="Close settings">×</button>
+            <button class="close" @click="closeAndSave()" aria-label="Close settings">×</button>
         </div>
 
         <!-- Error State -->
@@ -65,16 +65,6 @@
                 </template>
             </main>
 
-        </div>
-
-        <!-- Action Buttons -->
-        <div class="actions">
-            <div x-show="hasChanges" class="settings-unsaved">
-                You have unsaved changes
-            </div>
-
-            <button type="button" @click="resetSettingsForm()" :disabled="!hasChanges">Reset</button>
-            <button type="button" @click="saveSettings()" :disabled="!hasChanges">Save</button>
         </div>
     </div>
 </div>
