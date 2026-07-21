@@ -48,6 +48,7 @@ CHAT_STORE = {
         this.messages = result.messages;
 
         // make sure it always shows the bottom of the chat
+        await Alpine.nextTick();
         await forceScrollDown(document.getElementById("messages"));
     },
 

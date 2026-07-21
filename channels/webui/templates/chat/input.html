@@ -51,7 +51,7 @@
         if (!$store.chat.user_input) { return; }
 
         await send($store.chat.user_input);
-        await clearInput();
+        await $store.chat.clearInput();
         $el.style.height = '48px';
 
         await forceScrollDown($refs.messages);

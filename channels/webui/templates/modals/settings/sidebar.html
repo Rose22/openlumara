@@ -36,7 +36,7 @@
         </button>
         <button 
             class="item" 
-            @click="await simpleApiPost('/api/system/restart')"
+            @click="await $store.system.restart()"
         >
             <span>Restart Server</span>
         </button>

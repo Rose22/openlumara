@@ -1,0 +1,6 @@
+<div x-show="!$store.system.running || $store.system.restarting" x-cloak>
+    <div class="restart-modal">
+        <div class="spinner"></div>
+        <p x-text="$store.system.message"></p>
+    </div>
+</div>

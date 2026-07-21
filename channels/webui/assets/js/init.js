@@ -8,6 +8,7 @@ marked.setOptions({
  */
 document.addEventListener('alpine:init', async () => {
     // these are all defined in js/stores/
+    Alpine.store("system", SYSTEM_STORE);
     Alpine.store("ui", UI_STORE);
     Alpine.store("settings", SETTINGS_STORE);
     Alpine.store("chat", CHAT_STORE);
@@ -25,5 +26,5 @@ document.addEventListener('alpine:init', async () => {
     await Alpine.store('chat').load();
 
     // fetch logs
-    await Alpine.store('ui').reloadLogs();
+    await Alpine.store('system').reloadLogs();
 });

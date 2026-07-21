@@ -131,11 +131,17 @@ async function handleWebSocketMessage(data) {
             break;
 
         case "ready":
-            await Alpine.store('ui').closeModal();
+            sys = Alpine.store("system")
+            sys.running = true;
+            sys.restarting = false;
             break;
 
         case "shutdown":
-            await Alpine.store('ui').openModal('logs');
+            sys = Alpine.store("system")
+            if (!sys.restarting) {
+                sys.message = "Server is down! Trying to reconnect..";
+                sys.running = false;
+            }
             break;
 
         case "token":
