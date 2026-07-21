@@ -31,6 +31,16 @@
     font-family: var(--font-primary);
     color: var(--text-primary);
 
+    /* --- blurred backdrop --- */
+    &::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(4px) saturate(180%);
+        z-index: -1;
+    }
+
     .header {
         display: flex;
         align-items: center;

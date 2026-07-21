@@ -80,7 +80,7 @@ SETTINGS_STORE = {
         try {
             this.apiStatus = await simpleApiFetch("/api/check_connection");
         } catch (e) {
-            this.apiStatus = false;
+           this.apiStatus = false;
         }
     },
 
@@ -130,6 +130,20 @@ SETTINGS_STORE = {
 
                 await simpleApiPost("/api/system/restart");
                 return;
+            }
+
+            // Reconnect API if API settings changed
+            else if (
+                (JSON.stringify(this.categories.api) !== JSON.stringify(this.originalCategories.api))
+            ) {
+                try {
+                    console.log("reconnecting API");
+                    await simpleApiPost('/api/reconnect', {});
+                    this.apiError = null;
+                } catch (reconnectErr) {
+                    this.apiError = reconnectErr;
+                    console.warn('Reconnect failed:', reconnectErr);
+                }
             }
 
             this.settings = backendData;
