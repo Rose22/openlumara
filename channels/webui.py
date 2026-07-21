@@ -367,7 +367,8 @@ async def create_fastapi(channel):
         """Saves config data to the backend. Accepts a structure that reflects core.config.config exactly (check /api/settings/load to see that structure"""
         data = await request.json()
 
-        changed_modules = data.get("changed_modules", [])
+        changed_modules = list(data.get("changed_modules", []))
+        data.pop("changed_modules")
         
         result = core.config.config.load(data=data)
         core.config.config.save()
