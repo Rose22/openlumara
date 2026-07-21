@@ -22,5 +22,8 @@ document.addEventListener('alpine:init', async () => {
     await connectWebSocket();
 
     // fetch current chat
-    Alpine.store('chat').load();
+    await Alpine.store('chat').load();
+
+    // fetch logs
+    await Alpine.store('ui').reloadLogs();
 });

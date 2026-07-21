@@ -1,6 +1,6 @@
 <!-- list of categories -->
 <div id="category-list" x-ref="category-list">
-    <template x-for="category in $store.chat.categories">
+    <template x-for="category in $store.chat.categories" :key="category">
         <ul :class="{'item': true, 'active': category == $store.chat.selectedCategory}" @click="$store.chat.selectCategory(category)">
             <span class="icon">
                 <template x-if="category === 'general'">
@@ -22,7 +22,7 @@
     </div>
 
     <div class="chats">
-        <template x-for="chat in $store.chat.chats">
+        <template x-for="chat in $store.chat.chats" :key="chat.id">
             <!-- only show if it matches the current category and search query -->
             <template
                 x-if="
@@ -48,7 +48,7 @@
                 >
                     <span class="title" x-text="chat.title || 'New chat'"></span>
                     <ul class="tags">
-                        <template x-for="tag in chat.tags.slice(0,3)">
+                        <template x-for="tag in chat.tags.slice(0,3)" :key="tag">
                             <li x-text="tag" class="tag"></li>
                         </template>
                     </ul>

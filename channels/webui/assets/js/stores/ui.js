@@ -2,6 +2,7 @@ UI_STORE = {
     errors: [],
     currentModal: null,
     notice: null,
+    systemLogs: [],
 
     async openModal(name) {
         if (this.currentModal === 'settings') {
@@ -12,5 +13,9 @@ UI_STORE = {
     },
     async closeModal() {
         this.currentModal = null;
+    },
+
+    async reloadLogs() {
+        this.systemLogs = await simpleApiFetch("/api/system/logs");
     }
 }

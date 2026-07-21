@@ -182,6 +182,9 @@ class Webui(core.channel.Channel):
             # No event loop running - create one for this task
             asyncio.ensure_future(self.websocket_manager.broadcast(log_message))
 
+    async def on_shutdown(self):
+        await self.websocket_manager.broadcast({"type": "shutdown"})
+
 # -------------------
 # Helper Functions
 # -------------------
@@ -405,9 +408,15 @@ async def create_fastapi(channel):
     # ----------------------------
     # System.. stuff
     # ----------------------------
-    @app.get("/api/logs")
+    # -- GET
+    @app.get("/api/system/logs")
     async def get_logs():
         return api_result(channel.logs)
+
+    # -- POST
+    @app.post("/api/system/restart")
+    async def restart_server():
+        await channel.manager.restart()
 
     # ----------------------------
     # Dynamically generated files
@@ -606,6 +615,9 @@ class WebSocketManager:
         current_chat_id = await self.channel.context.chat.get_id()
 
         if current_chat_id:
+            await websocket.send_json({
+                "type": "ready"
+            })
             await websocket.send_json({
                 "type": "sync_state",
                 "active_chat_id": current_chat_id,

@@ -50,7 +50,7 @@
         <template x-if="setting.type === 'select'">
             <div class="row">
                 <label x-text="setting.title"></label>
-                <span class="setting-description" x-show="setting.description" x-html="renderMarkdown(setting.description)"></span>
+                <span class="description" x-show="setting.description" x-html="renderMarkdown(setting.description)"></span>
                 <select :value="setting.value" @change="updateSetting(setting, $event.target.value)">
                     <template x-for="[optionKey, optionLabel] in Object.entries(setting.options || {})" :key="optionKey">
                         <option :value="optionKey" x-text="optionKey" :selected="setting.value === optionKey"></option>

@@ -113,18 +113,23 @@ SETTINGS_STORE = {
 
             await simpleApiPost('/api/settings/save', backendData);
 
-            // Reconnect API if API settings changed
+            // restart server if enabled modules/channels changed
             if (
-                (JSON.stringify(this.categories.api) !== JSON.stringify(this.originalCategories.api))
+                (JSON.stringify(this.categories.modules.enabled) !== JSON.stringify(this.originalCategories.modules.enabled))
+                ||
+                (JSON.stringify(this.categories.user_modules.enabled) !== JSON.stringify(this.originalCategories.user_modules.enabled))
+                ||
+                (JSON.stringify(this.categories.channels.enabled) !== JSON.stringify(this.originalCategories.channels.enabled))
+                ||
+                (JSON.stringify(this.categories.user_channels.enabled) !== JSON.stringify(this.originalCategories.user_channels.enabled))
             ) {
-                try {
-                    console.log("reconnecting API");
-                    await simpleApiPost('/api/reconnect', {});
-                    this.apiError = null;
-                } catch (reconnectErr) {
-                    this.apiError = reconnectErr;
-                    console.warn('Reconnect failed:', reconnectErr);
-                }
+                console.log("restarting server..");
+                this.settings = backendData;
+                this.originalCategories = JSON.parse(JSON.stringify(this.categories));
+                this.changedModuleSettings.clear();
+
+                await simpleApiPost("/api/system/restart");
+                return;
             }
 
             this.settings = backendData;

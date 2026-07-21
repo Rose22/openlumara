@@ -1,0 +1,19 @@
+<div x-show="$store.ui.currentModal === 'logs'" x-cloak>
+    <div class="logs-modal modal">
+        <div class="header">
+            <h2 id="title">System Logs</h2>
+            <button class="close" @click="$store.ui.closeModal()" aria-label="Close">×</button>
+        </div>
+        <div class="body" id="log-container" x-ref="logContainer" x-effect="forceScrollDown($el)">
+            <template x-for="(entry, index) in $store.ui.systemLogs" :key="index">
+                <div class="entry">
+                    <div class="category" x-text="entry.category"></div>
+                    <div class="message" x-text="entry.message"></div>
+                </div>
+            </template>
+            <div x-show="$store.ui.systemLogs.length === 0" style="text-align: center; padding: 20px; color: var(--text-secondary);">
+                No logs yet.
+            </div>
+        </div>
+    </div>
+</div>

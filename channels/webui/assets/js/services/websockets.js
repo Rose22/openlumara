@@ -120,9 +120,22 @@ async function handleWebSocketMessage(data) {
             stream.userMessageId = data.index;
             stream.state = 'received';
             break;
+
         case "push":
             // it's a push messsage (like a scheduler reminder)
             chat.messages.push(data.content);
+            break;
+
+        case "log":
+            Alpine.store('ui').systemLogs.push(data);
+            break;
+
+        case "ready":
+            await Alpine.store('ui').closeModal();
+            break;
+
+        case "shutdown":
+            await Alpine.store('ui').openModal('logs');
             break;
 
         case "token":

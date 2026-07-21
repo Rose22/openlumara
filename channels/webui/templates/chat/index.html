@@ -10,7 +10,7 @@
 </template>
 
 <div id="messages" x-ref="messages" x-auto-scroll>
-    <template x-for="(turn, turnIndex) in $store.chat.turns">
+    <template x-for="(turn, turnIndex) in $store.chat.turns" :key="turnIndex">
         <div>
             <!-- user messages get rendered seperately -->
             <template x-if="turn.role === 'user'">
@@ -66,7 +66,7 @@
                     <div class="message-wrapper assistant" x-data="{ messageActionId: turn.index }">
                         <div class="message assistant">
                             <!-- all messages within a turn are displayed within the same message bubble -->
-                            <template x-for="(message, msgIndex) in turn.messages">
+                            <template x-for="(message, msgIndex) in turn.messages" :key="msgIndex">
                                 <div :class="{'flex': true, 'fullwidth': true, 'command': message.is_cmd}">
                                     <!-- render the messages based on message role -->
                                     <template x-if="message.role === 'assistant'">

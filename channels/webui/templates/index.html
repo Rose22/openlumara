@@ -61,7 +61,7 @@
             we use alpine stores for data access across the app,
             as putting every possible thing in one massive data object was no fun
         -->
-        <div id="main" x-data="{}" style="display: inline">
+        <div id="main" x-data="{}">
             <section id="main-wrapper">
                 {% if config.get("enable_sidebar") %}
                     <section id="sidebar">
@@ -74,7 +74,9 @@
                 </section>
             </section>
 
-            {% include 'modals/index.html' %}
+            <section id="modals">
+                {% include 'modals/index.html' %}
+            </section>
         </div>
 
         <!-- utility functions used by everything else -->

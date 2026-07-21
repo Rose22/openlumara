@@ -30,9 +30,15 @@
 
         <button 
             class="item" 
-            @click="$store.ui.openModal('logs');"
+            @click="$store.ui.openModal('logs')"
         >
             <span>System Logs</span>
+        </button>
+        <button 
+            class="item" 
+            @click="await simpleApiPost('/api/system/restart')"
+        >
+            <span>Restart Server</span>
         </button>
     </nav>
 </aside>

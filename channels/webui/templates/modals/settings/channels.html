@@ -13,7 +13,7 @@
                         <p class="description" x-html="renderMarkdown($store.settings.categories[activeCategory].descriptions[channel]) || ''"></p>
                     </div>
                     <button type="button" :class="{'toggle': true, 'toggle-off': $store.settings.categories[activeCategory].disabled.includes(channel), 'toggle-on': $store.settings.categories[activeCategory].enabled.includes(channel) }" 
-                            @click="toggleEnabled(activeCategory, channel)">
+                            @click="$store.settings.toggleEnabled(activeCategory, channel)">
                     </button>
                 </div>
             </template>
