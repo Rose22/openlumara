@@ -65,16 +65,16 @@
             <section id="main-wrapper">
                 {% if config.get("enable_sidebar") %}
                     <section id="sidebar">
-                        {% include 'sidebar.html' %}
+                        {% include 'sidebar/index.html' %}
                     </section>
                 {% endif %}
 
                 <section id="chat-window">
-                    {% include 'chat.html' %}
+                    {% include 'chat/index.html' %}
                 </section>
             </section>
 
-            {% include 'modals.html' %}
+            {% include 'modals/index.html' %}
         </div>
 
         <!-- utility functions used by everything else -->
