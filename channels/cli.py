@@ -10,6 +10,7 @@ import prompt_toolkit.key_binding
 import prompt_toolkit.shortcuts
 import prompt_toolkit.application
 import sys
+import shlex
 
 class Cli(core.channel.Channel):
     """Talk to your AI from the terminal! Auto-disables itself when ran as a background server."""
@@ -65,6 +66,25 @@ class Cli(core.channel.Channel):
         # Create a fresh renderer for this message session
         currently_reasoning = False
 
+        # special commands like /quit
+        message_after = None
+
+        words = shlex.split(msg)
+        cmd_prefix = core.config.get("core", "cmd_prefix")
+        cmd = words[0][len(cmd_prefix):]
+
+        if cmd in ("quit", "exit"):
+                print("Exiting..")
+                await self.manager.shutdown()
+                return
+        elif cmd == "help":
+            # append the extra commands to the /help
+            message_after = """
+---
+/quit           quits the program
+/exit           quits the program
+""".strip()
+
         # display sending indicator
         print("sending..", end="", flush=True)
 
@@ -93,6 +113,9 @@ class Cli(core.channel.Channel):
                     first_token_received = True
 
                 print(content, end="", flush=True)
+
+        if message_after:
+            print(message_after)
 
         print()
         print()
