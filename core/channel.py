@@ -119,6 +119,14 @@ class Channel:
         except Exception as e:
             print(f"[FATAL ERROR] failed to send log to channels ({e}): [{category.upper()}] {message}")
 
+    def log_error(self, msg: str, e: Exception):
+        """console log but with extra spice for errors"""
+        if core.debug:
+            self.log("error", f"{msg}: {core.detail_error(e)}")
+            self.log("error traceback", traceback.format_exception(e))
+        else:
+            self.log("error", f"{msg}: {e}")
+
     def on_log(self, category: str, message: str):
         """
         overridable method that you can use to display logs
