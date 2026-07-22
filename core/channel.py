@@ -221,7 +221,14 @@ class Channel:
         Converts a list of file handler objects into an openAI API multimodal message object,
         allowing the AI to process images, audio, etc.
 
-        for sending through channel.send_stream()
+        For sending through send() and send_stream()
+
+        Structure is:
+        {
+            "my_file.png": (file handler object),
+            "my_audio.mp3": (file handler object),
+            and so on
+        }
         """
         content_blocks = []
 
