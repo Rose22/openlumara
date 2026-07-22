@@ -64,15 +64,19 @@ class Channel:
             "keys_state": {}
         }
 
-    def __init_subclass__(cls, **kwargs):
-        super().__init_subclass__(**kwargs)
+    # ------------------
+    # Events
+    # ------------------
+    async def run(self):
+        # stub, meant for derivative channels to override
+        pass
 
-        # merge the base class's settings with the subclass settings.
-        # this way, we can define settings ALL channels should have
-        for b in cls.__mro__[1:]:
-            if hasattr(b, "settings"):
-                cls.settings = b.settings | cls.settings
-                break
+    async def on_ready(self):
+        """
+        called when the entire framework has fully initialized
+        (when the message "[CORE] Startup complete" shows up)
+        """
+        pass
 
     async def _shutdown(self):
         """internal shutdown function. gets called by the manager before on_shutdown()"""
@@ -85,89 +89,9 @@ class Channel:
             except asyncio.CancelledError:
                 pass
 
-    async def _set_as_active_channel(self):
-        if self.manager.channel is self:
-            return
-        self.manager.channel = self
-        self.manager.savedata["last_channel"] = self.name
-        self.manager.savedata.save()
-
-        # give all modules a way to access this channel
-        for module_name, module in self.manager.modules.items():
-            module.channel = self
-
-    def _get_disconnection_message(self):
-        status = self.manager.get_api_status()
-        error = status.get("error", "Unknown error")
-
-        message_parts = []
-
-        if error:
-            message_parts.append(f"Error: {error}")
-
-        if not status.get("url_configured"):
-            message_parts.append("Please configure your API URL in config/config.yml")
-        elif not status.get("key_configured"):
-            message_parts.append("Please configure your API key in config/config.yml")
-
-        return "\n".join(message_parts)
-
-    def _extract_content(self, message_dict):
-        """helper method that makes sure we always get the text content as a string from the messages array, even if it's multimodal"""
-        content = message_dict.get("content")
-
-        if isinstance(content, str):
-            return content
-        elif isinstance(content, list):
-            # it's multimodal
-            for item in content:
-                if isinstance(item, dict) and item.get("type") == "text":
-                    return item.get("text")
-
-        # fallback
-        return ""
-
-    def format_message(self, orig_message: dict):
-        formatted = ""
-
-        message = dict(orig_message)
-
-        role = message.get("role")
-
-        show_reasoning = self.config.get("show_reasoning")
-        reasoning_content = None
-
-        if role in ("user", "assistant"):
-            if show_reasoning:
-                reasoning_content = message.get("reasoning_content")
-                if reasoning_content:
-                    formatted += f"**Reasoning:**\n{reasoning_content}\n\n"
-
-            content = message.get("content")
-            if content:
-                if reasoning_content and show_reasoning:
-                    formatted += "**Conclusion**:\n"
-
-                formatted += f"{content}\n\n"
-
-        if role == "assistant":
-            if message.get("tool_calls"):
-                for tool_call in message.get("tool_calls"):
-                    formatted += self.tc_manager.display_call(tool_call)+"\n"
-
-                formatted += "\n\n"
-
-        if role == "tool":
-            formatted = "processing results.."
-
-        message["content"] = formatted.strip()
-
-        return message
-
-    async def _start_push_queue(self):
-        if not hasattr(self, "on_push"):
-            return
-        self._queue_task = asyncio.create_task(self._push_consumer())
+    async def on_shutdown(self):
+        """overridable method that runs on the channel's shutdown"""
+        pass
 
     async def _push_consumer(self):
         """Consumes messages from the queue and triggers on_push sequentially"""
@@ -195,14 +119,6 @@ class Channel:
         except Exception as e:
             print(f"[FATAL ERROR] failed to send log to channels ({e}): [{category.upper()}] {message}")
 
-    def log_error(self, msg: str, e: Exception):
-        """console log but with extra spice for errors"""
-        if core.debug:
-            self.log("error", f"{msg}: {core.detail_error(e)}")
-            self.log("error traceback", traceback.format_exception(e))
-        else:
-            self.log("error", f"{msg}: {e}")
-
     def on_log(self, category: str, message: str):
         """
         overridable method that you can use to display logs
@@ -211,30 +127,87 @@ class Channel:
         """
         pass
 
-    # async def _poll_loop(self):
-    #     """constantly polls the chat history to see if anything new arrived, and triggers on_message for every new message"""
-    #     if not hasattr(self, "on_message"):
-    #         return False
-    #
-    #     self.log(self.name, "started message polling loop")
-    #
-    #     while not getattr(self, "_shutting_down", False):
-    #         try:
-    #             # check for new messages
-    #             new_messages = await self.context.chat.get_new()
-    #
-    #             if new_messages:
-    #                 for message in new_messages:
-    #                     # trigger the event
-    #                     await self.on_message(self.format_message(message))
-    #
-    #             await asyncio.sleep(0.1)
-    #
-    #         except Exception as e:
-    #             self.log(self.name, f"error in poll loop: {str(e)}")
-    #             # if we hit an error, back off for a second so we don't spam the logs
-    #             await asyncio.sleep(1)
+    async def _start_push_queue(self):
+        if not hasattr(self, "on_push"):
+            return
+        self._queue_task = asyncio.create_task(self._push_consumer())
 
+    async def on_push(self, message: dict):
+        """
+        overridable method that should immediately display a message in your channel.
+        used by modules all over the framework, such as the scheduler, calendar, and so on,
+
+        to send content to the user without having to prompt the AI
+        """
+        pass
+
+    async def on_install(self):
+        """Overridable method that triggers when the auto-installer installs the dependencies for a channel"""
+        pass
+    async def on_uninstall(self):
+        """Overridable method that triggers when the auto-installer uninstalls the dependencies for a channel"""
+        pass
+
+    async def push(self, message):
+        """
+        push a message to the push queue, which will instantly display it in all channels
+        """
+
+        if not hasattr(self, "push_queue"):
+            return False
+
+        # message can be either a str or a dict.
+        # if dict, just use it as-is
+        # otherwise, turn it into an openAI message dict
+        if isinstance(message, dict):
+            await self.context.chat.add(message)
+            await self.push_queue.put(message)
+        else:
+            await self.context.chat.add({"role": "assistant", "content": str(message)})
+            await self.push_queue.put({"role": "assistant", "content": str(message)})
+
+    # --------------------
+    # Helper methods
+    # --------------------
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+
+        # merge the base class's settings with the subclass settings.
+        # this way, we can define settings ALL channels should have
+        for b in cls.__mro__[1:]:
+            if hasattr(b, "settings"):
+                cls.settings = b.settings | cls.settings
+                break
+
+    async def _set_as_active_channel(self):
+        if self.manager.channel is self:
+            return
+        self.manager.channel = self
+        self.manager.savedata["last_channel"] = self.name
+        self.manager.savedata.save()
+
+        # give all modules a way to access this channel
+        for module_name, module in self.manager.modules.items():
+            module.channel = self
+
+    def _extract_content(self, message_dict):
+        """helper method that makes sure we always get the text content as a string from the messages array, even if it's multimodal"""
+        content = message_dict.get("content")
+
+        if isinstance(content, str):
+            return content
+        elif isinstance(content, list):
+            # it's multimodal
+            for item in content:
+                if isinstance(item, dict) and item.get("type") == "text":
+                    return item.get("text")
+
+        # fallback
+        return ""
+
+    # ---------------------
+    # Content Processors
+    # ---------------------
     async def _process_multimodal(self, message: str = None, files: list = None) -> list:
         """
         Converts a list of file handler objects into an openAI API multimodal message object,
@@ -323,339 +296,47 @@ class Channel:
 
         return message
 
-    async def send(self, message: str, files: list = None, commands_authorized=False):
-        """sends a message to the AI from within the current channel"""
+    def format_message(self, orig_message: dict):
+        formatted = ""
 
-        user_message = message #alias for readability
+        message = dict(orig_message)
 
-        # as soon as user sends a message in this channel, set current channel (tracked in the manager) to this one
-        await self._set_as_active_channel()
+        role = message.get("role")
 
-        # process any /commands
-        cmd_response = None
-        is_cmd = user_message.strip().lower().startswith(
-            core.config.get("core", "cmd_prefix").strip().lower()
-        )
+        show_reasoning = self.config.get("show_reasoning")
+        reasoning_content = None
 
-        if is_cmd:
-            try:
-                cmd_response = await self.commands.process_input(user_message, authorized=commands_authorized)
-            except Exception as e:
-                self.log_error("error while executing command", e)
-                return {"role": "assistant", "content": str(e)}
+        if role in ("user", "assistant"):
+            if show_reasoning:
+                reasoning_content = message.get("reasoning_content")
+                if reasoning_content:
+                    formatted += f"**Reasoning:**\n{reasoning_content}\n\n"
 
-            if cmd_response:
-                return {"role": "assistant", "content": cmd_response}
-            else:
-                return {"role": "assistant", "content": "BLANK"}
+            content = message.get("content")
+            if content:
+                if reasoning_content and show_reasoning:
+                    formatted += "**Conclusion**:\n"
 
-        # run module event hooks
-        usr_msg_result = None
-        for module_name, module in self.manager.modules.items():
-            if hasattr(module, "on_user_message"):
-                try:
-                    if asyncio.iscoroutinefunction(module.on_user_message):
-                        usr_msg_result = await module.on_user_message(user_message)
-                    else:
-                        usr_msg_result = module.on_user_message(user_message)
-                except Exception as e:
-                    self.log("module error", f"{module_name}: in on_user_message(): {core.detail_error(e)}")
+                formatted += f"{content}\n\n"
 
-                if usr_msg_result is False:
-                    # when returning False from the user message hook,
-                    # we stop the chain here, allowing the hook to basically intercept the message
-                    # and prevent the AI from returning its own response to the message
-                    await self.context.chat.add(user_message)
-                    return
-                elif usr_msg_result is not None:
-                    # allow modifying user message by returning the modified message as a string
-                    user_message = usr_msg_result
+        if role == "assistant":
+            if message.get("tool_calls"):
+                for tool_call in message.get("tool_calls"):
+                    formatted += self.tc_manager.display_call(tool_call)+"\n"
 
-        # put multimodal content into the message if needed
-        user_message = await self._process_multimodal(message=user_message, files=files)
+                formatted += "\n\n"
 
-        # add sent message to context
-        add_success = await self.context.chat.add({"role": "user", "content": user_message})
+        if role == "tool":
+            formatted = "processing results.."
 
-        if not add_success:
-            return None
+        message["content"] = formatted.strip()
 
-        # if not a command, send the message to the AI and return it's response
-        # reconnect if needed
-        result = await self.manager.API.attempt_connect()
-        if result is not True:
-            self.log("API", str(result))
-            return {"role": "assistant", "content": str(result)}
-
-        # then get the full context window
-        context = await self.context.get(system_prompt=True, end_prompt=True)
-
-        # and then request the AI response and add it to context
-        response = await self.manager.API.send(context)
-
-        # handle any errors
-        if isinstance(response, core.api.APIError):
-            self.log("api", response)
-            return {"role": "assistant", "content": str(response)}
-
-        # make a copy of the response message and edit it
-        assistant_message = dict(response)
-        assistant_message["role"] = "assistant"
-
-        tool_calls = assistant_message.get("tool_calls")
-
-        # convert any toolcalls to a dict so that JSON serialization doesnt die
-        if tool_calls:
-            toolcalls_converted = []
-
-            for tool_call in tool_calls:
-                if not isinstance(tool_call, dict):
-                    tool_call = tool_call.model_dump(warnings=False)
-                toolcalls_converted.append(tool_call)
-
-            assistant_message["tool_calls"] = toolcalls_converted
-
-        if tool_calls:
-            # process() does all the toolcalling, but it also returns the raw toolcall stream for our own use
-            async for sub_token in self.tc_manager.process(
-                assistant_message,
-                push=True
-            ):
-                # push handles all the output
-                pass
-
-        # add to context
-        if not tool_calls:
-            await self.context.chat.add(assistant_message)
-
-        # run module event hooks
-        for module_name, module in self.manager.modules.items():
-            if hasattr(module, "on_assistant_message"):
-                try:
-                    if asyncio.iscoroutinefunction(module.on_assistant_message):
-                        await module.on_assistant_message(assistant_message.get("content", ""))
-                    else:
-                        module.on_assistant_message(assistant_message.get("content", ""))
-                except Exception as e:
-                    self.log("module error", f"{module_name}: in on_assistant_message(): {core.detail_error(e)}")
-
-        if tool_calls:
-            return None
-
-        return self.format_message(assistant_message)
-
-    def _build_final_assistant_message(self, final_content = [], final_reasoning = []):
-        assistant_message = {
-            "role": "assistant",
-            "content": "".join(final_content)
-        }
-
-        if final_reasoning:
-            assistant_message["reasoning_content"] = "".join(final_reasoning)
-
-        return assistant_message
-
-    async def throw_stream_error(self, error):
-        """
-        helper method to make throwing errors during a stream consistent
-        since it's easy to forget to add an error to context in addition to yielding it..
-        """
-        # add the error message to context
-        await self.context.chat.add({"role": "assistant", "content": f"Error: {error}"})
-
-        # and pass it on to yield
-        return {"type": "error", "content": error}
-
-    async def send_stream(self, message: str, files: list = None, commands_authorized=False):
-        """sends a message to the AI from within the current channel, streaming version"""
-
-        # as soon as user sends a message in this channel, set current channel (tracked in the manager) to this one
-        await self._set_as_active_channel()
-
-        user_message = message #alias for readability
-
-        # process any /commands
-        cmd_response = None
-        is_cmd = user_message.strip().lower().startswith(
-            core.config.get("core", "cmd_prefix").strip().lower()
-        )
-
-        if is_cmd:
-            # immediately yield the user's message for display in frontend channels
-            yield {"type": "user_message", "content": user_message}
-
-            # then process
-            try:
-                cmd_response = await self.commands.process_input(user_message, authorized=commands_authorized)
-            except Exception as e:
-                self.log_error("error while executing command", core.detail_error(e))
-
-                await self.context.chat.add({"role": "user", "content": user_message})
-                yield await self.throw_stream_error(str(core.detail_error(e)))
-                return
-
-            if cmd_response:
-                # insert and return the command response without sending it to the AI
-                # return the entire thing as one token so that it's instant
-
-                # we don't add to context here because process_input already does that! oopsie..
-                yield {"type": "content", "content": str(cmd_response), "is_cmd": True}
-                # we add a special is_cmd field so that channels can pick up on it and display it in a special way
-                # (the old webui used to just check for the presence of a '/' at the start of the string..)
-                # which obviously is really bad lol
-                # especially since everything is supposed to work across the core, NOT just the webui
-                return
-
-        # run user message module event hooks
-        # before we even send to the API, so that we can immediately yield the message for display in frontend channels
-        usr_msg_result = None
-        for module_name, module in self.manager.modules.items():
-            if hasattr(module, "on_user_message"):
-                try:
-                    if asyncio.iscoroutinefunction(module.on_user_message):
-                        usr_msg_result = await module.on_user_message(user_message)
-                    else:
-                        usr_msg_result = module.on_user_message(user_message)
-                except Exception as e:
-                    self.log("module error", f"{module_name}: in on_user_message(): {core.detail_error(e)}")
-
-                if usr_msg_result is False:
-                    # when returning False from the user message hook,
-                    # we stop the chain here, allowing the hook to basically intercept the message
-                    # and prevent the AI from returning its own response to the message
-                    await self.context.chat.add({"role": "user", "content": user_message})
-                    return
-                elif usr_msg_result is not None:
-                    # allow modifying user message by returning the modified message as a string
-                    user_message = usr_msg_result
-
-        # put multimodal content into the message if needed
-        user_message = await self._process_multimodal(message=user_message, files=files)
-
-        # yield user message as a special token for display in UI's (because user message can be modified by module hooks)
-        yield {"type": "user_message", "content": user_message}
-        
-        # add user's message to context
-        add_success = await self.context.chat.add({"role": "user", "content": user_message})
-        if not add_success:
-            yield await self.throw_stream_error("Unknown error while adding user message to context")
-            return
-
-        # reconnect if needed
-        result = await self.manager.API.attempt_connect()
-        if result is not True:
-            yield await self.throw_stream_error(str(result))
-            self.log("API", str(result))
-            return
-
-        # estimate tokens used for user message
-        user_message_token_estimation = 0
-        if self.context.chat.using_api_token_data:
-            # if using API token count
-            user_msg_tokens = await self.context.chat.count_tokens([{"role": "user", "content": user_message}])
-            user_message_token_estimation = await self.context.chat.get_token_usage()+user_msg_tokens
-
-            # add to existing API token count
-            await self.context.chat.set_token_usage(user_message_token_estimation)
-        else:
-            # just fully estimate
-            try:
-                user_message_token_estimation = await self.context.chat.count_tokens()
-            except Exception as e:
-                self.log_error("Error while trying to estimate token use", e)
-                yield await self.throw_stream_error(f"Error while trying to estimate token use: {core.detail_error(e)}")
-                # abort
-                return
-
-        # yield so it updates throughout all channels that display token count
-        yield {"type": "token_usage", "content": user_message_token_estimation, "source": "estimation"}
-
-        # get the new context window with the added message
-        context = await self.context.get(system_prompt=True, end_prompt=True)
-
-        final_content = []
-        final_reasoning = []
-        tc_response = None
-        tool_calls_occurred = False
-        fetched_token_usage = False
-
-        # and stream the response to the caller of this method
-        try:
-            stream = self.manager.API.send_stream(context)
-        except Exception as e:
-            yield self.throw_stream_error(f"Error while starting stream: {core.detail_error(e)}")
-            return
-
-        async for token in stream:
-            # always yield the token to the caller
-            yield token
-
-            token_type = token.get("type")
-
-            # handle any errors
-            if token_type == "error":
-                self.log(self.name, f"Error: {token.get('content')}")
-                yield token
-
-                # add the content that has been accumulated so far, so that we don't lose incomplete messages
-                assistant_message = self._build_final_assistant_message(final_content, final_reasoning)
-                await self.context.chat.add(assistant_message)
-
-                return
-
-            if token_type == "content":
-                # this is a normal piece of streamed text
-                final_content.append(token.get("content"))
-            elif token_type == "reasoning":
-                final_reasoning.append(token.get("content"))
-            elif token_type == "tool_call_delta":
-                # yay toolcall arg streaming!
-                pass
-            elif token_type == "tool_calls":
-                tool_calls_occurred = True
-
-                toolcall_request = await self.tc_manager._build_recursive_request(token, final_content, final_reasoning)
-
-                # we add the accumulated content tokens so far to the assistant_content argument
-                async for sub_token in self.tc_manager.process(toolcall_request):
-                    yield sub_token
-                # tc_manager.process() will loop until the AI no longer deems tool calls necessary
-            elif token_type == "tool":
-                # this is a toolcall response
-                pass
-            elif token_type == "token_usage":
-                # this is the final token usage count, usually emitted at the end of the stream
-                token_usage = token.get("content")
-                if isinstance(token_usage, int):
-                    # set the flag so that token counting is always using API data
-                    if not self.context.chat.using_api_token_data:
-                        self.context.chat.using_api_token_data = True
-
-                    # cache this so chat.get_token_usage() returns this value
-                    await self.context.chat.set_token_usage(token_usage)
-
-                    fetched_token_usage = True
-
-        if not fetched_token_usage:
-            # yield an estimated token usage if the API didn't provide one
-            yield {"type": "token_usage", "content": await self.context.chat.count_tokens(), "source": "estimation"}
-
-        if not tool_calls_occurred and final_content: # don't add an extra message at the end of a toolcalling chain
-            assistant_message = self._build_final_assistant_message(final_content, final_reasoning)
-            await self.context.chat.add(assistant_message)
-
-            # run module event hooks
-            for module_name, module in self.manager.modules.items():
-                if hasattr(module, "on_assistant_message"):
-                    try:
-                        if asyncio.iscoroutinefunction(module.on_assistant_message):
-                            await module.on_assistant_message(assistant_message.get("content", ""))
-                        else:
-                            module.on_assistant_message(assistant_message.get("content", ""))
-                    except Exception as e:
-                        self.log("module error", f"{module_name}: in on_assistant_message(): {core.detail_error(e)}")
+        return message
 
     def _render_tool_token(self, name: str, args_str: str) -> str:
+        # TODO: replace with proper python library
+        # as this is a pain
+
         delta = ""
 
         # 1. Handle tool switch
@@ -742,6 +423,284 @@ class Channel:
 
         self._tool_state["raw_args"] = args_str
         return delta
+
+    # -------------------------
+    # The actual sending logic
+    # -------------------------
+    async def _send_preprocess(self, message: str, files: list = None, commands_authorized = False):
+        """
+        internal helper function so that send() and send_stream()
+        both use many of the same code paths and i don't have to keep maintaining each one individually
+        """
+        await self._set_as_active_channel()
+        user_message = message
+
+        # process any commands
+        is_cmd = user_message.strip().lower().startswith(
+            core.config.get("core", "cmd_prefix").strip().lower()
+        )
+
+        if is_cmd:
+            try:
+                cmd_response = await self.commands.process_input(user_message, authorized=commands_authorized)
+            except Exception as e:
+                self.log(self.name, "error while executing command", core.detail_error(e))
+                await self.context.chat.add({"role": "user", "content": user_message})
+                return {"type": "error", "content": str(core.detail_error(e))}
+
+            if cmd_response:
+                # process_input already adds to context
+                return {"type": "cmd_response", "content": str(cmd_response), "is_cmd": True}
+            else:
+                return {"type": "blank"}
+
+        # apply any on_user_message() hooks
+        for module_name, module in self.manager.modules.items():
+            if hasattr(module, "on_user_message"):
+                try:
+                    if asyncio.iscoroutinefunction(module.on_user_message):
+                        usr_msg_result = await module.on_user_message(user_message)
+                    else:
+                        usr_msg_result = module.on_user_message(user_message)
+                except Exception as e:
+                    self.log("module error", f"{module_name}: in on_user_message(): {core.detail_error(e)}")
+
+                if usr_msg_result is False:
+                    await self.context.chat.add({"role": "user", "content": user_message})
+                    return {"type": "module_intercept"}
+                elif usr_msg_result is not None:
+                    user_message = usr_msg_result
+
+        # apply multimodal content if applicable
+        user_message = await self._process_multimodal(message=user_message, files=files)
+
+        # and add the user's message to context
+        add_success = await self.context.chat.add({"role": "user", "content": user_message})
+        if not add_success:
+            return {"type": "error", "content": "Unknown error while adding user message to context"}
+
+        # reconnect if needed
+        result = await self.manager.API.attempt_connect()
+        if result is not True:
+            return {"type": "error", "content": str(result)}
+
+        # build the context window
+        context = await self.context.get(system_prompt=True, end_prompt=True)
+
+        # and return the results for use in send() and send_stream()
+        return {"type": "ready", "user_message": user_message, "context": context}
+
+    async def _send_postprocess(self, assistant_message):
+        await self.context.chat.add(assistant_message)
+
+        # run module event hooks
+        for module_name, module in self.manager.modules.items():
+            if hasattr(module, "on_assistant_message"):
+                try:
+                    if asyncio.iscoroutinefunction(module.on_assistant_message):
+                        await module.on_assistant_message(assistant_message.get("content", ""))
+                    else:
+                        module.on_assistant_message(assistant_message.get("content", ""))
+                except Exception as e:
+                    self.log("module error", f"{module_name}: in on_assistant_message(): {core.detail_error(e)}")
+
+    def _build_final_assistant_message(self, final_content = [], final_reasoning = []):
+        assistant_message = {
+            "role": "assistant",
+            "content": "".join(final_content)
+        }
+
+        if final_reasoning:
+            assistant_message["reasoning_content"] = "".join(final_reasoning)
+
+        return assistant_message
+
+    async def throw_stream_error(self, error):
+        """
+        helper method to make throwing errors during a stream consistent
+        since it's easy to forget to add an error to context in addition to yielding it..
+        """
+        # add the error message to context
+        await self.context.chat.add({"role": "assistant", "content": f"Error: {error}"})
+
+        # and pass it on to yield
+        return {"type": "error", "content": error}
+
+    async def send(self, message: str, files: list = None, commands_authorized=False):
+        """sends a message to the AI from within the current channel"""
+
+        # preprocessing (API connection logic, command processing, user message module hooks, etc)
+        processed = await self._send_preprocess(message, files, commands_authorized)
+        match processed["type"]:
+            case "cmd_response":
+                return self.format_message({"role": "assistant", "content": processed["content"]})
+            case "blank":
+                return
+            case "module_intercept":
+                return
+            case "error":
+                return {"role": "assistant", "content": processed["content"]}
+
+        # request the AI response and add it to context
+        response = await self.manager.API.send(processed["context"])
+
+        # handle any errors
+        if isinstance(response, core.api.APIError):
+            self.log("api", response)
+            return {"role": "assistant", "content": str(response)}
+
+        # make a copy of the response message and edit it
+        assistant_message = dict(response)
+        assistant_message["role"] = "assistant"
+
+        tool_calls = assistant_message.get("tool_calls")
+
+        # convert any toolcalls to a dict so that JSON serialization doesnt die
+        if tool_calls:
+            toolcalls_converted = []
+
+            for tool_call in tool_calls:
+                if not isinstance(tool_call, dict):
+                    tool_call = tool_call.model_dump(warnings=False)
+                toolcalls_converted.append(tool_call)
+
+            assistant_message["tool_calls"] = toolcalls_converted
+
+        if tool_calls:
+            # process() does all the toolcalling, but it also returns the raw toolcall stream for our own use
+            async for sub_token in self.tc_manager.process(
+                assistant_message,
+                push=True
+            ):
+                # push handles all the output
+                pass
+
+            return None
+
+        # postprocessing ( mainly assistant message module hooks, but this can be extended later :) )
+        await self._send_postprocess(assistant_message)
+        return self.format_message(assistant_message)
+
+    async def send_stream(self, message: str, files: list = None, commands_authorized=False):
+        """sends a message to the AI from within the current channel, streaming version"""
+
+        # preprocessing (API connection logic, command processing, user message module hooks, etc)
+        processed = await self._send_preprocess(message, files, commands_authorized)
+
+        match processed["type"]:
+            case "cmd_response":
+                # immediately yield both the user message and the command response, so that they both display
+                yield {"type": "user_message", "content": message, "is_cmd": True}
+                yield {"type": "content", "content": processed["content"], "is_cmd": True}
+                return
+            case "blank":
+                yield {"type": "content", "content": "BLANK"}
+                return
+            case "module_intercept":
+                # let modules intercept messages, stopping the rest of the chain and doing whatever with the contents of the message
+                # in on_user_message()
+                return
+            case "error":
+                yield await self.throw_stream_error(processed["content"])
+                return
+
+        user_message = processed.get("user_message") #alias for readability
+
+        # yield user message as a special token for display in UI's (because user message can be modified by module hooks)
+        yield {"type": "user_message", "content": user_message}
+        
+        # estimate tokens used for user message
+        user_message_token_estimation = 0
+        if self.context.chat.using_api_token_data:
+            # if using API token count
+            user_msg_tokens = await self.context.chat.count_tokens([{"role": "user", "content": user_message}])
+            user_message_token_estimation = await self.context.chat.get_token_usage()+user_msg_tokens
+
+            # add to existing API token count
+            await self.context.chat.set_token_usage(user_message_token_estimation)
+        else:
+            # just fully estimate
+            try:
+                user_message_token_estimation = await self.context.chat.count_tokens()
+            except Exception as e:
+                self.log_error("Error while trying to estimate token use", e)
+                yield await self.throw_stream_error(f"Error while trying to estimate token use: {core.detail_error(e)}")
+                # abort
+                return
+
+        # yield so it updates throughout all channels that display token count
+        yield {"type": "token_usage", "content": user_message_token_estimation, "source": "estimation"}
+
+        final_content = []
+        final_reasoning = []
+        tc_response = None
+        tool_calls_occurred = False
+        fetched_token_usage = False
+
+        # and stream the response to the caller of this method
+        try:
+            stream = self.manager.API.send_stream(processed.get("context"))
+        except Exception as e:
+            yield await self.throw_stream_error(f"Error while starting stream: {core.detail_error(e)}")
+            return
+
+        async for token in stream:
+            # always yield the token to the caller
+            yield token
+
+            token_type = token.get("type")
+
+            # handle any errors
+            if token_type == "error":
+                self.log(self.name, f"Error: {token.get('content')}")
+                yield token
+
+                # add the content that has been accumulated so far, so that we don't lose incomplete messages
+                assistant_message = self._build_final_assistant_message(final_content, final_reasoning)
+                await self.context.chat.add(assistant_message)
+
+                return
+
+            if token_type == "content":
+                # this is a normal piece of streamed text
+                final_content.append(token.get("content"))
+            elif token_type == "reasoning":
+                final_reasoning.append(token.get("content"))
+            elif token_type == "tool_call_delta":
+                # yay toolcall arg streaming!
+                pass
+            elif token_type == "tool_calls":
+                tool_calls_occurred = True
+
+                toolcall_request = await self.tc_manager._build_recursive_request(token, final_content, final_reasoning)
+
+                # we add the accumulated content tokens so far to the assistant_content argument
+                async for sub_token in self.tc_manager.process(toolcall_request):
+                    yield sub_token
+                # tc_manager.process() will loop until the AI no longer deems tool calls necessary
+            elif token_type == "tool":
+                # this is a toolcall response
+                pass
+            elif token_type == "token_usage":
+                # this is the final token usage count, usually emitted at the end of the stream
+                token_usage = token.get("content")
+                if isinstance(token_usage, int):
+                    # set the flag so that token counting is always using API data
+                    if not self.context.chat.using_api_token_data:
+                        self.context.chat.using_api_token_data = True
+
+                    # cache this so chat.get_token_usage() returns this value
+                    await self.context.chat.set_token_usage(token_usage)
+
+                    fetched_token_usage = True
+
+        if not fetched_token_usage:
+            # yield an estimated token usage if the API didn't provide one
+            yield {"type": "token_usage", "content": await self.context.chat.count_tokens(), "source": "estimation"}
+
+        if not tool_calls_occurred and final_content: # don't add an extra message at the end of a toolcalling chain
+            assistant_message = self._build_final_assistant_message(final_content, final_reasoning)
+            await self._send_postprocess(assistant_message)
 
     async def format_stream_for_text(self, stream, chunk_size=None, use_markdown=True, strings: dict = None):
         """
@@ -882,41 +841,3 @@ class Channel:
                 char_counter += len(content)
                 yield text_to_token(content)
 
-    async def run(self):
-        # stub, meant for derivative channels to override
-        pass
-
-    async def on_ready(self):
-        """
-        called when the entire framework has fully initialized
-        (when the message "[CORE] Startup complete" shows up)
-        """
-        pass
-
-    async def on_push(self, message: dict):
-        raise NotImplementedError
-
-    async def on_install(self):
-        """Overridable method that triggers when the auto-installer installs the dependencies for a channel"""
-        pass
-    async def on_uninstall(self):
-        """Overridable method that triggers when the auto-installer uninstalls the dependencies for a channel"""
-        pass
-
-    async def push(self, message):
-        """
-        push a message to the push queue, which will instantly display it in all channels
-        """
-
-        if not hasattr(self, "push_queue"):
-            return False
-
-        # message can be either a str or a dict.
-        # if dict, just use it as-is
-        # otherwise, turn it into an openAI message dict
-        if isinstance(message, dict):
-            await self.context.chat.add(message)
-            await self.push_queue.put(message)
-        else:
-            await self.context.chat.add({"role": "assistant", "content": str(message)})
-            await self.push_queue.put({"role": "assistant", "content": str(message)})
