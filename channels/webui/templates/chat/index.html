@@ -10,16 +10,25 @@
 </template>
 
 <div id="messages" x-ref="messages"
-    x-effect="
-        let _ = $store.chat.turns.length;
-        let threshold = 50;
-
-        if ($el.scrollHeight - $el.scrollTop - $el.clientHeight < threshold) {
-            await $nextTick();
-            $el.scrollTop = $el.scrollHeight;
+    x-data="
+        {
+          autoScroll: true,
+          atBottom: true,
+          scrollLoop() {
+            if (this.autoScroll && this.atBottom) {
+              this.$refs.messages.scrollTop = this.$refs.messages.scrollHeight;
+            }
+            requestAnimationFrame(() => this.scrollLoop());
+          },
+          checkScroll() {
+            const el = this.$refs.messages;
+            const threshold = 10;
+            this.atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+          }
         }
     "
-    >
+    x-init="scrollLoop()"
+>
     <template x-for="(turn, turnIndex) in $store.chat.turns" :key="turnIndex">
         <div>
             <!-- user messages get rendered seperately -->
