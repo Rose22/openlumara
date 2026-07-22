@@ -4,6 +4,8 @@ UI_STORE = {
     currentModal: null,
     notice: null,
 
+    shouldScroll: true,
+
     windowWidth: window.innerWidth,
     isMobile: false,
 

@@ -11,7 +11,6 @@
 
 <div id="messages" x-ref="messages"
     @scroll="$store.ui.onScroll()"
-    x-effect="$watch('$store.chat.turns', () => $nextTick(() => $store.ui.forceScrollToBottom()), { deep: true })"
 >
     <template x-for="(turn, turnIndex) in $store.chat.turns" :key="turnIndex">
         <div>

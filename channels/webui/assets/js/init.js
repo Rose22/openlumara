@@ -41,6 +41,11 @@ document.addEventListener('alpine:init', async () => {
     // fetch logs
     await Alpine.store('system').reloadLogs();
 
+    // do the initial scroll to bottom
+    requestAnimationFrame(() => {
+        Alpine.store('ui').forceScrollToBottom();
+    });
+
     // auto-close sidebar on resizing to below desktop size (mobile size)
     // window.addEventListener('resize', () => {
     //     if (window.innerWidth < 768 && Alpine.store('ui').sidebarOpen) {

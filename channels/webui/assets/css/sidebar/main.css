@@ -9,8 +9,8 @@
 
 /* category list */
 #category-list {
-    width: 30%;
-    min-width: 30%;
+    width: 40%;
+    min-width: 40%;
     background: var(--bg-primary);
     border-right: 1px solid var(--border-sidebar);
     display: flex;

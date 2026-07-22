@@ -215,7 +215,7 @@ async function handleWebSocketMessage(data) {
             stream.tokens.push(token);
 
             // always scroll to the bottom upon a token coming in
-            Alpine.store('ui').scrollToBottom();
+            await Alpine.store('ui').scrollToBottom();
 
             break;
 
