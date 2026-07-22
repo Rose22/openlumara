@@ -51,7 +51,6 @@
         /* Both panes stack full-width, slide relative to each other */
         #category-list,
         #chat-list {
-            max-width: 340px !important;
             top: 0;
             left: 0;
             width: 100%;
@@ -63,13 +62,6 @@
 
         .chat-enter-from { transform: translateX(100%); }
         .chat-leave-to   { transform: translateX(100%); }
-
-        .mobile-sidebar-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: -1;
-        }
 
         .header-btn {
             width: 100%;

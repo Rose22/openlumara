@@ -1,12 +1,3 @@
-<!-- overlay (background for the menu on phones) -->
-<div x-show="$store.ui.isMobile && $store.ui.showSidebar"
-     x-transition:opacity.duration.300ms
-     @click="$store.ui.toggleSidebar()"
-     class="mobile-sidebar-overlay"
-     x-cloak
->
-</div>
-
 <!-- list of categories -->
 <div id="category-list" x-ref="category-list"
     x-show="!$store.ui.isMobile || $store.ui.showCategories" x-cloak

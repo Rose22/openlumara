@@ -9,7 +9,7 @@
     </div>
     <div class="right">
         {% if config.get("enable_streaming_state_display") %}
-            <span x-text="$store.stream.state.replace('_', ' ')" class="stream-state"></span>
+            <span x-text="$store.stream.state.replace('_', ' ')" class="stream-state" x-show="!$store.ui.isMobile" x-cloak></span>
         {% endif %}
 
         <button class="btn" id="search-btn" title="Search messages (Ctrl+F)">
