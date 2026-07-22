@@ -746,7 +746,7 @@ class Matrix(core.channel.Channel):
         shown_reasoning_text = False
 
         try:
-            async for token in self.send_stream({"role": "user", "content": message}):
+            async for token in self.send_stream(message):
                 visual = None
 
                 t_type = token.get("type")
