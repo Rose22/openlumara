@@ -1,21 +1,19 @@
 #sidebar {
-    width: 30%;
-
     /* divides the sidebar into the category list and the chat list */
+    width: 30%;
+    box-sizing: border-box;
     display: flex;
     flex-direction: row;
     height: 100%;
-    gap: var(--gap);
 }
 
 /* category list */
 #category-list {
     width: 30%;
     min-width: 30%;
-    background: var(--bg-dark);
+    background: var(--bg-primary);
     border-right: 1px solid var(--border-sidebar);
     display: flex;
-    flex: 1;
     flex-direction: column;
     flex-shrink: 0;
     overflow-y: auto;
@@ -83,20 +81,22 @@
 
 /* list of chats */
 #chat-list {
+    padding: 7px;
+    flex: 1;
+    min-width: 50%;
+    width: 50%;
+    box-sizing: border-box;
     display: flex;
     flex-direction: column;
-    padding: 7px;
-
-    width: 70%;
-    min-width: 70%;
+    overflow: hidden;
 
     gap: var(--gap);
-    overflow-x: hidden;
-    overflow-y: hidden;
+    background: var(--bg-primary);
 
     .chats {
         display: flex;
         flex-direction: column;
+        width: 100%;
         overflow-x: hidden;
         overflow-y: scroll;
         gap: var(--gap);
@@ -115,10 +115,14 @@
             display: flex;
             flex-direction: column;
             gap: var(--gap);
-            max-height: 10rem;
-            max-width: 97%;
-            flex-shrink: 0;
+            width: 100%;
+            max-width: 100%;
             overflow: hidden;
+            max-height: 10rem;
+            flex-shrink: 0;
+
+            width: 100%;              /* items fill the chat list */
+            max-width: 100%;          /* don't let them overflow */
 
             .title {
                 font-size: 0.9rem;
@@ -207,8 +211,8 @@
         gap: 8px;
 
         input {
-            flex: 1;
-            min-width: 0;
+            width: 100%;
+            box-sizing: border-box;
             padding: 9px 12px;
             background: var(--bg-tertiary) !important;
             border: 1px solid var(--border-color);

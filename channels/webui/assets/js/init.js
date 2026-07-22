@@ -27,9 +27,27 @@ document.addEventListener('alpine:init', async () => {
     self.notice = "Please wait, connecting to backend server..";
     await connectWebSocket();
 
+    // register the service worker
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js');
+    }
+
+    // check if we're on a phone
+    await Alpine.store('ui').init();
+
     // fetch current chat
     await Alpine.store('chat').load();
 
     // fetch logs
     await Alpine.store('system').reloadLogs();
+
+    // auto-close sidebar on resizing to below desktop size (mobile size)
+    // window.addEventListener('resize', () => {
+    //     if (window.innerWidth < 768 && Alpine.store('ui').sidebarOpen) {
+    //         Alpine.store('ui').sidebarOpen = false;
+    //     }
+    //     else if (window.innerWidth > 768 && !Alpine.store('ui').sidebarOpen) {
+    //         Alpine.store('ui').sidebarOpen = true;
+    //     }
+    // });
 });

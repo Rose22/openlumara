@@ -1,6 +1,6 @@
 <header>
     <div class="left">
-        <button class="menu-btn" title="Toggle sidebar">
+        <button class="menu-btn" title="Toggle sidebar" @click="$store.ui.toggleSidebar()" x-show="$store.ui.isMobile" x-cloak>
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
             </svg>
@@ -21,11 +21,11 @@
         <button class="btn" title="Export chat">
             {% include 'svg/download.svg' %}
         </button>
-        <button class="btn shortcuts-btn" title="Keyboard shortcuts (?)">
+        <button class="btn shortcuts-btn" title="Keyboard shortcuts (?)" x-show="!$store.ui.isMobile" x-cloak>
             {% include 'svg/keyboard.svg' %}
         </button>
 
-        <button class="btn" title="Storage Editor">
+        <button class="btn" title="Storage Editor" x-show="!$store.ui.isMobile" x-cloak>
             {% include 'svg/folder.svg' %}
         </button>
         <button class="btn" title="Clear chat" @click="

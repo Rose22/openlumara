@@ -1,4 +1,4 @@
-<aside class="sidebar" x-show="!mobile || activeCategory">
+<aside class="sidebar" x-show="activeCategory">
     <nav class="nav">
         <template x-for="[cat, data] in $store.settings.sortedCategories" :key="cat">
             <div x-animate.duration.150ms>
@@ -11,7 +11,7 @@
                 </button>
 
                 <!-- Module/Channel sub-lists -->
-                <template x-if="(cat === 'modules' || cat === 'user_modules' || cat === 'channels' || cat === 'user_channels') && expanded[cat]">
+                <template x-if="(cat === 'modules' || cat === 'user_modules' || cat === 'channels' || cat === 'user_channels') && expanded[cat] && !$store.ui.isMobile">
                     <div class="sub-list">
                         <template x-for="item in $store.settings.filteredSubItems(cat)" :key="item">
                             <button 

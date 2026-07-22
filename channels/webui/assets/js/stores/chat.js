@@ -50,7 +50,7 @@ CHAT_STORE = {
         ui = Alpine.store('ui');
 
         // make sure it always shows the bottom of the chat
-        ui.forceScrollToBottom();
+        await ui.forceScrollToBottom();
     },
 
     async newChat() {

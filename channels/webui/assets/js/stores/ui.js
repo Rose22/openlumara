@@ -4,6 +4,47 @@ UI_STORE = {
     currentModal: null,
     notice: null,
 
+    windowWidth: window.innerWidth,
+    isMobile: false,
+
+    showSidebar: true,
+    showCategories: true,
+    showChatList: true,
+
+    async init() {
+        // check if this is a phone
+        this.windowWidth = window.innerWidth;
+        this.isMobile = window.innerWidth <= 768;
+
+        // hide sidebar on mobile (in favor of a hamburger button)
+        this.showSidebar = !this.isMobile;
+
+        // on mobile, the sidebar is a drill-down navigator rather than a two-column pane
+        this.showCategories = !this.isMobile;
+        this.showChatList = true;
+    },
+
+    async toggleSidebar() {
+        this.showSidebar = !this.showSidebar;
+    },
+    async toggleCategories() {
+        this.showCategories = !this.showCategories;
+    },
+    async toggleChatList() {
+        this.showChatList = !this.showChatList;
+    },
+
+    async toggleMobileSidebarView() {
+        // toggles between the chatlist and the categories list
+        if (this.showChatList) {
+            this.showChatList = false;
+            this.showCategories = true;
+        } else {
+            this.showChatList = true;
+            this.showCategories = false;
+        }
+    },
+
     async openModal(name) {
         if (this.currentModal === 'settings') {
             // auto-save the settings when switching to a different modal

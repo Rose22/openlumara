@@ -1,0 +1,214 @@
+/* ==========================================================================
+ *  Responsive Styles
+ *  ========================================================================== */
+
+/* === MOBILE (< 768px) === */
+@media (max-width: 768px) {
+    /* Viewport height — 100vh clips on mobile with address bars */
+    html, body {
+        height: 100dvh;
+        height: -webkit-fill-available;
+    }
+
+    /* main-wrapper was using 100vh, which clips on mobile */
+    #main-wrapper {
+        height: 100dvh;
+        gap: 0;
+    }
+
+    /* Chat window takes full width when sidebar is hidden */
+    #chat-window {
+        min-width: 100% !important;
+        width: 100% !important;
+        overflow: hidden !important;
+        max-height: 100% !important;
+    }
+
+    /* Ensure #messages fills remaining space and can scroll */
+    #messages {
+        padding: 12px 8px !important;
+        min-height: 0 !important;
+        flex-shrink: 0 !important;
+    }
+
+    /* Message bubbles wider on mobile */
+    .message {
+        max-width: 95% !important;
+    }
+
+    /* Sidebar: fixed overlay on mobile */
+    #sidebar {
+        position: fixed;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        z-index: 100;
+        box-shadow: var(--shadow-strong);
+        min-width: 50%;
+        width: 100% !important;
+        overflow: hidden;
+
+        /* Both panes stack full-width, slide relative to each other */
+        #category-list,
+        #chat-list {
+            max-width: 340px !important;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .cat-enter-from { transform: translateX(-100%); }
+        .cat-leave-to   { transform: translateX(-100%); }
+
+        .chat-enter-from { transform: translateX(100%); }
+        .chat-leave-to   { transform: translateX(100%); }
+
+        .mobile-sidebar-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: -1;
+        }
+
+        .header-btn {
+            width: 100%;
+            padding: 14px 16px;
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid var(--border-sidebar);
+            color: var(--text-primary);
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: left;
+            transition: background 0.2s ease;
+
+            &:hover {
+                background: var(--bg-tertiary);
+            }
+        }
+    }
+
+    /* Header — constrained so it doesn't push content off-screen */
+    header {
+        max-height: 60px;
+        padding: 8px 12px;
+
+        h1 {
+            font-size: 1.05rem;
+        }
+
+        .btn {
+            padding: 6px 8px;
+            font-size: 0.8rem;
+
+            svg {
+                width: 14px;
+                height: 14px;
+            }
+        }
+
+        .stream-state {
+            font-size: 0.75rem;
+            padding: 3px 10px;
+        }
+    }
+
+    /* Input area */
+    #input {
+        padding: 8px;
+        gap: 8px;
+    }
+
+    #input #user-input {
+        padding: 12px 14px;
+        font-size: 16px;
+    }
+
+    #send, #stop {
+        height: 44px;
+        padding: 0 16px;
+        font-size: 0.85rem;
+    }
+
+    #input #upload {
+        width: 44px;
+        height: 44px;
+    }
+
+    /* Prevent horizontal overflow */
+    pre {
+        max-width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    table {
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        width: 100%;
+    }
+
+    /* Streaming indicator fit */
+    #stop.streaming .streaming-indicator {
+        bottom: 8px;
+        left: 0;
+        right: 0;
+    }
+
+    .stream-state {
+        font-size: 0.6rem !important;
+        padding: 7px !important;
+    }
+
+    .modal {
+        .content-wrapper {
+            padding: 0 !important;
+        }
+    }
+}
+
+/* === EXTRA SMALL (< 400px) === */
+@media (max-width: 400px) {
+    header h1 {
+        font-size: 1rem;
+    }
+
+    header .right .stream-state {
+        font-size: 0.75rem;
+        padding: 3px 10px;
+    }
+
+    .message {
+        max-width: 100% !important;
+        padding: 12px 10px;
+    }
+
+    #messages {
+        padding: 8px 4px;
+    }
+
+    .shortcuts-btn {
+        display: none;
+    }
+}
+
+/* === TABLET (600px - 1024px) === */
+@media (min-width: 600px) and (max-width: 1024px) {
+    #sidebar {
+        width: 320px !important;
+    }
+
+    .message {
+        max-width: 85% !important;
+    }
+}
+
+/* === DESKTOP (1024px+) === */
+@media (min-width: 1025px) {
+    .message {
+        max-width: var(--message-max-width, 75%) !important;
+    }
+}

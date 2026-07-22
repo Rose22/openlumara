@@ -31,6 +31,9 @@
 <html>
     <head>
         <title>{{ title }}</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="manifest" href="{{ url_for('assets', path='manifest.json') }}" />
+
         <!-- 
             ### libraries ###
         -->
@@ -61,10 +64,24 @@
             we use alpine stores for data access across the app,
             as putting every possible thing in one massive data object was no fun
         -->
-        <div id="main" x-data="{}">
+        <div id="main" x-data="{}" @resize.window="
+            $store.ui.windowWidth = window.innerWidth;
+            $store.ui.isMobile = window.innerWidth <= 768;
+
+            $store.ui.showSidebar = !$store.ui.isMobile;
+        ">
             <section id="main-wrapper">
                 {% if config.get("enable_sidebar") %}
-                    <section id="sidebar">
+                    <section id="sidebar" 
+                        x-show="$store.ui.showSidebar"
+                        x-transition:enter="transition ease-out duration-200"
+                        x-transition:enter-start="-translate-x-full"
+                        x-transition:leave="transition ease-in duration-150"
+                        x-transition:leave-end="-translate-x-full"
+                    >
+                        <!-- 
+                        @click.away="$store.ui.showSidebar = false"
+                        -->
                         {% include 'sidebar/index.html' %}
                     </section>
                 {% endif %}

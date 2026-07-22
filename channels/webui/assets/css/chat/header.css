@@ -6,6 +6,7 @@ header {
     align-items: center;
     justify-content: space-between;
     flex-shrink: 0;
+    overflow-x: hidden !important;
 
     .left {
         display: flex;
@@ -71,7 +72,6 @@ header {
     }
 
     .menu-btn {
-        display: none;
         padding: 8px;
         background: transparent;
         border: 1px solid var(--border-color);

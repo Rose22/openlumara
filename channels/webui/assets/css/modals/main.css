@@ -271,3 +271,15 @@
         }
     }
 }
+
+@media (max-width: 768px) {
+    .modal {
+        width: 100% !important;
+        height: 100% !important;
+        max-height: 100vh !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+        margin: 0 !important;
+        inset: 0 !important;
+    }
+}

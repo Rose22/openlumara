@@ -4,3 +4,7 @@
     height: 100vh;
     gap: 8px;
 }
+
+#modals {
+    flex: 1;
+}

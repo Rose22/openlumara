@@ -1,7 +1,23 @@
+<!-- overlay (background for the menu on phones) -->
+<div x-show="$store.ui.isMobile && $store.ui.showSidebar"
+     x-transition:opacity.duration.300ms
+     @click="$store.ui.toggleSidebar()"
+     class="mobile-sidebar-overlay"
+     x-cloak
+>
+</div>
+
 <!-- list of categories -->
-<div id="category-list" x-ref="category-list">
+<div id="category-list" x-ref="category-list"
+    x-show="!$store.ui.isMobile || $store.ui.showCategories" x-cloak
+    >
     <template x-for="category in $store.chat.categories" :key="category">
-        <ul :class="{'item': true, 'active': category == $store.chat.selectedCategory}" @click="$store.chat.selectCategory(category)">
+        <ul :class="{'item': true, 'active': category == $store.chat.selectedCategory}" @click="
+            $store.chat.selectCategory(category);
+            if ($store.ui.isMobile) {
+                await $store.ui.toggleMobileSidebarView();
+            }
+            ">
             <span class="icon">
                 <template x-if="category === 'general'">
                     {% include 'svg/home.svg' %}
@@ -16,7 +32,11 @@
 </div>
 
 <!-- list of chats -->
-<div id="chat-list" x-ref="chat-list" x-data="{query: ''}" >
+<div id="chat-list" x-ref="chat-list" x-data="{query: ''}"
+    x-show="!$store.ui.isMobile || $store.ui.showChatList" x-cloak
+>
+    <button class="header-btn" x-text="$store.chat.selectedCategory" x-show="$store.ui.isMobile" x-cloak @click="$store.ui.toggleMobileSidebarView()"></button>
+
     <div class="search">
         <input name="search" type="text" placeholder="Search through your chats.." x-model="query">
     </div>
@@ -36,7 +56,11 @@
                     x-data="{ active: false }"
                     :id="`chat-${chat.id}`"
                     :class="{'item': true, 'active': chat.id === $store.chat.selectedChat}"
-                    @click="active = !active; $store.chat.loadChat(chat.id)"
+                    @click="
+                    active = !active;
+                    $store.chat.loadChat(chat.id);
+                    if ($store.ui.isMobile) { $store.ui.showSidebar = false; }
+                    "
                     x-init="
                         $nextTick(() => {
                             // autoscroll to the selected chat
