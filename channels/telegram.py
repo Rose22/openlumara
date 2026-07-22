@@ -163,7 +163,7 @@ class Telegram(core.channel.Channel):
                         # Process the message (this waits for the stream to finish)
                         await self._process_stream(update, context)
                     else:
-                        response = await self.send({"role": "user", "content": user_msg}, commands_authorized=True)
+                        response = await self.send(user_msg, commands_authorized=True)
                         if response:
                             content = response.get("content")
                             if content:
@@ -227,7 +227,7 @@ class Telegram(core.channel.Channel):
             # 2. Consume the stream
             # Use a chunk size similar to Discord's MAX_CHARS
             stream = self.format_stream_for_text(
-                self.send_stream({"role": "user", "content": user_msg}, commands_authorized=True),
+                self.send_stream(user_msg, commands_authorized=True),
                 use_markdown=False,
                 chunk_size=1900
             )

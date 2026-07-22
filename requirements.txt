@@ -4,6 +4,8 @@ msgpack
 pyyaml
 json-repair
 regex
+filetype
+pypdf2
 python-ulid
 requests
 httpx

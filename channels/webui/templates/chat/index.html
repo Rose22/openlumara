@@ -20,12 +20,38 @@
                         'user': turn.messages[0].role === 'user',
                         'pending': turn.messages[0].msgId === $store.stream.pendingMessageId
                     }">
-                        <template x-if="$store.chat.editingMessageIndex != turn.messages[0].index">
-                            <div x-html="renderMarkdown(turn.messages[0].content)" :class="{'command': turn.messages[0].is_cmd}"></div>
+                    <template x-if="$store.chat.editingMessageIndex != turn.messages[0].index">
+                        <div>
+                            <!-- Render multimodal user content -->
+                            <template x-if="Array.isArray(turn.messages[0].content)">
+                                <div class="multimodal-content">
+                                    <template x-for="(block, blockIndex) in turn.messages[0].content" :key="'block-' + blockIndex">
+                                        <div>
+                                            <!-- Text content -->
+                                            <template x-if="block.type === 'text'">
+                                                <div x-html="renderMarkdown(block.text)"></div>
+                                            </template>
+                                            <!-- Image content -->
+                                            <template x-if="block.type === 'image_url'">
+                                                <div class="media-preview image-preview">
+                                                    <img :src="block.image_url.url" :alt="block.image_url.url" loading="lazy" />
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+
+                            <!-- normal text message -->
+                            <template x-if="typeof turn.messages[0].content === 'string'">
+                                <div x-html="renderMarkdown(turn.messages[0].content)" :class="{'command': turn.messages[0].is_cmd}"></div>
+                            </template>
+                            
                             <template x-if="turn.messages[0].msgId === $store.stream.pendingMessageId">
                                 <span class="status">Sending..</span>
                             </template>
-                        </template>
+                        </div>
+                    </template>
 
                         <template x-if="turn.messages[0].msgId !== $store.stream.pendingMessageId && $store.chat.editingMessageIndex != turn.messages[0].index">
                             <div class="message-buttons">
@@ -124,6 +150,8 @@
         {% include 'chat/prompt_processing.html' %}
     </template>
 </div>
+
+{% include 'chat/upload.html' %}
 
 <div id="input">
     {% include 'chat/input.html' %}

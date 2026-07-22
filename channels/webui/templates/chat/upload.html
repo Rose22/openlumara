@@ -1,0 +1,21 @@
+<div
+    x-show="$store.upload.files.length > 0"
+    id="upload-queue-container"
+    class="upload-queue"
+>
+    <!-- Pending files -->
+    <template x-if="$store.upload.files.length > 0">
+        <div class="upload-section">
+            <h3 class="upload-section-title">Files to Upload</h3>
+            <template x-for="(file, index) in $store.upload.files" :key="'pending-' + index">
+                <div class="item">
+                    <div class="file-info">
+                        <span class="file-name" x-text="file.name"></span>
+                        <span x-text="getFileTypeLabelFromType(file.type)"></span>
+                    </div>
+                    <button class="delete" @click="$store.upload.removeFile(index)" aria-label="Remove file">&times;</button>
+                </div>
+            </template>
+        </div>
+    </template>
+</div>

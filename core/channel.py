@@ -7,6 +7,9 @@ import json
 import asyncio
 import json_repair
 import re
+import base64
+import filetype
+import io
 import traceback
 
 def get_available_channels():
@@ -232,7 +235,95 @@ class Channel:
     #             # if we hit an error, back off for a second so we don't spam the logs
     #             await asyncio.sleep(1)
 
-    async def send(self, message: dict, commands_authorized=False):
+    async def _process_multimodal(self, message: str = None, files: list = None) -> list:
+        """
+        Converts a list of file handler objects into an openAI API multimodal message object,
+        allowing the AI to process images, audio, etc.
+
+        for sending through channel.send_stream()
+        """
+        content_blocks = []
+
+        if not message and not files:
+            # wtf why would you do that
+            return None
+
+        # if no files were provided, just return the content unmodified
+        if not files:
+            return message
+
+        # otherwise add the text message as a text block
+        if message:
+            content_blocks.append({"type": "text", "text": message})
+
+        format_map = {
+            "audio/wav": "wav", "audio/mp3": "mp3", "audio/mpeg": "mp3",
+            "audio/ogg": "ogg", "audio/flac": "flac",
+            "audio/webm": "webm", "audio/mp4": "mp4", "audio/aac": "mp4",
+        }
+
+        for filename, file_data in files.items():
+            if not file_data:
+                continue
+
+            kind = filetype.guess(file_data)
+            mime_type = kind.mime if kind else "application/octet-stream"
+
+            if mime_type.startswith("image/"):
+                b64 = base64.b64encode(file_data).decode("utf-8")
+                content_blocks.append({
+                    "type": "image_url",
+                    "image_url": {"url": f"data:{mime_type};base64,{b64}"}
+                })
+
+            elif mime_type.startswith("audio/"):
+                b64 = base64.b64encode(file_data).decode("utf-8")
+                content_blocks.append({
+                    "type": "input_audio",
+                    "input_audio": {
+                        "data": b64,
+                        "format": format_map.get(mime_type, "wav")
+                    }
+                })
+
+            elif mime_type == "application/pdf":
+                try:
+                    from PyPDF2 import PdfReader
+                    reader = PdfReader(io.BytesIO(file_data))
+                    text_parts = []
+                    for page in reader.pages:
+                        page_text = page.extract_text()
+                        if page_text:
+                            text_parts.append(page_text)
+                    combined = "\n\n".join(text_parts)
+                    content_blocks.append({
+                        "type": "text",
+                        "text": f"File: {filename}\n\n```pdf\n{combined}\n```"
+                    })
+                except Exception as e:
+                    content_blocks.append({
+                        "type": "text",
+                        "text": f"[Error extracting PDF '{filename}': {e}]"
+                    })
+
+            else:
+                try:
+                    content_blocks.append({
+                        "type": "text",
+                        "text": f"File: {filename}\n\n```{file_data.decode('utf-8')}```"
+                    })
+                except UnicodeDecodeError:
+                    content_blocks.append({
+                        "type": "text",
+                        "text": f"[Binary file: {filename}]"
+                    })
+
+        if content_blocks:
+            return content_blocks
+
+        return message
+
+    async def send(self, message: str, files: list = None, commands_authorized=False):
         """sends a message to the AI from within the current channel"""
 
         user_message = message #alias for readability
@@ -241,23 +332,22 @@ class Channel:
         await self._set_as_active_channel()
 
         # process any /commands
-        if isinstance(user_message.get("content"), str):
-            cmd_response = None
-            is_cmd = user_message.get("content", "").strip().lower().startswith(
-                core.config.get("core", "cmd_prefix").strip().lower()
-            )
+        cmd_response = None
+        is_cmd = user_message.strip().lower().startswith(
+            core.config.get("core", "cmd_prefix").strip().lower()
+        )
 
-            if is_cmd and user_message.get("role", "user") == "user":
-                try:
-                    cmd_response = await self.commands.process_input(user_message, authorized=commands_authorized)
-                except Exception as e:
-                    self.log_error("error while executing command", e)
-                    return {"role": "assistant", "content": str(e)}
+        if is_cmd:
+            try:
+                cmd_response = await self.commands.process_input(user_message, authorized=commands_authorized)
+            except Exception as e:
+                self.log_error("error while executing command", e)
+                return {"role": "assistant", "content": str(e)}
 
-                if cmd_response:
-                    return {"role": "assistant", "content": cmd_response}
-                else:
-                    return {"role": "assistant", "content": "BLANK"}
+            if cmd_response:
+                return {"role": "assistant", "content": cmd_response}
+            else:
+                return {"role": "assistant", "content": "BLANK"}
 
         # run module event hooks
         usr_msg_result = None
@@ -265,9 +355,9 @@ class Channel:
             if hasattr(module, "on_user_message"):
                 try:
                     if asyncio.iscoroutinefunction(module.on_user_message):
-                        usr_msg_result = await module.on_user_message(user_message.get("content", ""))
+                        usr_msg_result = await module.on_user_message(user_message)
                     else:
-                        usr_msg_result = module.on_user_message(user_message.get("content", ""))
+                        usr_msg_result = module.on_user_message(user_message)
                 except Exception as e:
                     self.log("module error", f"{module_name}: in on_user_message(): {core.detail_error(e)}")
 
@@ -279,10 +369,13 @@ class Channel:
                     return
                 elif usr_msg_result is not None:
                     # allow modifying user message by returning the modified message as a string
-                    user_message['content'] = usr_msg_result
+                    user_message = usr_msg_result
+
+        # put multimodal content into the message if needed
+        user_message = await self._process_multimodal(message=user_message, files=files)
 
         # add sent message to context
-        add_success = await self.context.chat.add(user_message)
+        add_success = await self.context.chat.add({"role": "user", "content": user_message})
 
         if not add_success:
             return None
@@ -373,7 +466,7 @@ class Channel:
         # and pass it on to yield
         return {"type": "error", "content": error}
 
-    async def send_stream(self, message: dict, commands_authorized=False):
+    async def send_stream(self, message: str, files: list = None, commands_authorized=False):
         """sends a message to the AI from within the current channel, streaming version"""
 
         # as soon as user sends a message in this channel, set current channel (tracked in the manager) to this one
@@ -382,37 +475,36 @@ class Channel:
         user_message = message #alias for readability
 
         # process any /commands
-        if isinstance(message.get("content"), str):
-            cmd_response = None
-            is_cmd = message.get("content", "").strip().lower().startswith(
-                core.config.get("core", "cmd_prefix").strip().lower()
-            )
+        cmd_response = None
+        is_cmd = user_message.strip().lower().startswith(
+            core.config.get("core", "cmd_prefix").strip().lower()
+        )
 
-            if is_cmd and message.get("role", "user") == "user":
-                # immediately yield the user's message for display in frontend channels
-                yield {"type": "user_message", "content": user_message.get("content")}
+        if is_cmd:
+            # immediately yield the user's message for display in frontend channels
+            yield {"type": "user_message", "content": user_message}
 
-                # then process
-                try:
-                    cmd_response = await self.commands.process_input(user_message, authorized=commands_authorized)
-                except Exception as e:
-                    self.log_error("error while executing command", core.detail_error(e))
+            # then process
+            try:
+                cmd_response = await self.commands.process_input(user_message, authorized=commands_authorized)
+            except Exception as e:
+                self.log_error("error while executing command", core.detail_error(e))
 
-                    await self.context.chat.add(user_message)
-                    yield await self.throw_stream_error(str(core.detail_error(e)))
-                    return
+                await self.context.chat.add({"role": "user", "content": user_message})
+                yield await self.throw_stream_error(str(core.detail_error(e)))
+                return
 
-                if cmd_response:
-                    # insert and return the command response without sending it to the AI
-                    # return the entire thing as one token so that it's instant
+            if cmd_response:
+                # insert and return the command response without sending it to the AI
+                # return the entire thing as one token so that it's instant
 
-                    # we don't add to context here because process_input already does that! oopsie..
-                    yield {"type": "content", "content": str(cmd_response), "is_cmd": True}
-                    # we add a special is_cmd field so that channels can pick up on it and display it in a special way
-                    # (the old webui used to just check for the presence of a '/' at the start of the string..)
-                    # which obviously is really bad lol
-                    # especially since everything is supposed to work across the core, NOT just the webui
-                    return
+                # we don't add to context here because process_input already does that! oopsie..
+                yield {"type": "content", "content": str(cmd_response), "is_cmd": True}
+                # we add a special is_cmd field so that channels can pick up on it and display it in a special way
+                # (the old webui used to just check for the presence of a '/' at the start of the string..)
+                # which obviously is really bad lol
+                # especially since everything is supposed to work across the core, NOT just the webui
+                return
 
         # run user message module event hooks
         # before we even send to the API, so that we can immediately yield the message for display in frontend channels
@@ -421,9 +513,9 @@ class Channel:
             if hasattr(module, "on_user_message"):
                 try:
                     if asyncio.iscoroutinefunction(module.on_user_message):
-                        usr_msg_result = await module.on_user_message(user_message.get("content", ""))
+                        usr_msg_result = await module.on_user_message(user_message)
                     else:
-                        usr_msg_result = module.on_user_message(user_message.get("content", ""))
+                        usr_msg_result = module.on_user_message(user_message)
                 except Exception as e:
                     self.log("module error", f"{module_name}: in on_user_message(): {core.detail_error(e)}")
 
@@ -431,17 +523,20 @@ class Channel:
                     # when returning False from the user message hook,
                     # we stop the chain here, allowing the hook to basically intercept the message
                     # and prevent the AI from returning its own response to the message
-                    await self.context.chat.add(user_message)
+                    await self.context.chat.add({"role": "user", "content": user_message})
                     return
                 elif usr_msg_result is not None:
                     # allow modifying user message by returning the modified message as a string
-                    user_message['content'] = usr_msg_result
+                    user_message = usr_msg_result
+
+        # put multimodal content into the message if needed
+        user_message = await self._process_multimodal(message=user_message, files=files)
 
         # yield user message as a special token for display in UI's (because user message can be modified by module hooks)
-        yield {"type": "user_message", "content": user_message.get("content")}
+        yield {"type": "user_message", "content": user_message}
         
         # add user's message to context
-        add_success = await self.context.chat.add(user_message)
+        add_success = await self.context.chat.add({"role": "user", "content": user_message})
         if not add_success:
             yield await self.throw_stream_error("Unknown error while adding user message to context")
             return
@@ -457,7 +552,7 @@ class Channel:
         user_message_token_estimation = 0
         if self.context.chat.using_api_token_data:
             # if using API token count
-            user_msg_tokens = await self.context.chat.count_tokens([user_message])
+            user_msg_tokens = await self.context.chat.count_tokens([{"role": "user", "content": user_message}])
             user_message_token_estimation = await self.context.chat.get_token_usage()+user_msg_tokens
 
             # add to existing API token count

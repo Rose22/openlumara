@@ -18,6 +18,7 @@ import asyncio
 import fastapi, fastapi.templating, fastapi.staticfiles
 import starlette
 import uvicorn
+import base64
 
 # --------------------
 # Channel class
@@ -419,6 +420,26 @@ async def create_fastapi(channel):
         await channel.manager.restart()
 
     # ----------------------------
+    # File uploading
+    # ----------------------------
+    # --- POST
+    @app.post("/api/upload")
+    async def upload_file(request: fastapi.Request):
+        """Uploads files for multimodal messages. Supports images, audio, video, and documents.
+        
+        Returns content_parts in OpenAI API format that can be included in the user message.
+        """
+        form = await request.form()
+        files = form.getlist("files")
+        text = form.get("text")
+        
+        if not files:
+            return api_result({"error": "No files provided"}, success=False)
+        
+        message = self.process_multimodal({"role": "user", "content": text}, files)
+        return api_result(message, success=True)
+
+    # ----------------------------
     # Dynamically generated files
     # ----------------------------
     @app.get("/themes.js")
@@ -525,17 +546,21 @@ async def create_fastapi(channel):
                                 "buffer": []
                             })
                         case "user_message":
-                            content = data.get("content")
-                            if content:
-                                try:
-                                    chat_id = await channel.context.chat.get_id() or "default"
-                                    await ws_mgr.start_stream(channel, chat_id, content)
-                                except Exception as e:
-                                    channel.log(channel.name, f"WebSocket start_stream error: {core.detail_error(e)}")
-                                    await ws_mgr.broadcast({
-                                        "type": "error",
-                                        "error": str(e)
-                                    })
+                            text = data.get("content")
+                            files_data = data.get("files")
+
+                            if not text and not files:
+                                break
+
+                            files_dict = None
+                            if files_data:
+                                files_dict = {
+                                    f["name"]: base64.b64decode(f["data"])
+                                    for f in files_data
+                                }
+
+                            chat_id = await channel.context.chat.get_id() or "default"
+                            await ws_mgr.start_stream(channel, chat_id, message=text, files=files_dict)
                         case "message_edit":
                             index = data.get("index")
                             if index < 0:
@@ -572,7 +597,7 @@ async def create_fastapi(channel):
                                         "type": "messages_updated",
                                         "messages": await channel.context.chat.get_messages()
                                     })
-                                    await ws_mgr.start_stream(channel, await channel.context.chat.get_id(), user_message)
+                                    await ws_mgr.start_stream(channel, await channel.context.chat.get_id(), user_message.get("content"))
                                 else:
                                     await ws_mgr.broadcast({
                                         "type": "error",
@@ -653,10 +678,10 @@ class WebSocketManager:
         for conn in disconnected:
             self.disconnect(conn)
 
-    async def _stream_task(self, message: dict, index: int):
+    async def _stream_task(self, message: str, index, files: list = None):
         user_message_confirmed = False
 
-        async for token in self.channel.send_stream(message, commands_authorized=self.channel.config.get("allow_admin_commands")):
+        async for token in self.channel.send_stream(message=message, files=files, commands_authorized=self.channel.config.get("allow_admin_commands")):
             if isinstance(token, dict):
                 payload = serialize_for_json(token)
                 token_type = token.get("type")
@@ -710,7 +735,7 @@ class WebSocketManager:
         self.stream_buffer = []
         self.active_chat_id = None
 
-    async def start_stream(self, channel, chat_id: str, message: dict):
+    async def start_stream(self, channel, chat_id: str, message: str, files: list = None):
         if self.active_stream_task and not self.active_stream_task.done():
             self.active_stream_task.cancel()
 
@@ -719,11 +744,11 @@ class WebSocketManager:
         next_index = len(await channel.context.chat.get_messages())
 
         try:
-            self.active_stream_task = asyncio.create_task(self._stream_task(message, next_index))
+            self.active_stream_task = asyncio.create_task(self._stream_task(message, next_index, files=files))
         except asyncio.CancelledError:
             pass
         except Exception as e:
-            channel.log("webui", f"Background stream error: {core.detail_error(e)}")
+            channel.log(channel.name, f"Background stream error: {core.detail_error(e)}")
             self.stream_buffer = []
             self.active_chat_id = None
 

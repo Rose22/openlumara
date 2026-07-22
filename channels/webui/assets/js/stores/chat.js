@@ -109,6 +109,36 @@ CHAT_STORE = {
         this.user_input = '';
     },
 
+
+    async send(text) {
+        const uploadStore = Alpine.store("upload");
+
+        let files = null;
+
+        if (uploadStore.files.length > 0) {
+            files = await Promise.all(
+                uploadStore.files.map(async (file) => ({
+                    name: file.name,
+                    data: await uploadStore.readFileAsBase64(file)
+                }))
+            );
+        }
+
+        AudioManager.play("send_message");
+
+        const success = await simpleSocketSend({
+            type: "user_message",
+            content: text,
+            files: files
+        });
+
+        if (success) {
+            Alpine.store("stream").state = "sending";
+        }
+
+        uploadStore.clear();
+    },
+
     /* ----------------------
      * message actions
      * ----------------------- */

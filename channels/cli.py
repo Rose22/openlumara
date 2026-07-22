@@ -71,7 +71,7 @@ class Cli(core.channel.Channel):
         first_token_received = False
         processing_prompt = False
         async for token in self.format_stream_for_text(
-            self.send_stream({"role": "user", "content": msg}, commands_authorized=True),
+            self.send_stream(msg, commands_authorized=True),
             use_markdown=False
         ):
             token_type = token.get("type")

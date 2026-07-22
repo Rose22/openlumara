@@ -7,12 +7,12 @@
 </div>
 -->
 
-<button id="upload" title="Upload file" aria-label="Upload file" :disabled="$store.stream.state != 'idle'">
+<button id="upload" @click="$refs['file-input'].click()" title="Upload file" aria-label="Upload file" :disabled="$store.stream.state != 'idle'">
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
     </svg>
 </button>
-<input type="file" id="file-input" aria-hidden="true" multiple>
+<input type="file" x-ref="file-input" @change="$store.upload.addFile($event)" x-show="false" aria-hidden="true" multiple>
 
 <!-- user_input is defined over in index.html, so that we have access to it everywhere -->
 <textarea 
@@ -34,7 +34,7 @@
             $event.preventDefault();
             if (!$store.chat.user_input) { return; }
 
-            await send($store.chat.user_input);
+            await $store.chat.send($store.chat.user_input);
             await $store.chat.clearInput();
             $el.style.height = '48px';
 
@@ -50,7 +50,7 @@
         $event.preventDefault();
         if (!$store.chat.user_input) { return; }
 
-        await send($store.chat.user_input);
+        await $store.chat.send($store.chat.user_input);
         await $store.chat.clearInput();
         $el.style.height = '48px';
 
@@ -63,7 +63,7 @@
 <button id="stop" aria-label="Stop generation" x-show="$store.stream.state != 'idle'" @click="
 await simpleSocketSend({
     'type': 'user_message',
-    'content': {'role': 'user', 'content': '/stop'}
+    'content': '/stop'
 })
 ">
     <span class="stop-text">Stop</span>

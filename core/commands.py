@@ -283,9 +283,8 @@ class Commands:
         except ValueError as e:
             return None, None, []
 
-    async def process_input(self, message: dict, authorized=False):
+    async def process_input(self, content: str, authorized=False):
         """wrapper around the real _process_input, handles insertion of context"""
-        content = self.channel._extract_content(message)
         cmd_prefix, cmd, args = await self._extract_cmd(content)
 
         if cmd_prefix is None or cmd is None:
@@ -310,17 +309,17 @@ class Commands:
             args_display += " ".join(args)
         await self.channel.context.chat.add({"role": "user", "content": f"{cmd_prefix}{cmd[0]}{args_display}"}, cmd=True, ghost=use_temporary)
 
-        result = await self._process_input(message)
+        result = await self._process_input(content)
 
         # insert command result into context, flagging as temporary if needed
         await self.channel.context.chat.add({"role": "assistant", "content": f"{result}"}, cmd=True, ghost=use_temporary)
 
         return result
 
-    async def _process_input(self, message: dict):
+    async def _process_input(self, content: str):
         """processes user input and detects special commands that control opticlaw"""
 
-        cmd_prefix, cmd, args = await self._extract_cmd(self.channel._extract_content(message))
+        cmd_prefix, cmd, args = await self._extract_cmd(content)
 
         match cmd[0]:
             # case "undo":

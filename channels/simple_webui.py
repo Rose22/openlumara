@@ -292,14 +292,14 @@ class SimpleWebui(core.channel.Channel):
 
     HTML_CLEAN_PATTERN = re.compile('<.*?>')
 
-    def _sync_send(self, message_dict):
+    def _sync_send(self, message):
         """
         Helper method to call async self.send() from a synchronous context.
         Uses asyncio.new_event_loop() + run_until_complete to bridge the gap.
         """
         loop = asyncio.new_event_loop()
         try:
-            task = asyncio.ensure_future(self.send(message_dict, commands_authorized=self.config.get("allow_commands")), loop=loop)
+            task = asyncio.ensure_future(self.send(message, commands_authorized=self.config.get("allow_commands")), loop=loop)
             return loop.run_until_complete(task)
         finally:
             loop.close()
@@ -353,7 +353,7 @@ class SimpleWebui(core.channel.Channel):
                 def handle_ai_call():
                     try:
                         # Call AI synchronously (helper bridges async->sync)
-                        response_dict = self._sync_send({"role": "user", "content": self._pending_user_input})
+                        response_dict = self._sync_send(self._pending_user_input)
 
                         if response_dict:
                             response_content = response_dict.get("content", "")

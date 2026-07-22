@@ -1,6 +1,6 @@
 import core
 
-class CliLite(core.channel.Channel):
+class CliMultimodal(core.channel.Channel):
     """Lightweight version of the CLI channel that uses basic python input and doesn't use streaming"""
 
     settings =  {
@@ -11,10 +11,11 @@ class CliLite(core.channel.Channel):
     }
 
     async def run(self):
-        while True:
-            user_input = input("> ")
-            response = await self.send(user_input, commands_authorized=True)
-            print(response.get("content"), flush=True)
+        with open("/tmp/epica.jpg", 'rb') as thefile:
+            while True:
+                user_input = input("> ")
+                response = await self.send(user_input, files=[thefile], commands_authorized=True)
+                print(response.get("content"), flush=True)
 
     def on_log(self, category, message):
         if core.quiet:

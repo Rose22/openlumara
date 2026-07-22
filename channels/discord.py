@@ -172,14 +172,14 @@ class Client(discord.Client):
                         if self.ai_channel.config.get("use_message_streaming"):
                             response_obj = self.ai_channel.format_stream_for_text(
                                 self.ai_channel.send_stream(
-                                    {"role": "user", "content": content},
+                                    content,
                                     commands_authorized=commands_authorized
                                 ),
                                 chunk_size=MAX_CHARS
                             )
                             await self._stream_to_discord(response_obj, message.channel)
                         else:
-                            response_obj = await self.ai_channel.send({"role": "user", "content": content}, commands_authorized=commands_authorized)
+                            response_obj = await self.ai_channel.send(content, commands_authorized=commands_authorized)
 
                             if response_obj:
                                 response_content = response_obj.get("content")
