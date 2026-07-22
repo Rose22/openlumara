@@ -48,10 +48,10 @@ class Lists(core.module.Module):
         return output
 
     def _verify_target(self, category, list_name):
-        if category not in self.data.keys():
+        if category not in self.data:
             return False
-
-        if list_name not in self.data[category].keys():
+            
+        if list_name not in self.data.get(category, {}):
             return False
 
         return True
@@ -154,11 +154,13 @@ class Lists(core.module.Module):
         return self.result(output)
 
     def _find_item(self, items: list, starts_with: str):
-        # Remove leading number prefix like "1. ", "2. ", etc.
-        clean_prefix = regex.sub(r'^\d+\.\s*', '', starts_with.strip().lower())
+        # Remove leading number prefix like "1. ", "2. ", etc. from the search term
+        clean_search = regex.sub(r'^\d+\.\s*', '', starts_with.strip().lower())
 
         for index, item in enumerate(items):
-            if item.strip().lower().startswith(starts_with.strip().lower()):
+            # Also strip leading number from the item for comparison
+            clean_item = regex.sub(r'^\d+\.\s*', '', item.strip().lower())
+            if clean_item.startswith(clean_search):
                 return index
         return None
 
