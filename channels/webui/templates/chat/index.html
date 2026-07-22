@@ -9,7 +9,17 @@
     <div class="notice" x-html="$store.ui.notice"></div>
 </template>
 
-<div id="messages" x-ref="messages" x-auto-scroll>
+<div id="messages" x-ref="messages"
+    x-effect="
+        let _ = $store.chat.turns.length;
+        let threshold = 50;
+
+        if ($el.scrollHeight - $el.scrollTop - $el.clientHeight < threshold) {
+            await $nextTick();
+            $el.scrollTop = $el.scrollHeight;
+        }
+    "
+    >
     <template x-for="(turn, turnIndex) in $store.chat.turns" :key="turnIndex">
         <div>
             <!-- user messages get rendered seperately -->
