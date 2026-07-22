@@ -10,24 +10,8 @@
 </template>
 
 <div id="messages" x-ref="messages"
-    x-data="
-        {
-          autoScroll: true,
-          atBottom: true,
-          scrollLoop() {
-            if (this.autoScroll && this.atBottom) {
-              this.$refs.messages.scrollTop = this.$refs.messages.scrollHeight;
-            }
-            requestAnimationFrame(() => this.scrollLoop());
-          },
-          checkScroll() {
-            const el = this.$refs.messages;
-            const threshold = 10;
-            this.atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
-          }
-        }
-    "
-    x-init="scrollLoop()"
+    @scroll="$store.ui.onScroll()"
+    x-effect="$watch('$store.chat.turns', () => $nextTick(() => $store.ui.forceScrollToBottom()), { deep: true })"
 >
     <template x-for="(turn, turnIndex) in $store.chat.turns" :key="turnIndex">
         <div>

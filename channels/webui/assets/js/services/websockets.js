@@ -111,6 +111,9 @@ async function handleWebSocketMessage(data) {
                 msgId: msgId
             });
             stream.pendingMessageId = msgId;
+
+            // force scroll to bottom
+            await Alpine.store('ui').forceScrollToBottom();
             break;
         case "user_message_confirmed":
             // aaand now we remove the pending status
@@ -210,6 +213,10 @@ async function handleWebSocketMessage(data) {
             }
 
             stream.tokens.push(token);
+
+            // always scroll to the bottom upon a token coming in
+            Alpine.store('ui').scrollToBottom();
+
             break;
 
         case "messages_updated":

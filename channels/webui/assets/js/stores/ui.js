@@ -1,4 +1,5 @@
 UI_STORE = {
+    scrollThreshold: 100,
     errors: [],
     currentModal: null,
     notice: null,
@@ -27,4 +28,42 @@ UI_STORE = {
         this.currentModal = null;
     },
 
+    /*
+     * Called from @scroll on the messages container.
+     * Toggles shouldScroll based on whether the user is near the bottom.
+     */
+    onScroll(containerId = 'messages') {
+        const el = document.getElementById(containerId);
+        if (!el) return;
+
+        const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+        const wasAtBottom = this.shouldScroll;
+
+        if (distFromBottom < this.scrollThreshold) {
+            this.shouldScroll = true;
+        } else {
+            this.shouldScroll = false;
+        }
+    },
+
+    async scrollToBottom(containerId = 'messages') {
+        if (!this.shouldScroll) return;
+
+        const el = document.getElementById(containerId);
+        if (!el) return;
+
+        Alpine.nextTick(() => {
+            el.scrollTop = el.scrollHeight;
+        });
+    },
+
+    async forceScrollToBottom(containerId = 'messages') {
+        const el = document.getElementById(containerId);
+        if (!el) return;
+
+        Alpine.nextTick(() => {
+            el.scrollTop = el.scrollHeight;
+            this.shouldScroll = true;
+        });
+    },
 }

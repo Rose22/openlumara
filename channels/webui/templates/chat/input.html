@@ -37,9 +37,6 @@
             await $store.chat.send($store.chat.user_input);
             await $store.chat.clearInput();
             $el.style.height = '48px';
-
-            // force scroll to the bottom
-            await forceScrollDown($refs.messages);
         }
     "
 ></textarea>
@@ -53,8 +50,6 @@
         await $store.chat.send($store.chat.user_input);
         await $store.chat.clearInput();
         $el.style.height = '48px';
-
-        await forceScrollDown($refs.messages);
     }
     "
     x-show="$store.stream.state === 'idle'"

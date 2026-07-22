@@ -47,9 +47,10 @@ CHAT_STORE = {
         this.selectedCategory = result.category;
         this.messages = result.messages;
 
+        ui = Alpine.store('ui');
+
         // make sure it always shows the bottom of the chat
-        await Alpine.nextTick();
-        await forceScrollDown(document.getElementById("messages"));
+        ui.forceScrollToBottom();
     },
 
     async newChat() {
