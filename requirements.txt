@@ -3,6 +3,7 @@ tiktoken
 msgpack
 pyyaml
 json-repair
+partial-json-parser
 regex
 filetype
 pypdf2

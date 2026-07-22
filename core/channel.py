@@ -1,15 +1,23 @@
+# core
 import core
 import core.commands
+
+# system
 import os
 import sys
 import time
 import json
 import asyncio
+
+# parsing stuff
 import json_repair
-import re
+import partial_json_parser
+import regex
 import base64
 import filetype
 import io
+
+# an error occurred please try again later
 import traceback
 
 def get_available_channels():
@@ -348,92 +356,35 @@ class Channel:
 
         return message
 
-    def _render_tool_token(self, name: str, args_str: str) -> str:
-        # TODO: replace with proper python library
-        # as this is a pain
-
-        delta = ""
-
+    async def _render_tool_token(self, name: str, args_str: str) -> str:
         # 1. Handle tool switch
         if name != self._tool_state["name"]:
             self._tool_state["name"] = name
             self._tool_state["raw_args"] = ""
             self._tool_state["keys_state"] = {}
-            return f"\n**Calling tool: {name}**\n"
+            return f"\n**Calling tool: {name}**"
 
-        # 2. Try parsing JSON for key-value formatting
-        data = {}
+        # 2. Parse partial JSON - handles incomplete/malformed streams
+        delta = ""
         try:
-            # Try the fast/easy way first: full parse
-            parsed = json_repair.loads(args_str)
-            if isinstance(parsed, dict):
-                data = parsed
-            else:
-                # If it's not a dict, it might be a partial dict that json_repair 
-                # couldn't quite fix into a dict. Let's try the regex fallback.
-                raise ValueError("Not a dict")
-        except Exception:
-            # Fallback to robust partial parsing if json_repair fails to produce a dict
-            # This mimics the WebUI's ability to extract keys even from incomplete JSON
-            key_pattern = re.compile(r'"([^"\\]*(?:\\.[^"\\]*)*)"\s*:\s*')
-            matches = list(key_pattern.finditer(args_str))
-            
-            for i, match in enumerate(matches):
-                key = match.group(1)
-                value_start = match.end()
-                
-                # Determine the end of the value
-                if i + 1 < len(matches):
-                    next_match_start = matches[i+1].start()
-                    potential_value_str = args_str[value_start:next_match_start].rstrip().rstrip(',')
-                else:
-                    potential_value_str = args_str[value_start:]
-                
-                # Use json_repair to try and get the value by wrapping it in a dict
-                try:
-                    # Try to get the value by wrapping it in a dict
-                    repaired = json_repair.loads(f'{{"v": {potential_value_str}}}')
-                    if isinstance(repaired, dict) and "v" in repaired:
-                        data[key] = repaired["v"]
-                    else:
-                        # Fallback: strip quotes and trailing JSON structural characters
-                        val = potential_value_str.lstrip()
-                        if val.startswith('"'):
-                            val = val[1:]
-                        val = val.rstrip('"} ,]')
-                        data[key] = val
-                except Exception:
-                    # Final fallback: strip quotes and trailing JSON structural characters
-                    val = potential_value_str.lstrip()
-                    if val.startswith('"'):
-                        val = val[1:]
-                    val = val.rstrip('"} ,]')
-                    data[key] = val
+            data = partial_json_parser.loads(args_str, allow_partial=partial_json_parser.Allow.ALL)
+            if not isinstance(data, dict):
+                data = {}
+        except Exception as e:
+            data = {}
 
-        # 3. Generate the delta based on the current (potentially partial) data
+        # 3. Delta comparison
         for key, value in data.items():
-            # Convert value to string for comparison and display
-            if isinstance(value, (dict, list)):
-                val_str = json.dumps(value)
-            else:
-                val_str = str(value)
-            
+            val_str = json.dumps(value) if isinstance(value, (dict, list)) else str(value)
             prev_val = self._tool_state["keys_state"].get(key)
 
             if prev_val is None:
-                # New key: append header and current value
                 delta += f"\n**{key}**: "
                 if val_str:
                     delta += val_str
                 self._tool_state["keys_state"][key] = val_str
             elif val_str != prev_val:
-                # Existing key: append only the new part of the value
-                if val_str.startswith(prev_val):
-                    delta += val_str[len(prev_val):]
-                else:
-                    # If the value changed completely, just append the new value.
-                    # This is a fallback for delta channels.
-                    delta += val_str
+                delta += val_str[len(prev_val):] if val_str.startswith(prev_val) else val_str
                 self._tool_state["keys_state"][key] = val_str
 
         self._tool_state["raw_args"] = args_str
@@ -767,7 +718,7 @@ class Channel:
                     newline_str = "\n"
 
                 # collapse more than 2 newlines to just 2
-                content = re.sub(r'\n{3,}', '\n\n', content)
+                content = regex.sub(r'\n{3,}', '\n\n', content)
                 content = content.replace("\n", newline_str)
             except:
                 pass
@@ -821,21 +772,21 @@ class Channel:
             #     yield text_to_token(tool_result_str)
 
             if self.config.get("stream_tool_calls") and token_type == "tool_call_delta":
-                char_counter += len("\n")
-                yield text_to_token("\n")
-
                 # Extract the accumulated tool call from the delta
                 tc_list = token.get("tool_calls", [])
                 if tc_list:
                     tc = tc_list[0]
                     # Render the partial/full tool call fancy style
-                    tool_delta_str = self._render_tool_token(tc.function.name, tc.function.arguments)
+                    tool_delta_str = await self._render_tool_token(tc.function.name, tc.function.arguments)
 
                     # fix fake newlines
                     tool_delta_str = tool_delta_str.replace("\\n", "\n")
 
                     char_counter += len(tool_delta_str)
                     yield text_to_token(tool_delta_str)
+            elif token_type == "tool":
+                char_counter += len("\n\n")
+                yield text_to_token("\n\n")
             elif not self.config.get("stream_tool_calls") and token_type == "tool_calls":
                 char_counter += len("\n")
                 yield text_to_token("\n")

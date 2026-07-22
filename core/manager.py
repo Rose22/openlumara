@@ -77,15 +77,21 @@ class Manager:
             # add an instance of the channel's class to self.channels
             channel_name = core.modules.get_name(channel)
             try:
-                storage[channel_name] = channel(self, is_user_channel=is_user_channels)
+                try:
+                    storage[channel_name] = channel(self, is_user_channel=is_user_channels)
+                except Exception as e:
+                    core.log(channel_name, f"Error while loading channel: {core.detail_error(e)}")
 
                 # run installation hook
                 if channel_name in newly_installed_channels:
-                    await storage[channel_name].on_install()
+                    try:
+                        await storage[channel_name].on_install()
+                    except Exception as e:
+                        core.log(channel_name, f"Error while installing channel: {core.detail_error(e)}")
 
                 self.log("core", f"loaded {is_user_str}channel : {channel_name}")
             except Exception as e:
-                self.log(channel_name, f"failed to load channel: {core.detail_error(e)}")
+                self.log(channel_name, f"Failed to load channel: {core.detail_error(e)}")
 
     async def _load_modules(self, storage, modules, enabled_modules, is_user_modules=False):
         # install dependencies
