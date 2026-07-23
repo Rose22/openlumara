@@ -1,9 +1,9 @@
-<div :class="{'reasoning-wrapper': true, 'collapsed': collapsed, 'expanded': !collapsed}" x-data="{collapsed: false}" @click="collapsed = !collapsed">
+<div :class="{'reasoning-wrapper': true, 'collapsed': collapsed, 'expanded': !collapsed}" x-data="{collapsed: $store.settings.expandReasoning}" @click="collapsed = !collapsed">
     <div class="header">
         {% include 'svg/thought_bubble.svg' %}
         <span class="text">
             <!-- TODO: add `Thought` after done thinking -->
-            <span class="label">Thinking..</span>
+            <span class="label">Thoughts</span>
             <span class="dots"><span aria-hidden="true">&nbsp;</span><span aria-hidden="true">&nbsp;</span><span aria-hidden="true">&nbsp;</span></span>
         </span>
         <svg class="toggle" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

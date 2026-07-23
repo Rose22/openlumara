@@ -565,7 +565,6 @@ async def create_fastapi(channel):
                         case "stop":
                             if channel:
                                 await channel.manager.API.cancel()
-                                ws_mgr.stream_buffer.clear()
 
                                 stream_id = data.get("id")
                                 if stream_id:
@@ -596,7 +595,6 @@ async def create_fastapi(channel):
                                 await ws_mgr.broadcast({
                                     "type": "chat_switched",
                                     "chat_id": new_chat_id,
-                                    "buffer": ws_mgr.stream_buffer
                                 })
                         case "new_chat":
                             if ws_mgr.active_stream_task and not ws_mgr.active_stream_task.done():
@@ -704,7 +702,6 @@ class WebSocketManager:
 
         self.active_connections = []
 
-        self.stream_buffer = []
         self.active_stream_task = None
         self.active_chat_id = None
         self.webui_ready = False
@@ -718,11 +715,6 @@ class WebSocketManager:
         if current_chat_id:
             await websocket.send_json({
                 "type": "ready"
-            })
-            await websocket.send_json({
-                "type": "sync_state",
-                "active_chat_id": current_chat_id,
-                "buffer": self.stream_buffer
             })
 
         asyncio.create_task(self.queue_ready_signal())
@@ -765,7 +757,6 @@ class WebSocketManager:
                 )
             ):
             payload = serialize_for_json(partial)
-            self.stream_buffer.append(partial)
 
             if partial.get("type") == "token":
                 token = partial.get("content")
@@ -816,12 +807,9 @@ class WebSocketManager:
                 })
 
         await self.broadcast({
-            "type": "stream_complete",
-            "buffer": self.stream_buffer,
-            "index": index
+            "type": "stream_complete"
         })
 
-        self.stream_buffer = []
         self.active_chat_id = None
 
     async def start_stream(self, channel, chat_id: str, message: str, files: list = None):
@@ -829,7 +817,6 @@ class WebSocketManager:
             self.active_stream_task.cancel()
 
         self.active_chat_id = chat_id
-        self.stream_buffer = []
         next_index = len(await channel.context.chat.get_messages())
 
         try:
@@ -838,6 +825,5 @@ class WebSocketManager:
             pass
         except Exception as e:
             channel.log(channel.name, f"Background stream error: {core.detail_error(e)}")
-            self.stream_buffer = []
             self.active_chat_id = None
 

@@ -23,7 +23,7 @@
             <template x-if="turn.role === 'user'">
                 <div class="message-wrapper user" x-data="{ message: turn.messages[0] }">
                     <div class="message user">
-                        <div x-html="renderMarkdown(message.content)" :class="{'command': message.is_cmd}"></div>
+                        {% include 'chat/turns/user.html' %}
                         <div x-data="{ targetIndex: turn.first_message_index }" class="fullwidth">
                             {% include 'chat/message_buttons.html' %}
                         </div>
@@ -50,9 +50,9 @@
 
     <!-- user message (if one was just sent) -->
     <template x-if="$store.stream.userMsg">
-        <div class="message-wrapper user">
-            <div class="message user" :class="{'command': $store.stream.userMsg.is_cmd}">
-                <div class="fullwidth" x-html="renderMarkdown($store.stream.userMsg.content)"></div>
+        <div class="message-wrapper user" x-data="{ message: $store.stream.userMsg }">
+            <div class="message user">
+                {% include 'chat/turns/user.html' %}
                 <div class="fullwidth" x-data="{ targetIndex: $store.stream.userMsg.index }">
                     {% include 'chat/message_buttons.html' %}
                 </div>
@@ -72,7 +72,7 @@
                     {% include 'chat/prompt_processing.html' %}
                 </template>
 
-                <div x-data="{ targetIndex: turn.first_message_index }" class="fullwidth">
+                <div x-data="{ targetIndex: $store.stream.turn.first_message_index }" class="fullwidth">
                     {% include 'chat/message_buttons.html' %}
                 </div>
             </div>

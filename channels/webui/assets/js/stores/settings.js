@@ -14,6 +14,7 @@ SETTINGS_STORE = {
     
     // --- Feature Flags ---
     showUnsafe: false,
+    expandReasoning: JSON.parse(localStorage.getItem('reasoningExpandedByDefault') || 'false'),
     
     // --- Model Cache ---
     cachedModels: null,
@@ -148,6 +149,10 @@ SETTINGS_STORE = {
 
             this.settings = backendData;
             this.originalCategories = JSON.parse(JSON.stringify(this.categories));
+
+            // handle localstorage settings
+            localStorage.setItem('expandReasoning', this.expandReasoning);
+
             this.changedModuleSettings.clear();
         } catch (err) {
             this.error = err.message || 'Failed to save settings';

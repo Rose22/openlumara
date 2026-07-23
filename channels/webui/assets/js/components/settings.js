@@ -26,6 +26,7 @@ function settingsModal() {
         fontSize: localStorage.getItem('fontSize') || '16',
         chatWidth: localStorage.getItem('chatContentWidth') || '100',
         messageWidth: localStorage.getItem('messageMaxWidth') || '60',
+        expandReasoning: localStorage.getItem('expandReasoning') || false,
 
         get activeNavCategory() {
             return this.activeModule ? 'modules' : 

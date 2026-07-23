@@ -1,5 +1,5 @@
 UI_STORE = {
-    scrollThreshold: 100,
+    scrollThreshold: 50,
     errors: [],
     currentModal: null,
     notice: null,
@@ -13,6 +13,8 @@ UI_STORE = {
     showCategories: true,
     showChatList: true,
 
+    expandReasoning: false,
+
     async init() {
         // check if this is a phone
         this.windowWidth = window.innerWidth;
@@ -24,6 +26,8 @@ UI_STORE = {
         // on mobile, the sidebar is a drill-down navigator rather than a two-column pane
         this.showCategories = !this.isMobile;
         this.showChatList = true;
+
+        this.expandReasoning = localStorage.getItem("expandReasoning");
     },
 
     async toggleSidebar() {

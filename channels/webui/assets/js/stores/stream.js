@@ -7,7 +7,6 @@ let STREAM_STORE = {
     userMsgPending: false,
 
     // stores raw token data
-    tokens: [],
     turn: [],
     processing: {},
 
@@ -21,7 +20,6 @@ let STREAM_STORE = {
     userMessageId: null,
 
     async clearTokens() {
-        this.tokens = [];
         this.turn = [];
         this.userMsg = null;
         this.processing = {};

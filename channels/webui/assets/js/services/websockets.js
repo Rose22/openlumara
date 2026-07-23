@@ -99,7 +99,8 @@ async function handleWebSocketMessage(data) {
              * thanks alpine.js
              */
         
-            stream.tokens = data.buffer;
+            // actually nope its not even needed anymore because we just stream an entire turn from the backend LOL
+            // this is now just here for a memory, this data type doesn't actually get broadcast anymore
             break;
 
         case "user_message_added":
@@ -122,6 +123,42 @@ async function handleWebSocketMessage(data) {
 
             // always scroll to the bottom upon a token coming in
             await Alpine.store('ui').scrollToBottom();
+
+            // process depending on what segment we're in
+            const current_segment = stream.turn.messages[stream.turn.messages.length-1]
+            const segment_type = current_segment.type;
+            switch (segment_type) {
+                case "reasoning":
+                    stream.state = 'thinking';
+                    stream.processing = {};
+
+                    AudioManager.stopProcessingSound();
+                    AudioManager.play("token");
+
+                    if (!responseSoundPlayed) {
+                        AudioManager.play("response_start");
+                        responseSoundPlayed = true;
+                    }
+                    break;
+                case "content":
+                    stream.state = 'streaming';
+                    stream.processing = {};
+
+                    AudioManager.stopProcessingSound();
+                    AudioManager.play("token");
+
+                    if (!responseSoundPlayed) {
+                        AudioManager.play("response_start");
+                        responseSoundPlayed = true;
+                    }
+                    break;
+            }
+
+            if (current_segment.is_cmd) {
+                // reload the global state in case something changed due to the command
+                await chat.reloadChat();
+            }
+
             break;
 
         case "push":
@@ -169,30 +206,6 @@ async function handleWebSocketMessage(data) {
 
                     AudioManager.playProcessingSound();
                     break;
-                case "reasoning":
-                    stream.state = 'thinking';
-                    stream.processing = {};
-
-                    AudioManager.stopProcessingSound();
-                    AudioManager.play("token");
-
-                    if (!responseSoundPlayed) {
-                        AudioManager.play("response_start");
-                        responseSoundPlayed = true;
-                    }
-                    break;
-                case "content":
-                    stream.state = 'streaming';
-                    stream.processing = {};
-
-                    AudioManager.stopProcessingSound();
-                    AudioManager.play("token");
-
-                    if (!responseSoundPlayed) {
-                        AudioManager.play("response_start");
-                        responseSoundPlayed = true;
-                    }
-                    break;
                 case "tool_call_delta":
                     stream.state = 'calling_tools';
                     stream.processing = {};
@@ -204,16 +217,7 @@ async function handleWebSocketMessage(data) {
                     stream.state = 'processing_tools';
                     AudioManager.playProcessingSound();
                     break;
-
             }
-
-            if (token.is_cmd) {
-                // reload the global state in case something changed due to the command
-                await chat.reloadChat();
-                return
-            }
-
-            stream.tokens.push(token);
 
             // always scroll to the bottom upon a token coming in
             await Alpine.store('ui').scrollToBottom();
