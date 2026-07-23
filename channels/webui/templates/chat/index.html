@@ -17,12 +17,17 @@
     "
 >
     <!-- historical turns -->
-    <template x-for="turn in $store.chat.turnHistory">
-        <div>
+    <template x-for="(turn, turnIndex) in $store.chat.turnHistory" :key="turnIndex">
+        <div class="fullwidth">
             <!-- user turn (always one message) -->
             <template x-if="turn.role === 'user'">
                 <div class="message-wrapper user" x-data="{ message: turn.messages[0].content }">
-                    <div class="message user" x-html="renderMarkdown(message)"></div>
+                    <div class="message user">
+                        <div x-html="renderMarkdown(message)"></div>
+                        <div x-data="{ targetIndex: turn.first_message_index }" class="message-button-wrapper">
+                            {% include 'chat/message_buttons.html' %}
+                        </div>
+                    </div>
                 </div>
             </template>
 
@@ -30,9 +35,13 @@
             <template x-if="turn.role === 'assistant'">
                 <div class="message-wrapper assistant">
                     <div class="message assistant">
-                        <template x-for="message in turn.messages">
+                        <template x-for="(message, messageIndex) in turn.messages" :key="messageIndex">
                             {% include 'chat/turns/assistant_history.html' %}
                         </template>
+
+                        <div x-data="{ targetIndex: turn.first_message_index }" class="message-button-wrapper">
+                            {% include 'chat/message_buttons.html' %}
+                        </div>
                     </div>
                 </div>
             </template>
@@ -42,7 +51,12 @@
     <!-- user message (if one was just sent) -->
     <template x-if="$store.stream.userMsg">
         <div class="message-wrapper user">
-            <div class="message user" x-html="renderMarkdown($store.stream.userMsg.content)"></div>
+            <div class="message user">
+                <div class="fullwidth" x-html="renderMarkdown($store.stream.userMsg.content)"></div>
+                <div class="fullwidth" x-data="{ targetIndex: $store.stream.userMsg.index }">
+                    {% include 'chat/message_buttons.html' %}
+                </div>
+            </div>
         </div>
     </template>
 
@@ -50,21 +64,29 @@
     <template x-if="$store.stream.turn.messages">
         <div class="message-wrapper assistant">
             <div class="message assistant">
-                <template x-for="message in $store.stream.turn.messages">
+                <template x-for="(message, messageIndex) in $store.stream.turn.messages" :key="messageIndex">
                     {% include 'chat/turns/assistant_stream.html' %}
                 </template>
+
+                <template x-if="$store.stream.state === 'processing_tools'">
+                    {% include 'chat/prompt_processing.html' %}
+                </template>
+
+                <div x-data="{ targetIndex: turn.first_message_index }" class="message-button-wrapper">
+                    {% include 'chat/message_buttons.html' %}
+                </div>
             </div>
         </div>
     </template>
 
-    <!-- TYPING INDICATOR -->
+    <!-- typing indicator -->
     <template x-if="$store.stream.state === 'received'">
         <div class="typing-indicator" id="typing" aria-label="AI is typing" x-ignore>
             <span></span><span></span><span></span>
         </div>
     </template>
 
-    <!-- PROMPT PROCESSING INDICATOR -->
+    <!-- prompt processing indicator -->
     <template x-if="$store.stream.state === 'processing'">
         {% include 'chat/prompt_processing.html' %}
     </template>

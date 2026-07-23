@@ -1,0 +1,11 @@
+<div class="message-buttons">
+    <button @click="$store.chat.startEdit(turn.first_message_index)" title="Edit" :disabled="$store.stream.state != 'idle'">
+        {% include 'svg/edit.svg' %}
+    </button>
+    <button @click="$store.chat.regenerateMessage(turn.first_message_index)" title="Regenerate" :disabled="$store.stream.state != 'idle'">
+        {% include 'svg/reload.svg' %}
+    </button>
+    <button @click="$store.chat.deleteMessage(turn.first_message_index)" title="Delete" :disabled="$store.stream.state != 'idle'">
+        {% include 'svg/trash.svg' %}
+    </button>
+</div>

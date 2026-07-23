@@ -126,7 +126,9 @@ async function handleWebSocketMessage(data) {
 
         case "push":
             // it's a push messsage (like a scheduler reminder)
-            chat.messages.push(data.content);
+            chat.turnHistory.push(data.content);
+            await chat.reloadChat();
+
             console.log(data.content);
             await AudioManager.play('response_start');
             await Alpine.store('notifications').send(data.content.content);
@@ -230,22 +232,25 @@ async function handleWebSocketMessage(data) {
 
         case "stream_complete":
             /*
-             * Reconstruct an entire assistant turn from the raw tokens
-             * and then push it to the messages array
-             *
-             * (so that the UI won't flicker when syncing from the backend)
+             * this prevents UI flicker that comes from re-rendering the entire turn history
              */
 
-            await stream.clearTokens();
+            // push the user message + the fully collected assistant turn to the history
+            chat.turnHistory.push({"role": "user", "messages": [stream.userMsg]});
+            chat.turnHistory.push(stream.turn);
+            
+            // then clear the user message placeholder and the current turn
+            stream.userMsg = null;
+            stream.turn = [];
 
-            // then sync from the backend to make sure we're completely synced up
+            // finalize the stream
+            AudioManager.play("completion");
+            await Alpine.store('ui').scrollToBottom();
+            stream.state = 'idle';
+
+            // and finally, sync back up with the backend
             await chat.reloadChat();
 
-            AudioManager.play("completion");
-
-            await Alpine.store('ui').scrollToBottom();
-
-            stream.state = 'idle';
             break;
     }
 }

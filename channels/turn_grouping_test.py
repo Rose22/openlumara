@@ -1,7 +1,7 @@
 import core
 import json
 
-class Turnstest(core.channel.Channel):
+class TurnGroupingTest(core.channel.Channel):
     running = False
 
     async def clearscreen(self):
@@ -22,6 +22,8 @@ class Turnstest(core.channel.Channel):
                 if partial.get("type") == "turn":
                     await self.clearscreen()
                     #print(partial.get("content"))
+                    print(f">> {usr_input}")
+                    print()
                     print(json.dumps(partial.get("content"), indent=2))
 
     def on_log(self, category, message):

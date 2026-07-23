@@ -44,9 +44,11 @@
         border-radius: var(--radius-sm);
         overflow: hidden;
         opacity: 1;
+        /*
         transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1),
                     opacity 0.25s ease,
                     padding 0.25s ease;
+        */
     }
 
     .content {
@@ -108,6 +110,7 @@
     margin-top: 0;
 }
 
+/*
 .reasoning-wrapper.collapsed {
     .toggle {
         transform: rotate(-90deg);
@@ -127,6 +130,7 @@
         animation: reasoningBlockFadeIn 0.3s ease-out forwards;
     }
 }
+*/
 
 /* Reasoning Streaming Animation */
 @keyframes reasoningBlockFadeIn {
