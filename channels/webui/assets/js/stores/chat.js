@@ -13,6 +13,15 @@ CHAT_STORE = {
     editingMessageIndex: null,
     editContent: '',
 
+
+    _turnsVersion: 0,
+    _historyTurns: null,
+    _historyTurnsHash: null,
+
+    _streamingTurn: null,
+    _streamingTurnHash: null,
+
+
     user_input: '',
     last_user_input: '',
 
@@ -207,8 +216,25 @@ CHAT_STORE = {
         };
     },
 
+    // Version counter for Alpine reactivity
+    get turnsVersion() {
+        // This lets Alpine know the turns have changed
+        // by accessing a reactive property that increments
+        return this._turnsVersion || 0;
+    },
+
+    // Call this from the WebSocket handler after pushing a token
+    onTokenArrived() {
+        this._turnsVersion = (this._turnsVersion || 0) + 1;
+    },
+
+    // Call this from the WebSocket handler after messages_updated
+    onMessagesChanged() {
+        this._turnsVersion = (this._turnsVersion || 0) + 1;
+    },
+
     get turns() {
-        // defined in chat/turns.js
+        // defined in processors/turns.js
         return getTurns(this);
     }
 }

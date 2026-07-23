@@ -1,0 +1,139 @@
+<div x-show="DEBUG_TURNS" x-cloak
+     style="position:fixed;bottom:80px;right:10px;background:rgba(0,0,0,0.85);color:#0f0;font-family:monospace;font-size:11px;padding:10px;border-radius:6px;max-width:400px;max-height:280px;overflow:auto;z-index:9999;border:1px solid #0f0;line-height:1.4"
+     x-data="debugData()">
+    <div style="font-weight:bold;margin-bottom:4px;color:#ff0">⚡ TURNS DEBUG</div>
+    
+    <div>
+        History: <span :style="historyHit?'color:#0f0':'color:#f80'" x-text="historyText"></span>
+        &nbsp; Stream: <span :style="streamHit?'color:#0f0':'color:#f80'" x-text="streamText"></span>
+    </div>
+    
+    <div style="margin-top:4px">
+        Turns: <b x-text="safeTurns.length"></b>
+        Msgs: <b x-text="messages.length"></b>
+        Tokens: <b x-text="tokenCount"></b>
+    </div>
+    
+    <template x-for="t in safeTurns" :key="t._idx">
+        <div :style="'color:'+(t.role==='user'?'#4af':'#4f4')+(t._streaming?' font-weight:bold':'')+' padding-left:'+(t.role==='user'?'8px':'16px')+' border-left:2px solid '+(t.role==='user'?'#4af':'#4f4')">
+            <span x-text="t.role==='user'?'👤':'🤖'"></span>
+            <span x-text="t.role.toUpperCase()"></span>
+            <span style="color:#888">#<span x-text="t._idx"></span></span>
+            <template x-if="t.role==='assistant'">
+                <span style="color:#f80" x-text="t._streaming?'[STREAMING]':'[HISTORY]'"></span>
+            </template>
+            <span style="color:#666">—<span x-text="t._msgCount"></span> msgs</span>
+        </div>
+    </template>
+    
+    <template x-if="showStreamInfo">
+        <div style="margin-top:6px;padding-top:4px;border-top:1px solid #444">
+            <div style="color:#ff0;font-weight:bold">State: <span x-text="streamState"></span></div>
+            <div style="color:#888">Tokens: <span x-text="tokenCount"></span></div>
+        </div>
+    </template>
+    
+    <template x-if="safeLastTurn">
+        <div style="margin-top:6px;padding-top:4px;border-top:1px solid #444">
+            <div style="color:#ff0;font-weight:bold">Last turn:</div>
+            <template x-for="(m,mi) in safeLastTurnMsgs" :key="mi">
+                <div style="padding-left:12px;color:#aaa;font-size:10px">
+                    <span :style="mTypeColor(m.type)" x-text="mTypeName(m.type)"></span>
+                    <span style="color:#666"> <span x-text="mLen(m)"></span> chars <template x-if="m.pending"><span> [PENDING]</span></template></span>
+                </div>
+            </template>
+        </div>
+    </template>
+</div>
+
+<script>
+function debugData() {
+    return {
+        DEBUG_TURNS: true,
+        
+        get allTurns() {
+            var chat = Alpine.store('chat');
+            return chat ? (chat.turns || []) : [];
+        },
+        
+        get stream() {
+            return Alpine.store('stream') || {};
+        },
+        
+        get messages() {
+            var chat = Alpine.store('chat');
+            return chat ? (chat.messages || []) : [];
+        },
+        
+        get historyHit() {
+            var chat = Alpine.store('chat');
+            return chat && chat._historyTurnsHash ? true : false;
+        },
+        
+        get streamHit() {
+            var chat = Alpine.store('chat');
+            return chat && chat._streamingTurnHash ? true : false;
+        },
+        
+        get historyText() { return this.historyHit ? '✅ HIT' : '❌ MISS'; },
+        get streamText() { return this.streamHit ? '✅ HIT' : '❌ MISS'; },
+        
+        get safeTurns() {
+            var turns = this.allTurns;
+            var result = [];
+            for (var i = 0; i < turns.length; i++) {
+                var t = turns[i];
+                if (!t || !t.role) continue;
+                var msgs = t.messages || [];
+                var streaming = false;
+                for (var j = 0; j < msgs.length; j++) {
+                    if (msgs[j] && msgs[j].pending) { streaming = true; break; }
+                }
+                result.push({
+                    _idx: i + 1,
+                    role: t.role,
+                    messages: msgs,
+                    _streaming: streaming,
+                    _msgCount: msgs.length
+                });
+            }
+            return result;
+        },
+        
+        get safeLastTurn() {
+            var s = this.safeTurns;
+            return s.length > 0 ? s[s.length - 1] : null;
+        },
+        
+        get safeLastTurnMsgs() {
+            if (!this.safeLastTurn) return [];
+            var result = [];
+            var msgs = this.safeLastTurn.messages || [];
+            for (var i = 0; i < msgs.length; i++) {
+                if (msgs[i]) result.push(msgs[i]);
+            }
+            return result;
+        },
+        
+        get streamState() { return this.stream.state || 'idle'; },
+        get tokenCount() { return (this.stream.tokens || []).length; },
+        get showStreamInfo() { return this.streamState !== 'idle' && this.tokenCount > 0; },
+        
+        mTypeColor: function(type) {
+            if (type === 'reasoning') return 'color:#f0f';
+            if (type === 'content') return 'color:#0f0';
+            if (type === 'tool_calls') return 'color:#0ff';
+            return 'color:#888';
+        },
+        
+        mTypeName: function(type) {
+            return type || 'unknown';
+        },
+        
+        mLen: function(msg) {
+            if (!msg) return 0;
+            return (msg.content || msg.reasoning_content || '').length;
+        }
+    };
+}
+</script>
