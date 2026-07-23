@@ -19,6 +19,8 @@
 
         .command {
             font-family: monospace;
+            white-space: pre-wrap;
+            word-wrap: break-word;
         }
 
         h1,

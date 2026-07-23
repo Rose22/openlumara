@@ -6,7 +6,7 @@
 
     <!-- Content block -->
     <template x-if="message.role === 'assistant' && Object.hasOwn(message, 'content') || message.type === 'content'">
-        <div class="content" x-html="renderMarkdown(message.content)"></div>
+        <div class="content" x-html="message.is_cmd ? message.content : renderMarkdown(message.content)" :class="{'command': message.is_cmd}"></div>
     </template>
 
     <!-- Tool calls block -->
