@@ -1,3 +1,4 @@
+<!-- chat header -->
 {% if config.get('enable_chat_header') %}
     {% include 'chat/header.html' %}
 {% endif %}
@@ -9,6 +10,7 @@
     <div class="notice" x-html="$store.ui.notice"></div>
 </template>
 
+<!-- the main message view -->
 <div id="messages" x-ref="messages" x-cloak
     @scroll.throttle="
         const el = $el;
@@ -16,6 +18,24 @@
         $store.ui.shouldScroll = distFromBottom < $store.ui.scrollThreshold;
     "
 >
+    <!--
+        a "turn" is:
+            when it's a user turn:
+                just one message which is the user's request
+
+            when it's an AI turn:
+                all messages emitted by the assistant after a user's request
+
+                this can be reasoning (thinking), content, partial toolcalls, full toolcalls,
+                tool responses, and so on.
+
+        the grouping of raw messages into turns happens in the backend, in core/turn.py
+        see that file for more information on how this works.
+
+        any channel can use channel.group_stream() to get an array of grouped turns,
+        just like what the webUI uses here!
+    -->
+
     <!-- historical turns -->
     <template x-for="(turn, turnIndex) in $store.chat.turnHistory" :key="turnIndex">
         <div class="fullwidth">
@@ -48,7 +68,7 @@
         </div>
     </template>
 
-    <!-- user message (if one was just sent) -->
+    <!-- current user message (if one was just sent) -->
     <template x-if="$store.stream.userMsg">
         <div class="message-wrapper user" x-data="{ message: $store.stream.userMsg }">
             <div class="message user">
@@ -60,7 +80,7 @@
         </div>
     </template>
 
-    <!-- streaming assistant message -->
+    <!-- streaming assistant turn -->
     <template x-if="$store.stream.turn.messages">
         <div class="message-wrapper assistant">
             <div class="message assistant">
@@ -86,14 +106,16 @@
         </div>
     </template>
 
-    <!-- prompt processing indicator -->
+    <!-- prompt processing indicator (works with llama.cpp and derivatives) -->
     <template x-if="$store.stream.state === 'processing'">
         {% include 'chat/prompt_processing.html' %}
     </template>
 </div>
 
+<!-- invisible upload form -->
 {% include 'chat/upload.html' %}
 
+<!-- input field -->
 <div id="input">
     {% include 'chat/input.html' %}
 </div>
