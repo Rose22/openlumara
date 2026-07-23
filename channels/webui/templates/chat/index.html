@@ -24,7 +24,7 @@
                 <div class="message-wrapper user" x-data="{ message: turn.messages[0] }">
                     <div class="message user">
                         <div x-html="renderMarkdown(message.content)" :class="{'command': message.is_cmd}"></div>
-                        <div x-data="{ targetIndex: turn.first_message_index }" class="message-button-wrapper">
+                        <div x-data="{ targetIndex: turn.first_message_index }" class="fullwidth">
                             {% include 'chat/message_buttons.html' %}
                         </div>
                     </div>
@@ -39,7 +39,7 @@
                             {% include 'chat/turns/assistant_history.html' %}
                         </template>
 
-                        <div x-data="{ targetIndex: turn.first_message_index }" class="message-button-wrapper">
+                        <div x-data="{ targetIndex: turn.first_message_index }" class="fullwidth">
                             {% include 'chat/message_buttons.html' %}
                         </div>
                     </div>
@@ -72,7 +72,7 @@
                     {% include 'chat/prompt_processing.html' %}
                 </template>
 
-                <div x-data="{ targetIndex: turn.first_message_index }" class="message-button-wrapper">
+                <div x-data="{ targetIndex: turn.first_message_index }" class="fullwidth">
                     {% include 'chat/message_buttons.html' %}
                 </div>
             </div>
