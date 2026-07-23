@@ -149,6 +149,10 @@ class TurnCollector:
                 new_segment["role"] = "assistant" if segment_type != 'tool' else "tool"
                 
                 if segment_type == 'reasoning':
+                    if "content" in new_segment.keys():
+                        # remove non-reasoning content from the reasoning segment
+                        new_segment.pop("content")
+
                     new_segment.setdefault("reasoning_content", token.get("content", ''))
                 elif segment_type == 'content':
                     new_segment.setdefault("content", token.get("content", ''))
