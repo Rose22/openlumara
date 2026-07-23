@@ -27,6 +27,7 @@ import core.commands
 import core.context
 import core.toolcalls
 import core.chat
+import core.turns
 import core.channel
 
 import core.modules

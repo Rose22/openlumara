@@ -1,13 +1,3 @@
-// ============================================================
-// OPTIMIZED getTurns() — version 2
-// Changes: versioned caching, streaming-only append, pre-filtering
-// ============================================================
-
-// Version counter stored on the chat store instance
-// Incremented whenever messages or stream tokens change
-
-const DEBUG_TURNS = false;
-
 function getTurns(instance) {
     /*
      * this absolute black magic, ported over from the old webUI,
@@ -25,80 +15,12 @@ function getTurns(instance) {
      * and in fact, when i use AI to help coding on openlumara,
      * i use openlumara itself for it :)
      */
-    const stream = Alpine.store('stream');
-    const messages = instance.messages;
 
-    // --- STEP 1: Compute history hash (messages only, no tokens) ---
-    let msgHash = messages.length;
-    for (let i = 0; i < messages.length; i++) {
-        const m = messages[i];
-        msgHash += m.index;
-        const content = typeof m.content === 'string' ? m.content : '';
-        for (let c = Math.max(0, content.length - 50); c < content.length; c++) {
-            msgHash += content.charCodeAt(c) * (i + 1);
-        }
-    }
-    const historyHash = `${msgHash}`;
-
-    // --- STEP 2: Compute streaming hash (tokens only) ---
-    let tokenHash = stream.tokens.length;
-    for (let i = 0; i < stream.tokens.length; i++) {
-        const t = stream.tokens[i];
-        tokenHash += t.type.charCodeAt(0);
-        const content = t.content || '';
-        for (let c = Math.max(0, content.length - 30); c < content.length; c++) {
-            tokenHash += content.charCodeAt(c) * (i + 1);
-        }
-    }
-    const streamingHash = `${tokenHash}-${stream.state}`;
-
-    // --- STEP 3: Build/rebuild history turns (only when messages change) ---
-    let historyTurns = instance._historyTurns;
-    if (historyHash !== instance._historyTurnsHash) {
-        historyTurns = buildHistoryTurns(messages);
-        instance._historyTurns = historyTurns;
-        instance._historyTurnsHash = historyHash;
-
-        if (DEBUG_TURNS) {
-            console.log(
-                `%c[getTurns] History rebuilt — ${historyTurns.length} turns`,
-                'color: #4af; font-weight: bold'
-            );
-        }
-    }
-
-    // --- STEP 4: Build/rebuild streaming turn (only when tokens change) ---
-    let streamingTurn = instance._streamingTurn;
-    if (streamingHash !== instance._streamingTurnHash) {
-        streamingTurn = buildStreamingTurn(stream);
-        instance._streamingTurn = streamingTurn;
-        instance._streamingTurnHash = streamingHash;
-
-        if (DEBUG_TURNS) {
-            console.log(
-                `%c[getTurns] Streaming turn rebuilt — ${streamingTurn ? streamingTurn.messages.length : 0} segments`,
-                'color: #f90; font-weight: bold'
-            );
-        }
-    }
-
-    // --- STEP 5: Combine ---
-    const turns = streamingTurn
-        ? [...historyTurns, streamingTurn]
-        : historyTurns;
-
-    return turns;
-}
-
-// ============================================================
-// buildHistoryTurns(messages) — extracts and groups ALL non-streaming messages
-// Returns: array of turn objects (user + assistant)
-// ============================================================
-function buildHistoryTurns(messages) {
+    // 1. Group all finalized messages from history
     const turns = [];
     let currentAssistantTurn = null;
 
-    for (const msg of messages) {
+    for (const msg of instance.messages) {
         if (msg.role === 'user') {
             if (currentAssistantTurn) {
                 turns.push(currentAssistantTurn);
@@ -106,137 +28,176 @@ function buildHistoryTurns(messages) {
             }
             turns.push({
                 role: "user",
-                messages: [Object.assign({}, msg)]
+                messages: [Object.assign({}, msg)]  // copy the message object
             });
         } else {
             if (!currentAssistantTurn) {
                 currentAssistantTurn = {
                     role: "assistant",
-                    index: msg.index,
+                    index: msg.index, // id of the first message of a turn, used for message regeneration etc
                     messages: []
                 };
             }
 
-            msg.type = msg.tool_calls ? "tool_calls" : 'history';
-
-            // Tool responses get merged, not displayed as separate messages
-            if (msg.role === 'tool') {
-                if (!currentAssistantTurn._toolResponses) {
-                    currentAssistantTurn._toolResponses = {};
-                }
-                currentAssistantTurn._toolResponses[msg.tool_call_id] = msg.content;
-                continue;
+            // normalize historical messages to include a type property
+            // so that it works both when not streaming and when streaming
+            if (msg.tool_calls) {
+                msg.type = "tool_calls"
+            } else {
+                msg.type = 'history';
             }
-
             currentAssistantTurn.messages.push(msg);
         }
     }
-    if (currentAssistantTurn) {
-        // Merge tool responses into tool calls
-        if (currentAssistantTurn._toolResponses) {
-            for (const msg of currentAssistantTurn.messages) {
-                if (msg.tool_calls) {
-                    for (const tool of msg.tool_calls) {
-                        if (currentAssistantTurn._toolResponses[tool.id]) {
-                            tool.response = currentAssistantTurn._toolResponses[tool.id];
+    if (currentAssistantTurn) turns.push(currentAssistantTurn);
+
+    // Merge tool responses into their tool calls
+    for (const turn of turns) {
+        if (turn.role !== 'assistant') continue;
+        const responseMap = {};
+        for (const msg of turn.messages) {
+            if (msg.role === 'tool') responseMap[msg.tool_call_id] = msg.content;
+        }
+        for (const msg of turn.messages) {
+            if (msg.tool_calls) {
+                for (const tool of msg.tool_calls) {
+                    if (responseMap[tool.id]) tool.response = responseMap[tool.id];
+                }
+            }
+        }
+    }
+
+    // 2. Reconstruct streaming turn from token segments
+    /*
+     * this is the part that handles streaming tokens...
+     * absolute black magic if you ask me
+     */
+    const stream = Alpine.store('stream');
+    if (
+        stream.state != 'idle'
+        && stream.tokens
+        && stream.tokens.length > 0
+    ) {
+        const segments = [];
+        let lastSegmentType = null;
+
+        for (const token of stream.tokens) {
+            // Skip non-display tokens
+            if (token.type === 'prompt_progress' || token.type === 'token_usage' || token.type === 'timings') {
+                continue;
+            }
+
+            let segmentType = token.type;
+            // Normalize tool call types into a single segment type
+            if (token.type === 'tool_call_delta' || token.type === 'tool_calls') {
+                segmentType = 'tool_calls';
+            }
+
+            const lastMsg = segments[segments.length - 1];
+            if (segmentType !== lastSegmentType || (segmentType === 'tool' && lastMsg && lastMsg.tool_call_id !== token.tool_call_id)) {
+                // New segment type: start a fresh message
+                // Copy the original token and override only what needs changing
+                if (segmentType === 'reasoning') {
+                    segments.push({
+                        ...token,
+                        role: "assistant",
+                        type: "reasoning",
+                        reasoning_content: token.content || '',
+                        pending: true
+                    });
+                } else if (segmentType === 'content') {
+                    segments.push({
+                        ...token,
+                        role: "assistant",
+                        type: "content",
+                        content: token.content || '',
+                        pending: true
+                    });
+                } else if (segmentType === 'tool_calls') {
+                    segments.push({
+                        ...token,
+                        role: "assistant",
+                        type: "tool_calls",
+                        tool_calls: token.tool_calls || [],
+                        pending: true
+                    });
+                } else if (segmentType === 'tool_call_delta') {
+                    segments.push({
+                        ...token,
+                        role: "assistant",
+                        type: "tool_call_delta",
+                        tool_calls: token.tool_calls || [],
+                        pending: true
+                    });
+                } else if (segmentType === 'tool') {
+                    segments.push({
+                        ...token,
+                        role: "tool",
+                        type: "tool_response",
+                        content: token.content || '',
+                        tool_call_id: token.tool_call_id || '',
+                        pending: true
+                    });
+                }
+
+                lastSegmentType = segmentType;
+            } else {
+                // Same segment type: append to the last message
+                if (lastMsg) {
+                    if (segmentType === 'tool_calls') {
+                        if (token.tool_calls) {
+                            lastMsg.tool_calls = token.tool_calls;  // replace with accumulated
+                        }
+                    } else if (segmentType === 'tool') {
+                        lastMsg.content += (token.content || '');
+                    } else {
+                        if (segmentType === 'reasoning') {
+                            lastMsg.reasoning_content += (token.content || '');
+                        } else {
+                            lastMsg.content += (token.content || '');
                         }
                     }
                 }
             }
         }
-        delete currentAssistantTurn._toolResponses;
-        turns.push(currentAssistantTurn);
+
+        if (segments.length > 0) {
+            // merge tool responses with their toolcalls, even during streaming!
+            const responseMap = {};
+            for (const msg of segments) {
+                if (msg.type === 'tool_response') responseMap[msg.tool_call_id] = msg.content;
+            }
+
+            /*
+             * filter out the raw tool responses so we don't display raw
+             * json when the fancy json mapping exists
+             */
+            const displaySegments = segments.filter(s => s.type !== 'tool_response');
+
+            // and merge the responsemap into the tool_calls
+            for (const msg of segments) {
+                if (msg.tool_calls) {
+                    for (const tool of msg.tool_calls) {
+                        if (responseMap[tool.id]) tool.response = responseMap[tool.id];
+                    }
+                }
+            }
+
+            turns.push({
+                role: "assistant",
+                messages: segments,
+                index: stream.userMessageIndex+1
+            });
+        }
     }
 
     return turns;
-}
 
-// ============================================================
-// buildStreamingTurn(stream) — builds ONLY the current streaming turn
-// Returns: a single turn object, or null if idle
-// ============================================================
-function buildStreamingTurn(stream) {
-    if (stream.state === 'idle' || stream.tokens.length === 0) {
-        return null;
-    }
-
-    const segments = [];
-    let lastSegmentType = null;
-
-    for (const token of stream.tokens) {
-        if (token.type === 'prompt_progress' ||
-            token.type === 'token_usage' ||
-            token.type === 'timings') {
-            continue;
-        }
-
-        let segmentType = token.type;
-        if (token.type === 'tool_call_delta' || token.type === 'tool_calls') {
-            segmentType = 'tool_calls';
-        }
-
-        const lastMsg = segments[segments.length - 1];
-        const isNewSegment = segmentType !== lastSegmentType ||
-            (segmentType === 'tool' && lastMsg && lastMsg.tool_call_id !== token.tool_call_id);
-
-        if (isNewSegment) {
-            const newMsg = { role: "assistant", pending: true };
-            if (segmentType === 'reasoning') {
-                newMsg.type = "reasoning";
-                newMsg.reasoning_content = token.content || '';
-            } else if (segmentType === 'content') {
-                newMsg.type = "content";
-                newMsg.content = token.content || '';
-            } else if (segmentType === 'tool_calls') {
-                newMsg.type = "tool_calls";
-                newMsg.tool_calls = token.tool_calls || [];
-            } else if (segmentType === 'tool_call_delta') {
-                newMsg.type = "tool_call_delta";
-                newMsg.tool_calls = token.tool_calls || [];
-            } else if (segmentType === 'tool') {
-                newMsg.role = "tool";
-                newMsg.type = "tool_response";
-                newMsg.content = token.content || '';
-                newMsg.tool_call_id = token.tool_call_id || '';
-            }
-            segments.push(newMsg);
-            lastSegmentType = segmentType;
-        } else {
-            if (lastMsg) {
-                if (segmentType === 'tool_calls' || segmentType === 'tool_call_delta') {
-                    if (token.tool_calls) lastMsg.tool_calls = token.tool_calls;
-                } else if (segmentType === 'tool') {
-                    lastMsg.content += (token.content || '');
-                } else if (segmentType === 'reasoning') {
-                    lastMsg.reasoning_content += (token.content || '');
-                } else {
-                    lastMsg.content += (token.content || '');
-                }
-            }
-        }
-    }
-
-    if (segments.length === 0) return null;
-
-    // Merge tool responses
-    const responseMap = {};
-    for (const msg of segments) {
-        if (msg.type === 'tool_response') responseMap[msg.tool_call_id] = msg.content;
-    }
-    const displaySegments = segments.filter(s => s.type !== 'tool_response');
-    for (const msg of displaySegments) {
-        if (msg.tool_calls) {
-            for (const tool of msg.tool_calls) {
-                if (responseMap[tool.id]) tool.response = responseMap[tool.id];
-            }
-        }
-    }
-
-    return {
-        role: "assistant",
-        messages: displaySegments,
-        index: stream.userMessageIndex + 1
-    };
+    /*
+     * you can really see the difference between my comments and the AI's, huh?
+     * well good, i want to keep it that way, so that it's obvious which parts
+     * have been tainted by AI, and which haven't
+     */
 }
 
 function streamedTokensToMessages(tokens) {

@@ -155,6 +155,8 @@ async function handleWebSocketMessage(data) {
             token_type = token.type;
             token_content = token.content;
 
+            console.log(token);
+
             // process tokens based on their type
             switch (token_type) {
                 case "prompt_progress":
@@ -215,17 +217,11 @@ async function handleWebSocketMessage(data) {
             // always scroll to the bottom upon a token coming in
             await Alpine.store('ui').scrollToBottom();
 
-            // Notify that turns may need updating
-            Alpine.store('chat').onTokenArrived();
-
             break;
 
         case "messages_updated":
             // make sure we sync chat
             await chat.reloadChat();
-
-            // Notify that messages changed
-            Alpine.store('chat').onMessagesChanged();
             break;
 
         case "chat_switched":

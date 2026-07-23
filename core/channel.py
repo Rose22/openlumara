@@ -49,6 +49,7 @@ class Channel:
         self.console_buffer = [] # used to log system messages
 
         self.tc_manager = core.toolcalls.ToolcallManager(self)
+        self.turncollector = core.turns.TurnCollector()
 
         # used to track whether to preserve reasoning
         # for only the current "agentic turn"
@@ -807,3 +808,22 @@ class Channel:
                 char_counter += len(content)
                 yield text_to_token(content)
 
+    async def get_turns_stream(self, stream):
+        """
+        groups incoming tokens into "turns" using the TurnCollector defined in core/turns.py
+
+        a turn is a group of assistant messages, such as reasoning, content, toolcalls, and so on,
+        that have all been grouped together into one object, for display in your preferred UI.
+
+        this used to be exclusive to the webUI, but i've ported it over to the core, so that it
+        can be reused across channels
+        """
+        async for partial_turn in self.turncollector.group_stream(stream):
+            yield partial_turn
+
+    async def get_turn_history(self):
+        """
+        takes a list of messages and turns it into turns that are identical to the ones shown by get_turns_stream()
+        for displaying message history in the same grouped turns format
+        """
+        return self.turncollector.group_history(await self.context.chat.get())
