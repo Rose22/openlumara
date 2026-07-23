@@ -1,0 +1,171 @@
+{% if config.get('enable_chat_header') %}
+    {% include 'chat/header.html' %}
+{% endif %}
+{% if config.get('enable_chat_titlebar') %}
+    {% include 'chat/titlebar.html' %}
+{% endif %}
+
+<template x-if="$store.ui.notice">
+    <div class="notice" x-html="$store.ui.notice"></div>
+</template>
+
+<div id="messages" x-ref="messages" x-cloak
+    @scroll.throttle="
+        const el = $el;
+        const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+        $store.ui.shouldScroll = distFromBottom < $store.ui.scrollThreshold;
+    "
+>
+    <!--
+        NOTE: turns now come from split getTurns()
+        - History turns: have turn.index, turn.messages with history messages
+        - Streaming turn: has turn.index, turn.messages with pending segments
+    -->
+
+    <pre x-text="JSON.stringify($store.chat.turns, null, 2)"></pre>
+
+    <template x-for="(turn, turnIndex) in $store.chat.turns" :key="turnIndex">
+        <div>
+            <!-- USER MESSAGES -->
+            <template x-if="turn.role === 'user'">
+                <div class="message-wrapper user">
+                    <div :class="{
+                        'message': true,
+                        'user': turn.messages[0].role === 'user',
+                        'pending': turn.messages[0].msgId === $store.stream.pendingMessageId
+                    }">
+                        <template x-if="$store.chat.editingMessageIndex != turn.messages[0].index">
+                            <div>
+                                <template x-if="Array.isArray(turn.messages[0].content)">
+                                    <div class="multimodal-content">
+                                        <template x-for="(block, blockIndex) in turn.messages[0].content" :key="'block-' + blockIndex">
+                                            <div>
+                                                <template x-if="block.type === 'text'">
+                                                    <div x-html="renderMarkdown(block.text)"></div>
+                                                </template>
+                                                <template x-if="block.type === 'image_url'">
+                                                    <div class="media-preview image-preview">
+                                                        <img :src="block.image_url.url" :alt="block.image_url.url" loading="lazy" />
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </template>
+
+                                <template x-if="typeof turn.messages[0].content === 'string'">
+                                    <div x-html="renderMarkdown(turn.messages[0].content)" :class="{'command': turn.messages[0].is_cmd}"></div>
+                                </template>
+
+                                <template x-if="turn.messages[0].msgId === $store.stream.pendingMessageId">
+                                    <span class="status">Sending..</span>
+                                </template>
+                            </div>
+                        </template>
+
+                        <template x-if="turn.messages[0].msgId !== $store.stream.pendingMessageId && $store.chat.editingMessageIndex != turn.messages[0].index">
+                            <div class="message-buttons">
+                                <button @click="$store.chat.startEdit(turn.messages[0].index)" title="Edit" :disabled="$store.stream.state != 'idle'">
+                                    {% include 'svg/edit.svg' %}
+                                </button>
+                                <button @click="$store.chat.regenerateMessage(turn.messages[0].index)" title="Regenerate" :disabled="$store.stream.state != 'idle'">
+                                    {% include 'svg/reload.svg' %}
+                                </button>
+                                <button @click="$store.chat.deleteMessage(turn.messages[0].index)" title="Delete" :disabled="$store.stream.state != 'idle'">
+                                    {% include 'svg/trash.svg' %}
+                                </button>
+                            </div>
+                        </template>
+
+                        <template x-if="$store.chat.editingMessageIndex === turn.messages[0].index">
+                            <div class="flex fullwidth editing">
+                                <textarea x-model="editContent" rows="3"></textarea>
+                                <div class="edit-actions">
+                                    <button @click="$store.chat.saveEdit($store.chat.editingMessageIndex)">Save</button>
+                                    <button @click="$store.chat.cancelEdit()">Cancel</button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </template>
+
+            <!-- ASSISTANT MESSAGES -->
+            <template x-if="turn.role === 'assistant'">
+                <div>
+                    <!--
+                        ADDED: x-data with isStreaming check
+                        Streaming turn has pending messages, history turns don't
+                    -->
+                    <div class="message-wrapper assistant"
+                         x-data="{
+                             messageActionId: turn.index,
+                         }">
+                        <div class="message assistant">
+                            <template x-for="(message, msgIndex) in turn.messages" :key="msgIndex">
+                                <div :class="{'flex': true, 'fullwidth': true, 'command': message.is_cmd}">
+                                    <!-- Reasoning block -->
+                                    <template x-if="message.type === 'reasoning' || (message.type === 'history' && message.reasoning_content && message.reasoning_content.trim().length > 0) || (message.type === 'tool_calls' && message.reasoning_content && message.reasoning_content.trim().length > 0)">
+                                        {% include 'chat/reasoning.html' %}
+                                    </template>
+
+                                    <!-- Content block -->
+                                    <template x-if="message.type === 'content' || message.type === 'history'">
+                                        <div class="content" x-html="renderMarkdown(message.content)"></div>
+                                    </template>
+
+                                    <!-- Tool calls block -->
+                                    <template x-if="message.type === 'tool_calls' || message.type === 'tool_call_delta'">
+                                        {% include 'chat/toolcalls.html' %}
+                                    </template>
+                                </div>
+                            </template>
+
+                            <!--
+                                PROMPT PROCESSING INDICATOR — moved here for correct scope
+                                Only show below tool calls in the LAST turn (streaming turn)
+                            -->
+                            <template x-if="$store.stream.state === 'processing_tools' && turnIndex === $store.chat.turns.length - 1">
+                                <!-- Only show if this turn actually has tool calls -->
+                                <template x-if="turn.messages.some(m => m.tool_calls)">
+                                    {% include 'chat/prompt_processing.html' %}
+                                </template>
+                            </template>
+
+                            <!--
+                                ADDED: hide message buttons during streaming
+                                (regenerate/delete don't make sense while AI is still typing)
+                            -->
+                            <div class="message-buttons">
+                                <button @click="$store.chat.regenerateMessage(turn.index)" title="Regenerate" :disabled="$store.stream.state != 'idle'">
+                                    {% include 'svg/reload.svg' %}
+                                </button>
+                                <button @click="$store.chat.deleteMessage(turn.index)" title="Delete" :disabled="$store.stream.state != 'idle'">
+                                    {% include 'svg/trash.svg' %}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </template>
+
+    <!-- TYPING INDICATOR -->
+    <template x-if="$store.stream.state === 'received'">
+        <div class="typing-indicator" id="typing" aria-label="AI is typing" x-ignore>
+            <span></span><span></span><span></span>
+        </div>
+    </template>
+
+    <!-- PROMPT PROCESSING INDICATOR -->
+    <template x-if="$store.stream.state === 'processing'">
+        {% include 'chat/prompt_processing.html' %}
+    </template>
+</div>
+
+{% include 'chat/upload.html' %}
+
+<div id="input">
+    {% include 'chat/input.html' %}
+</div>

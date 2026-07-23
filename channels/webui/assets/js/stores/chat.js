@@ -9,7 +9,7 @@ CHAT_STORE = {
     selectedChat: null,
     selectedCategory: 'general',
 
-    messages: [],
+    turnHistory: [],
     editingMessageIndex: null,
     editContent: '',
 
@@ -27,7 +27,7 @@ CHAT_STORE = {
         this.chat = result;
         this.selectedChat = result.id;
         this.selectedCategory = result.category;
-        this.messages = result.messages;
+        this.turnHistory = result.turn_history;
     },
 
     /* ----------------------
@@ -45,7 +45,7 @@ CHAT_STORE = {
         this.chat = result;
         this.selectedChat = chatId;
         this.selectedCategory = result.category;
-        this.messages = result.messages;
+        this.turnHistory = result.turn_history;
 
         ui = Alpine.store('ui');
 
@@ -78,7 +78,7 @@ CHAT_STORE = {
         this.selectedChat = result.id;
         this.selectedCategory = result.category;
 
-        this.messages = result.messages;
+        this.turnHistory = result.turn_history;
 
         /*
          * since the AI can move chats to different categories,
@@ -205,10 +205,5 @@ CHAT_STORE = {
             remaining,
             remaining_str: `(ETA: ${Math.ceil(remaining)}s)`
         };
-    },
-
-    get turns() {
-        // defined in chat/turns.js
-        return getTurns(this);
     }
 }

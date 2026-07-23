@@ -101,27 +101,27 @@ async function handleWebSocketMessage(data) {
         
             stream.tokens = data.buffer;
             break;
+
         case "user_message_added":
             // show the message, with a special "pending" status
-            let msgId = Date.now();
-            console.log(data.message);
-            chat.messages.push({
-                ...data.message,
-                role: 'user',
-                msgId: msgId
-            });
-            stream.pendingMessageId = msgId;
+            stream.userMsg = data.message;
+            stream.userMsgPending = true;
 
             // force scroll to bottom
             await Alpine.store('ui').forceScrollToBottom();
             break;
+
         case "user_message_confirmed":
             // aaand now we remove the pending status
-            stream.pendingMessageId = null;
-
-            // and track the index of it so we can know the index of the next assistant message
-            stream.userMessageId = data.index;
+            stream.userMsgPending = false;
             stream.state = 'received';
+            break;
+
+        case "turn_stream":
+            stream.turn = data.turns;
+
+            // always scroll to the bottom upon a token coming in
+            await Alpine.store('ui').scrollToBottom();
             break;
 
         case "push":
@@ -154,8 +154,6 @@ async function handleWebSocketMessage(data) {
             token = data_content;
             token_type = token.type;
             token_content = token.content;
-
-            console.log(token);
 
             // process tokens based on their type
             switch (token_type) {
@@ -204,6 +202,7 @@ async function handleWebSocketMessage(data) {
                     stream.state = 'processing_tools';
                     AudioManager.playProcessingSound();
                     break;
+
             }
 
             if (token.is_cmd) {
@@ -237,14 +236,14 @@ async function handleWebSocketMessage(data) {
              * (so that the UI won't flicker when syncing from the backend)
              */
 
-            lastTurn = streamedTokensToMessages(stream.tokens);
-            chat.messages.push(...lastTurn);
             await stream.clearTokens();
 
             // then sync from the backend to make sure we're completely synced up
             await chat.reloadChat();
 
             AudioManager.play("completion");
+
+            await Alpine.store('ui').scrollToBottom();
 
             stream.state = 'idle';
             break;

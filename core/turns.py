@@ -147,6 +147,7 @@ class TurnCollector:
                 # create a new segment (message within the turn)
                 new_segment = token.copy()
                 new_segment["role"] = "assistant" if segment_type != 'tool' else "tool"
+                new_segment["type"] = segment_type
                 
                 if segment_type == 'reasoning':
                     if "content" in new_segment.keys():

@@ -1,0 +1,16 @@
+<div>
+    <!-- Reasoning block -->
+    <template x-if="Object.hasOwn(message, 'reasoning_content') || message.type === 'reasoning'">
+        {% include 'chat/reasoning.html' %}
+    </template>
+
+    <!-- Content block -->
+    <template x-if="message.role === 'assistant' && Object.hasOwn(message, 'content') || message.type === 'content'">
+        <div class="content" x-html="renderMarkdown(message.content)"></div>
+    </template>
+
+    <!-- Tool calls block -->
+    <template x-if="Object.hasOwn(message, 'tool_calls') || message.type === 'tool_calls'">
+        {% include 'chat/toolcalls.html' %}
+    </template>
+</div>

@@ -7,8 +7,6 @@ async function simpleApiFetch(url) {
         await fetch(url)
     ).json()
 
-    console.log(raw_data);
-
     if (!raw_data.success) {
         throw raw_data.data;
     }
@@ -28,8 +26,6 @@ async function simpleApiPost(url, content=null) {
     if (!raw_data.success) {
         throw raw_data.data;
     }
-
-    console.log(raw_data);
 
     return raw_data.data;
 }

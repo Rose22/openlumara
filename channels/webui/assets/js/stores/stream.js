@@ -2,8 +2,13 @@ let STREAM_STORE = {
     // one of: idle, sending, processing, streaming
     state: 'idle',
 
+    // tracks latest sent user message
+    userMsg: null,
+    userMsgPending: false,
+
     // stores raw token data
     tokens: [],
+    turn: [],
     processing: {},
 
     // stores the final message after the stream has finished
@@ -17,6 +22,8 @@ let STREAM_STORE = {
 
     async clearTokens() {
         this.tokens = [];
+        this.turn = [];
+        this.userMsg = null;
         this.processing = {};
     }
 }

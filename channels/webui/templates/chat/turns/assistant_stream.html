@@ -1,0 +1,16 @@
+<div>
+    <!-- Reasoning block -->
+    <template x-if="message.type === 'reasoning'">
+        {% include 'chat/reasoning.html' %}
+    </template>
+
+    <!-- Content block -->
+    <template x-if="message.type === 'content'">
+        <div class="content" x-html="renderMarkdown(message.content)"></div>
+    </template>
+
+    <!-- Tool calls block -->
+    <template x-if="message.type === 'tool_calls' || message.type === 'tool_call_delta'">
+        {% include 'chat/toolcalls.html' %}
+    </template>
+</div>
