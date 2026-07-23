@@ -808,7 +808,7 @@ class Channel:
                 char_counter += len(content)
                 yield text_to_token(content)
 
-    async def get_turns_stream(self, stream):
+    async def group_stream(self, stream):
         """
         groups incoming tokens into "turns" using the TurnCollector defined in core/turns.py
 
@@ -821,7 +821,7 @@ class Channel:
         async for partial_turn in self.turncollector.group_stream(stream):
             yield partial_turn
 
-    async def get_turn_history(self):
+    async def group_history(self):
         """
         takes a list of messages and turns it into turns that are identical to the ones shown by get_turns_stream()
         for displaying message history in the same grouped turns format

@@ -110,7 +110,10 @@ class TurnCollector:
         #       do_whatever_with(partial_turn)
 
         async for token in stream_generator:
-            # skip non-display tokens
+            # yield the raw token in case it needs to be processed (for things like user messages, API errors, etc)
+            yield {"type": "token", "content": token}
+
+            # skip grouping for non-display tokens
             if token.get("type") in ['prompt_progress', 'token_usage', 'timings']:
                 continue
 
@@ -192,4 +195,4 @@ class TurnCollector:
             }
 
             # aaand yield!
-            yield streaming_turn
+            yield {"type": "turn", "content": streaming_turn}
