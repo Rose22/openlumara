@@ -411,7 +411,7 @@ class Channel:
             try:
                 cmd_response = await self.commands.process_input(user_message, authorized=commands_authorized)
             except Exception as e:
-                self.log(self.name, "error while executing command", core.detail_error(e))
+                self.log(self.name, f"Error while executing command: {core.detail_error(e)}")
                 await self.context.chat.add({"role": "user", "content": user_message})
                 return {"type": "error", "content": str(core.detail_error(e))}
 

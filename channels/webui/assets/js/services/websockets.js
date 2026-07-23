@@ -196,6 +196,10 @@ async function handleWebSocketMessage(data) {
 
             // process tokens based on their type
             switch (token_type) {
+                case "error":
+                    // force a refresh
+                    await chat.reloadChat();
+                    break;
                 case "prompt_progress":
                     if (stream.state != "processing_tools") {
                         // let it stay in that state if it's been set
