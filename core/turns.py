@@ -3,12 +3,12 @@ import asyncio
 class TurnCollector:
     """
     this takes a raw openAI messages array and turns it into a grouped list of dicts,
-    where a "turn" is any assistant/tool message inbetween a user's request
+    where a "turn" is a group of any assistant/tool messages inbetween a user's request
 
     so basically, a user makes their request, then the response gets grouped into one single object
     that contains multiple messages, grouped by type (reasoning, content, toolcall, etc)
 
-    this works for chat history (process_history) and even for streams (process_stream)
+    this works for chat history (group_history) and even for streams (group_stream)
 
     this is a port from the old webui's frontend-only turn collection logic
     now available in the core for any channel to use :)
@@ -86,7 +86,7 @@ class TurnCollector:
         # throughout this function you'll see mentions of "segments"
         # a segment is basically a group of tokens that are of the same type
 
-        # since we can have multiple turns, for example
+        # since we can have multiple messages within a turn, for example
         # user -> assistant (reasoning+content) -> toolcalls -> tool response -> 
         # -> assistant (reasoning only) -> toolcalls -> tool response -> assistant final answer (reasoning+content)
 
