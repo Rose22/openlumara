@@ -521,18 +521,6 @@ class Channel:
         assistant_message["role"] = "assistant"
 
         tool_calls = assistant_message.get("tool_calls")
-
-        # convert any toolcalls to a dict so that JSON serialization doesnt die
-        if tool_calls:
-            toolcalls_converted = []
-
-            for tool_call in tool_calls:
-                if not isinstance(tool_call, dict):
-                    tool_call = tool_call.model_dump(warnings=False)
-                toolcalls_converted.append(tool_call)
-
-            assistant_message["tool_calls"] = toolcalls_converted
-
         if tool_calls:
             # process() does all the toolcalling, but it also returns the raw toolcall stream for our own use
             async for sub_token in self.tc_manager.process(

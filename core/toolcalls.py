@@ -47,8 +47,6 @@ class ToolcallManager:
     def _repair_tool_calls(self, tool_calls):
         repaired_tool_calls = []
         for tool_call in tool_calls:
-            if not isinstance(tool_call, dict):
-                tool_call = tool_call.model_dump(warnings=False)
             raw_args = tool_call['function']['arguments']
 
             if isinstance(raw_args, dict):

@@ -109,13 +109,20 @@ class TurnCollector:
         #   ):
         #       do_whatever_with(partial_turn)
 
-        async for token in stream_generator:
+        async for raw_token in stream_generator:
+            # copy the token so we don't mutate it
+            token = dict(raw_token)
+
             # yield the raw token in case it needs to be processed (for things like user messages, API errors, etc)
             yield {"type": "token", "content": token}
 
             # skip grouping for non-display tokens
-            if token.get("type") in ['prompt_progress', 'token_usage', 'timings']:
+            if token.get("type") in ['prompt_progress', 'token_usage', 'timings', 'user_message']:
                 continue
+
+            # remove timing data from the token
+            if token.get("timings"):
+                token.pop("timings")
 
             segment_type = token.get("type")
             
@@ -182,9 +189,6 @@ class TurnCollector:
             for msg in display_segments:
                 if msg.get("tool_calls"):
                     for tool in msg["tool_calls"]:
-                        if not isinstance(tool, dict):
-                            tool = tool.model_dump(warnings=False)
-
                         if tool.get("id") in stream_response_map:
                             tool["response"] = stream_response_map[tool["id"]]
 

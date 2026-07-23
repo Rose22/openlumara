@@ -631,7 +631,7 @@ class APIClient():
 
                                 yield {
                                     "type": "tool_call_delta",
-                                    "tool_calls": [tool_call_buffer[index]]
+                                    "tool_calls": [tool_call_buffer[index].model_dump()]
                                 }
                             else:
                                 # the documentation for this was awful, so i had to use AI to figure it out
@@ -657,7 +657,7 @@ class APIClient():
                                     # the magic sauce that allows streaming toolcall arguments
                                     yield {
                                         "type": "tool_call_delta",
-                                        "tool_calls": [tool_call_buffer[index]]
+                                        "tool_calls": [tool_call_buffer[index].model_dump()]
                                     }
 
                 # if response has usage data, save it so we can use it to show to the user and to trim context

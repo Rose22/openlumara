@@ -288,17 +288,27 @@ async def create_fastapi(channel):
         success = await channel.context.chat.load(id)
         if not success:
             # that likely means this is already the loaded chat
-            return api_result(inject_indexes_into_chat(await channel.context.chat.get_chat()), success=True)
+            chat = dict(await channel.context.chat.get_chat())
+            chat.pop("messages")
+            chat["turn_history"] = await channel.group_history()
+            return api_result(chat, success=True)
 
         # broadcast the switch to any connected clients
         await channel.websocket_manager.broadcast({"type": "chat_switched", "id": id})
 
-        return api_result(inject_indexes_into_chat(await channel.context.chat.get_chat()), success=True)
+        chat = dict(await channel.context.chat.get_chat())
+        chat.pop("messages")
+        chat["turn_history"] = await channel.group_history()
+        return api_result(chat, success=True)
 
     @app.get("/api/chat/current")
     async def chat_get_current():
         """Gives you the currently loaded chat's data"""
-        return api_result(inject_indexes_into_chat(await channel.context.chat.get_chat()))
+
+        chat = dict(await channel.context.chat.get_chat())
+        chat.pop("messages")
+        chat["turn_history"] = await channel.group_history()
+        return api_result(chat)
 
     @app.get("/api/chats")
     async def get_chats(request: fastapi.Request):
@@ -747,12 +757,19 @@ class WebSocketManager:
     async def _stream_task(self, message: str, index, files: list = None):
         user_message_confirmed = False
 
-        async for token in self.channel.send_stream(message=message, files=files, commands_authorized=self.channel.config.get("allow_admin_commands")):
-            if isinstance(token, dict):
-                payload = serialize_for_json(token)
-                token_type = token.get("type")
-                self.stream_buffer.append(payload)
+        async for partial in self.channel.turncollector.group_stream(
+                self.channel.send_stream(
+                    message=message,
+                    files=files,
+                    commands_authorized=self.channel.config.get("allow_admin_commands")
+                )
+            ):
+            payload = serialize_for_json(partial)
+            self.stream_buffer.append(partial)
 
+            if partial.get("type") == "token":
+                token = partial.get("content")
+                token_type = token.get("type")
                 match token_type:
                     case "user_message":
                         try:
@@ -789,8 +806,14 @@ class WebSocketManager:
 
                         await self.broadcast({
                             "type": "token",
-                            "content": payload
+                            "content": token
                         })
+
+            elif partial.get("type") == "turn":
+                await self.broadcast({
+                    "type": "turn_stream",
+                    "turns": partial.get("content")
+                })
 
         await self.broadcast({
             "type": "stream_complete",
