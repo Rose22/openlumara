@@ -22,7 +22,7 @@ class TurnCollector:
         turns = []
         current_assistant_turn = None
 
-        for msg in history:
+        for index, msg in enumerate(history):
             role = msg.get('role')
             
             if role == 'user':
@@ -35,14 +35,15 @@ class TurnCollector:
                 # append the user message as a single turn. a user message is never multiple turns
                 turns.append({
                     "role": "user",
-                    "messages": [msg.copy()]
+                    "messages": [msg.copy()],
+                    "first_message_index": index
                 })
             else:
                 # create the assistant turn if it doesn't already exist
                 if not current_assistant_turn:
                     current_assistant_turn = {
                         "role": "assistant",
-                        "index": msg.get("index"),
+                        "first_message_index": index,
                         "messages": []
                     }
                     
