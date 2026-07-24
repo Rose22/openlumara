@@ -441,7 +441,7 @@ async def create_fastapi(channel):
     async def get_prompt():
         sysprompt = await channel.context.get(history=False)
         if isinstance(sysprompt, core.api.APIError):
-            return api_result(sysprompt, success=false)
+            return api_result(sysprompt, success=False)
 
         return api_result(sysprompt[-1].get("content"))
 
