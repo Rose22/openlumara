@@ -65,7 +65,7 @@ class Channel(core.module.Module):
 
         # if self.config.get("enable_new_user_reminder"):
         #
-        if not self.channel or await self.channel.context.chat.get_data("character"):
+        if not self.channel or await self.channel.context.chat.get("metadata").get("character"):
             return None
 
         chan = core.modules.get_name(self.channel)

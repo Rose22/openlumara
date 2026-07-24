@@ -88,14 +88,14 @@ class Characters(core.module.Module):
     async def cmd_switch(self, args: list):
         name = " ".join(args)
         if not name:
-            char = await self.channel.context.chat.get_data("character")
+            char = self.channel.context.chat.get("metadata").get("character")
             self.active = True
             if char:
                 return f"currently active character: {char}"
             else:
                 return "please provide a character name."
         elif name in("reset", "default"):
-                await self.channel.context.chat.set_data("character", "")
+                self.channel.context.chat.get("metadata")["character"] = "character"
                 self.active = False
                 return "character has been reset to default"
 
@@ -108,7 +108,7 @@ class Characters(core.module.Module):
         return f"character switched to {character}"
 
     async def on_system_prompt(self):
-        curr_char = await self.channel.context.chat.get_data("character")
+        curr_char = await self.channel.context.chat.get("metadata").get("character")
 
         tool_text = f"Characters available to switch yourself to:\n{await self._list_characters()}" if (
             core.config.get("model", {}).get("use_tools") and
@@ -119,7 +119,7 @@ class Characters(core.module.Module):
         if not curr_char:
             return tool_text or None
 
-        char_name = await self.channel.context.chat.get_data("character")
+        char_name = await self.channel.context.chat.get("metadata").get("character")
         char = self.characters.get(char_name)
 
         # the presence of the "data" key means it's
@@ -176,7 +176,7 @@ class Characters(core.module.Module):
 
         # if this is an empty chat, insert the first message into history by sending it as a push
         if first_msg:
-            if len(await self.channel.context.chat.get()) == 0:
+            if len(await self.channel.context.chat.messages.get()) == 0:
                 first_msg = self._replace_tags(char_name, first_msg)
                 await self.channel.push({"role": "assistant", "content": first_msg})
                 await self.channel.context.chat.messages.add({"role": "assistant", "content": first_msg})
@@ -184,7 +184,7 @@ class Characters(core.module.Module):
         return char_text
 
     async def on_end_prompt(self):
-        curr_char = await self.channel.context.chat.get_data("character")
+        curr_char = await self.channel.context.chat.get("metadata").get("character")
         if not curr_char:
             return None
 
@@ -216,7 +216,7 @@ class Characters(core.module.Module):
                 "description": char.get("identity")
             }
 
-        await self.channel.context.chat.set_data("character", char_data.get("name"))
+        self.channel.context.chat.get("metadata")["character"] = char_data.get("name")
         self.active = True
         user_name = self.user_profile.get("name", "User")
 
@@ -232,7 +232,8 @@ class Characters(core.module.Module):
     
     async def switch_to_default(self):
         """Switches you back to your default identity."""
-        await self.channel.context.chat.set_data("character", "")
+        self.channel.context.chat.get("metadata")["character"] = ""
+
         self.active = False
         return "success"
 
