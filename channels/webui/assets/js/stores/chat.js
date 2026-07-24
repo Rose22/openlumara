@@ -151,16 +151,22 @@ CHAT_STORE = {
     },
 
     async regenerateMessage(index) {
+        await this.reloadChat();
+        Alpine.store('stream').userMsg = null;
+        await Alpine.nextTick();
         await simpleSocketSend({
             "type": "message_regenerate",
             "index": index
         });
     },
 
-    async startEdit(index) {
-        const msg = this.messages[index]
+    async startEdit(turnIndex) {
+        const turn = this.turnHistory[turnIndex];
+        const msg = turn.messages[0];
+        console.log(msg);
+        console.log(turn);
         if (msg) {
-            this.editingMessageIndex = index;
+            this.editingMessageIndex = turn.first_message_index;
             this.editContent = msg.content || msg.reasoning_content || '';
         }
     },
@@ -176,6 +182,7 @@ CHAT_STORE = {
             "index": index,
             "content": this.editContent
         });
+
         this.editingMessageIndex = null;
         this.editContent = '';
     },

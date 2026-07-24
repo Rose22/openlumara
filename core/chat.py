@@ -323,10 +323,10 @@ class Chat:
         return await self.add(message, cmd=cmd, ghost=ghost)
 
     async def edit_message(self, index, message: dict):
-        return self.edit(index, message)
+        return await self.edit(index, message)
 
     async def delete_message(self, index):
-        return self.pop(index)
+        return await self.pop(index)
 
     async def delete_all_messages_after(self, index):
         return await self.delete_from(index)

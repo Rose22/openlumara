@@ -82,7 +82,7 @@ async function handleWebSocketMessage(data) {
     data_type = data.type;
     data_content = data.content;
 
-    if (data_type != 'token') {
+    if (data_type != 'token' && data_type != "turn_stream") {
         console.log(data);
     }
 

@@ -1,24 +1,38 @@
-<template x-if="Array.isArray(message.content)">
-    <div class="multimodal-content">
-        <template x-for="(block, blockIndex) in message.content" :key="'block-' + blockIndex">
-            <div>
-                <template x-if="block.type === 'text'">
-                    <div x-html="renderMarkdown(block.text)"></div>
-                </template>
-                <template x-if="block.type === 'image_url'">
-                    <div class="media-preview image-preview">
-                        <img :src="block.image_url.url" :alt="block.image_url.url" loading="lazy" />
+<template x-if="$store.chat.editingMessageIndex !== turn.first_message_index">
+    <div class="fullwidth">
+        <template x-if="Array.isArray(message.content)">
+            <div class="multimodal-content">
+                <template x-for="(block, blockIndex) in message.content" :key="'block-' + blockIndex">
+                    <div>
+                        <template x-if="block.type === 'text'">
+                            <div x-html="renderMarkdown(block.text)"></div>
+                        </template>
+                        <template x-if="block.type === 'image_url'">
+                            <div class="media-preview image-preview">
+                                <img :src="block.image_url.url" :alt="block.image_url.url" loading="lazy" />
+                            </div>
+                        </template>
                     </div>
                 </template>
             </div>
         </template>
+
+        <template x-if="typeof message.content === 'string'">
+            <div x-html="renderMarkdown(message.content)" :class="{'command': message.is_cmd}"></div>
+        </template>
+
+        <template x-if="message.index === $store.stream.pendingMessageId">
+            <span class="status">Sending..</span>
+        </template>
     </div>
 </template>
 
-<template x-if="typeof message.content === 'string'">
-    <div x-html="renderMarkdown(message.content)" :class="{'command': message.is_cmd}"></div>
-</template>
-
-<template x-if="message.index === $store.stream.pendingMessageId">
-    <span class="status">Sending..</span>
+<template x-if="$store.chat.editingMessageIndex === turn.first_message_index">
+    <div class="flex fullwidth editing">
+        <textarea x-model="$store.chat.editContent" rows="3"></textarea>
+        <div class="edit-actions">
+            <button @click="$store.chat.saveEdit($store.chat.editingMessageIndex)">Save</button>
+            <button @click="$store.chat.cancelEdit()">Cancel</button>
+        </div>
+    </div>
 </template>
