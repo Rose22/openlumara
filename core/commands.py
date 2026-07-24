@@ -307,12 +307,12 @@ class Commands:
         if args:
             args_display += " "
             args_display += " ".join(args)
-        await self.channel.context.chat.add({"role": "user", "content": f"{cmd_prefix}{cmd[0]}{args_display}"}, cmd=True, ghost=use_temporary)
+        await self.channel.context.chat.messages.add({"role": "user", "content": f"{cmd_prefix}{cmd[0]}{args_display}"}, cmd=True, ghost=use_temporary)
 
         result = await self._process_input(content)
 
         # insert command result into context, flagging as temporary if needed
-        await self.channel.context.chat.add({"role": "assistant", "content": f"{result}"}, cmd=True, ghost=use_temporary)
+        await self.channel.context.chat.messages.add({"role": "assistant", "content": f"{result}"}, cmd=True, ghost=use_temporary)
 
         return result
 
@@ -351,7 +351,7 @@ class Commands:
 
                 """list chats"""
 
-                chats = await self.channel.context.chat.get_all()
+                chats = self.channel.context.chat.get_all()
                 if not chats:
                     return self.result("No saved chats found.", False)
 
@@ -364,30 +364,29 @@ class Commands:
             case "chat":
                 """load chat using its ID"""
                 if not args:
-                    chat_title = await self.channel.context.chat.get_title()
-                    chat_category = await self.channel.context.chat.get_category()
-                    chat_tags = await self.channel.context.chat.get_tags()
+                    chat = self.channel.context.chat
+
                     chat_tags_str = "None"
-                    if chat_tags:
-                        chat_tags_str = ", ".join(chat_tags)
-                    chat_data = await self.channel.context.chat.get_data() or {}
+                    if chat.get('tags'):
+                        chat_tags_str = ", ".join(chat.get('tags'))
+                    chat_data = self.channel.context.chat.get("metadata") or {}
                     if chat_data:
                         chat_data_str = "\n"
                         chat_data_str += "\n".join([f"  {key}: {value}" for key, value in chat_data.items()])
                     else:
                         chat_data_str = "None"
 
-                    return f"== chat info ==\ntitle: {chat_title}\ncategory: {chat_category}\ntags: {chat_tags_str}\ndata: {chat_data_str}"
+                    return f"== chat info ==\ntitle: {chat.get('title')}\ncategory: {chat.get('category')}\ntags: {chat_tags_str}\nmetadata: {chat_data_str}"
                 match args[0].lower().strip():
                     case "rename":
                         newname = " ".join(args[1:])
-                        result = await self.channel.context.chat.set_title(newname)
+                        result = await self.channel.context.chat.set("title", newname)
                         if not result:
                             return "rename failed"
                         return f"chat renamed to {newname}"
                     case "category":
                         newcat = " ".join(args[1:])
-                        result = await self.channel.context.chat.set_category(newcat)
+                        result = await self.channel.context.chat.set("category", newcat)
                         if not result:
                             return "setting category failed"
                         return f"chat categorised into {newcat}"

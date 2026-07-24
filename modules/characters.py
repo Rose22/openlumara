@@ -179,7 +179,7 @@ class Characters(core.module.Module):
             if len(await self.channel.context.chat.get()) == 0:
                 first_msg = self._replace_tags(char_name, first_msg)
                 await self.channel.push({"role": "assistant", "content": first_msg})
-                await self.channel.context.chat.add({"role": "assistant", "content": first_msg})
+                await self.channel.context.chat.messages.add({"role": "assistant", "content": first_msg})
 
         return char_text
 
@@ -225,7 +225,7 @@ class Characters(core.module.Module):
             # bypass the usual tool response flow and instead send the first message as a push message
             first_msg = self._replace_tags(name, first_msg)
             await self.channel.push({"role": "assistant", "content": first_msg})
-            await self.channel.context.chat.add({"role": "assistant", "content": first_msg})
+            await self.channel.context.chat.messages.add({"role": "assistant", "content": first_msg})
             return None
 
         return self.result(f"Switch successful. Write your response as the character's first message.")

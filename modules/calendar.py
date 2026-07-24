@@ -97,7 +97,7 @@ class Calendar(core.module.Module):
             message = f"🔔 **Calendar**: {event['title']} is starting {notify_window_str}"
             await channel.push(message)
             # add to context so the AI knows it just notified the user
-            await channel.context.chat.add({"role": "assistant", "content": message})
+            await channel.context.chat.messages.add({"role": "assistant", "content": message})
 
             # disable notification
             index = await self._get_event_by_id(event['id'])

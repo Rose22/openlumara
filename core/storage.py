@@ -19,6 +19,9 @@ class StorageList(list):
         self.name = os.path.basename(self.path)
         self.binary = False
 
+        # create path if it doesnt exist
+        os.makedirs(os.path.dirname(self.path), exist_ok=True)
+
         # cache for change detection
         self._last_modified = 0.0
 
@@ -162,6 +165,9 @@ class StorageDict(dict):
 
         self.name = os.path.basename(self.path)
         self.binary = False
+
+        # create path if it doesnt exist
+        os.makedirs(os.path.dirname(self.path), exist_ok=True)
 
         # this is mainly for the config, so that we can still make changes in temporary mode
         # but who knows what it might be needed for in the future
@@ -434,6 +440,9 @@ class StorageText:
             path = core.get_data_path()
 
         self.path = core.sandbox_path(path, name)
+
+        # create path if it doesnt exist
+        os.makedirs(os.path.dirname(self.path), exist_ok=True)
 
         self._data = ""
 

@@ -79,6 +79,7 @@ class Manager:
             try:
                 try:
                     storage[channel_name] = channel(self, is_user_channel=is_user_channels)
+                    await storage[channel_name].init()
                 except Exception as e:
                     core.log(channel_name, f"Error while loading channel: {core.detail_error(e)}")
 
@@ -457,7 +458,7 @@ class Manager:
 
         active_character = None
         if self.channel:
-            active_character = await self.channel.context.chat.get_data("character")
+            active_character = self.channel.context.chat.get("metadata").get("character")
 
         # automatically insert system prompts returned by modules (such as memory)
         sysprompt_top = []
@@ -524,7 +525,7 @@ class Manager:
         # don't return endprompt if characters module is active
         active_character = None
         if self.channel:
-            active_character = await self.channel.context.chat.get_data("character")
+            active_character = self.channel.context.chat.get("metadata").get("character")
 
         # automatically insert system prompts returned by modules (such as memory)
         histend_prompt = []

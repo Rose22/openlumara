@@ -38,9 +38,9 @@ class Chats(core.module.Module):
         if not new_name:
             return self.result("name must not be blank", False)
 
-        await self.channel.context.chat.set_title(new_name)
-        await self.channel.context.chat.set_category(category)
-        await self.channel.context.chat.set_tags(tags)
+        await self.channel.context.chat.set("title", new_name)
+        await self.channel.context.chat.set("category", category)
+        await self.channel.context.chat.set("tags", tags)
         return self.result(f"chat organised!")
 
     async def _search(self, query: str, max_results: int = 20):
@@ -67,15 +67,16 @@ class Chats(core.module.Module):
                 found = True
 
             # search within content
-            for message in chat.get("messages", []):
-                content = message.get("content", "")
-                if not isinstance(content, str):
-                    continue
+            # TODO: make this work with new chat structure
+            # for message in chat.get("messages", []):
+            #     content = message.get("content", "")
+            #     if not isinstance(content, str):
+            #         continue
 
-                if content.lower().find(query.lower().strip()) != -1:
-                    filtered_chat["messages"].append({"role": message.get("role"), "content": message.get("content")})
-                    found = True
-                    break
+            #     if content.lower().find(query.lower().strip()) != -1:
+            #         filtered_chat["messages"].append({"role": message.get("role"), "content": message.get("content")})
+            #         found = True
+            #         break
 
             if found:
                 count += 1
@@ -121,10 +122,10 @@ class Chats(core.module.Module):
             return None
 
         # add special cutoff message that gets handled by the context manager
-        await self.manager.channel.context.chat.add(self.manager.channel.context.SUMMARIZATION_CUTOFF)
+        await self.manager.channel.context.chat.messages.add(self.manager.channel.context.SUMMARIZATION_CUTOFF)
 
         # add AI's summarization
-        await self.manager.channel.context.chat.add({"role": "assistant", "content": response.get("content")})
+        await self.manager.channel.context.chat.messages.add({"role": "assistant", "content": response.get("content")})
 
         return True
 

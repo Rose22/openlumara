@@ -407,7 +407,7 @@ async def create_fastapi(channel):
         success = await channel.context.chat.load(id)
         if not success:
             # that likely means this is already the loaded chat
-            chat = dict(await channel.context.chat.get_chat())
+            chat = dict(channel.context.chat.get())
             chat.pop("messages")
             chat["turn_history"] = await channel.group_history()
             return api_result(chat, success=True)
@@ -415,7 +415,7 @@ async def create_fastapi(channel):
         # broadcast the switch to any connected clients
         await channel.websocket_manager.broadcast({"type": "chat_switched", "id": id})
 
-        chat = dict(await channel.context.chat.get_chat())
+        chat = dict(channel.context.chat.get())
         chat.pop("messages")
         chat["turn_history"] = await channel.group_history()
         return api_result(chat, success=True)
@@ -424,7 +424,7 @@ async def create_fastapi(channel):
     async def chat_get_current():
         """Gives you the currently loaded chat's data"""
 
-        chat = dict(await channel.context.chat.get_chat())
+        chat = dict(channel.context.chat.get())
         chat.pop("messages")
         chat["turn_history"] = await channel.group_history()
         return api_result(chat)
@@ -436,7 +436,7 @@ async def create_fastapi(channel):
         filtered_chats = []
 
         # get rid of messages, for faster loading
-        for chat in await channel.context.chat.get_all():
+        for chat in channel.context.chat.get_all():
             chat_copy = dict(chat)
             chat_copy.pop("messages")
             filtered_chats.append(chat_copy)
@@ -446,7 +446,7 @@ async def create_fastapi(channel):
     @app.get("/api/chats/categories")
     async def get_chat_categories():
         """Returns a list of all existing chat categories"""
-        return api_result(await channel.context.chat.get_categories(), True)
+        return api_result(channel.context.chat.get_categories(), True)
 
     @app.get("/api/chat/prompt")
     async def get_prompt():
@@ -716,16 +716,16 @@ async def create_fastapi(channel):
                         case "reload_messages":
                             await ws_mgr.broadcast({
                                 "type": "messages_updated",
-                                "messages": inject_indexes_into_messages(await channel.context.chat.get_messages())
+                                "messages": inject_indexes_into_messages(await channel.context.chat.messages.get())
                             })
                         case "rename":
                             new_title = data.get("title")
                             if channel and new_title:
-                                await channel.context.chat.set_title(new_title)
+                                await channel.context.chat.set("title", new_title)
                                 await ws_mgr.broadcast({
                                     "type": "chat_metadata_updated",
                                     "title": new_title,
-                                    "tags": await channel.context.chat.get_tags() or []
+                                    "tags": channel.context.chat.get("tags") or []
                                 })
                         case "switch_chat":
                             new_chat_id = data.get("chat_id")
@@ -760,7 +760,7 @@ async def create_fastapi(channel):
                             await channel.context.chat.delete(chat_id)
                             await ws_mgr.broadcast({
                                 "type": "chat_switched",
-                                "chat_id": channel.context.chat.current,
+                                "chat_id": channel.context.chat.get("id"),
                                 "buffer": []
                             })
                         case "user_message":
@@ -777,45 +777,45 @@ async def create_fastapi(channel):
                                     for f in files_data
                                 }
 
-                            chat_id = await channel.context.chat.get_id() or "default"
+                            chat_id = channel.context.chat.get("id") or "default"
                             await ws_mgr.start_stream(channel, chat_id, message=text, files=files_dict)
                         case "message_edit":
                             index = data.get("index")
                             if index < 0:
                                 return False
 
-                            message = await channel.context.chat.get_message(index)
+                            message = await channel.context.chat.messages.get(index)
                             message["content"] = data.get("content")
-                            await channel.context.chat.edit_message(index, message)
+                            await channel.context.chat.messages.edit(index, message)
 
                             await ws_mgr.broadcast({
                                 "type": "messages_updated",
-                                "messages": inject_indexes_into_messages(await channel.context.chat.get_messages())
+                                "messages": inject_indexes_into_messages(await channel.context.chat.messags.get())
                             })
                         case "message_delete":
                             index = data.get("index")
                             if not index:
                                 return False
 
-                            await channel.context.chat.delete_from(index-1)
+                            await channel.context.chat.messages.delete_from(index-1)
                             await ws_mgr.broadcast({
                                 "type": "messages_updated",
-                                "messages": inject_indexes_into_messages(await channel.context.chat.get_messages())
+                                "messages": inject_indexes_into_messages(await channel.context.chat.messages.get())
                             })
                         case "message_regenerate":
                             index = data.get("index")
 
                             if index is not None and channel:
-                                last_user_message_index = await channel.context.chat.get_last_message_with_role("user", cutoff_index=index)
-                                user_message = await channel.context.chat.get_message(last_user_message_index)
-                                await channel.context.chat.delete_from(last_user_message_index-1)
+                                last_user_message_index = await channel.context.chat.messages.get_last_message_with_role("user", cutoff_index=index)
+                                user_message = await channel.context.chat.messages.get(last_user_message_index)
+                                await channel.context.chat.messages.delete_from(last_user_message_index-1)
 
                                 if user_message:
                                     await ws_mgr.broadcast({
                                         "type": "messages_updated",
-                                        "messages": await channel.context.chat.get_messages()
+                                        "messages": await channel.context.chat.messages.get()
                                     })
-                                    await ws_mgr.start_stream(channel, await channel.context.chat.get_id(), user_message.get("content"))
+                                    await ws_mgr.start_stream(channel, channel.context.chat.get("id"), user_message.get("content"))
                                 else:
                                     await ws_mgr.broadcast({
                                         "type": "error",
@@ -854,7 +854,7 @@ class WebSocketManager:
         await websocket.accept()
         self.active_connections.append(websocket)
 
-        current_chat_id = await self.channel.context.chat.get_id()
+        current_chat_id = self.channel.context.chat.get("id")
 
         if current_chat_id:
             await websocket.send_json({
@@ -961,7 +961,7 @@ class WebSocketManager:
             self.active_stream_task.cancel()
 
         self.active_chat_id = chat_id
-        next_index = len(await channel.context.chat.get_messages())
+        next_index = len(await channel.context.chat.messages.get())
 
         try:
             self.active_stream_task = asyncio.create_task(self._stream_task(message, next_index, files=files))

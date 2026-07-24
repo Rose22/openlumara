@@ -114,7 +114,7 @@ class ToolcallManager:
         repaired_tool_calls = self._repair_tool_calls(assistant_message["tool_calls"])
 
         # add it to context
-        await self.channel.context.chat.add(assistant_message)
+        await self.channel.context.chat.messages.add(assistant_message)
 
         # push if needed
         if push:
@@ -155,7 +155,7 @@ class ToolcallManager:
                 ):
                     # don't allow disabled tools to be called
                     rejected_msg = json.dumps({"content": "That tool has been disabled by the user.", "status": "error"})
-                    await self.channel.context.chat.add({
+                    await self.channel.context.chat.messages.add({
                         "role": "tool",
                         "tool_call_id": tool_call_dict['id'],
                         "content": rejected_msg
@@ -211,7 +211,7 @@ class ToolcallManager:
                     yield {"type": "tool", "tool_call_id": tool_call_dict['id'], "content": func_response_str}
 
                     # add the tool response to the context window
-                    await self.channel.context.chat.add(tool_response)
+                    await self.channel.context.chat.messages.add(tool_response)
 
                     # push it if needed
                     # if push:
@@ -223,7 +223,7 @@ class ToolcallManager:
                 )
 
         if self.channel.manager.API.cancel_request:
-            await self.channel.announce("toolcalling chain cancelled", "info")
+            await self.channel.push("toolcalling chain cancelled")
             return
 
         final_content = []
@@ -238,7 +238,7 @@ class ToolcallManager:
                 tools=self.channel.manager.tools
             ):
                 if self.channel.manager.API.cancel_request:
-                    await self.channel.announce("toolcalling chain cancelled", "info")
+                    await self.channel.push("toolcalling chain cancelled")
                     return
 
                 token_type = token.get("type")
@@ -256,10 +256,10 @@ class ToolcallManager:
                     usage = token.get("content")
                     if usage is not None:
                         # set the flag so that token counting is always using API data
-                        if not self.channel.context.chat.using_api_token_data:
-                            self.channel.context.chat.using_api_token_data = True
+                        if not self.channel.context.using_api_token_data:
+                            self.channel.context.using_api_token_data = True
 
-                        await self.channel.context.chat.set_token_usage(usage)
+                        await self.channel.context.chat.set("token_usage", usage)
                         # yield it to the frontend so the token bar updates in real-time
                         yield token
 
@@ -273,7 +273,7 @@ class ToolcallManager:
                         push=push
                     ):
                         if self.channel.manager.API.cancel_request:
-                            await self.channel.announce("toolcalling chain cancelled", "info")
+                            await self.channel.push("toolcalling chain cancelled")
                             return
                         yield sub_token
 
@@ -289,15 +289,14 @@ class ToolcallManager:
                     if final_reasoning_str:
                         final_msg["reasoning_content"] = final_reasoning_str
 
-                    await self.channel.context.chat.add(final_msg)
-                    self.channel.agentic_loop_start = len(await self.channel.context.chat.get())-1
+                    await self.channel.context.chat.messages.add(final_msg)
+                    self.channel.agentic_loop_start = len(await self.channel.context.chat.messages.get())-1
 
                     if push:
                         await self.channel.push(final_msg)
 
         except Exception as e:
             self.channel.log_error(f"Error while handling tool calls", e)
-            await self.channel.announce(
-                f"Error while handling tool calls: {e}",
-                "error"
+            await self.channel.push(
+                f"Error while handling tool calls: {e}"
             )

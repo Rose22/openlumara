@@ -45,7 +45,10 @@ class Channel:
         self.name = core.modules.get_name(self) # shorthand alias
         self.commands = core.commands.Commands(self)
         self._last_cmd_was_temporary = False
+
         self.context = core.context.Context(self) # each channel has its own context window
+        # the path to a channel's chat is: channel -> context -> chat
+
         self.console_buffer = [] # used to log system messages
 
         self.tc_manager = core.toolcalls.ToolcallManager(self)
@@ -72,6 +75,11 @@ class Channel:
             "raw_args": "",
             "keys_state": {}
         }
+
+    async def init(self):
+        """async class constructor. gets called by manager._load_channels()"""
+        core.log(self.name, "autoloading chat")
+        await self.context.chat.autoload()
 
     # ------------------
     # Events
@@ -177,10 +185,10 @@ class Channel:
         # if dict, just use it as-is
         # otherwise, turn it into an openAI message dict
         if isinstance(message, dict):
-            await self.context.chat.add(message)
+            await self.context.chat.messages.add(message)
             await self.push_queue.put(message)
         else:
-            await self.context.chat.add({"role": "assistant", "content": str(message)})
+            await self.context.chat.messages.add({"role": "assistant", "content": str(message)})
             await self.push_queue.put({"role": "assistant", "content": str(message)})
 
     # --------------------
@@ -412,7 +420,7 @@ class Channel:
                 cmd_response = await self.commands.process_input(user_message, authorized=commands_authorized)
             except Exception as e:
                 self.log(self.name, f"Error while executing command: {core.detail_error(e)}")
-                await self.context.chat.add({"role": "user", "content": user_message})
+                await self.context.chat.messages.add({"role": "user", "content": user_message})
                 return {"type": "error", "content": str(core.detail_error(e))}
 
             if cmd_response:
@@ -433,7 +441,7 @@ class Channel:
                     self.log("module error", f"{module_name}: in on_user_message(): {core.detail_error(e)}")
 
                 if usr_msg_result is False:
-                    await self.context.chat.add({"role": "user", "content": user_message})
+                    await self.context.chat.messages.add({"role": "user", "content": user_message})
                     return {"type": "module_intercept"}
                 elif usr_msg_result is not None:
                     user_message = usr_msg_result
@@ -442,7 +450,7 @@ class Channel:
         user_message = await self._process_multimodal(message=user_message, files=files)
 
         # and add the user's message to context
-        add_success = await self.context.chat.add({"role": "user", "content": user_message})
+        add_success = await self.context.chat.messages.add({"role": "user", "content": user_message})
         if not add_success:
             return {"type": "error", "content": "Unknown error while adding user message to context"}
 
@@ -458,7 +466,7 @@ class Channel:
         return {"type": "ready", "user_message": user_message, "context": context}
 
     async def _send_postprocess(self, assistant_message):
-        await self.context.chat.add(assistant_message)
+        await self.context.chat.messages.add(assistant_message)
 
         # run module event hooks
         for module_name, module in self.manager.modules.items():
@@ -488,7 +496,7 @@ class Channel:
         since it's easy to forget to add an error to context in addition to yielding it..
         """
         # add the error message to context
-        await self.context.chat.add({"role": "assistant", "content": f"Error: {error}"})
+        await self.context.chat.messages.add({"role": "assistant", "content": f"Error: {error}"})
 
         # and pass it on to yield
         return {"type": "error", "content": error}
@@ -566,17 +574,17 @@ class Channel:
         
         # estimate tokens used for user message
         user_message_token_estimation = 0
-        if self.context.chat.using_api_token_data:
+        if self.context.using_api_token_data:
             # if using API token count
-            user_msg_tokens = await self.context.chat.count_tokens([{"role": "user", "content": user_message}])
-            user_message_token_estimation = await self.context.chat.get_token_usage()+user_msg_tokens
+            user_msg_tokens = await self.context.count_tokens([{"role": "user", "content": user_message}])
+            user_message_token_estimation = await self.context.get_token_usage()+user_msg_tokens
 
             # add to existing API token count
-            await self.context.chat.set_token_usage(user_message_token_estimation)
+            await self.context.chat.set("token_usage", user_message_token_estimation)
         else:
             # just fully estimate
             try:
-                user_message_token_estimation = await self.context.chat.count_tokens()
+                user_message_token_estimation = await self.context.count_tokens()
             except Exception as e:
                 self.log_error("Error while trying to estimate token use", e)
                 yield await self.throw_stream_error(f"Error while trying to estimate token use: {core.detail_error(e)}")
@@ -612,7 +620,7 @@ class Channel:
 
                 # add the content that has been accumulated so far, so that we don't lose incomplete messages
                 assistant_message = self._build_final_assistant_message(final_content, final_reasoning)
-                await self.context.chat.add(assistant_message)
+                await self.context.chat.messages.add(assistant_message)
 
                 return
 
@@ -641,17 +649,17 @@ class Channel:
                 token_usage = token.get("content")
                 if isinstance(token_usage, int):
                     # set the flag so that token counting is always using API data
-                    if not self.context.chat.using_api_token_data:
-                        self.context.chat.using_api_token_data = True
+                    if not self.context.using_api_token_data:
+                        self.context.using_api_token_data = True
 
                     # cache this so chat.get_token_usage() returns this value
-                    await self.context.chat.set_token_usage(token_usage)
+                    await self.context.chat.set("token_usage", token_usage)
 
                     fetched_token_usage = True
 
         if not fetched_token_usage:
             # yield an estimated token usage if the API didn't provide one
-            yield {"type": "token_usage", "content": await self.context.chat.count_tokens(), "source": "estimation"}
+            yield {"type": "token_usage", "content": await self.context.count_tokens(), "source": "estimation"}
 
         if not tool_calls_occurred and final_content: # don't add an extra message at the end of a toolcalling chain
             assistant_message = self._build_final_assistant_message(final_content, final_reasoning)
@@ -765,8 +773,10 @@ class Channel:
                 tc_list = token.get("tool_calls", [])
                 if tc_list:
                     tc = tc_list[0]
+                    func = tc.get("function")
+
                     # Render the partial/full tool call fancy style
-                    tool_delta_str = await self._render_tool_token(tc.function.name, tc.function.arguments)
+                    tool_delta_str = await self._render_tool_token(func, func.get("arguments"))
 
                     # fix fake newlines
                     tool_delta_str = tool_delta_str.replace("\\n", "\n")
@@ -814,4 +824,4 @@ class Channel:
         takes a list of messages and turns it into turns that are identical to the ones shown by get_turns_stream()
         for displaying message history in the same grouped turns format
         """
-        return self.turncollector.group_history(await self.context.chat.get())
+        return self.turncollector.group_history(await self.context.chat.messages.get())
