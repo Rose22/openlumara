@@ -1,0 +1,8 @@
+<template x-if="activeCategory === 'system_prompt' && !activeModule && !activeChannel">
+    <div class="fullwidth">
+        <h3 class="section-title">System Prompt</h3>
+        <p class="section-desc">The full system prompt being sent to the AI at the start of every chat<br>(You can also see this by using the /prompt command)</p>
+
+        <div class="system-prompt" x-text="$store.settings.systemPrompt"></div>
+    </div>
+</template>

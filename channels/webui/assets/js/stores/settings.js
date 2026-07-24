@@ -20,6 +20,8 @@ SETTINGS_STORE = {
     cachedModels: null,
     modelsLoadError: null,
     moduleInfoCache: {},
+
+    systemPrompt: '',
     
     // --- Computed Getters ---
     get hasChanges() {
@@ -66,6 +68,8 @@ SETTINGS_STORE = {
             this.changedModuleSettings.clear();
 
             this.showUnsafe = this.settings.channels.settings.webui.show_unsafe_settings;
+
+            this.systemPrompt = simpleApiFetch("/api/chat/prompt");
 
             await this.checkApiConnection();
         } catch (err) {
@@ -149,6 +153,9 @@ SETTINGS_STORE = {
 
             this.settings = backendData;
             this.originalCategories = JSON.parse(JSON.stringify(this.categories));
+
+            // re-fetch system prompt
+            this.systemPrompt = simpleApiFetch("/api/chat/prompt");
 
             // handle localstorage settings
             localStorage.setItem('expandReasoning', this.expandReasoning);

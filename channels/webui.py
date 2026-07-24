@@ -10,15 +10,23 @@ Let's get this WebUI up to the standards of the rest of openlumara, since it's b
 ~ Rose22
 """
 
+# openlumara core
 import core
 
+# system
 import os
 import json
 import asyncio
+import time
+
+# webui stuff
 import fastapi, fastapi.templating, fastapi.staticfiles
-import starlette
+import starlette, starlette.middleware.sessions
 import uvicorn
 import base64
+
+# security libraries
+import secrets
 
 # --------------------
 # Channel class
@@ -30,6 +38,7 @@ class Webui(core.channel.Channel):
     dependencies = [
         "fastapi",
         "starlette>=1.0.1",
+        "itsdangerous",
         "websockets",
         "jinja2",
         "uvicorn"
@@ -103,11 +112,26 @@ class Webui(core.channel.Channel):
         },
         "username": "admin",
         "password": "admin",
+        "login_lifetime": {
+            "description": "How many days to stay logged in for",
+            "default": 30
+        },
         "debug_mode": {
             "description": "When enabled, this will show a ton of webui-related messages in the server console. Very useful for debugging webui related issues!",
             "default": False
         }
     }
+
+    async def _verify_credentials(self, username: str, password: str) -> bool:
+        """Verify credentials securely using timing-safe comparison."""
+        correct_username = self.config.get("username")
+        correct_password = self.config.get("password")
+
+        if not secrets.compare_digest(username, correct_username):
+            # Dummy comparison to prevent timing attacks
+            secrets.compare_digest(password, correct_password)
+            return False
+        return secrets.compare_digest(password, correct_password)
 
     async def on_ready(self):
         debug = self.config.get("debug_mode")
@@ -142,6 +166,10 @@ class Webui(core.channel.Channel):
 
         # stores logs from channel.log()
         self.logs = []
+
+        self.username = self.config.get("username", "admin")
+        self.password = self.config.get("password", "admin")
+        self.login_attempts = {}
 
         # initialize the websocket manager
         self.websocket_manager = WebSocketManager(self)
@@ -251,12 +279,50 @@ def api_result(obj = None, success: bool = True):
 async def create_fastapi(channel):
     app = fastapi.FastAPI()
 
+    # add authorization, cookies, and so on (middleware)
+    # auth middleware for all routes
+    @app.middleware("http")
+    async def auth_middleware(request: fastapi.Request, call_next):
+        # Skip auth check if login isn't required
+        if not channel.config.get("require_login", False):
+            return await call_next(request)
+        
+        # Skip auth for login page and assets
+        if request.url.path in ["/login", "/logout"] or str(request.url.path).startswith("/assets/"):
+            return await call_next(request)
+        
+        # Check session for API and other routes
+        if not request.session.get("authenticated", False):
+            # For API requests, return 401
+            if str(request.url.path).startswith("/api"):
+                return fastapi.responses.JSONResponse(
+                    status_code=401,
+                    content={"detail": "Unauthorized"}
+                )
+            # For web routes, redirect to login
+            if request.url.path != "/login":
+                return fastapi.responses.RedirectResponse(url="/login", status_code=303)
+        
+        return await call_next(request)
+
+    session_lifetime_days = channel.config.get("login_lifetime")
+    app.add_middleware(
+        starlette.middleware.sessions.SessionMiddleware,
+        secret_key=channel.config.get("session_secret", "openlumara-default-session-secret-change-me"),
+        max_age=session_lifetime_days * 86400
+    )
+
     debug = channel.config.get("debug_mode")
 
     # serve asset files (formerly /static) using fastAPI's mount()
     if debug: channel.log(channel.name, "Serving assets..") 
     app.mount("/assets", fastapi.staticfiles.StaticFiles(directory=channel.assets_path), name="assets")
 
+    # ------------------
+    # Web pages
+    # ------------------
+
+    # main page
     @app.get("/")
     async def root(request: fastapi.Request):
         """The main page. This returns HTML, not JSON"""
@@ -271,8 +337,61 @@ async def create_fastapi(channel):
             "css_files": css_files,
             "alpine_stores": alpine_stores,
             "js_utils": js_utils,
-            "js_files": js_files
+            "js_files": js_files,
+            "login_enabled": channel.config.get("require_login")
         })
+
+    # ---- login
+    # -- GET
+    @app.get("/login")
+    async def login_page(request: fastapi.Request):
+        """Shows the login form."""
+        return channel.templates.TemplateResponse(request, "login.html", {"error": None})
+    # -- POST
+    @app.post("/login")
+    async def login_submit(request: fastapi.Request):
+        """Handles login form submission."""
+
+        # rate limit the request
+        client_ip = request.client.host if request.client else "unknown"
+        now = time.time()
+
+        if client_ip in channel.login_attempts:
+            # clean old attempts (older than 15 minutes)
+            channel.login_attempts[client_ip] = [
+                t for t in channel.login_attempts[client_ip] if now - t < 900
+            ]
+
+            if len(channel.login_attempts[client_ip]) >= 5:
+                return fastapi.responses.JSONResponse(
+                    status_code=429,
+                    content={"error": "Too many attempts. Try again later."}
+                )
+
+        # and now check if the credentials match
+        form = await request.form()
+        username = form.get("username")
+        password = form.get("password")
+        
+        if await channel._verify_credentials(username, password):
+            channel.login_attempts[client_ip] = []
+            request.session["authenticated"] = True
+
+            return fastapi.responses.RedirectResponse(url="/", status_code=303)
+        
+        # on failure, record the login attempt
+        if client_ip not in channel.login_attempts:
+            channel.login_attempts[client_ip] = []
+        channel.login_attempts[client_ip].append(now)
+        
+        return channel.templates.TemplateResponse(request, "login.html", {"error": "Invalid credentials"})
+
+    # ---- logout
+    @app.get("/logout")
+    async def logout(request: fastapi.Request):
+        """Logs the user out by clearing their session."""
+        request.session.pop("authenticated", None)
+        return fastapi.responses.RedirectResponse(url="/login", status_code=303)
 
     # ------------------
     # API routes (/api)
@@ -328,6 +447,11 @@ async def create_fastapi(channel):
     async def get_chat_categories():
         """Returns a list of all existing chat categories"""
         return api_result(await channel.context.chat.get_categories(), True)
+
+    @app.get("/api/chat/prompt")
+    async def get_prompt():
+        sysprompt = await channel.context.get(history=False)
+        return api_result(sysprompt[-1].get("content"))
 
     # -- POST
     @app.post("/api/chat/new")
@@ -544,6 +668,26 @@ async def create_fastapi(channel):
     async def websocket_endpoint(websocket: fastapi.WebSocket):
         if debug:
             channel.log(channel.name, "Attempting to connect websocket..")
+
+        # WebSocket auth check
+        if channel.config.get("require_login", False):
+            session_cookie = websocket.cookies.get("session")
+            if not session_cookie:
+                # check if rate limited
+                client_ip = websocket.client.host if websocket.client else "unknown"
+                now = time.time()
+
+                if client_ip in channel.login_attempts:
+                    channel.login_attempts[client_ip] = [
+                        t for t in channel.login_attempts[client_ip] if now - t < 900
+                    ]
+                    if len(channel.login_attempts[client_ip]) >= 5:
+                        await websocket.close(code=4001, reason="Rate limited")
+                        return
+
+                # failure
+                await websocket.close(code=4001, reason="Unauthorized")
+                return
 
         ws_mgr = channel.websocket_manager
         await ws_mgr.connect(websocket)

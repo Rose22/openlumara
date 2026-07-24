@@ -2,24 +2,36 @@
 <div id="category-list" x-ref="category-list"
     x-show="!$store.ui.isMobile || $store.ui.showCategories" x-cloak
     >
-    <template x-for="category in $store.chat.categories" :key="category">
-        <ul :class="{'item': true, 'active': category == $store.chat.selectedCategory}" @click="
-            $store.chat.selectCategory(category);
-            if ($store.ui.isMobile) {
-                await $store.ui.toggleMobileSidebarView();
-            }
-            ">
-            <span class="icon">
-                <template x-if="category === 'general'">
-                    {% include 'svg/home.svg' %}
-                </template>
-                <template x-if="category != 'general'">
-                    {% include 'svg/chat.svg' %}
-                </template>
-            </span>
-            <span class="title" x-text="category"></span>
-        </ul>
-    </template>
+    <div class="list">
+        <template x-for="category in $store.chat.categories" :key="category">
+            <ul :class="{'item': true, 'active': category == $store.chat.selectedCategory}" @click="
+                $store.chat.selectCategory(category);
+                if ($store.ui.isMobile) {
+                    await $store.ui.toggleMobileSidebarView();
+                }
+                ">
+                <span class="icon">
+                    <template x-if="category === 'general'">
+                        {% include 'svg/home.svg' %}
+                    </template>
+                    <template x-if="category != 'general'">
+                        {% include 'svg/chat.svg' %}
+                    </template>
+                </span>
+                <span class="title" x-text="category"></span>
+            </ul>
+        </template>
+    </div>
+
+    {% if login_enabled %}
+        <div class="buttons">
+            <!-- Logout button -->
+            <button class="sidebar-btn" @click="if(confirm('Log out?')) window.location.href='/logout'">
+                {% include 'svg/download.svg' %}
+                <span>Logout</span>
+            </button>
+        </div>
+    {% endif %}
 </div>
 
 <!-- list of chats -->
@@ -72,7 +84,7 @@
         </template>
     </div>
 
-    <button class="new-chat-btn" @click="$store.chat.newChat()">
+    <button class="sidebar-btn" @click="$store.chat.newChat()">
         {% include 'svg/add.svg' %}
         New Chat
     </button>

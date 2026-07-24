@@ -38,7 +38,7 @@
         </div>
 
         <!-- Sound Files -->
-        <template x-for="soundId in ['send_message', 'response_start', 'processing', 'typewriter', 'typing', 'token', 'completion', 'reasoning_end']" :key="soundId">
+        <template x-for="soundId in ['send_message', 'response_start', 'processing', 'token', 'completion', 'reasoning_end']" :key="soundId">
             <div class="item">
                 <div class="toggle-row">
                     <label class="label" x-text="soundId.charAt(0).toUpperCase() + soundId.slice(1).replace('_', ' ',) + ' Sound'"></label>

@@ -3,6 +3,7 @@
     flex-direction: row;
     height: 100vh;
     gap: 8px;
+    background-color: var(--bg-primary);
 }
 
 #modals {

@@ -24,6 +24,12 @@ function buildSettingsStructure(originalData, moduleInfo = {}) {
         order: order++,
         isThemeCategory: true
     };
+    categories.system_prompt = {
+        title: 'System Prompt',
+        description: 'See the current system prompt',
+        order: 100,
+        isThemeCategory: true
+    };
     categories.system_logs = {
         title: 'System Logs',
         description: 'Peek into the great unknown',
