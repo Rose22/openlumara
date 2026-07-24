@@ -133,7 +133,7 @@ SETTINGS_STORE = {
                 this.originalCategories = JSON.parse(JSON.stringify(this.categories));
                 this.changedModuleSettings.clear();
 
-                await simpleApiPost("/api/system/restart");
+                await Alpine.store('system').restart("Restarting the server to apply your changes..");
                 return;
             }
 

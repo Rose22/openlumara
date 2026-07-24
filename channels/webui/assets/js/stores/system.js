@@ -4,8 +4,8 @@ SYSTEM_STORE = {
     restarting: false,
     message: '',
 
-    async restart() {
-        this.message = "Restarting server..";
+    async restart(message = 'Restarting server..') {
+        this.message = message || "Restarting server..";
         this.restarting = true;
         await simpleApiPost("/api/system/restart");
         this.restarting = false;

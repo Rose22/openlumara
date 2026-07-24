@@ -7,8 +7,8 @@
         <!-- All channels (enabled first, then disabled) -->
         <template x-for="channel in [...$store.settings.categories[activeCategory].enabled, ...$store.settings.categories[activeCategory].disabled]" :key="channel">
             <template x-if="$store.settings.showUnsafe || !$store.settings.categories[activeCategory].unsafeModules[channel]">
-                <div class="unified-card" :class="{ 'disabled': !$store.settings.categories[activeCategory].enabled.includes(channel), 'unsafe': $store.settings.categories[activeCategory].unsafeModules[channel] }" @click="activeChannel = channel">
-                    <div class="info">
+                <div class="unified-card" :class="{ 'disabled': !$store.settings.categories[activeCategory].enabled.includes(channel), 'unsafe': $store.settings.categories[activeCategory].unsafeModules[channel] }">
+                    <div class="info" @click="activeChannel = channel">
                         <span type="button" class="channel-name-btn" x-text="formatLabel(channel)"></span>
                         <p class="description" x-html="renderMarkdown($store.settings.categories[activeCategory].descriptions[channel]) || ''"></p>
                     </div>
