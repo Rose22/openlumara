@@ -6,9 +6,15 @@ import os
 class Chat:
     def __init__(self, channel):
         self.path = os.path.join("chats", channel.name)
+        self.channel = channel
+
+        # Auto-migrate if old format detected
+        old_chats_file = core.get_data_path(f"{channel.name}_chats.json")
+        if os.path.exists(old_chats_file):
+            self._migrate_if_needed()
+
         self.data = core.storage.StorageList(os.path.join(self.path, "index"), "msgpack")
         self.messages = None # initialized by autoload()
-        self.channel = channel
 
         # store currently loaded chat index
         self.current = None
@@ -48,6 +54,90 @@ class Chat:
 
         return None
 
+    def _migrate_if_needed(self):
+        """Automatically migrate old format chat files if detected."""
+        import json
+        import msgpack
+        import shutil
+        from pathlib import Path
+        
+        old_chats_file = core.get_data_path(f"{self.channel.name}_chats.json")
+        
+        if not os.path.exists(old_chats_file):
+            return  # No old format detected
+        
+        self.channel.log(self.channel.name, f"[MIGRATE] Old format detected for '{self.channel.name}', migrating...")
+        
+        # Read old chats
+        with open(old_chats_file, 'r', encoding='utf-8') as f:
+            old_chats = json.load(f)
+        
+        if not isinstance(old_chats, list):
+            self.channel.log(self.channel.name, f"[MIGRATE] Invalid old format, skipping")
+            return
+        
+        # Create new directory structure
+        new_channel_dir = core.get_data_path(os.path.join("chats", self.channel.name))
+        os.makedirs(new_channel_dir, exist_ok=True)
+        os.makedirs(os.path.join(new_channel_dir, "history"), exist_ok=True)
+        
+        # Migrate each chat
+        new_chats = []
+        for old_chat in old_chats:
+            chat_id = old_chat.get('id', '')
+            if not chat_id:
+                print(f"skipping {chat_id}")
+                continue
+            
+            # Save messages to separate file
+            messages = old_chat.get('messages', [])
+            messages_path = os.path.join(new_channel_dir, "history", f"{chat_id}.json")
+            with open(messages_path, 'w', encoding='utf-8') as f:
+                f.write(json.dumps(messages, indent=2, ensure_ascii=False))
+            
+            # Build new metadata
+            new_chats.append({
+                "id": chat_id,
+                "title": old_chat.get("title", ""),
+                "category": old_chat.get("category", "general"),
+                "tags": old_chat.get("tags", []),
+                "token_usage": old_chat.get("token_usage", 0),
+                "metadata": old_chat.get("custom_data", {}),
+                "created": old_chat.get("created", ""),
+                "updated": old_chat.get("updated", ""),
+            })
+        
+        # Save new index
+        index_path = os.path.join(new_channel_dir, "index.mp")
+        with open(index_path, 'wb') as f:
+            f.write(msgpack.packb(new_chats))
+        
+        # Handle current chat
+        old_current_file = core.get_data_path(f"{self.channel.name}_current_chat")
+        if os.path.exists(old_current_file):
+            try:
+                with open(old_current_file, 'r') as f:
+                    current_index = int(f.read().strip())
+                safe_index = min(current_index, len(new_chats) - 1) if new_chats else 0
+                current_path = os.path.join(new_channel_dir, "current")
+                with open(current_path, 'w', encoding='utf-8') as f:
+                    f.write(str(safe_index))
+            except:
+                pass
+
+        # Move old files to backup
+        backup_dir = core.get_data_path("chat_migration_backups")
+        os.makedirs(backup_dir, exist_ok=True)
+        
+        # Move chats file
+        old_chats_file = core.get_data_path(f"{self.channel.name}_chats.json")
+        if os.path.exists(old_chats_file):
+            backup_name = f"{self.channel.name}_chats.json.bak"
+            shutil.move(old_chats_file, os.path.join(backup_dir, backup_name))
+            self.channel.log(self.channel.name, f"[MIGRATE] Backed up old chats file to {backup_name}")
+        
+        self.channel.log(self.channel.name, f"[MIGRATE] Migrated {len(new_chats)} chats for '{self.channel.name}'")
+
     async def new(self, category: str = "general", title: str = "", metadata = {}):
         """create a new chat"""
         now = datetime.datetime.utcnow().isoformat()
@@ -58,7 +148,6 @@ class Chat:
             "title": title,
             "category": category,
             "tags": [],
-            "messages": [],
             "token_usage": 0,
             "metadata": metadata,
             "created": now,
