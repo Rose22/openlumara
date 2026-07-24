@@ -577,7 +577,7 @@ class Channel:
         if self.context.using_api_token_data:
             # if using API token count
             user_msg_tokens = await self.context.count_tokens([{"role": "user", "content": user_message}])
-            user_message_token_estimation = await self.context.get_token_usage()+user_msg_tokens
+            user_message_token_estimation = await self.context.chat.get("token_usage")+user_msg_tokens
 
             # add to existing API token count
             await self.context.chat.set("token_usage", user_message_token_estimation)

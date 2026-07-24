@@ -16,14 +16,8 @@ class TokenThreshold(core.module.Module):
             return None
             
         # Use prevent_recursion flag to avoid infinite recursion
-        token_usage = await self.channel.context.get_token_usage()
-        
-        # Handle potential errors in token counting
-        if not isinstance(token_usage, dict) or 'current' not in token_usage or 'max' not in token_usage:
-            return None
-            
-        current = token_usage['current']
-        max_tokens = token_usage['max']
+        token_usage = await self.channel.context.chat.get_token_usage()
+        max_tokens = int(core.config.get("api", "max_context"))
         
         # Avoid division by zero
         if max_tokens <= 0:

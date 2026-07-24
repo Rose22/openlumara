@@ -11,6 +11,7 @@ class Context:
         self.channel = channel
         self.model_name = None
         self.using_api_token_data = False
+        self.token_encoding = None
 
         # UI-agnostic chat history system - save/load context windows from save file!
         self.chat = core.chat.Chat(self.channel)
@@ -240,45 +241,6 @@ class Context:
             "end prompt size": f"{histend_size_tokens} tokens | {histend_size_words} words",
             "total size": f"{token_usage} tokens | {combined_size_words} words",
         }
-
-    async def get_token_usage(self):
-        max_tokens = core.config.get("api").get("max_context", 8192)
-
-        # First, check if we have API-provided token usage from the last response
-        if hasattr(self.chat, 'token_usage') and self.chat.token_usage > 0:
-            return {
-                "current": self.chat.token_usage,
-                "max": max_tokens
-            }
-
-        # Otherwise, calculate token usage locally
-        # we use prevent_recursion to tell the system prompt retrieval
-        # call in self.get() to not include token usage data
-
-        try:
-            prompt_tokens = await self.count_tokens(await self.get(system_prompt=True, prevent_recursion=True))
-        except AttributeError as e:
-            # when modules don't have a channel assigned yet, this error triggers. we handle it "gracefully".
-            return {"current": 0, "max": max_tokens}
-        except Exception as e:
-            # Return a conservative estimate on error
-            return {"current": 0, "max": max_tokens}
-
-        return {
-            "current": prompt_tokens,
-            "max": max_tokens
-        }
-
-    async def get_token_usage(self):
-        """
-        Returns the chat's current total token usage.
-        Prioritizes the API's data above all,
-        but if not available, will fall back on counting locally using tiktoken
-        """
-        if not self.using_api_token_data:
-            return await self.count_tokens()
-
-        return self.chat.get("token_usage")
 
     def _count_text_tokens(self, text: str) -> int:
         """Helper to encode text using tiktoken or fallback to character heuristic"""

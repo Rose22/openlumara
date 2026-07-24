@@ -265,3 +265,15 @@ class Chat:
             if chat.get("category") not in collected_categories:
                 collected_categories.append(chat.get("category"))
         return collected_categories
+
+    async def get_token_usage(self):
+        """
+        Returns the chat's current total token usage.
+        Prioritizes the API's data above all,
+        but if not available, will fall back on counting locally using tiktoken
+        """
+        if not self.using_api_token_data:
+            return await self.channel.context.count_tokens()
+
+        return self.data[self.current]["token_usage"]
+
