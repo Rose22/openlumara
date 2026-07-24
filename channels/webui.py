@@ -408,7 +408,6 @@ async def create_fastapi(channel):
         if not success:
             # that likely means this is already the loaded chat
             chat = dict(channel.context.chat.get())
-            chat.pop("messages")
             chat["turn_history"] = await channel.group_history()
             return api_result(chat, success=True)
 
@@ -416,7 +415,6 @@ async def create_fastapi(channel):
         await channel.websocket_manager.broadcast({"type": "chat_switched", "id": id})
 
         chat = dict(channel.context.chat.get())
-        chat.pop("messages")
         chat["turn_history"] = await channel.group_history()
         return api_result(chat, success=True)
 
@@ -425,7 +423,6 @@ async def create_fastapi(channel):
         """Gives you the currently loaded chat's data"""
 
         chat = dict(channel.context.chat.get())
-        chat.pop("messages")
         chat["turn_history"] = await channel.group_history()
         return api_result(chat)
 
@@ -433,15 +430,7 @@ async def create_fastapi(channel):
     async def get_chats(request: fastapi.Request):
         """Returns a list of all chats"""
 
-        filtered_chats = []
-
-        # get rid of messages, for faster loading
-        for chat in channel.context.chat.get_all():
-            chat_copy = dict(chat)
-            chat_copy.pop("messages")
-            filtered_chats.append(chat_copy)
-
-        return api_result(filtered_chats, success=True)
+        return api_result(channel.context.chat.get_all(), success=True)
 
     @app.get("/api/chats/categories")
     async def get_chat_categories():
