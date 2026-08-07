@@ -21,3 +21,6 @@ dev_run.sh
 .module_cache.json
 .tiktoken_cache/
 .requirements_hash
+graphify-out/
+camofox_module_fix_report.md
+fix_plan.md
