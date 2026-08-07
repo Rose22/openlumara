@@ -2,6 +2,7 @@ import core
 import ulid
 import datetime
 import os
+import sys
 
 class Chat:
     def __init__(self, channel):
@@ -16,13 +17,17 @@ class Chat:
                 print("Found old chat history files! In order for them to work in the new version of openlumara, they need to be migrated.")
                 print(f"\033[1;31m!! PLEASE MAKE A BACKUP OF YOUR DATA FOLDER, SO THAT YOU WON'T POTENTIALLY LOSE YOUR CHATS !!\033[0m")
                 print()
-                print("Then, when you're ready, type MIGRATE in caps into this prompt:")
-                while not core.proceed_migration:
-                    confirm = input("migrate?> ")
-                    if confirm.strip() == "MIGRATE":
-                        core.proceed_migration = True
+                if sys.stdin.isatty():
+                    print("Then, when you're ready, type MIGRATE in caps into this prompt:")
+                    while not core.proceed_migration:
+                        confirm = input("migrate?> ")
+                        if confirm.strip() == "MIGRATE":
+                            core.proceed_migration = True
 
-                    print("Type 'MIGRATE' exactly in capital letters")
+                        print("Type 'MIGRATE' exactly in capital letters")
+                else:
+                    print("No terminal detected, auto-migrating (old chats will be backed up).")
+                    core.proceed_migration = True
                     
             self._migrate_if_needed()
 
