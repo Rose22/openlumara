@@ -161,6 +161,26 @@ class Models(core.module.Module):
 
         return f"model has been switched to {found_id}"
 
+    async def apply_config_model(self):
+        """Ensure the model configured in core config (model.name) is the one loaded in VRAM.
+
+        Called by the web UI after a settings save. Only acts when
+        ``enable_model_load_unload`` is on; otherwise this is a no-op.
+        """
+        if not self.config.get("enable_model_load_unload"):
+            return None
+
+        target = core.config.get("model", "name")
+        if not target:
+            return None
+
+        await self._load_models()
+        if not self.models:
+            return None
+
+        await self._switch_with_load_unload(target)
+        return None
+
     async def _switch_with_load_unload(self, found_id: str):
         """Unload the running model, wait for VRAM, then load the target."""
         async with self._switch_lock:
