@@ -597,12 +597,30 @@ async def create_fastapi(channel):
 
         changed_modules = list(data.get("changed_modules", []))
         data.pop("changed_modules")
-        
+
+        prev_model = core.config.config.get("model", "name")
+
         result = core.config.config.load(data=data)
         core.config.config.save()
 
         if not result:
             return api_result(success=False)
+
+        # If the AI model selection changed and the models module manages load/unload,
+        # apply it to VRAM (unload current, then load the newly configured model).
+        new_model = core.config.config.get("model", "name")
+        if new_model and new_model != prev_model:
+            models_module = channel.manager.modules.get("models")
+            if (
+                models_module is not None
+                and getattr(models_module, "apply_config_model", None)
+                and models_module.config.get("enable_model_load_unload")
+            ):
+                await models_module.apply_config_model()
+                channel.log(
+                    self.name,
+                    f"Model changed to '{new_model}': unloading previous model and loading {new_model}",
+                )
 
         # Reload modules that had their settings changed
         if changed_modules:

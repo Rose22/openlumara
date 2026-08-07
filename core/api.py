@@ -736,3 +736,90 @@ class APIClient():
             return []
 
         return model_list
+
+    def _router_base_url(self):
+        """Derive llama.cpp router base URL from api.url config (strip the /v1 suffix)."""
+        url = core.config.get("api", "url", default="")
+        return url.rstrip("/").replace("/v1", "")
+
+    def _router_client(self):
+        """Return the shared httpx client or an APIError if not connected."""
+        if not self._httpx_client:
+            return APIError("API is not connected. Call connect() first.")
+        return self._httpx_client
+
+    async def load_model(self, model_name: str):
+        """POST /models/load — load a model into VRAM. Success is in the body {'success': True}."""
+        base = self._router_base_url()
+        if not base:
+            return APIError("No api.url configured")
+        client = self._router_client()
+        if isinstance(client, APIError):
+            return client
+        try:
+            resp = await client.post(f"{base}/models/load", json={"model": model_name})
+            if resp.status_code >= 400:
+                return APIError(f"Failed to load {model_name}: {resp.text}")
+            data = resp.json()
+            if not data.get("success"):
+                return APIError(f"Failed to load {model_name}: {data}")
+            return data
+        except Exception as e:
+            return APIError(f"Failed to load {model_name}", e)
+
+    async def unload_model(self, model_name: str):
+        """POST /models/unload — unload a model from VRAM. Success is in the body {'success': True}."""
+        base = self._router_base_url()
+        if not base:
+            return APIError("No api.url configured")
+        client = self._router_client()
+        if isinstance(client, APIError):
+            return client
+        try:
+            resp = await client.post(f"{base}/models/unload", json={"model": model_name})
+            if resp.status_code >= 400:
+                return APIError(f"Failed to unload {model_name}: {resp.text}")
+            data = resp.json()
+            if not data.get("success"):
+                return APIError(f"Failed to unload {model_name}: {data}")
+            return data
+        except Exception as e:
+            return APIError(f"Failed to unload {model_name}", e)
+
+    async def get_loaded_models(self):
+        """GET /models — return list of model IDs currently loaded in VRAM (status == 'loaded')."""
+        base = self._router_base_url()
+        if not base:
+            return APIError("No api.url configured")
+        client = self._router_client()
+        if isinstance(client, APIError):
+            return client
+        try:
+            resp = await client.get(f"{base}/models")
+            if resp.status_code >= 400:
+                return APIError(f"Failed to get loaded models: {resp.text}")
+            data = resp.json()
+            return [m["id"] for m in data.get("data", []) if m.get("status", {}).get("value") == "loaded"]
+        except Exception as e:
+            return APIError("Failed to get loaded models", e)
+
+    async def list_router_models(self):
+        """GET /models — return ALL discoverable model IDs (loaded, loading, unloaded).
+
+        Unlike list_models() (OpenAI /v1/models), which in llama.cpp router mode only reflects
+        the ALREADY LOADED model, this returns the full set a user could switch to.
+        """
+        base = self._router_base_url()
+        if not base:
+            return APIError("No api.url configured")
+        client = self._router_client()
+        if isinstance(client, APIError):
+            return client
+        try:
+            resp = await client.get(f"{base}/models")
+            if resp.status_code >= 400:
+                return APIError(f"Failed to list router models: {resp.text}")
+            data = resp.json()
+            return [m["id"] for m in data.get("data", [])]
+        except Exception as e:
+            return APIError("Failed to list router models", e)
