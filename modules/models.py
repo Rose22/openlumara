@@ -6,11 +6,9 @@ import core
 class Models(core.module.Module):
     """Lets you or the AI switch between AI models.
 
-    By default switching is a config-only change (the base models module assumes the
-    target model is already loaded in VRAM). When ``enable_model_load_unload`` is on,
-    switching actively unloads the running model and loads the target through the
-    llama.cpp router HTTP API (``/models/load``, ``/models/unload``, ``/models``).
-    The server URL is derived from ``api.url`` (the ``/v1`` suffix is stripped).
+    By default that's just a config change. With enable_model_load_unload on it
+    unloads the previously selected model and loads the target through the llama.cpp
+    router instead, so switching works on a VRAM-constrained box.
     """
 
     settings = {
@@ -148,7 +146,7 @@ class Models(core.module.Module):
             return "model does not exist. use models_get_available() first"
 
         if self.config.get("enable_model_load_unload"):
-            result = await self._switch_with_load_unload(found_id)
+            result = await self._switch_with_load_unload(found_id, self.manager.API.get_model())
             if isinstance(result, str):
                 return result
             return f"model has been switched to {found_id}"
@@ -160,11 +158,12 @@ class Models(core.module.Module):
 
         return f"model has been switched to {found_id}"
 
-    async def apply_config_model(self):
-        """Ensure the model configured in core config (model.name) is the one loaded in VRAM.
+    async def apply_config_model(self, previous: str = None):
+        """Make sure the model in core config is the one loaded in VRAM.
 
-        Called by the web UI after a settings save. Only acts when
-        ``enable_model_load_unload`` is on; otherwise this is a no-op.
+        Called by the web UI after a settings save. previous is the model that
+        was active before the change; only unload that one. No-op unless
+        enable_model_load_unload is on.
         """
         if not self.config.get("enable_model_load_unload"):
             return None
@@ -177,54 +176,52 @@ class Models(core.module.Module):
         if not self.models:
             return None
 
-        await self._switch_with_load_unload(target)
+        await self._switch_with_load_unload(target, previous)
         return None
 
-    async def _switch_with_load_unload(self, found_id: str):
-        """Unload the running model, wait for VRAM, then load the target."""
+    async def _switch_with_load_unload(self, found_id: str, previous: str = None):
+        """Unload the previously selected model, wait for VRAM, then load the target."""
+        if not previous:
+            previous = self.manager.API.get_model()
+
         async with self._switch_lock:
             loaded = await self.manager.API.get_loaded_models()
             if isinstance(loaded, core.api.APIError):
-                # graceful degradation: fall back to config-only switch with a warning
-                self.channel.log(self.name, f"Load/unload unavailable, falling back to config-only switch: {loaded}")
+                self.log(self.name, f"Load/unload unavailable, falling back to config-only switch: {loaded}")
+                self._config_only_switch(found_id)
+                return f"switched to {found_id} in config only (couldn't reach the router): {loaded}"
+
+            # fast path: the target is already the one sitting in VRAM
+            if any(m.strip().lower() == found_id.strip().lower() for m in loaded):
                 self._config_only_switch(found_id)
                 return None
 
-            loaded_id = None
-            for m in loaded:
-                if m.strip().lower() == found_id.strip().lower():
-                    loaded_id = m
-                    break
+            unloaded = False
+            if previous:
+                for m in loaded:
+                    if m.strip().lower() == previous.strip().lower():
+                        self.log(self.name, f"Unloading previous model: {m}")
+                        unload = await self.manager.API.unload_model(m)
+                        if isinstance(unload, core.api.APIError):
+                            self.log(self.name, f"Failed to unload {m}: {unload}")
+                        else:
+                            unloaded = True
+                        break
 
-            if loaded_id:
-                # fast path: target is already loaded
-                self._config_only_switch(found_id)
-                return None
+            if unloaded:
+                wait = self.config.get("unload_wait_seconds") or 10
+                if wait > 0:
+                    self.log(self.name, f"Waiting {wait} seconds for VRAM to clear...")
+                    await asyncio.sleep(wait)
 
-            # unload whatever is currently loaded
-            for m in loaded:
-                self.channel.log(self.name, f"Unloading current model: {m}")
-                unload = await self.manager.API.unload_model(m)
-                if isinstance(unload, core.api.APIError):
-                    self.channel.log(self.name, f"Failed to unload {m}: {unload}")
-                    continue
-                break
-
-            wait = self.config.get("unload_wait_seconds", default=10) or 10
-            if wait > 0:
-                self.channel.log(self.name, f"Waiting {wait} seconds for VRAM to clear...")
-                await asyncio.sleep(wait)
-
-            self.channel.log(self.name, f"Loading model: {found_id}")
+            self.log(self.name, f"Loading model: {found_id}")
             load = await self.manager.API.load_model(found_id)
             if isinstance(load, core.api.APIError):
-                # graceful fallback: keep config consistent but warn user
-                self.channel.log(self.name, f"Failed to load {found_id}: {load}. Config updated but VRAM state unknown.")
+                self.log(self.name, f"Failed to load {found_id}: {load}. Config updated, VRAM state unknown.")
                 self._config_only_switch(found_id)
-                return None
+                return f"switched to {found_id} in config only, load failed: {load}"
 
             self._config_only_switch(found_id)
-            self.channel.log(self.name, f"Successfully loaded {found_id}")
             return None
 
     def _config_only_switch(self, found_id: str):
