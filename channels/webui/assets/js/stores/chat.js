@@ -227,7 +227,13 @@ CHAT_STORE = {
       const turn = this.turnHistory[turnIndex];
       const msg = turn?.messages?.[turn.messages?.length - 1]; // last message in the turn
       if (!msg) return;
-      navigator.clipboard.writeText(msg.content)
+
+      // copy and edit should always show the same content (text).
+      const text = Array.isArray(msg.content)
+          ? this._extractEditText(msg)
+          : msg.content;
+
+      navigator.clipboard.writeText(text)
         .then(() => {
             return true;
         })
