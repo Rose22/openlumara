@@ -240,6 +240,62 @@
                         }
                     }
                 }
+
+                .edit-files {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 4px;
+                    padding: 8px;
+                    background: var(--bg-tertiary);
+                    border: 1px solid var(--border-color);
+                    border-radius: var(--radius-sm);
+                    max-width: 100%;
+
+                    .edit-file-row {
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+
+                        .edit-file-remove {
+                            width: 28px;
+                            height: 28px;
+                            padding: 0;
+                            flex-shrink: 0;
+                            background: var(--bg-tertiary);
+                            border: 1px solid var(--border-color);
+                            border-radius: var(--radius-md);
+                            color: var(--text-secondary);
+                            cursor: pointer;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            opacity: 0.6;
+                            transition: all 0.2s ease;
+
+                            svg {
+                                width: 14px;
+                                height: 14px;
+                            }
+
+                            &:hover {
+                                background: var(--bg-secondary);
+                                color: var(--error);
+                                border-color: var(--error);
+                                opacity: 1;
+                            }
+
+                            &:active {
+                                transform: scale(0.95);
+                            }
+                        }
+
+                        .edit-file-name {
+                            font-size: 0.85rem;
+                            color: var(--text-secondary);
+                            word-break: break-all;
+                        }
+                    }
+                }
             }
         }
 

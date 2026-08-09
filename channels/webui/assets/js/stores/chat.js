@@ -16,6 +16,7 @@ CHAT_STORE = {
     turnHistory: [],
     editingMessageIndex: null,
     editContent: '',
+    editAttached: [],
 
     user_input: '',
     last_user_input: '',
@@ -273,6 +274,9 @@ CHAT_STORE = {
         
         this.editingMessageIndex = msg.index;
         this.editContent = this._extractEditText(msg);
+        // files currently attached (excluding the '' text slot) - the working set
+        // for this edit session; changes only commit on save
+        this.editAttached = (msg._metadata?.filenames || []).filter(f => f);
         Alpine.store('ui').scrollToTurnIndex = turnIndex;
 
         // after Alpine renders the edit box, scroll its top into view
@@ -307,45 +311,69 @@ CHAT_STORE = {
     async cancelEdit() {
         this.editingMessageIndex = null;
         this.editContent = '';
+        this.editAttached = [];
+    },
+
+    removeEditFile(fname) {
+        this.editAttached = this.editAttached.filter(f => f !== fname);
+    },
+
+    _findMessage(index) {
+        for (const turn of this.turnHistory) {
+            const found = (turn.messages || []).find(m => m.index === index);
+            if (found) { return found; }
+        }
+        return null;
     },
 
     async saveEdit(index) {
         // find the original message so we can preserve any attached files
-        let origMessage = null;
-        for (const turn of this.turnHistory) {
-            const found = (turn.messages || []).find(m => m.index === index);
-            if (found) { origMessage = found; break; }
-        }
+        let origMessage = this._findMessage(index);
 
         let content = this.editContent;
+        let filenames = null;
 
         if (origMessage && Array.isArray(origMessage.content)) {
-            // keep the file blocks, only replace the first text block (the actual message)
+            // keep the file blocks, only replace the first text block (the actual message),
+            // and drop any blocks whose file is no longer in the edit working set
+            const attached = this.editAttached;
             let replacedText = false;
-            const blocks = origMessage.content.map(block => {
+            const blocks = [];
+            const names = [];
+
+            origMessage.content.forEach((block, blockIndex) => {
+                const fname = origMessage._metadata?.filenames?.[blockIndex];
+                if (fname && !attached.includes(fname)) { return; } // file removed by user
+
                 if (block.type === 'text' && !replacedText) {
                     replacedText = true;
-                    return { ...block, text: content };
+                    blocks.push({ ...block, text: content });
+                } else {
+                    blocks.push(block);
                 }
-                return block;
+                names.push(fname || '');
             });
 
             // if the message had no text block but the user typed something, add one
             if (!replacedText && content) {
                 blocks.unshift({ type: 'text', text: content });
+                names.unshift('');
             }
 
             content = blocks;
+            filenames = names;
         }
 
         await simpleSocketSend({
             "type": "message_edit",
             "index": index,
-            "content": content
+            "content": content,
+            "filenames": filenames
         });
 
         this.editingMessageIndex = null;
         this.editContent = '';
+        this.editAttached = [];
     },
 
     /* ----------------------

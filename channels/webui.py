@@ -886,6 +886,11 @@ async def create_fastapi(channel):
 
                             message = await channel.context.chat.messages.get(index)
                             message["content"] = data.get("content")
+
+                            filenames = data.get("filenames")
+                            if filenames is not None:
+                                message.setdefault("_metadata", {})["filenames"] = filenames
+
                             await channel.context.chat.messages.edit(index, message)
 
                             await ws_mgr.broadcast({
