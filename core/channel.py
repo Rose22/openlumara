@@ -232,7 +232,7 @@ class Channel:
     # ---------------------
     # Content Processors
     # ---------------------
-    async def _process_multimodal(self, message: str = None, files: list = None) -> list:
+    async def _process_multimodal(self, message: str = None, files: list = None, metadata: dict = None) -> list:
         """
         Converts a list of file handler objects into an openAI API multimodal message object,
         allowing the AI to process images, audio, etc.
@@ -245,12 +245,18 @@ class Channel:
             "my_audio.mp3": (file handler object),
             and so on
         }
+
+        `metadata` is preserved when the message is already multimodal.
         """
         content_blocks = []
 
         # if the message was a list... this was already multimodal, so dont modify
         if isinstance(message, list):
-            return {"role": "user", "content": message}
+            result = {"role": "user", "content": message}
+            if metadata:
+                # copy so we don't mutate the caller's dict
+                result["_metadata"] = dict(metadata)
+            return result
 
         if not message and not files:
             # wtf why would you do that
@@ -418,15 +424,21 @@ class Channel:
         """
         internal helper function so that send() and send_stream()
         both use many of the same code paths and i don't have to keep maintaining each one individually
+
+        if the message is a dict (e.g. regenerate passes the stored message through),
+        its `_metadata` is preserved so attachment info like `_metadata.filenames`
+        survives being re-added to history.
         """
         await self._set_as_active_channel()
         user_message = message
+        metadata = None
 
         # sometimes legacy parts of the openlumara framework still send dicts.
         # that is not supposed to happen, and i need to find the code that does it
         # so, TODO: find the legacy code that calls channel.send()/send_stream() with dicts
         # but for now.. to avoid breaking everything, i'll convert
         if isinstance(user_message, dict):
+            metadata = user_message.get("_metadata")
             user_message = user_message.get("content", "")
 
         if isinstance(user_message, str):
@@ -467,7 +479,7 @@ class Channel:
                         user_message = usr_msg_result
 
         # apply multimodal content if applicable
-        user_message_processed = await self._process_multimodal(message=user_message, files=files)
+        user_message_processed = await self._process_multimodal(message=user_message, files=files, metadata=metadata)
 
         # and add the user's message to context
         add_success = await self.context.chat.messages.add(user_message_processed)

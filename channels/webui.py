@@ -920,7 +920,7 @@ async def create_fastapi(channel):
                                 await channel.context.chat.messages.delete_from(max(0, last_user_message_index))
 
                                 await ws_mgr.broadcast({"type": "sync"})
-                                await ws_mgr.start_stream(channel, channel.context.chat.get("id"), user_message.get("content"))
+                                await ws_mgr.start_stream(channel, channel.context.chat.get("id"), user_message)
                         case _:
                             channel.log(channel.name, f"Unknown websocket command received: {msg_type}")
 
