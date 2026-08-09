@@ -266,8 +266,28 @@ CHAT_STORE = {
         if (!msg) { return; }
         
         this.editingMessageIndex = msg.index;
-        this.editContent = msg.content;
+        this.editContent = this._extractEditText(msg);
         Alpine.store('ui').scrollToTurnIndex = turnIndex;
+    },
+
+    /*
+     * messages with attached files store their content as an array of blocks
+     * (text + image_url/input_audio/text blocks for files).
+     * only the first block is the user's own editable text
+     * (it is the only one with an empty entry in _metadata.filenames).
+     */
+    _extractEditText(msg) {
+        if (Array.isArray(msg.content)) {
+            const filenames = msg._metadata?.filenames;
+            const isUserTextFirst = Array.isArray(filenames) && filenames[0] === '';
+            if (isUserTextFirst) {
+                const textBlock = msg.content.find(block => block.type === 'text');
+                return textBlock?.text ?? '';
+            }
+            // no user text (pure file upload) - nothing editable
+            return '';
+        }
+        return msg.content;
     },
 
     async cancelEdit() {
@@ -276,10 +296,38 @@ CHAT_STORE = {
     },
 
     async saveEdit(index) {
+        // find the original message so we can preserve any attached files
+        let origMessage = null;
+        for (const turn of this.turnHistory) {
+            const found = (turn.messages || []).find(m => m.index === index);
+            if (found) { origMessage = found; break; }
+        }
+
+        let content = this.editContent;
+
+        if (origMessage && Array.isArray(origMessage.content)) {
+            // keep the file blocks, only replace the first text block (the actual message)
+            let replacedText = false;
+            const blocks = origMessage.content.map(block => {
+                if (block.type === 'text' && !replacedText) {
+                    replacedText = true;
+                    return { ...block, text: content };
+                }
+                return block;
+            });
+
+            // if the message had no text block but the user typed something, add one
+            if (!replacedText && content) {
+                blocks.unshift({ type: 'text', text: content });
+            }
+
+            content = blocks;
+        }
+
         await simpleSocketSend({
             "type": "message_edit",
             "index": index,
-            "content": this.editContent
+            "content": content
         });
 
         this.editingMessageIndex = null;
