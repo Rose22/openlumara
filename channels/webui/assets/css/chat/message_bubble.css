@@ -184,6 +184,9 @@
                 textarea {
                     width: 100%;
                     min-height: 60px;
+                    max-height: 80vh;
+                    /* autosize switches to scroll when the content hits max-height */
+                    overflow-y: hidden;
                     padding: 8px;
                     background: var(--bg-input);
                     color: var(--text-primary);
