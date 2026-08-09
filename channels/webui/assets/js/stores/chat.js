@@ -268,6 +268,14 @@ CHAT_STORE = {
         this.editingMessageIndex = msg.index;
         this.editContent = this._extractEditText(msg);
         Alpine.store('ui').scrollToTurnIndex = turnIndex;
+
+        // after Alpine renders the edit box, scroll its top into view
+        // (the bubble collapses when entering edit mode, which can leave
+        //  the edit box above the visible area)
+        Alpine.nextTick(() => {
+            const turnEl = document.querySelector(`[data-turn-index="${turnIndex}"]`);
+            turnEl?.querySelector('.editing textarea')?.scrollIntoView({ block: 'start' });
+        });
     },
 
     /*
