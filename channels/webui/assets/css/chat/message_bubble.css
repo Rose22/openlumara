@@ -15,6 +15,13 @@
         position: relative;
         max-width: var(--message-max-width, 75%);
         width: fit-content;
+
+        /* when a message is being edited, expand the bubble to its max width
+           so the edit box doesn't collapse to the textarea's intrinsic size */
+        &.editing-active {
+            width: 100%;
+        }
+
         backdrop-filter: blur(10px);
 
         .command {
