@@ -584,6 +584,8 @@ async def create_fastapi(channel):
     async def models_get():
         """Returns a list of all available AI models"""
         result = await channel.manager.API.list_models()
+        result = list(set(result))
+        
         if isinstance(result, core.api.APIError):
             return api_result(str(result), success=False)
 
