@@ -94,6 +94,8 @@ def _check_missing_deps(deps):
     for dep in deps:
         # extract the base package name (e.g. 'python-telegram-bot' from 'python-telegram-bot>=1.0')
         pkg_name = dep.split('>=')[0].split('==')[0].split('<')[0].split('>')[0].strip()
+        # strip stuff like [e2e] from the dependency
+        pkg_name = pkg_name.split('[')[0].strip()
         try:
             version(pkg_name)
         except PackageNotFoundError:
