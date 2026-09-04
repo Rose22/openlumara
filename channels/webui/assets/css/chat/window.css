@@ -5,6 +5,7 @@
     width: 100%;
     min-width: 40%;
     max-height: 100%;
+    position: relative;
 
     border: 1px solid var(--border-sidebar);
     #messages {

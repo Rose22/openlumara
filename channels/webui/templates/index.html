@@ -95,7 +95,12 @@
                     </section>
                 {% endif %}
 
-                <section id="chat-window">
+                <section id="chat-window"
+                    @dragenter.prevent="$store.upload.dragEnter()"
+                    @dragover.prevent="$store.upload.dragOver()"
+                    @dragleave="$store.upload.dragLeave($event, $el)"
+                    @drop.prevent="$store.upload.handleDrop($event)"
+                >
                     {% include 'chat/index.html' %}
                 </section>
             </section>
