@@ -36,8 +36,8 @@ class Ntfy(core.channel.Channel):
         if not content:
             return False
 
-        server = self.config.get("server").rstrip('/')
-        topic = self.config.get("topic")
+        server = (self.config.get("server") or "http://localhost:3050").rstrip('/')
+        topic = self.config.get("topic") or "openlumara"
         url = f"{server}/{topic}"
 
         # prepare headers

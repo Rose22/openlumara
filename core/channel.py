@@ -98,6 +98,13 @@ class Channel:
         """internal shutdown function. gets called by the manager before on_shutdown()"""
 
         self._shutting_down = True
+
+        # flush any debounced message saves so nothing is lost
+        try:
+            await self.context.chat.messages.save()
+        except Exception as e:
+            self.log("core", f"error flushing message saves during shutdown: {e}")
+
         if self._queue_task:
             self._queue_task.cancel()
             try:
@@ -189,6 +196,15 @@ class Channel:
         else:
             await self.context.chat.messages.add({"role": "assistant", "content": str(message)})
             await self.push_queue.put({"role": "assistant", "content": str(message)})
+
+    async def announce(self, message: str, type: str = "info"):
+        """
+        Convenience helper to announce a message across the channel or push queue.
+        Supports channels defining custom _announce handlers (e.g. Matrix).
+        """
+        if hasattr(self, "_announce") and callable(self._announce):
+            return await self._announce(message, type=type)
+        return await self.push(message)
 
     # --------------------
     # Helper methods
@@ -341,8 +357,10 @@ class Channel:
         return {"role": "user", "content": message}
 
     def format_message(self, orig_message: dict):
-        formatted = ""
+        if not orig_message:
+            return {"role": "assistant", "content": ""}
 
+        formatted = ""
         message = dict(orig_message)
 
         role = message.get("role")
@@ -604,10 +622,14 @@ class Channel:
         # yield user message as a special token for display in UI's (because user message can be modified by module hooks)
         yield {"type": "user_message", "content": user_message}
         
-        # estimate tokens used for user message
+        # estimate tokens used for user message.
+        # the context was just built in _send_preprocess, so count it directly
+        # instead of rebuilding the whole thing via get_total_tokens()
         user_message_token_estimation = 0
         try:
-            user_message_token_estimation = await self.context.get_total_tokens()
+            user_message_token_estimation = await self.context.count_tokens(processed.get("context"))
+            if self.manager.tools:
+                user_message_token_estimation += await self.context.count_tokens(self.manager.tools)
         except Exception as e:
             self.log_error("Error while trying to estimate token use", e)
             yield await self.throw_stream_error(f"Error while trying to estimate token use: {core.detail_error(e)}")
@@ -698,7 +720,14 @@ class Channel:
 
         if not fetched_token_usage:
             # yield an estimated token usage if the API didn't provide one
-            yield {"type": "token_usage", "content": await self.context.get_total_tokens(), "source": "estimation"}
+            # (count the already-built context rather than rebuilding it)
+            try:
+                estimate = await self.context.count_tokens(processed.get("context"))
+                if self.manager.tools:
+                    estimate += await self.context.count_tokens(self.manager.tools)
+            except Exception:
+                estimate = 0
+            yield {"type": "token_usage", "content": estimate, "source": "estimation"}
 
         # and finally, once the stream has completed, add the finished assistant message to context
         if tool_calls_occurred:

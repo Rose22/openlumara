@@ -370,7 +370,11 @@ class Chat:
         
         results = []
         query_lower = query.lower()
-        
+
+        # flush any pending debounced saves so we search the latest on-disk history
+        if self.messages:
+            await self.messages.save()
+
         found_chats = []
         for chat_meta in self.data:
             found = dict(chat_meta)
@@ -378,60 +382,64 @@ class Chat:
             chat_id = chat_meta.get("id")
             if not chat_id:
                 continue
-            
-            if query_lower in chat_meta.get("title").lower():
+
+            title = chat_meta.get("title") or ""
+            if query_lower in title.lower():
                 found["title_match"] = True
-            
+
             # Load messages from the history file
             history_path = core.get_data_path(os.path.join(self.path, "history", f"{chat_id}.json"))
             if not os.path.exists(history_path):
                 if found.get("title_match"):
                     found_chats.append(found)
                 continue
-            
+
             try:
                 with open(history_path, 'r', encoding='utf-8') as f:
                     messages = json.load(f)
-            except (json.JSONDecodeError, Exception):
+            except Exception:
                 if found.get("title_match"):
                     found_chats.append(found)
                 continue
-            
+
             # Search through messages
             found_messages = []
-            for msg_index, message in enumerate(messages):
+            for message in messages:
                 content = message.get("content", "")
                 if not content:
                     continue
-                
+
                 # Handle multimodal content - extract text parts
                 if isinstance(content, list):
                     content = " ".join(
-                        part.get("text", "") 
-                        for part in content 
+                        part.get("text", "")
+                        for part in content
                         if isinstance(part, dict) and part.get("type") == "text"
                     )
-                
+
                 if not isinstance(content, str) or not content.strip():
                     continue
-                
+
                 # Case-insensitive substring search
-                if query_lower in content.lower():
-                    # Find the match position for snippet generation
-                    match_pos = content.lower().find(query_lower)
-                    
-                    # Generate snippet with context
-                    snippet_start = max(0, match_pos - 50)
-                    snippet_end = min(len(content), match_pos + len(query) + 50)
-                    snippet = content[snippet_start:snippet_end]
-                    
-                    # Add ellipsis if truncated
-                    if snippet_start > 0:
-                        snippet = "..." + snippet
-                    if snippet_end < len(content):
-                        snippet = snippet + "..."
-                    
-                    found_messages.append(snippet)
+                content_lower = content.lower()
+                if query_lower not in content_lower:
+                    continue
+
+                # Find the match position for snippet generation
+                match_pos = content_lower.find(query_lower)
+
+                # Generate snippet with context
+                snippet_start = max(0, match_pos - 50)
+                snippet_end = min(len(content), match_pos + len(query) + 50)
+                snippet = content[snippet_start:snippet_end]
+
+                # Add ellipsis if truncated
+                if snippet_start > 0:
+                    snippet = "..." + snippet
+                if snippet_end < len(content):
+                    snippet = snippet + "..."
+
+                found_messages.append(snippet)
             
             if found_messages:
                 found.update({

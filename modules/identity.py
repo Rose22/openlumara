@@ -8,9 +8,10 @@ class Identity(core.module.Module):
 
     async def on_system_prompt(self):
         # dont use identity if the characters module is enabled and a character is currently active
-        if self.channel.context.chat.get("metadata").get("character"):
-            return None
-
+        if self.channel and hasattr(self.channel, 'context') and self.channel.context:
+            metadata = self.channel.context.chat.get("metadata") or {}
+            if metadata.get("character"):
+                return None
         identity = "\n".join(self.identity) if len(self.identity) > 0 else None
 
         if not identity:

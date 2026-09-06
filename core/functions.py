@@ -77,13 +77,15 @@ def get_data_path(subpath=None):
     return sandbox_path(data_path, subpath) if subpath else data_path
 
 def remove_duplicates(lst: list):
-    # removes duplicates from a list
-
-    new_lst = []
-    for item in lst:
-        if item not in new_lst:
-            new_lst.append(item)
-    return new_lst
+    """removes duplicates from a list in O(N) time while preserving insertion order"""
+    try:
+        return list(dict.fromkeys(lst))
+    except TypeError:
+        new_lst = []
+        for item in lst:
+            if item not in new_lst:
+                new_lst.append(item)
+        return new_lst
 
 def validate_path_string(path: str) -> str:
     """
@@ -131,10 +133,16 @@ def sandbox_path(base_path: str, requested_path: str = None) -> str:
 
     # remove the base path from it in case the AI/user inserts it
     prefix = base_path + os.sep
-    if path.startswith(prefix):
-        path = path[len(prefix):]
-    elif path == base_path:
-        path = ""
+    if sys.platform == "win32":
+        if path.lower().startswith(prefix.lower()):
+            path = path[len(prefix):]
+        elif path.lower() == base_path.lower():
+            path = ""
+    else:
+        if path.startswith(prefix):
+            path = path[len(prefix):]
+        elif path == base_path:
+            path = ""
 
     decoded = validate_path_string(path)
 

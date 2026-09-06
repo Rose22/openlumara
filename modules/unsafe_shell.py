@@ -3,7 +3,7 @@ import os
 import sys
 import subprocess
 import tempfile
-
+import asyncio
 class UnsafeShell(core.module.Module):
     """Lets your AI run shell commands with full access to your system. EXTREMELY DANGEROUS! Enable at your own risk"""
 
@@ -11,7 +11,7 @@ class UnsafeShell(core.module.Module):
 
     async def exec(self, cmd: str):
         """Executes commands in an unsandboxed shell. Be extremely careful! ONLY use if the user explicitly asks. NEVER run autonomously. Prefer sandboxed shell if available."""
-        result = subprocess.run(cmd, capture_output=True, shell=True, text=True)
+        result = await asyncio.to_thread(subprocess.run, cmd, capture_output=True, shell=True, text=True)
         return self.result({
             "stdout": result.stdout.strip(),
             "stderr": result.stderr.strip(),

@@ -76,6 +76,7 @@ async def main_loop(arg_list):
 
     # the manager class connects everything together
     manager = core.manager.Manager(cmdline_args=args)
+    result = None  # initialized so an exception below can't hit an unbound local
     # run main loop
     try:
         result = await manager.run()

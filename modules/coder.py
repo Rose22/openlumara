@@ -5,7 +5,10 @@ import shutil
 import regex
 import glob
 import fnmatch
-import tree_sitter_language_pack as tslp
+try:
+    import tree_sitter_language_pack as tslp
+except ImportError:
+    tslp = None
 
 class Coder(core.module.Module):
     """Lets your AI write code within sandboxes, without using a shell. Validates code syntax before writing to disk to protect your code from breaking."""
@@ -159,12 +162,9 @@ class Coder(core.module.Module):
 
         # create them if they dont exist
         for path in paths:
-            os.makedirs(os.path.expanduser(path).rstrip(os.path.sep), exist_ok=True)
+            os.makedirs(os.path.expanduser(path).rstrip("/\\"), exist_ok=True)
 
-        # strip the paths of separators at the end so that os.path.basename doesnt return a blank string (why, python?)
-        paths = [path.rstrip(os.path.sep) for path in paths]
-
-        # now return the basename of each sandbox
+        paths = [path.rstrip("/\\") for path in paths]
         return [os.path.basename(path) for path in paths]
 
     async def _get_full_sandbox_path(self, requested_path: str):
@@ -174,8 +174,8 @@ class Coder(core.module.Module):
             return None
 
         for path in paths:
-            if os.path.basename(path.rstrip(os.path.sep)) == requested_path.rstrip(os.path.sep):
-                return os.path.expanduser(path).rstrip(os.path.sep)
+            if os.path.basename(path.rstrip("/\\")) == requested_path.rstrip("/\\"):
+                return os.path.expanduser(path).rstrip("/\\")
 
         raise Exception("That sandbox does not exist")
 
@@ -185,10 +185,13 @@ class Coder(core.module.Module):
         then checks whether the requested path is within the sandbox,
         and if so, returns it
         """
-        # remove the sandbox path itself from the string in case the AI decided to add it
-        if requested_path.startswith(sandbox):
-            requested_path = requested_path[len(sandbox):]
-
+        # only remove sandbox prefix if it matches exactly or is followed by a separator
+        norm_req = requested_path.replace("\\", "/")
+        norm_box = sandbox.replace("\\", "/").strip("/")
+        if norm_req == norm_box:
+            requested_path = ""
+        elif norm_req.startswith(f"{norm_box}/"):
+            requested_path = norm_req[len(norm_box) + 1:]
         sandbox_path = await self._get_full_sandbox_path(sandbox)
         return core.sandbox_path(sandbox_path, requested_path)
 
@@ -198,6 +201,9 @@ class Coder(core.module.Module):
     async def _check_syntax(self, code: str, file_path: str):
         """verifies code for syntax errors without writing it to disk"""
         errors = []
+
+        if not tslp:
+            return []
 
         lang = tslp.detect_language_from_path(file_path)
         if not lang or lang in ("vimdoc", "html", "htm"):
@@ -234,7 +240,10 @@ class Coder(core.module.Module):
         if not lang:
             # return None so that the caller can handle it and tell the user
             return None
+        if not tslp:
+            return None
 
+        lang = tslp.detect_language_from_path(file_path)
         extraction = tslp.process(code, tslp.ProcessConfig(
             language=lang,
             structure=True,
@@ -389,25 +398,17 @@ class Coder(core.module.Module):
                             all_lines = f.readlines()
                             for line_num, line in enumerate(all_lines, 1):
                                 if compiled_pattern.search(line, timeout=self.regex_timeout):
-                                    # add context lines
-                                    context_lines = []
-                                    start = max(0, line_num - 1 - int(context))
-                                    end = min(len(all_lines), line_num + int(context))
-                                    for ctx_line_num in range(start, end):
-                                        if ctx_line_num + 1 != line_num:
-                                            context_lines.append(all_lines[ctx_line_num].rstrip())
-                                    
                                     match_dict = {
                                         "file": os.path.relpath(filepath, target_path),
                                         "line_num": line_num,
                                         "line": line.rstrip(),
                                     }
                                     if context:
+                                        c_num = int(context)
                                         match_dict.update({
-                                            "context_before": context_lines[:context],
-                                            "context_after": context_lines[-context:] if context > 0 else []
+                                            "context_before": [all_lines[i].rstrip() for i in range(max(0, line_num - 1 - c_num), line_num - 1)],
+                                            "context_after": [all_lines[i].rstrip() for i in range(line_num, min(len(all_lines), line_num + c_num))] if c_num > 0 else []
                                         })
-
                                     matches.append(match_dict)
                                     if len(matches) >= int(max_matches):
                                         break
@@ -593,25 +594,17 @@ class Coder(core.module.Module):
                 all_lines = f.readlines()
                 for line_num, line in enumerate(all_lines, 1):
                     if compiled_pattern.search(line, timeout=self.regex_timeout):
-                        # add context lines
-                        context_lines = []
-                        start = max(0, line_num - 1 - int(context))
-                        end = min(len(all_lines), line_num + int(context))
-                        for ctx_line_num in range(start, end):
-                            if ctx_line_num + 1 != line_num:
-                                context_lines.append(all_lines[ctx_line_num].rstrip(),)
-
                         match_dict = {
                             "line_num": line_num,
                             "line": line.rstrip()
                         }
 
                         if context:
+                            c_num = int(context)
                             match_dict.update({
-                                "context_before": context_lines[:int(context)],
-                                "context_after": context_lines[-int(context):] if int(context) > 0 else []
+                                "context_before": [all_lines[i].rstrip() for i in range(max(0, line_num - 1 - c_num), line_num - 1)],
+                                "context_after": [all_lines[i].rstrip() for i in range(line_num, min(len(all_lines), line_num + c_num))] if c_num > 0 else []
                             })
-
                         matches.append(match_dict)
 
                         if len(matches) >= int(max_matches):

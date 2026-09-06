@@ -113,9 +113,10 @@ class ToolcallManager:
         # add it to context
         await self.channel.context.chat.messages.add(assistant_message)
 
-        # push if needed
+        # push if needed. NOTE: put the message on the push queue directly
+        # instead of calling push(), which would add it to context a second time
         if push:
-            await self.channel.push(assistant_message)
+            await self.channel.push_queue.put(assistant_message)
 
         timeout_val = float(core.config.get("core", "tool_timeout", default=10.0))
 
@@ -176,9 +177,6 @@ class ToolcallManager:
 
                     # add a timeout so that tools can't hang the application forever
                     func_response = await asyncio.wait_for(_run_tool(), timeout=timeout_val)
-                    if func_response is None:
-                        # bypass the usual response flow and just abort the chain
-                        continue
 
                 except asyncio.TimeoutError as e:
                     err_msg = core.detail_error(e) if core.debug else str(e)
@@ -188,31 +186,33 @@ class ToolcallManager:
                     err_msg = core.detail_error(e) if core.debug else str(e)
                     func_response = module_instance.result(f"Error while executing tool: {err_msg}", success=False)
                     self.channel.log("toolcall", func_response.get("content"))
-                finally:
-                    func_response_str = None
 
-                    # don't double-escape strings
-                    if isinstance(func_response, str):
-                        func_response_str = func_response
-                    else:
-                        func_response_str = json.dumps(func_response)
+                if func_response is None:
+                    # the tool explicitly returned nothing: abort the whole chain.
+                    # the old code used a `continue` inside try with a `finally`,
+                    # which *still* yielded and recorded a bogus "null" tool
+                    # response, and then sent the tool_calls to the API without
+                    # a matching tool reply (which backends reject)
+                    return
 
-                    # build the openai toolcall response object
-                    tool_response = {
-                        "role": "tool",
-                        "tool_call_id": tool_call_dict['id'],
-                        "content": func_response_str
-                    }
+                # don't double-escape strings
+                if isinstance(func_response, str):
+                    func_response_str = func_response
+                else:
+                    func_response_str = json.dumps(func_response)
 
-                    # yield it so it can be displayed immediately
-                    yield {"type": "tool", "tool_call_id": tool_call_dict['id'], "content": func_response_str}
+                # build the openai toolcall response object
+                tool_response = {
+                    "role": "tool",
+                    "tool_call_id": tool_call_dict['id'],
+                    "content": func_response_str
+                }
 
-                    # add the tool response to the context window
-                    await self.channel.context.chat.messages.add(tool_response)
+                # yield it so it can be displayed immediately
+                yield {"type": "tool", "tool_call_id": tool_call_dict['id'], "content": func_response_str}
 
-                    # push it if needed
-                    # if push:
-                    #     await self.channel.push(tool_response)
+                # add the tool response to the context window
+                await self.channel.context.chat.messages.add(tool_response)
             else:
                 self.channel.log(
                     "toolcall",

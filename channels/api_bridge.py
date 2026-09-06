@@ -168,16 +168,12 @@ class ApiBridge(core.channel.Channel):
             self.log("api bridge", f"Error while starting API bridge: {core.detail_error(e)}")
 
     async def on_shutdown(self):
-        # this is a flag exposed by uvicorn itself, which causes it to start gracefully shutting down when set
-        self.server.should_exit = True
-
-        # wait for uvicorn to actually finish shutting down
-        try:
-            await asyncio.wait_for(self.server.shutdown(), timeout=5.0)
-        except (AttributeError, asyncio.TimeoutError):
-            # fallback: just give it a moment to release the socket
-            await asyncio.sleep(0.5)
-
+        if hasattr(self, "server") and self.server:
+            self.server.should_exit = True
+            try:
+                await asyncio.wait_for(self.server.shutdown(), timeout=5.0)
+            except (AttributeError, asyncio.TimeoutError):
+                await asyncio.sleep(0.5)
         self.log("api bridge", "API bridge server shut down successfully.")
 
     async def _completion_handler(self, message, model):

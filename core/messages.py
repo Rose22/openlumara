@@ -1,5 +1,6 @@
 import core
 import os
+import asyncio
 
 class Messages:
     def __init__(self, channel, chat):
@@ -11,26 +12,34 @@ class Messages:
             raise Exception("Could not load chat messages: Chat ID must be a string")
 
         self.path = os.path.join(self.chat.path, "history", self.chat.get("id"))
-        self.data = core.storage.StorageList(self.path, "json")
+        # compact_json: history is rewritten on every save, so skip indent + ascii escaping
+        self.data = core.storage.StorageList(self.path, "json", compact_json=True)
 
-        # for index in range(len(self.data) - 1, -1, -1):
-        #     chat = self.data[index]
-        #     messages = chat.get("messages", [])
+        # saves are debounced: rapid adds (tool call chains, streams) coalesce
+        # into a single disk write instead of one full rewrite per message
+        self._save_task = None
+        self.SAVE_DEBOUNCE_SECONDS = 0.15
 
-        #     # find any blank chats and delete them
-        #     if not messages:
-        #         self.data.pop(index)
-        #     # find chats that only contain command/responses and delete them
-        #     elif self._is_command_only(messages):
-        #         self.data.pop(index)
-        #     # find any missing metadata fields and add them
-        #     else:
-        #         for key, default_value in self.DEFAULT_DATA.items():
-        #             if key not in chat.keys():
-        #                 self.data[index][key] = default_value
+    def _schedule_save(self):
+        if self._save_task and not self._save_task.done():
+            return
+        self._save_task = asyncio.create_task(self._debounced_save())
+
+    async def _debounced_save(self):
+        await asyncio.sleep(self.SAVE_DEBOUNCE_SECONDS)
+        self._save_task = None
+        await self.save()
 
     async def save(self):
-        """saves data and updates the chat's timestamp"""
+        """flush any pending debounced save immediately, then write to disk"""
+
+        task, self._save_task = self._save_task, None
+        if task and not task.done():
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
 
         await self.chat.update_timestamp()
         return self.data.save()
@@ -88,9 +97,7 @@ class Messages:
                 new_message["_metadata"]["injection"] = "\n\n".join(injections)
 
         self.data.append(new_message)
-
-        index = len(self.data) - 1
-        await self.save()
+        self._schedule_save()
         return True
 
     async def edit(self, index: int, message):
@@ -125,6 +132,9 @@ class Messages:
 
     async def clear(self):
         self.data.clear()
+        # persist the wipe: without a save here the old history file would
+        # resurrect the messages on the next restart
+        await self.save()
         return True
 
     async def get_last_message_with_role(self, role: str, cutoff_index: int = None):

@@ -58,8 +58,9 @@ class Notes(core.module.Module):
 
     async def search(self, query: str):
         found = []
+        q = query.lower()
         for key, content in self._recursive_items(dict(self.data)):
-            if query.lower() in key.lower() or query.lower() in content.lower():
+            if q in key.lower() or q in content.lower():
                 found.append({key: content})
         return self.result(found)
 

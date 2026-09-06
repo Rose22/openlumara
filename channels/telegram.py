@@ -97,11 +97,10 @@ class Telegram(core.channel.Channel):
 
     async def on_shutdown(self):
         if self.config.get("announce_shutdown"):
-            await self.announce("Shutting down Telegram channel...", "status")
-            self.running = False
-            self._shutting_down = True
-            return True
-
+            await self.push("Shutting down Telegram channel...")
+        self.running = False
+        self._shutting_down = True
+        return True
     async def _tg_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id = update.effective_chat.id
 
@@ -212,15 +211,16 @@ class Telegram(core.channel.Channel):
         edit_interval = 1.5
 
         async def periodic_editor():
+            last_edited = ""
             while state.is_running:
                 await asyncio.sleep(edit_interval)
                 async with edit_lock:
-                    if state.message_obj and state.full_content:
+                    if state.message_obj and state.full_content and state.full_content != last_edited:
                         try:
                             await state.message_obj.edit_text(state.full_content[:4000])
+                            last_edited = state.full_content
                         except Exception:
                             pass
-
         editor_task = asyncio.create_task(periodic_editor())
 
         try:

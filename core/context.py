@@ -15,15 +15,12 @@ class Context:
         # UI-agnostic chat history system - save/load context windows from save file!
         self.chat = core.chat.Chat(self.channel)
 
-    async def get(self, system_prompt=True, end_prompt=True, history=True, prevent_recursion=False):
+    async def _prepare(self, system_prompt=True, end_prompt=True, history=True, prevent_recursion=False):
         """
-        builds the full context window using system prompt + message history + end prompt
-        to the API, we send this full context.
-
-        to frontend channels, we send only the message history part of the context (context.chat.messages.get()),
-        without the system prompt and without the modifications we do to it such as the endprompt.
-
-        context must ALWAYS follow this strict turn order: system->user->assistant->user->assistant->user->...
+        builds and preprocesses the three context components (system prompt,
+        message history, end prompt) without trimming them for token count.
+        used by both get() and get_size() so that the expensive preprocessing
+        (module prompts, history filtering) only runs once per call.
         """
         if not self.channel.manager.API.connected:
             # attempt to connect
@@ -41,6 +38,7 @@ class Context:
         # 1. Prepare Components
         system_msg = []
         if system_prompt:
+            content = None
             try:
                 content = await self.channel.manager.get_system_prompt()
             except Exception as e:
@@ -176,6 +174,69 @@ class Context:
 
             messages = enforced_messages
 
+        return {
+            "system_msg": system_msg,
+            "messages": messages,
+            "end_msg": end_msg,
+        }
+
+    @staticmethod
+    def _clean_msg_for_tokens(msg):
+        """Strip multimodal media content when estimating tokens, matching count_tokens() behavior"""
+        content = msg.get("content")
+        if isinstance(content, list):
+            return {
+                **msg,
+                "content": [item for item in content if isinstance(item, dict) and item.get("type") == "text"]
+            }
+        return msg
+
+    @classmethod
+    def _json_length(cls, data) -> int:
+        """exact json.dumps() length of any data, matching count_tokens()'s representation"""
+        if isinstance(data, dict):
+            return len(json.dumps(cls._clean_msg_for_tokens(data)))
+        return len(json.dumps(data))
+
+    def _message_token_lengths(self, messages) -> list:
+        """per-message json string lengths, equivalent to how count_tokens() serializes a list"""
+        return [len(json.dumps(self._clean_msg_for_tokens(msg))) for msg in messages]
+    def _chunk_tokens(self, lengths, start, system_msg, end_msg, tool_tokens, reserved_tokens=0) -> int:
+        """token count of system_msg + messages[start:] + end_msg, using the exact
+        same arithmetic count_tokens() would produce (json.dumps length // 4).
+
+        json.dumps of the flat combined list is "[" + items joined with ", " + "]",
+        so its length is exactly: 2 + sum of each *item's* length + 2 * (n - 1).
+        """
+        n = len(lengths)
+        sys_len = Context._json_length(system_msg[0]) if system_msg else 0
+        end_len = Context._json_length(end_msg[0]) if end_msg else 0
+        total_items = len(system_msg) + (n - start) + len(end_msg)
+        separator_len = 2 * max(total_items - 1, 0)
+        return (2 + sys_len + end_len + sum(lengths[start:]) + separator_len) // 4 + tool_tokens + reserved_tokens
+
+    async def get(self, system_prompt=True, end_prompt=True, history=True, prevent_recursion=False):
+        """
+        builds the full context window using system prompt + message history + end prompt
+        to the API, we send this full context.
+
+        to frontend channels, we send only the message history part of the context (context.chat.messages.get()),
+        without the system prompt and without the modifications we do to it such as the endprompt.
+
+        context must ALWAYS follow this strict turn order: system->user->assistant->user->assistant->user->...
+        """
+        # Configuration
+        max_tokens = int(core.config.get("api").get("max_context", 8192))
+
+        parts = await self._prepare(system_prompt, end_prompt, history, prevent_recursion)
+        if not isinstance(parts, dict):
+            # API connect failed; pass the error object through like the original code did
+            return parts
+
+        system_msg = parts["system_msg"]
+        messages = parts["messages"]
+        end_msg = parts["end_msg"]
+
         # 2. Build and Trim Context
         # We combine them to check the total token count
 
@@ -184,36 +245,34 @@ class Context:
         if self.channel.manager.tools:
             tool_tokens = await self.count_tokens(self.channel.manager.tools)
 
-        # then combine it all
-        full_context = system_msg + messages + end_msg
-        
+        # exact per-message json lengths so the trim search doesn't re-serialize
+        # the whole context on every iteration
+        lengths = self._message_token_lengths(messages)
+        total_length = sum(lengths)
+
         # Calculate current token count (includes tools + context)
-        current_tokens = await self.count_tokens(full_context) + tool_tokens
+        current_tokens = self._chunk_tokens(lengths, 0, system_msg, end_msg, tool_tokens)
 
         # Leave a small buffer (5%) to avoid hitting exact limit
         effective_max_tokens = int(max_tokens * 0.95)
-        
+
         # If we are over the limit, trim the history (the middle part).
         # We don't trim the system prompt or the end prompt as they are essential.
         # Use binary search to find the optimal trim point efficiently.
         if current_tokens > effective_max_tokens and messages:
             # Reserve tokens for the last user message so it always fits
             reserved_tokens = 0
-            if messages and messages[-1].get("role") == "user":
-                reserved_tokens = await self.count_tokens([messages[-1]])
-            
-            # Reduce the effective max by the reserved amount
-            effective_max_with_reserve = effective_max_tokens - reserved_tokens
-            
+            if messages[-1].get("role") == "user":
+                # count_tokens([messages[-1]]) == (len(json.dumps([msg])) // 4)
+                reserved_tokens = (lengths[-1] + 2) // 4
+
             # Binary search: find the minimum number of messages to remove from the front
             lo, hi = 0, len(messages)
             best_trim = len(messages)  # worst case: remove everything
 
             while lo <= hi:
                 mid = (lo + hi) // 2
-                trimmed = messages[mid:]
-                candidate_context = system_msg + trimmed + end_msg
-                tokens = tool_tokens + await self.count_tokens(candidate_context) + reserved_tokens
+                tokens = self._chunk_tokens(lengths, mid, system_msg, end_msg, tool_tokens, reserved_tokens)
 
                 if tokens <= effective_max_tokens:
                     best_trim = mid
@@ -222,8 +281,12 @@ class Context:
                     lo = mid + 1
 
             messages = messages[best_trim:]
-            full_context = system_msg + messages + end_msg
-            current_tokens = tool_tokens + await self.count_tokens(full_context) + reserved_tokens
+            lengths = lengths[best_trim:]
+
+            # recompute the token count with the trimmed context, like the original
+            current_tokens = self._chunk_tokens(lengths, 0, system_msg, end_msg, tool_tokens, reserved_tokens)
+
+        full_context = system_msg + messages + end_msg
 
         # If we are STILL over the limit even with empty history,
         # the system prompt + end prompt alone exceed the limit, or a single message is too large.
@@ -242,24 +305,47 @@ class Context:
     async def get_size(self):
         """basically just a fancy display of current token use, used by the `/status` command, and can optionally be used by other parts of the framework"""
 
-        # we're using self.get() here because it dynamically trims message history,
-        # and chat.messages.get() would instead return the ENTIRE history without trimming,
-        # which would be an inaccurate count
-        message_history = await self.get(system_prompt=False, end_prompt=False, history=True)
-        sysprompt = await self.get(system_prompt=True, end_prompt=False, history=False)
-        histend = await self.get(system_prompt=False, end_prompt=True, history=False)
-        
-        # now we count the tokens for each part of the context
-        sysprompt_size_tokens = await self.count_tokens(sysprompt)
-        sysprompt_size_words = len(str(sysprompt).split())
-        
-        message_hist_size_tokens = await self.count_tokens(message_history)
-        message_hist_size_words = len(str(message_history).split())
-        
-        histend_size_tokens = await self.count_tokens(await self.get(system_prompt=False, end_prompt=True, history=False))
-        histend_size_words = len(str(histend).split()) if histend else 0
+        parts = await self._prepare(system_prompt=True, end_prompt=True, history=True)
+        if not isinstance(parts, dict):
+            return {}
 
-        tool_array_size_tokens = await self.count_tokens(self.channel.manager.tools)
+        system_msg = parts["system_msg"]
+        messages = parts["messages"]
+        end_msg = parts["end_msg"]
+
+        max_tokens = int(core.config.get("api").get("max_context", 8192))
+        tool_tokens = await self.count_tokens(self.channel.manager.tools) if self.channel.manager.tools else 0
+
+        # use the same trimming logic as get() so the history bucket reflects
+        # what would actually be sent to the API
+        lengths = self._message_token_lengths(messages)
+        effective_max_tokens = int(max_tokens * 0.95)
+        total = 0
+        if self._chunk_tokens(lengths, 0, system_msg, end_msg, 0) > effective_max_tokens and messages:
+            reserved_tokens = (lengths[-1] + 2) // 4 if messages[-1].get("role") == "user" else 0
+            lo, hi = 0, len(messages)
+            best_trim = len(messages)
+            while lo <= hi:
+                mid = (lo + hi) // 2
+                tokens = self._chunk_tokens(lengths, mid, system_msg, end_msg, 0, reserved_tokens)
+                if tokens <= effective_max_tokens:
+                    best_trim = mid
+                    hi = mid - 1
+                else:
+                    lo = mid + 1
+            messages = messages[best_trim:]
+            lengths = lengths[best_trim:]
+
+        sysprompt_size_tokens = await self.count_tokens(system_msg)
+        sysprompt_size_words = len(str(system_msg).split())
+
+        message_hist_size_tokens = await self.count_tokens(messages)
+        message_hist_size_words = len(str(messages).split())
+
+        histend_size_tokens = await self.count_tokens(end_msg)
+        histend_size_words = len(str(end_msg).split()) if end_msg else 0
+
+        tool_array_size_tokens = tool_tokens
         tool_array_size_words = len(str(self.channel.manager.tools).split())
 
         # get amount of tools active
@@ -267,7 +353,7 @@ class Context:
 
         combined_size_words = tool_array_size_words + sysprompt_size_words + message_hist_size_words + histend_size_words
 
-        token_usage = await self.get_total_tokens()
+        token_usage = tool_tokens + self._chunk_tokens(lengths, 0, system_msg, end_msg, 0)
 
         return {
             "system prompt size": f"{sysprompt_size_tokens} tokens | {sysprompt_size_words} words",
@@ -282,7 +368,7 @@ class Context:
 
         if not text:
             return 0
-        
+
         # 1 token is roughly 4 characters for most English text
         return len(text) // 4
 
@@ -319,12 +405,8 @@ class Context:
                 # and we auto remove all previous multimodal content from context when passing to the API,
                 # sending only the current message's multimodal content (such as an image)
 
-                # first i coded this function by hand using a for loop that copied each message and stripped it of any non-text content, 
-                # then i asked my local AI for a more compact and performance friendly way to do it.
-                # now that's a good way to use AI coding, imho :)
-                # thanks Qwen3.6-35B!
                 cleaned_messages = [
-                    {**msg, "content": [item for item in (msg.get("content") or []) if item.get("type") == "text"]}
+                    {**msg, "content": [item for item in (msg.get("content") or []) if isinstance(item, dict) and item.get("type") == "text"]}
                     if isinstance(msg.get("content"), list)
                     else msg
                     for msg in data

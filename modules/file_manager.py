@@ -4,6 +4,7 @@ import sys
 import platform
 import shutil
 from pathlib import Path
+import base64
 
 class FileManager(core.module.Module):
     """Gives your AI full access to your filesystem. CAUTION: Unsafe! Use at your own risk."""
@@ -58,7 +59,7 @@ class FileManager(core.module.Module):
         if not verify.get("success"):
             return self.result(verify.get("reason"), False)
 
-        return os.listdir(path)
+        return self.result(os.listdir(path))
 
     async def read(self, path: str):
         verify = self._verify_path(path, should_be_file=True)
@@ -83,7 +84,7 @@ class FileManager(core.module.Module):
         try:
             with open(path, 'rb') as f:
                 content = f.read()
-            return self.result(content)
+            return self.result(base64.b64encode(content).decode('ascii'))
         except Exception as e:
             return self.result(str(e), False)
 

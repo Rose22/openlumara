@@ -295,26 +295,28 @@ class SimpleWebui(core.channel.Channel):
     def _sync_send(self, message):
         """
         Helper method to call async self.send() from a synchronous context.
-        Uses asyncio.new_event_loop() + run_until_complete to bridge the gap.
+        Uses asyncio.run_coroutine_threadsafe to dispatch to the main event loop.
         """
-        loop = asyncio.new_event_loop()
-        try:
-            task = asyncio.ensure_future(self.send(message, commands_authorized=self.config.get("allow_commands")), loop=loop)
-            return loop.run_until_complete(task)
-        finally:
-            loop.close()
+        if hasattr(self, "_main_loop") and self._main_loop.is_running():
+            future = asyncio.run_coroutine_threadsafe(
+                self.send(message, commands_authorized=self.config.get("allow_commands")),
+                self._main_loop
+            )
+            return future.result()
+        return None
 
     def _sync_clear(self):
-        loop = asyncio.new_event_loop()
-        try:
-            task = asyncio.ensure_future(self.context.chat.clear(), loop=loop)
-            return loop.run_until_complete(task)
-        finally:
-            loop.close()
-
+        if hasattr(self, "_main_loop") and self._main_loop.is_running():
+            future = asyncio.run_coroutine_threadsafe(
+                self.context.chat.clear(),
+                self._main_loop
+            )
+            return future.result()
+        return None
     async def on_ready(self):
         """Initialize Flask app and start it in a background thread."""
         self.app = Flask(__name__)
+        self._main_loop = asyncio.get_running_loop()
         self.app.secret_key = str(uuid.uuid4())
         self.thread = None
         self.html_template = HTML_TEMPLATE.replace("var(--primary-color)", self.config.get("primary_color"))

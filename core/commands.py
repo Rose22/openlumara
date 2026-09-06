@@ -386,9 +386,8 @@ class Commands:
         # use API.send() to skip all the usual convenience logic
         response = await self.channel.manager.API.send(context+[{"role": "user", "content": "Please summarize our conversation so far up to this point. The purpose is to compress current context into a summary that will be used to continue the chat."}], use_tools=False, use_thinking=False)
 
-        if not response:
-            return None
-
+        if not response or isinstance(response, core.api.APIError):
+            return f"Error while compressing chat: {response or 'No response from AI'}"
         # add special cutoff message that gets handled by the context manager
         await self.channel.context.chat.messages.add(self.channel.context.SUMMARIZATION_CUTOFF)
 
@@ -435,8 +434,10 @@ class Commands:
         return "\n".join(lines)
     
     async def cmd_modules(self, args: list):
-        modules_str = "\n".join(core.config.get("modules").get("enabled"))
-        modules_disabled_str = "\n".join(core.config.get("modules").get("disabled"))
+        enabled_mods = core.config.get("modules", "enabled", default=[]) or []
+        disabled_mods = core.config.get("modules", "disabled", default=[]) or []
+        modules_str = "\n".join(enabled_mods)
+        modules_disabled_str = "\n".join(disabled_mods)
         modules_loaded_str = "\n".join(self.channel.manager.modules.keys())
         
         return f"== loaded ==\n{modules_loaded_str}\n\n== disabled ==\n{modules_disabled_str}\n"
