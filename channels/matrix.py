@@ -814,29 +814,9 @@ class Matrix(core.channel.Channel):
                 pass
 
     def _format_tool_call(self, tool_data) -> str:
-        # (Preserved from original)
-        try:
-            import json_repair
-            if hasattr(tool_data, "function"):
-                func_name = getattr(tool_data.function, "name", "unknown")
-                raw_args = getattr(tool_data.function, "arguments", "{}")
-            elif isinstance(tool_data, dict) and "function" in tool_data:
-                func_name = tool_data["function"].get("name", "unknown")
-                raw_args = tool_data["function"].get("arguments", "{}")
-            else:
-                return "🔧 Calling tool…"
-
-            if isinstance(raw_args, str):
-                args_dict = json_repair.loads(raw_args)
-            elif isinstance(raw_args, dict):
-                args_dict = raw_args
-            else:
-                args_dict = {}
-
-            arg_strs = [f'{k}="{str(v)[:30]}"' for k, v in args_dict.items()]
-            return f"🔧 {func_name}({', '.join(arg_strs)})"
-        except Exception:
-            return "🔧 Calling tool…"
+        if hasattr(self, 'tc_manager'):
+            return self.tc_manager.display_call(tool_data)
+        return "🔧 Calling tool…"
 
     # ── room I/O ──────────────────────────────────────────────────────────
 
@@ -860,6 +840,9 @@ class Matrix(core.channel.Channel):
             except Exception as e:
                 self.log("matrix", f"Announce to {room_id} failed: {e}")
 
+
+    # Alias to match base channel interface and internal callers
+    announce = _announce
 
 
     async def _send_room_message(self, room_id: str, text: str):

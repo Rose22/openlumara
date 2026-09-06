@@ -60,7 +60,15 @@ class Calendar(core.module.Module):
         delay = (event_time - now).total_seconds() - window_seconds
 
         if delay <= 0:
-            # If the event is happening right now or has passed, trigger immediately
+            # If the event occurred in the past (beyond window), mark it without spamming
+            if (now - event_time).total_seconds() > window_seconds:
+                index = await self._get_event_by_id(event['id'])
+                if index != -1:
+                    self.events[index]["notify"] = False
+                    self.events.save()
+                return
+
+            # If the event is happening right now, trigger immediately
             await self._notify_user(event)
             return
 
@@ -83,7 +91,7 @@ class Calendar(core.module.Module):
         if not channel_name:
             channel_name = self.config.get("notification_channel")
 
-        channel = self.manager.channels.get(channel_name)
+        channel = self.manager.channels.get(channel_name) or self.channel
 
         if channel:
             event_time = datetime.datetime.fromisoformat(event["date"])
@@ -103,11 +111,11 @@ class Calendar(core.module.Module):
             # add to context so the AI knows it just notified the user
             await channel.context.chat.messages.add({"role": "assistant", "content": message})
 
-            # disable notification
-            index = await self._get_event_by_id(event['id'])
-            if index != -1:
-                self.events[index]["notify"] = False
-                self.events.save()
+        # disable notification
+        index = await self._get_event_by_id(event['id'])
+        if index != -1:
+            self.events[index]["notify"] = False
+            self.events.save()
 
     async def _get_events_in_range(self):
         # display appointments between certain range

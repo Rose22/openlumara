@@ -11,7 +11,7 @@ class Logger(core.channel.Channel):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.path = self.config.get("path")
+        self.path = self.config.get("path") or "lumara.log"
 
         self.logfile = None
 
@@ -48,4 +48,5 @@ class Logger(core.channel.Channel):
         self.logfile.flush()
 
     async def on_shutdown(self):
-        self.logfile.close()
+        if self.logfile and not self.logfile.closed:
+            self.logfile.close()

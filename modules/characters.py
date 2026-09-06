@@ -88,16 +88,22 @@ class Characters(core.module.Module):
     async def cmd_switch(self, args: list):
         name = " ".join(args)
         if not name:
-            char = self.channel.context.chat.get("metadata").get("character")
+            meta = (self.channel.context.chat.get("metadata") or {}) if (self.channel and hasattr(self.channel, 'context') and self.channel.context) else {}
+            char = meta.get("character")
             self.active = True
             if char:
                 return f"currently active character: {char}"
             else:
                 return "please provide a character name."
-        elif name in("reset", "default"):
-                self.channel.context.chat.get("metadata")["character"] = "character"
-                self.active = False
-                return "character has been reset to default"
+        elif name in ("reset", "default"):
+            chat = self.channel.context.chat
+            meta = chat.get("metadata")
+            if meta is None:
+                meta = {}
+                chat.data[chat.current]["metadata"] = meta
+            meta["character"] = ""
+            self.active = False
+            return "character has been reset to default"
 
         character = self._find_character(name)
         if not character:
@@ -109,7 +115,9 @@ class Characters(core.module.Module):
         return f"character switched to {char_name}"
 
     async def on_system_prompt(self):
-        curr_char = self.channel.context.chat.get("metadata").get("character")
+        chat = self.channel.context.chat if (self.channel and hasattr(self.channel, 'context') and self.channel.context) else None
+        meta = (chat.get("metadata") or {}) if chat else {}
+        curr_char = meta.get("character")
 
         tool_text = f"Characters available to switch yourself to:\n{await self._list_characters()}" if (
             core.config.get("model", {}).get("use_tools") and
@@ -117,11 +125,12 @@ class Characters(core.module.Module):
             not curr_char
         ) else ""
 
-        if not curr_char:
+        if not curr_char or curr_char == "character":
             return tool_text or None
 
-        char_name = self.channel.context.chat.get("metadata").get("character")
-        char = self.characters.get(char_name)
+        char = self.characters.get(curr_char)
+        if not char or not isinstance(char, dict):
+            return tool_text or None
 
         # the presence of the "data" key means it's
         # either character card V2 or V3 or higher
@@ -185,8 +194,10 @@ class Characters(core.module.Module):
         return char_text
 
     async def on_end_prompt(self):
-        curr_char = self.channel.context.chat.get("metadata").get("character")
-        if not curr_char:
+        chat = self.channel.context.chat if (self.channel and hasattr(self.channel, 'context') and self.channel.context) else None
+        meta = (chat.get("metadata") or {}) if chat else {}
+        curr_char = meta.get("character")
+        if not curr_char or curr_char == "character":
             return None
 
         char = self._find_character(curr_char)
@@ -233,11 +244,15 @@ class Characters(core.module.Module):
     
     async def switch_to_default(self):
         """Switches you back to your default identity."""
-        self.channel.context.chat.get("metadata")["character"] = ""
+        chat = self.channel.context.chat
+        meta = chat.get("metadata")
+        if meta is None:
+            meta = {}
+            chat.data[chat.current]["metadata"] = meta
+        meta["character"] = ""
 
         self.active = False
         return "success"
-
     def _case_insensitive_replace(self, text, old, new):
         """Replaces all occurrences of 'old' with 'new' in 'text', ignoring case."""
         if not old:

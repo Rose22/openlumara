@@ -14,24 +14,23 @@ class SafeCalculator:
     and only allowing specific mathematical operations.
     """
 
+    _BINARY_OPERATORS = {
+        ast.Add: operator.add,
+        ast.Sub: operator.sub,
+        ast.Mult: operator.mul,
+        ast.Div: operator.truediv,
+    }
+
+    _UNARY_OPERATORS = {
+        ast.UAdd: operator.pos,
+        ast.USub: operator.neg,
+    }
+
+    _ALLOWED_CHARS = frozenset('0123456789+-*/(). ')
+
     def __init__(self):
-        # Mapping of allowed binary operators
-        self._binary_operators = {
-            ast.Add: operator.add,
-            ast.Sub: operator.sub,
-            ast.Mult: operator.mul,
-            ast.Div: operator.truediv,
-            #ast.FloorDiv: operator.floordiv,
-            #ast.Mod: operator.mod,
-            #ast.Pow: operator.pow,
-        }
-
-        # Mapping of allowed unary operators
-        self._unary_operators = {
-            ast.UAdd: operator.pos,
-            ast.USub: operator.neg,
-        }
-
+        self._binary_operators = self._BINARY_OPERATORS
+        self._unary_operators = self._UNARY_OPERATORS
     def evaluate(self, expression: str) -> float:
         """
         Safely evaluates a mathematical expression string.
@@ -50,8 +49,7 @@ class SafeCalculator:
             raise ValueError("Expression cannot be empty")
 
         # block characters not in the whitelist, just in case
-        allowed = set('0123456789+-*/(). ')
-        if not all(c in allowed for c in expression):
+        if not all(c in self._ALLOWED_CHARS for c in expression):
             raise ValueError("Invalid characters in expression")
 
         # block expressions that are too long
@@ -125,7 +123,10 @@ class Calculator(core.module.Module):
         self._calc = SafeCalculator()
 
     async def calc(self, expression: str):
-        return self.result(self._calc.evaluate(expression))
+        try:
+            return self.result(self._calc.evaluate(expression))
+        except (ValueError, ZeroDivisionError) as e:
+            return self.result(str(e), success=False)
 
     def _tests(self):
         test_cases = [

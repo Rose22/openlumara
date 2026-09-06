@@ -44,6 +44,14 @@ class AutoBackup(core.module.Module):
 
         await self._setup_backup()
 
+    def _log(self, category: str, message):
+        # self.channel is None until a channel activates (first message sent),
+        # but backups can run before that, so fall back to the manager's log
+        if self.channel:
+            self.channel.log(category, message)
+        else:
+            self.manager.log(category, message)
+
     async def on_shutdown(self):
         """Cancel the background backup task."""
         if self._backup_task and not self._backup_task.done():
@@ -71,7 +79,7 @@ class AutoBackup(core.module.Module):
                 wait_days = int(wait_time / 86400)
 
                 if wait_time > 0:
-                    self.channel.log(self.name, f"Waiting {wait_days} day(s) until next backup")
+                    self._log(self.name, f"Waiting {wait_days} day(s) until next backup")
                     await asyncio.sleep(wait_time)
 
                 # Check again after sleep in case settings changed
@@ -85,7 +93,7 @@ class AutoBackup(core.module.Module):
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                self.channel.log(self.name, f"Error during backup cycle: {core.detail_error(e)}")
+                self._log(self.name, f"Error during backup cycle: {core.detail_error(e)}")
                 # Wait a bit before retrying on error
                 await asyncio.sleep(60)
 
@@ -94,16 +102,16 @@ class AutoBackup(core.module.Module):
         # Create backup directory if it doesn't exist
         try:
             if not os.path.exists(self.backup_path):
-                self.channel.log(self.name, f"Backup directory created: {self.backup_path}")
+                self._log(self.name, f"Backup directory created: {self.backup_path}")
                 os.makedirs(self.backup_path, exist_ok=True)
         except Exception as e:
-            self.channel.log(self.name, f"Warning: Could not create backup directory '{self.backup_path}': {e}")
+            self._log(self.name, f"Warning: Could not create backup directory '{self.backup_path}': {e}")
 
         interval = self.config.get("backup_interval_days", 7)
         if interval and interval > 0:
-            self.channel.log(self.name, f"Automatic backups enabled every {interval} day(s)")
+            self._log(self.name, f"Automatic backups enabled every {interval} day(s)")
         else:
-            self.channel.log(self.name, "Automatic backups are disabled (interval set to 0)")
+            self._log(self.name, "Automatic backups are disabled (interval set to 0)")
 
     async def _perform_backup(self):
         """Perform a single backup operation."""
@@ -112,8 +120,8 @@ class AutoBackup(core.module.Module):
 
         if not data_folder or not os.path.exists(data_folder):
             error_msg = f"Backup failed: Data folder not found.\n"
-            self.channel.log(self.name, error_msg)
-            if enable_notifications:
+            self._log(self.name, error_msg)
+            if enable_notifications and self.channel:
                 await self.channel.push(
                     f"⚠️ Data Backup Failed\n{error_msg}"
                 )
@@ -122,26 +130,28 @@ class AutoBackup(core.module.Module):
         # Create the zip filename with timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         zip_filename = f"openlumara_backup_{timestamp}.zip"
+        os.makedirs(self.backup_path, exist_ok=True)
         zip_path = os.path.join(self.backup_path, zip_filename)
 
         try:
-            # Create the zip backup
+            # Create the zip backup (skip backup_path if inside data_folder to avoid recursive bloat)
+            backup_real = os.path.realpath(self.backup_path)
             with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
                 for root, dirs, files in os.walk(data_folder):
+                    if os.path.realpath(root).startswith(backup_real):
+                        continue
                     for file in files:
                         file_path = os.path.join(root, file)
-                        # Calculate the archive name (relative to data folder)
                         arcname = os.path.relpath(file_path, data_folder)
                         zipf.write(file_path, arcname)
-
             # Get file size for notification
             file_size = os.path.getsize(zip_path)
             size_mb = file_size / (1024 * 1024)
 
-            self.channel.log(self.name, f"Backup completed: {zip_filename} ({size_mb:.2f} MB)")
+            self._log(self.name, f"Backup completed: {zip_filename} ({size_mb:.2f} MB)")
 
             # Send notification if enabled
-            if enable_notifications:
+            if enable_notifications and self.channel:
                 notification = (
                     f"✅ Data Backup Complete\n"
                     f"File: {zip_filename}\n"
@@ -152,11 +162,11 @@ class AutoBackup(core.module.Module):
 
             # Update last backup time in persistent storage
             self._last_backup.set(str(datetime.now().isoformat()))
-            self.channel.log(self.name, f"Last backup time saved: {self._last_backup}")
+            self._log(self.name, f"Last backup time saved: {self._last_backup}")
 
         except Exception as e:
             error_msg = f"Backup failed with error: {e}"
-            self.channel.log(self.name, error_msg)
+            self._log(self.name, error_msg)
             if enable_notifications:
                 await self.channel.push(f"⚠️ Data Backup Failed\n{error_msg}")
 
@@ -188,14 +198,14 @@ class AutoBackup(core.module.Module):
             remaining = interval_seconds - elapsed
             
             if remaining <= 0:
-                self.channel.log(self.name, "Backup interval has passed, backing up immediately")
+                self._log(self.name, "Backup interval has passed, backing up immediately")
                 return 0
             
             return remaining
             
         except (ValueError, TypeError) as e:
             # Invalid timestamp format, wait for full interval
-            self.channel.log(self.name, f"Invalid last backup timestamp: {e}, waiting full interval")
+            self._log(self.name, f"Invalid last backup timestamp: {e}, waiting full interval")
             return interval_seconds
 
     # -------------------------

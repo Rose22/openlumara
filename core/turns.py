@@ -23,22 +23,28 @@ class TurnCollector:
         current_assistant_turn = None
 
         for index, msg in enumerate(history):
+            # copy the message so we never mutate the stored history:
+            # the original code added 'index' / 'response' keys straight onto
+            # the live message objects, which then leaked into saved history
+            # files and into the tool_calls sent to the API
+            msg = dict(msg)
+
             role = msg.get('role')
 
             # add the index to the message so that it can be directly targeted no matter which turn it is in
             msg["index"] = index
-            
+
             if role == 'user':
                 if current_assistant_turn:
                     # if a user message arrives and it's currently still
                     # the assistant's turn, that means we finalize it, and move onto a new turn!
                     turns.append(current_assistant_turn)
                     current_assistant_turn = None
-                
+
                 # append the user message as a single turn. a user message is never multiple turns
                 turns.append({
                     "role": "user",
-                    "messages": [msg.copy()],
+                    "messages": [msg],
                     "first_message_index": index
                 })
             else:
@@ -53,7 +59,12 @@ class TurnCollector:
                 # update the last message index.. since this is a for loop,
                 # by the time we reach the last message, this will be set to the last message index
                 current_assistant_turn["last_message_index"] = index
-                    
+
+                # tool_calls are nested objects shared with the stored history,
+                # so copy them too before we merge responses into them
+                if msg.get("tool_calls"):
+                    msg["tool_calls"] = [dict(tc) for tc in msg["tool_calls"]]
+
                 current_assistant_turn["messages"].append(msg)
 
         if current_assistant_turn:
@@ -66,7 +77,7 @@ class TurnCollector:
             
             response_map = {}
             for msg in turn["messages"]:
-                if msg.get("role") == 'tool':
+                if msg.get("role") == 'tool' and msg.get("tool_call_id"):
                     response_map[msg["tool_call_id"]] = msg.get("content")
 
             for msg in turn["messages"]:

@@ -1,6 +1,9 @@
 import os
 import sys
-import readline
+try:
+    import readline  # posix-only; gives input() line editing/history where available
+except ImportError:
+    pass
 import asyncio
 import random
 import concurrent.futures

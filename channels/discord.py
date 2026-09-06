@@ -86,7 +86,7 @@ class Client(discord.Client):
                     except Exception:
                         try:
                             await discord_channel.send(state.full_content)
-                        except:
+                        except Exception:
                             pass
 
     async def on_ready(self):
@@ -290,7 +290,7 @@ class Discord(core.channel.Channel):
                     return
 
     async def run(self):
-        token = core.config.config.get("channels").get("settings").get("discord").get("token")
+        token = self.config.get("token")
 
         if not token:
             self.log("error", "Discord token not set! Set it up in the webui or by editing the config")
@@ -318,4 +318,5 @@ class Discord(core.channel.Channel):
         if shutdown_message:
             await self.push(shutdown_message)
 
-        await self._client.close()
+        if hasattr(self, "_client") and self._client:
+            await self._client.close()

@@ -180,9 +180,10 @@ class WritingStyle(core.module.Module):
     }
 
     async def on_system_prompt(self):
+        cfg = self.config.to_dict()
         constraints = [""]
 
-        style = self.config.get("writing_style")
+        style = cfg.get("writing_style")
         match style:
             case "chat":
                 constraints.append("Style: Messaging app (Telegram/Discord).")
@@ -201,13 +202,13 @@ class WritingStyle(core.module.Module):
             case "javascript":
                 constraints[-1] += "Output ONLY javascript code"
 
-        flair = self.config.get("writing_flair")
+        flair = cfg.get("writing_flair")
         if style != "default" and flair != "default":
             constraints[-1] += " "
 
         match flair:
             case "custom":
-                custom_flair = self.config.get("custom_writing_flair") or "Not sure"
+                custom_flair = cfg.get("custom_writing_flair") or "Not sure"
                 constraints[-1] += custom_flair
             case "spambot":
                 constraints[-1] += "You are always advertising something to the user."
@@ -238,7 +239,7 @@ class WritingStyle(core.module.Module):
         if len(constraints[0]) == 0:
             constraints.pop(0)
 
-        cap_style = self.config.get("capitalization_style")
+        cap_style = cfg.get("capitalization_style")
         match cap_style:
             case "lowercase":
                 constraints.append("Case: Lowercase only")
@@ -251,7 +252,7 @@ class WritingStyle(core.module.Module):
             case "snake_case":
                 constraints.append("Case: snake_case_for_the_entire_response")
 
-        length = self.config.get("writing_length")
+        length = cfg.get("writing_length")
         match length:
             case "one paragraph":
                 constraints.append("Length: Only one paragraph")
@@ -266,7 +267,7 @@ class WritingStyle(core.module.Module):
             case "book":
                 constraints.append("You MUST write your response with the length of an entire book")
 
-        vocab = self.config.get("vocabulary_level")
+        vocab = cfg.get("vocabulary_level")
         match vocab:
             case "simple":
                 constraints.append("Vocabulary: Use simple, everyday language. Avoid flowery buzzwords.")
@@ -281,7 +282,7 @@ class WritingStyle(core.module.Module):
             case "old english":
                 constraints.append("Vocabulary: Use old english language.")
 
-        emoji = self.config.get("emoji_style")
+        emoji = cfg.get("emoji_style")
         match emoji:
             case "none":
                 constraints.append("Emoji: Forbidden.")
@@ -296,10 +297,10 @@ class WritingStyle(core.module.Module):
             case "spam me pls":
                 constraints.append("Emoji: Heavy spam.")
 
-        mood = self.config.get("mood")
+        mood = cfg.get("mood")
         match mood:
             case "custom":
-                custom_mood = self.config.get("custom_mood") or "Annoyed at user for not specifying a custom mood"
+                custom_mood = cfg.get("custom_mood") or "Annoyed at user for not specifying a custom mood"
                 constraints.append(f"Mood: {custom_mood}")
             case "happy":
                 constraints.append("Mood: Happy")
@@ -333,10 +334,10 @@ class WritingStyle(core.module.Module):
             case "manic":
                 constraints.append("Mood: Manically happy")
 
-        desire = self.config.get("desire")
+        desire = cfg.get("desire")
         match desire:
             case "custom":
-                custom_desire = self.config.get("custom_desire") or "Not sure"
+                custom_desire = cfg.get("custom_desire") or "Not sure"
                 constraints.append(f"Desire: {custom_desire}")
             case "helpful":
                 constraints.append("Desire: Help the user")
@@ -353,29 +354,29 @@ class WritingStyle(core.module.Module):
             case "you":
                 constraints.append("Desire: The user")
 
-        l_style = self.config.get("list_style")
+        l_style = cfg.get("list_style")
         match l_style:
             case "none":
                 constraints.append("No lists")
             case "no bold headers":
                 constraints.append("Lists: No bold headers at start of items.")
 
-        if self.config.get("forbid_em_dash"):
+        if cfg.get("forbid_em_dash"):
             constraints.append("Don't use `—`, use `-` instead")
 
-        if self.config.get("forbid_markdown"):
+        if cfg.get("forbid_markdown"):
             constraints.append("Don't use markdown")
         else:
-            if self.config.get("forbid_tables"):
+            if cfg.get("forbid_tables"):
                 constraints.append("No tables")
 
-            if self.config.get("forbid_headers"):
+            if cfg.get("forbid_headers"):
                 constraints.append("No headers")
 
-        if self.config.get("forbid_negative_parallelism"):
+        if cfg.get("forbid_negative_parallelism"):
             constraints.append("No negative parallelism (e.g., 'Not just X, but Y').")
 
-        if self.config.get("forbid_relentless_praise"):
+        if cfg.get("forbid_relentless_praise"):
             constraints.append("No excessive user praise (e.g., 'You're absolutely right!').")
 
         if not constraints:

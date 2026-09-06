@@ -492,17 +492,24 @@ class Manager:
 
         # run the module shutdown hook
         try:
-            await module.on_shutdown()
+            if hasattr(module, "on_shutdown"):
+                if asyncio.iscoroutinefunction(module.on_shutdown):
+                    await module.on_shutdown()
+                else:
+                    module.on_shutdown()
         except Exception as e:
             self.log("core", f"Error running on_shutdown for {module_name}: {core.detail_error(e)}")
 
         # re-run the module's setup (on_ready usually contains the config-dependent initialization logic)
         try:
-            await module.on_ready()
+            if hasattr(module, "on_ready"):
+                if asyncio.iscoroutinefunction(module.on_ready):
+                    await module.on_ready()
+                else:
+                    module.on_ready()
         except Exception as e:
             self.log("core", f"Error running on_ready for {module_name}: {core.detail_error(e)}")
             return False
-
         # re-add the module tools based on the new state (after on_ready's modifications)
         await self.load_module_tools(module)
 
@@ -527,6 +534,15 @@ class Manager:
         sysprompt_middle = []
         sysprompt_bottom = []
 
+        characters_module = self.modules.get("characters")
+        char_modules_exempt = ["characters"]
+        if (
+            self.modules.get("writing_style") and
+            characters_module and
+            characters_module.config.get("use_writing_style")
+        ):
+            char_modules_exempt.append("writing_style")
+
         for module_name, module in self.modules.items():
             if not core.config.get("model").get("use_tools", False) and module_name not in core.modules.nonagentic:
                 # skip most prompts if tools are turned off
@@ -535,15 +551,7 @@ class Manager:
             if module_name in self.broken_modules:
                 continue
 
-            char_modules_exempt = ["characters"]
-            if (
-                self.modules.get("writing_style") and
-                self.modules.get("characters") and
-                self.modules["characters"].config.get("use_writing_style")
-            ):
-                char_modules_exempt.append("writing_style")
-
-            if active_character and module_name not in char_modules_exempt and "characters" in self.modules.keys():
+            if active_character and module_name not in char_modules_exempt and characters_module:
                 # if a character is currently active, display ONLY the character system prompt
                 char_disable_agent_prompts = self.modules["characters"].config.get("disable_agent_prompts_when_character_active")
 
@@ -768,6 +776,11 @@ class Manager:
                     param_type = "array"
                 elif param_annotation == dict:
                     param_type = "object"
+                else:
+                    # unhandled annotation (Optional, list[str], float, etc):
+                    # the old code left param_type unbound, crashing the whole
+                    # startup with an UnboundLocalError
+                    param_type = "string"
 
                 # add params without a default value to the required params list
                 if param.default == inspect.Parameter.empty:

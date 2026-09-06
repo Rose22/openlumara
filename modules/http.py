@@ -22,6 +22,7 @@ from collections import Counter
 
 import core
 import requests
+import asyncio
 
 # ============================================================================
 # Prompt Injection Defense Layer (Research-backed, 2025-2026)
@@ -1239,61 +1240,58 @@ class Http(core.module.Module):
                          "verify", "timeout", "include_content")
         }
 
-        current_url = url
-        try:
-            for _hop in range(self.MAX_REDIRECTS + 1):
-                # Re-validate (incl. DNS + IP) on the initial URL and every hop.
-                ok, err = self._is_safe_url(current_url)
-                if not ok:
-                    self._log(f"Blocked URL ({current_url}): {err}")
-                    return self.result("URL blocked by security policy", False)
+        def _execute():
+            current_url = url
+            try:
+                for _hop in range(self.MAX_REDIRECTS + 1):
+                    ok, err = self._is_safe_url(current_url)
+                    if not ok:
+                        self._log(f"Blocked URL ({current_url}): {err}")
+                        return self.result("URL blocked by security policy", False)
 
-                resp = func(
-                    current_url,
-                    headers=headers,
-                    allow_redirects=False,   # manual redirect handling
-                    stream=True,             # stream so we can cap bytes
-                    verify=True,             # always verify TLS
-                    timeout=timeout,
-                    **passthrough,
-                )
+                    resp = func(
+                        current_url,
+                        headers=headers,
+                        allow_redirects=False,
+                        stream=True,
+                        verify=True,
+                        timeout=timeout,
+                        **passthrough,
+                    )
 
-                # Handle redirects manually so each hop is re-validated.
-                if resp.is_redirect or resp.is_permanent_redirect:
-                    location = resp.headers.get("Location")
-                    resp.close()
-                    if not location:
-                        return self.result("Redirect with no Location header", False)
-                    current_url = requests.compat.urljoin(current_url, location)
-                    continue
+                    if resp.is_redirect or resp.is_permanent_redirect:
+                        location = resp.headers.get("Location")
+                        resp.close()
+                        if not location:
+                            return self.result("Redirect with no Location header", False)
+                        current_url = requests.compat.urljoin(current_url, location)
+                        continue
 
-                return self._build_response(resp, include_content)
+                    return self._build_response(resp, include_content)
 
-            self._log(f"Too many redirects starting from {url}")
-            return self.result(
-                f"Too many redirects (maximum: {self.MAX_REDIRECTS})", False
-            )
+                self._log(f"Too many redirects starting from {url}")
+                return self.result(f"Too many redirects (maximum: {self.MAX_REDIRECTS})", False)
 
-        except requests.exceptions.Timeout:
-            self._log(f"Request timeout: {url}")
-            return self.result(f"Request timed out after {timeout} seconds", False)
-        except requests.exceptions.SSLError as e:
-            self._log(f"SSL error for {url}: {e}")
-            return self.result("SSL verification failed", False)
-        except requests.exceptions.TooManyRedirects:
-            self._log(f"Too many redirects: {url}")
-            return self.result(
-                f"Too many redirects (maximum: {self.MAX_REDIRECTS})", False
-            )
-        except requests.exceptions.ConnectionError as e:
-            self._log(f"Connection error for {url}: {e}")
-            return self.result("Connection error", False)
-        except requests.exceptions.RequestException as e:
-            self._log(f"Request failed for {url}: {e}")
-            return self.result("Request failed", False)
-        except Exception as e:
-            self._log(f"Unexpected error for {url}: {e}")
-            return self.result("An unexpected error occurred", False)
+            except requests.exceptions.Timeout:
+                self._log(f"Request timeout: {url}")
+                return self.result(f"Request timed out after {timeout} seconds", False)
+            except requests.exceptions.SSLError as e:
+                self._log(f"SSL error for {url}: {e}")
+                return self.result("SSL verification failed", False)
+            except requests.exceptions.TooManyRedirects:
+                self._log(f"Too many redirects: {url}")
+                return self.result(f"Too many redirects (maximum: {self.MAX_REDIRECTS})", False)
+            except requests.exceptions.ConnectionError as e:
+                self._log(f"Connection error for {url}: {e}")
+                return self.result("Connection error", False)
+            except requests.exceptions.RequestException as e:
+                self._log(f"Request failed for {url}: {e}")
+                return self.result("Request failed", False)
+            except Exception as e:
+                self._log(f"Unexpected error for {url}: {e}")
+                return self.result("An unexpected error occurred", False)
+
+        return await asyncio.to_thread(_execute)
 
     async def _guardrail_check(self, content: str) -> bool:
         """
