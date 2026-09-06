@@ -42,7 +42,7 @@
             <!-- user turn (always one message) -->
             <template x-if="turn.role === 'user'">
                 <div class="message-wrapper user" x-data="{ get message() { return turn.messages[0] } }">
-                    <div class="message user">
+                    <div class="message user" :class="{'editing-active': $store.chat.editingMessageIndex === turn.first_message_index}">
                         {% include 'chat/turns/user.html' %}
                         <div x-data="{ get targetIndex() { return turn.first_message_index } }" class="fullwidth">
                             {% include 'chat/message_buttons.html' %}
@@ -54,7 +54,7 @@
             <!-- assistant turn (multiple messages combined into one bubble) -->
             <template x-if="turn.role === 'assistant'">
                 <div class="message-wrapper assistant">
-                    <div class="message assistant">
+                    <div class="message assistant" :class="{'editing-active': $store.chat.editingMessageIndex === turn.last_message_index}">
                         <template x-for="(message, messageIndex) in turn.messages" :key="messageIndex">
                             {% include 'chat/turns/assistant_history.html' %}
                         </template>
