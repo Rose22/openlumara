@@ -41,13 +41,21 @@ class DiscordClient(discord.Client):
             return
 
         # if mentions are required, only reply if mentioned
-        mentioned = False
-        for member in message.mentions:
-            if member.id == self.user.id:
-                mentioned = True
+        if self._chan.config.get("require_mentions"):
+            mentioned = False
+            # go through normal mentions first
+            for member in message.mentions:
+                if member.id == self.user.id:
+                    mentioned = True
 
-        if self._chan.config.get("require_mentions") and not mentioned:
-            return
+            # then check for mention keywords
+            mention_keywords = self._chan.config.get("mention_keywords")
+            for keyword in mention_keywords:
+                if keyword in message.content:
+                    mentioned = True
+
+            if not mentioned:
+                return
 
         # determine whether non-public commands may be ran by the user
         authorized = (message.author.id == int(self._chan.config.get("authorized_user_id")))
@@ -101,21 +109,29 @@ class DiscordBot(core.channel.Channel):
             "description": "Whether to require people to mention the bot or reply to one of its messages in order to trigger a response",
             "default": True
         },
+        "mention_keywords": {
+            "description": "An optional list of keywords that, when present in a user's message, should trigger the discord bot to respond to the message. As an alternative to @mentions. For example, \"hey lumara\"",
+            "default": [],
+            "type": "list",
+            "depends": "require_mentions"
+        },
+        "show_reasoning": {
+            "description": "Whether to show the model's internal reasoning process within sent messages. Works in both streaming mode and non-streaming mode",
+            "default": False
+        },
         "use_message_streaming": {
             "description": "Whether to stream messages by periodically editing them. Use this together with *show reasoning* and *stream tool calls* for an experience very similar to the WebUI!",
             "default": False
         },
         "edit_interval": {
             "description": "The rate (in seconds) at which your bot's messages will be edited in streaming mode. Recommend setting this to 1 or above to avoid being rate limited!",
-            "default": 1
-        },
-        "show_reasoning": {
-            "description": "Whether to show the model's internal reasoning process within sent messages. Works in both streaming mode and non-streaming mode",
-            "default": False
+            "default": 1,
+            "depends": "use_message_streaming"
         },
         "stream_tool_calls": {
             "description": "Whether to stream tool call arguments as they are written by the AI. Extremely useful when using toolcalls with long content, such as when using the Coder to write code",
-            "default": False
+            "default": False,
+            "depends": "use_message_streaming"
         },
         "use_replies": {
             "description": "Whether the bot should reply to your messages using discord's reply feature",
