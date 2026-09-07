@@ -60,21 +60,56 @@ class DiscordClient(discord.Client):
         # determine whether non-public commands may be ran by the user
         authorized = (message.author.id == int(self._chan.config.get("authorized_user_id")))
 
-        msg_content = message.content
+        content = message.content
 
         # remove mentions from message before sending
-        msg_content = msg_content.strip()
+        content = content.strip()
         for mention in message.raw_mentions:
-            msg_content = msg_content.replace(str(mention), "")
-            msg_content = msg_content.replace("<@>", "")
-            msg_content = msg_content.strip()
+            content = content.replace(str(mention), "")
+            content = content.replace("<@>", "")
+            content = content.strip()
+
+        is_cmd = False
+        cmd_prefix, cmd, args = await self._chan.commands._extract_cmd(content)
+        if cmd:
+            is_cmd = content.lower().strip().startswith(cmd_prefix.lower())
+
+        if is_cmd:
+            # send the pure command to the AI
+            # command authorization checks were moved to the core framework
+            # so that it's much more secure
+            pass
+        else:
+            orig_content = str(content)
+            content = ""
+
+            group_chat = self._chan.config.get("enable_group_chat")
+
+            # check if the message is a reply
+            if message.reference:
+                # this gets the actual message object being replied to
+                replied_message = await message.channel.fetch_message(message.reference.message_id)
+
+                # format it like a reply
+                replied_content = replied_message.content or ""
+                replied_message_formatted = "> "+"\n> ".join(replied_content.split("\n"))
+                content += f"in reply to:\n{replied_message_formatted}\n\n"
+
+            # if group chat is enabled, make the AI aware of who is speaking
+            if group_chat:
+                # strip cmd prefix from author name for safety
+                # extra layer of security on top of the fix further below in the code
+                author_name = str(message.author.name).lstrip(cmd_prefix)
+                content += f"{author_name} said: {orig_content}"
+            else:
+                content += orig_content
 
         if self._chan.config.get("use_message_streaming"):
             # TODO: message streaming
             pass
         else:
             async with self.target_channel.typing():
-                response_obj = await self._chan.send(msg_content, commands_authorized=authorized)
+                response_obj = await self._chan.send(content, commands_authorized=authorized)
                 response = response_obj.get("content")
 
         if len(response) < CHUNK_SIZE:
