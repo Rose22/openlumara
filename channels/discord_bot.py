@@ -51,7 +51,7 @@ class DiscordClient(discord.Client):
             # then check for mention keywords
             mention_keywords = self._chan.config.get("mention_keywords")
             for keyword in mention_keywords:
-                if keyword in message.content:
+                if keyword.lower() in message.content.lower():
                     mentioned = True
 
             if not mentioned:
