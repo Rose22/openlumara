@@ -18,12 +18,11 @@ reported_missing = []
 reported_broken = []
 
 # buffer the warnings and errors so that we can propagate them to manager.log()
-log_buffer = []
 def log(category, message):
     if core.manager.global_instance:
         core.manager.global_instance.log(category, message)
     else:
-        log_buffer.append((category, message))
+        print(f"[{category.upper()}] {message}")
 
 # --------------------------------------
 # dependency auto-installer/uninstaller
@@ -284,7 +283,7 @@ def load(package, base_class = None, filter: list = None, reload: bool = False, 
         except core.exceptions.DependencyMissing as e:
             # silence these warnings for now
             # need a better way to deal with missing dependencies
-            pass
+            continue
         except Exception as e:
             # Catching Exception prevents the program from crashing on faulty modules.
             # We simply log the warning and continue to the next module.
