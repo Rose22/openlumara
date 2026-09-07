@@ -33,6 +33,8 @@ def plaintext(text):
 class Cli(core.channel.Channel):
     """A basic CLI channel for openlumara"""
 
+    running = True
+
     settings = {
         "show_reasoning": {
             "description": "Whether to show the model's internal reasoning process within sent messages. Works in both streaming mode and non-streaming mode",
@@ -203,7 +205,7 @@ class Cli(core.channel.Channel):
             })
         )
 
-        while True:
+        while self.running:
             try:
                 optional_args = {}
                 if self.config.get("show_status_bar"):
@@ -305,6 +307,7 @@ class Cli(core.channel.Channel):
                         self.console.print(token_content, end="")
             except asyncio.CancelledError:
                 self.console.print(f"\n[{accent_color}]cancelled.[/]")
+                break
             except KeyboardInterrupt:
                 self.console.print(f"\n[{accent_color}]cancelled.[/]")
             finally:
@@ -317,6 +320,10 @@ class Cli(core.channel.Channel):
                 self._token_usage = await self.context.get_total_tokens()
 
             self.console.print()
+
+    async def on_shutdown(self):
+        # stop the input loop so that run() exits cleanly
+        self.running = False
 
     async def on_push(self, message: dict):
         accent_color = self._get_accent_color()
