@@ -560,13 +560,17 @@ class Channel:
         tool_calls = assistant_message.get("tool_calls")
         if tool_calls:
             # process() does all the toolcalling, but it also returns the raw toolcall stream for our own use
+            final_message = None
             async for sub_token in self.tc_manager.process(
                 assistant_message,
                 push=True
             ):
-                # push handles all the output
-                pass
+                if sub_token.get("type") == "final":
+                    final_message = sub_token.get("content")
 
+            if final_message:
+                await self._send_postprocess(final_message)
+                return self.format_message(final_message)
             return None
 
         # postprocessing ( mainly assistant message module hooks, but this can be extended later :) )

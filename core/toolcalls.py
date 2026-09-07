@@ -268,9 +268,6 @@ class ToolcallManager:
 
                 yield {"type": "final", "content": final_msg}
 
-                if final_content and push:
-                    await self.channel.push("".join(final_content))
-
                 # set the agentic loop marker so that context.py knows where to start removing reasoning from toolcall messages
                 self.channel.agentic_loop_start = len(await self.channel.context.chat.messages.get())-1
 
