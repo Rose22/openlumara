@@ -610,7 +610,7 @@ async def create_fastapi(channel):
                 try:
                     await channel.manager.reload_module(module_name)
                 except Exception as e:
-                    channel.log(self.name, f"Error reloading module {module_name}: {core.detail_error(e)}")
+                    channel.log(channel.name, f"Error reloading module {module_name}: {core.detail_error(e)}")
 
         return api_result(success=True)
     
@@ -867,7 +867,7 @@ async def create_fastapi(channel):
                             text = data.get("content")
                             files_data = data.get("files")
 
-                            if not text and not files:
+                            if not text and not files_data:
                                 break
 
                             files_dict = None
