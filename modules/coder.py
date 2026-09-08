@@ -82,7 +82,7 @@ class Coder(core.module.Module):
     async def on_ready(self):
         # enable/disable tools based on selected modes
         if self.config.get("read-only"):
-            self.disabled_tools.extend(["file_create", "file_move", "file_delete", "file_edit", "folder_create", "folder_delete"])
+            self.disabled_tools.extend(["file_create", "file_move", "file_delete", "file_edit", "folder_delete"])
 
         if self.config.get("insert_sandbox_paths_into_system_prompt"):
             self.disabled_tools.append("list_sandboxes")
@@ -309,13 +309,10 @@ class Coder(core.module.Module):
     async def list_sandboxes(self):
         return self.result(await self._get_sandbox_paths())
 
-    async def glob(self, sandbox: str, pattern: str, sub_path=None, recursive: bool = True):
-        """globs a given path for your desired files. does not support regex. paths are relative to sandbox root."""
+    async def glob(self, sandbox: str, pattern: str, sub_path=None, recursive: bool = False, max_results: int = 200):
+        """globs path for desired files. does not support regex. paths relative to sandbox root."""
         sandbox_path = await self._get_full_sandbox_path(sandbox)
         target_path = await self._get_sandbox_subpath(sandbox, sub_path or '.')
-
-        if recursive and pattern.strip() in ("*", "**", "."):
-            return self.result("search is too broad! try searching for specific file types, or search by keywords", success=False)
 
         folder_blacklist = self.config.get("folder_blacklist")
 
@@ -331,12 +328,13 @@ class Coder(core.module.Module):
                 elif '/' in pattern and '**' not in pattern:
                     pattern = f"**/{pattern}"
 
-            matches = glob.glob(
+            matches = sorted(glob.glob(
                 os.path.join(target_path, pattern),
                 recursive=recursive
-            )
+            ))
 
             results = []
+            total = 0
             for match in matches:
                 rel_path = os.path.relpath(match, target_path)
 
@@ -345,16 +343,27 @@ class Coder(core.module.Module):
                 if any(part in folder_blacklist for part in path_parts):
                     continue
 
+                total += 1
+                if total > int(max_results):
+                    break
+
                 # ensure it's within the sandbox
                 core.sandbox_path(sandbox_path, rel_path)
                 results.append(rel_path)
 
+            if total > int(max_results):
+                return self.result({
+                    "results": results,
+                    "truncated": True,
+                    "total": total,
+                    "note": f"showing first {int(max_results)} of {total} matches - narrow your pattern to see more"
+                })
             return self.result(results)
         except Exception as e:
             return self.result(str(e), success=False)
 
     async def folder_grep(self, sandbox: str, sub_path: str, regex_pattern: str, case_sensitive=False, context: int = 0, file_extensions: list = None, max_matches: int = 100):
-        """Searches for regex pattern in all files within a folder"""
+        """searches for regex pattern in all files in folder"""
         folder_blacklist = self.config.get("folder_blacklist")
 
         if regex_pattern.strip() in [".", "*"]:
@@ -426,12 +435,19 @@ class Coder(core.module.Module):
     # tools: file management
     # ----------------------
     async def file_create(self, sandbox: str, path: str, content: str):
+        """creates new file. auto-creates parent dirs in path"""
         target_path = await self._get_sandbox_subpath(sandbox, path)
 
         # first, check for syntax errors
         syntax_errors = await self._check_syntax(content, target_path)
         if syntax_errors:
             return self.result({"errors": syntax_errors, "message": "Syntax errors detected! File was not written to disk."}, success=False)
+
+        # auto-create any parent folders that don't exist yet,
+        # so the AI doesn't have to bother creating them manually
+        parent_dir = os.path.dirname(target_path)
+        if parent_dir:
+            os.makedirs(parent_dir, exist_ok=True)
 
         # using try/except here instead of checking if the file exists, to defend against
         # TOCTOU (Time-Of-Check -> Time-Of-Use)
@@ -469,19 +485,8 @@ class Coder(core.module.Module):
 
         return self.result(f"File {path} successfully deleted")
 
-    async def folder_create(self, sandbox: str, path: str):
-        target_path = await self._get_sandbox_subpath(sandbox, path)
-        
-        try:
-            os.makedirs(target_path, exist_ok=False)
-        except Exception as e:
-            # KAWCH TUHA
-            return self.result(str(e), success=False)
-
-        return self.result(f"Folder {path} created")
-
     async def folder_delete(self, sandbox: str, path: str):
-        """only use this if user explicitely requests it. can only remove empty folders as a safety precaution."""
+        """only use this if user explicitely requests it. can only remove empty folders as safety precaution."""
         target_path = await self._get_sandbox_subpath(sandbox, path)
         
         try:
@@ -496,7 +501,7 @@ class Coder(core.module.Module):
     # tools: file reading
     # ----------------------
     async def file_outline(self, sandbox: str, path: str):
-        """provides valuable information about source code. only works on source code files."""
+        """provides information about source code. only works on source code files."""
         target_path = await self._get_sandbox_subpath(sandbox, path)
         try:
             with open(target_path, 'r', encoding="utf-8") as f:
@@ -511,7 +516,7 @@ class Coder(core.module.Module):
             return self.result(str(e), success=False)
 
     async def file_read(self, sandbox: str, path: str, line_start: int = None, line_end: int = None):
-        """reads a file, or a portion of the file. use line_start and line_end to read in chunks."""
+        """reads file, or part of file. use line_start and line_end to read in chunks."""
         target_path = await self._get_sandbox_subpath(sandbox, path)
 
         # protect against tocccc touh
