@@ -194,7 +194,7 @@ class APIClient():
             "messages": context,
             "tools": tools,
             "stream": stream,
-            "temperature": core.config.get("model", {}).get("temperature", 0.2),
+            "temperature": core.config.get("model", {}).get("temperature", 0.7),
             "max_completion_tokens": core.config.get("api", {}).get("max_output_tokens", 8192),
             "extra_body": {
                 "chat_template_kwargs": {
