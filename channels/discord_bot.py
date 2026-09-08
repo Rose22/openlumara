@@ -5,7 +5,7 @@ import time
 import datetime
 import json_repair
 
-CHUNK_SIZE = 1000
+CHUNK_SIZE = 1500
 
 # we have to create a special class here so that we can override methods and make methods like on_message work
 class DiscordClient(discord.Client):
