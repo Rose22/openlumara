@@ -184,7 +184,12 @@ class DiscordClient(discord.Client):
                             reasoning_content_full += token_content
 
                             # stream only part of the reasoning
-                            reasoning_snippet = reasoning_content_full[-450:]
+                            reasoning_snippet = "\n".join(
+                                # last 5 lines of reasoning
+                                "".join(
+                                    reasoning_content_full
+                                ).split("\n")[-5:]
+                            )
                             reasoning_snippet = "\n".join([f"> {txt}" for txt in reasoning_snippet.split("\n")])
 
                             reasoning_content = "## thinking..\n"+reasoning_snippet
