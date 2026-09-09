@@ -144,6 +144,10 @@ class DiscordClient(discord.Client):
                         if accumulated_toolcalls:
                             toolcalls_str = "\n".join(accumulated_toolcalls[-5:])+"\n\n"
 
+                        if token_type == "error":
+                            await self.send_to_main(f"✖ ERROR: {token_content}")
+                            return
+
                         if token_type in ["user_message", "token_usage"]:
                             continue
 
