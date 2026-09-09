@@ -1,7 +1,6 @@
 import core
 import inspect
-import re
-
+import regex as re
 
 class ToolLoader:
     """Manages dynamic tool loading: catalog, active set, and meta tools."""
@@ -16,10 +15,88 @@ class ToolLoader:
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+    def parse_tool_docstring(self, docstring):
+        """
+        Parses Google-style docstring to extract param descriptions
+        and returns a cleaned docstring without the Args/Returns sections.
+        """
+        if not docstring:
+            return {}, ""
+
+        descriptions = {}
+        lines = docstring.split("\n")
+        clean_lines = []
+
+        skip_section = False
+        section_headers = {"Args:", "Returns:", "Raises:", "Note:", "Example:"}
+
+        for line in lines:
+            stripped = line.strip()
+
+            # Check if we're entering a section to skip
+            if any(stripped.startswith(header) for header in section_headers):
+                skip_section = True
+                continue
+
+            # Check if we're still in a skip section (indented line)
+            if skip_section:
+                # Empty line or unindented line means end of section
+                if stripped == "" or (line and not line[0].isspace() and stripped):
+                    # But if it's another section header, stay in skip mode
+                    if not any(stripped.startswith(h) for h in section_headers):
+                        skip_section = False
+                        if stripped:
+                            clean_lines.append(line)
+                continue
+
+            clean_lines.append(line)
+
+        # Now parse Args section separately for descriptions
+        in_args = False
+        current_param = None
+        current_desc = []
+
+        for line in lines:
+            stripped = line.strip()
+
+            if stripped.startswith("Args:"):
+                in_args = True
+                continue
+
+            if in_args:
+                if any(stripped.startswith(h) for h in {"Returns:", "Raises:", "Note:", "Example:"}):
+                    if current_param and current_desc:
+                        descriptions[current_param] = " ".join(current_desc)
+                    break
+
+                if not stripped:
+                    continue
+
+                # Match: "param_name: description" or "param_name (type): description"
+                match = re.match(r"(\w+)(?:\s*\([^)]*\))?\s*:\s*(.+)", stripped)
+                if match:
+                    # Save previous param if exists
+                    if current_param and current_desc:
+                        descriptions[current_param] = " ".join(current_desc)
+
+                    current_param = match.group(1)
+                    current_desc = [match.group(2)]
+                elif current_param and stripped:
+                    # Continuation of previous param description
+                    current_desc.append(stripped)
+
+        # Save last param
+        if current_param and current_desc:
+            descriptions[current_param] = " ".join(current_desc)
+
+        # Clean up the description (remove leading/trailing whitespace, empty lines)
+        clean_doc = "\n".join(clean_lines).strip()
+
+        return descriptions, clean_doc
 
     def _tool_dict_from_func(self, func, tool_name):
         """Build a tool dict from a callable using existing Manager rules."""
-        param_descriptions, docstring = self.channel.manager.parse_tool_docstring(
+        param_descriptions, docstring = self.parse_tool_docstring(
             func.__doc__
         )
 
@@ -211,9 +288,7 @@ class ToolLoader:
                 truncated_desc = entry["description"][:160]
                 scored.append({
                     "name": name,
-                    "module": entry["module"],
                     "description": truncated_desc,
-                    "loaded": name in self.active_names,
                     "score": score,
                 })
 
