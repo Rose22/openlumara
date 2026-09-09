@@ -299,6 +299,7 @@ class ToolLoader:
                 scored.append({
                     "name": name,
                     "description": truncated_desc,
+                    "loaded": name in self.active_names,
                     "score": score,
                 })
 
