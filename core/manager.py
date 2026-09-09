@@ -278,6 +278,11 @@ class Manager:
             # of the meta tools so a few frequently-used tools are always ready.
             for channel in self.channels.values():
                 channel.tool_loader.load_default_tools()
+                # Now that the catalog is populated, restore any tools that were
+                # persisted in the auto-resumed chat's metadata. During autoload()
+                # the catalog was still empty so the initial restore_chat_tools()
+                # call in _set_current() couldn't load anything.
+                channel.tool_loader.restore_chat_tools()
 
         if not self.args.disable_auto_installer:
             # uninstall dependencies for disabled modules (only if deps are still installed)
