@@ -78,7 +78,7 @@ class ToolcallManager:
         else:
             return token
 
-    async def _build_recursive_request(self, token, final_content = "", final_reasoning = ""):
+    async def _build_recursive_request(self, token, final_content="", final_reasoning=""):
         repaired_token = await self._repair_toolcall_token(token)
 
         toolcall_request = {"role": "assistant"}
@@ -91,7 +91,7 @@ class ToolcallManager:
 
         return toolcall_request
 
-    async def process(self, assistant_message, push=False, recursion_counter=0):
+    async def process(self, assistant_message, push=False):
         """
         process tool calls from an API response..
         assistant_content is the "normal" non-toolcall content, the text that the AI wants to say that's not toolcalls
@@ -148,17 +148,13 @@ class ToolcallManager:
                 module_instance = None
                 method_name = None
 
-                for module_name, module_obj in self.channel.manager.modules.items():
-                    class_display_name = core.modules.get_name(module_obj)
-                    module_prefix = f"{class_display_name}_"
+                if tool_name in self.channel.tool_loader.catalog:
+                    entry = self.channel.tool_loader.catalog[tool_name]
+                    module_instance = self.channel.manager.modules.get(entry["module"])
+                    if module_instance is not None:
+                        method_name = entry["method"]
 
-                    if tool_name.startswith(module_prefix):
-                        method_name = tool_name[len(module_prefix):]
-                        if hasattr(module_obj, method_name):
-                            module_instance = module_obj
-                            break
-
-                if module_instance is None:
+                if module_instance is None or method_name is None:
                     # --- 3. No module matched (hallucinated name) ---
                     self.channel.log("toolcall", f"tried to call tool {tool_name} but couldn't find it")
 
@@ -224,12 +220,19 @@ class ToolcallManager:
                 async def _run_tool():
                     return await func_callable(**tool_args)
 
-                func_response = await asyncio.wait_for(_run_tool(), timeout=timeout_val)
+                tool_task = asyncio.create_task(_run_tool())
+                func_response = await asyncio.wait_for(tool_task, timeout=timeout_val)
                 if func_response is None:
                     # bypass the usual response flow and just abort the chain
                     continue
 
             except asyncio.TimeoutError as e:
+                # Actually cancel the running task so it doesn't continue in the background
+                tool_task.cancel()
+                try:
+                    await tool_task
+                except asyncio.CancelledError:
+                    pass
                 err_msg = core.detail_error(e) if core.debug else str(e)
                 # For meta tools, we don't have module_instance.result, so format manually
                 if tool_name in tool_loader.meta_tool_names:
@@ -295,7 +298,6 @@ class ToolcallManager:
 
                     async for sub_token in self.process(
                         toolcall_request,
-                        recursion_counter=recursion_counter,
                         push=push
                     ):
                         yield sub_token

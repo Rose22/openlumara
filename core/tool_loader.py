@@ -64,7 +64,8 @@ class ToolLoader:
                 continue
 
             if in_args:
-                if any(stripped.startswith(h) for h in {"Returns:", "Raises:", "Note:", "Example:"}):
+                # Only treat as section end if the line is EXACTLY the header (no content after colon)
+                if stripped in {"Returns:", "Raises:", "Note:", "Example:"}:
                     if current_param and current_desc:
                         descriptions[current_param] = " ".join(current_desc)
                     break
@@ -388,7 +389,7 @@ class ToolLoader:
                 continue
             if name in self.active_names:
                 continue
-            self.active_tools.append(entry["tool"])
-            self.active_names.append(name)
             if len(self.active_names) >= max_active:
                 break
+            self.active_tools.append(entry["tool"])
+            self.active_names.append(name)
