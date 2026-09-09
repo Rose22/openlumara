@@ -128,6 +128,7 @@ class DiscordClient(discord.Client):
                 chunk_content = ""
                 reasoning_content_full = ""
                 reasoning_content = ""
+                accumulated_toolcalls = []
 
                 should_stream_text = self._chan.config.get("stream_text")
 
@@ -137,6 +138,11 @@ class DiscordClient(discord.Client):
                     try:
                         token_type = token.get("type")
                         token_content = token.get("content")
+
+                        # accumulate toolcalls for display
+                        toolcalls_str = ""
+                        if accumulated_toolcalls:
+                            toolcalls_str = "\n".join(accumulated_toolcalls[-5:])+"\n\n"
 
                         if token_type in ["user_message", "token_usage"]:
                             continue
@@ -150,7 +156,7 @@ class DiscordClient(discord.Client):
                             percentage = 0
                             if total:
                                 percentage = (processed / total) * 100
-                            msg = await msg.edit(content=self._make_progress_bar(percentage))
+                            msg = await msg.edit(content=toolcalls_str+self._make_progress_bar(percentage))
 
                             continue
 
@@ -170,6 +176,10 @@ class DiscordClient(discord.Client):
                             continue
 
                         # edit-streaming logic
+                        if token_type == "tool_calls":
+                            for tc in token.get("tool_calls"):
+                                accumulated_toolcalls.append(self._chan.tc_manager.display_call(tc))
+
                         if token_type == "reasoning":
                             reasoning_content_full += token_content
 
@@ -198,9 +208,9 @@ class DiscordClient(discord.Client):
                         if (time.time() - timer) >= edit_interval:
                             if reasoning_content:
                                 if self._chan.config.get("show_reasoning"):
-                                    msg = await msg.edit(content=reasoning_content)
-                                elif msg.content != "thinking..":
-                                    msg = await msg.edit(content="thinking..")
+                                    msg = await msg.edit(content=toolcalls_str+reasoning_content)
+                                elif msg.content != toolcalls_str+"thinking..":
+                                    msg = await msg.edit(content=toolcalls_str+"thinking..")
                             else:
                                 msg = await msg.edit(content=chunk_content)
 
