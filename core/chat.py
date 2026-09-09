@@ -42,6 +42,9 @@ class Chat:
     # ------------------
     async def _set_current(self, index: int):
         """load a chat and its messages by index"""
+        old_id = self.data[self.current]["id"] if self.current is not None else None
+        new_id = self.data[index]["id"]
+
         self.current = index
 
         # store current index into a simple file, for chat autoloading later
@@ -50,6 +53,10 @@ class Chat:
 
         # load this chat's Messages object
         self.messages = core.messages.Messages(self.channel, self)
+
+        # Reset active tools when switching to a different chat
+        if old_id != new_id:
+            self.channel.manager.tool_loader.reset_for_new_chat()
 
     def _find_index(self, id: str):
         """find index of the chat with that ID"""
@@ -199,6 +206,9 @@ class Chat:
     async def clear(self):
         if self.current is None:
             raise Exception("No chat is currently loaded!")
+
+        # Reset active tools on clear
+        self.channel.manager.tool_loader.reset_for_new_chat()
 
         await self.messages.clear()
         

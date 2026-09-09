@@ -29,6 +29,7 @@ import core.storage
 import core.module
 import core.commands
 import core.context
+import core.tool_loader
 import core.toolcalls
 import core.messages
 import core.chat

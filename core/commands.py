@@ -119,7 +119,11 @@ class Commands:
         "modules": "lists modules",
         "module": "enables/disables a module by name",
         "channel": "toggles a channel",
-        "tools": "lists tools available to the AI",
+        "tools": {
+            "": "lists tools available to the AI",
+            "search <query>": "searches the tool catalog",
+            "load <name> [name2 ...]": "loads tools by exact name",
+        },
         "__SPACER__4": "",
         # system
         "config": "explore, view, and set config settings",
@@ -473,23 +477,87 @@ class Commands:
     async def cmd_tools(self, args: list):
         if not core.config.get("model").get("use_tools", False):
             return "tools are turned off"
-        
+
+        if args:
+            subcmd = args[0].lower()
+
+            # /tools search <query>
+            if subcmd == "search":
+                query = " ".join(args[1:])
+                if not query:
+                    return "Usage: /tools search <query>"
+                result = await self.channel.manager.tool_loader.tools_lookup(query)
+                if result["status"] == "success" and isinstance(result["content"], list):
+                    lines = [f"Found {len(result['content'])} tools matching '{query}':"]
+                    for tool in result["content"]:
+                        loaded_tag = " [LOADED]" if tool["loaded"] else ""
+                        lines.append(f"  - {tool['name']} ({tool['module']}){loaded_tag}")
+                        if tool.get("description"):
+                            lines.append(f"    {tool['description'][:120]}")
+                    return "\n".join(lines)
+                else:
+                    return f"Search result: {result['content']}"
+
+            # /tools load <name> [name2 ...]
+            elif subcmd == "load":
+                names = args[1:]
+                if not names:
+                    return "Usage: /tools load <name> [name2 ...]"
+                result = await self.channel.manager.tool_loader.tools_load(names)
+                lines = [f"Load result for {len(names)} tool(s):"]
+                content = result["content"]
+                if content.get("loaded"):
+                    lines.append(f"  Loaded: {', '.join(content['loaded'])}")
+                if content.get("already_loaded"):
+                    lines.append(f"  Already loaded: {', '.join(content['already_loaded'])}")
+                if content.get("unknown"):
+                    lines.append(f"  Unknown: {', '.join(content['unknown'])}")
+                if content.get("disabled"):
+                    lines.append(f"  Disabled: {', '.join(content['disabled'])}")
+                if not any(content.get(k) for k in ("loaded", "already_loaded", "unknown", "disabled")):
+                    lines.append("  (no changes)")
+                return "\n".join(lines)
+
+            else:
+                return f"Unknown subcommand: {subcmd}. Use /tools search, /tools load, or /tools (no args) for help."
+
+        # No subcommand — show active + catalog
         tool_map = {}
         for tool in self.channel.manager.tools:
             tool_name = tool.get("function").get("name")
-            module_name = tool_name.split("_")[0]
-            
+            # Meta tools are grouped under "core"
+            if tool_name in ("tools_lookup", "tools_load"):
+                module_name = "core"
+            else:
+                module_name = tool_name.split("_")[0]
+
             if module_name not in tool_map.keys():
                 tool_map[module_name] = []
             tool_map[module_name].append(tool_name)
-        
+
         tool_map_display = []
-        tool_map_display.append("enabled tools:")
+        tool_map_display.append("== active tools ==")
         for module_name, tools in tool_map.items():
             tools_display = "\n".join(tools)
-            tool_map_display.append(f"== {module_name} ==\n{tools_display}")
-        
-        return "\n\n".join(tool_map_display)
+            tool_map_display.append(f"  {module_name}: {', '.join(tools)}")
+
+        # Show catalog (available but not loaded)
+        catalog_by_module = {}
+        for name, entry in self.channel.manager.tool_loader.catalog.items():
+            mod = entry["module"]
+            if mod not in catalog_by_module:
+                catalog_by_module[mod] = []
+            catalog_by_module[mod].append(name)
+
+        catalog_display = []
+        catalog_display.append("== available tools (not loaded) ==")
+        if catalog_by_module:
+            for mod, names in sorted(catalog_by_module.items()):
+                catalog_display.append(f"  {mod}: {', '.join(names)}")
+        else:
+            catalog_display.append("  (none)")
+
+        return "\n\n".join(tool_map_display) + "\n\n" + "\n".join(catalog_display)
     
     async def cmd_config(self, args: list):
         """explore, view, and set config settings"""

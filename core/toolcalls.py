@@ -118,39 +118,50 @@ class ToolcallManager:
             await self.channel.push(assistant_message)
 
         timeout_val = float(core.config.get("core", "tool_timeout", default=10.0))
+        tool_loader = self.channel.manager.tool_loader
 
         # execute each tool and add their responses
         for tool_call_dict in repaired_tool_calls:
             tool_name = tool_call_dict['function']['name']
             tool_args = json_repair.loads(tool_call_dict['function']['arguments'])
 
-            module_instance = None
-            module_instance_display_name = None
-            method_name = None
+            # --- 1. Meta tool check (FIRST, before module scan) ---
+            if tool_name in tool_loader.meta_tool_names:
+                func_callable = tool_loader.get_meta_callable(tool_name)
+                make_result = lambda msg, success=False: {"status": "success" if success else "error", "content": msg}
+                # fall through to shared execution block
+            else:
+                # --- 2. Module scan ---
+                module_instance = None
+                method_name = None
 
-            # find the module that has the requested tool
-            # and store the instance and name of that module
-            for module_name, module_obj in self.channel.manager.modules.items():
-                class_display_name = core.modules.get_name(module_obj)
-                module_prefix = f"{class_display_name}_"
+                for module_name, module_obj in self.channel.manager.modules.items():
+                    class_display_name = core.modules.get_name(module_obj)
+                    module_prefix = f"{class_display_name}_"
 
-                # check if the tool name actually belongs to this module
-                if tool_name.startswith(module_prefix):
-                    # get the translated method name (coder_read() -> read())
-                    method_name = tool_name[len(module_prefix):]
+                    if tool_name.startswith(module_prefix):
+                        method_name = tool_name[len(module_prefix):]
+                        if hasattr(module_obj, method_name):
+                            module_instance = module_obj
+                            break
 
-                    if hasattr(module_obj, method_name):
-                        module_instance = module_obj
-                        module_instance_display_name = class_display_name
-                        break
+                if module_instance is None:
+                    # --- 3. No module matched (hallucinated name) ---
+                    self.channel.log("toolcall", f"tried to call tool {tool_name} but couldn't find it")
+                    rejected_msg = json.dumps({
+                        "content": f"No tool named {tool_name} exists. Use tools_lookup to find available tools.",
+                        "status": "error"
+                    })
+                    await self.channel.context.chat.messages.add({
+                        "role": "tool",
+                        "tool_call_id": tool_call_dict['id'],
+                        "content": rejected_msg
+                    })
+                    yield {"type": "tool", "tool_call_id": tool_call_dict['id'], "content": rejected_msg}
+                    continue
 
-            if module_instance:
-                if (
-                    tool_name not in self.channel.manager.tool_names
-                    or
-                    method_name in module_instance.disabled_tools
-                ):
-                    # don't allow disabled tools to be called
+                # Check disabled tools FIRST (higher priority than "not loaded")
+                if method_name in module_instance.disabled_tools:
                     rejected_msg = json.dumps({"content": "That tool has been disabled by the user.", "status": "error"})
                     await self.channel.context.chat.messages.add({
                         "role": "tool",
@@ -160,64 +171,67 @@ class ToolcallManager:
                     yield {"type": "tool", "tool_call_id": tool_call_dict['id'], "content": rejected_msg}
                     continue
 
-                # and use it to get the function object for that tool
-                func_callable = getattr(module_instance, method_name)
-
-                # build a fancy toolcall display string
-                tool_call_str = self.display_call(tool_call_dict)
-
-                self.channel.log("toolcall", tool_call_str)
-
-                func_response = None
-                try:
-                    # do the function call and get it's result
-                    async def _run_tool():
-                        return await func_callable(**tool_args)
-
-                    # add a timeout so that tools can't hang the application forever
-                    func_response = await asyncio.wait_for(_run_tool(), timeout=timeout_val)
-                    if func_response is None:
-                        # bypass the usual response flow and just abort the chain
-                        continue
-
-                except asyncio.TimeoutError as e:
-                    err_msg = core.detail_error(e) if core.debug else str(e)
-                    func_response = module_instance.result(f"Tool timed out after {timeout_val}s", success=False)
-                    self.channel.log("toolcall", func_response.get("content"))
-                except Exception as e:
-                    err_msg = core.detail_error(e) if core.debug else str(e)
-                    func_response = module_instance.result(f"Error while executing tool: {err_msg}", success=False)
-                    self.channel.log("toolcall", func_response.get("content"))
-                finally:
-                    func_response_str = None
-
-                    # don't double-escape strings
-                    if isinstance(func_response, str):
-                        func_response_str = func_response
-                    else:
-                        func_response_str = json.dumps(func_response)
-
-                    # build the openai toolcall response object
-                    tool_response = {
+                # Check if tool is loaded
+                if tool_name not in self.channel.manager.tool_names:
+                    rejected_msg = json.dumps({
+                        "content": f"Tool {tool_name} is not loaded. Load it first by calling tools_load with names=[\"{tool_name}\"], then call it again.",
+                        "status": "error"
+                    })
+                    await self.channel.context.chat.messages.add({
                         "role": "tool",
                         "tool_call_id": tool_call_dict['id'],
-                        "content": func_response_str
-                    }
+                        "content": rejected_msg
+                    })
+                    yield {"type": "tool", "tool_call_id": tool_call_dict['id'], "content": rejected_msg}
+                    continue
 
-                    # yield it so it can be displayed immediately
-                    yield {"type": "tool", "tool_call_id": tool_call_dict['id'], "content": func_response_str}
+                # Tool is valid and loaded — get callable
+                func_callable = getattr(module_instance, method_name)
 
-                    # add the tool response to the context window
-                    await self.channel.context.chat.messages.add(tool_response)
+            # --- Shared execution block ---
+            tool_call_str = self.display_call(tool_call_dict)
+            self.channel.log("toolcall", tool_call_str)
 
-                    # push it if needed
-                    # if push:
-                    #     await self.channel.push(tool_response)
+            func_response = None
+            try:
+                async def _run_tool():
+                    return await func_callable(**tool_args)
+
+                func_response = await asyncio.wait_for(_run_tool(), timeout=timeout_val)
+                if func_response is None:
+                    # bypass the usual response flow and just abort the chain
+                    continue
+
+            except asyncio.TimeoutError as e:
+                err_msg = core.detail_error(e) if core.debug else str(e)
+                # For meta tools, we don't have module_instance.result, so format manually
+                if tool_name in tool_loader.meta_tool_names:
+                    func_response = {"status": "error", "content": f"Tool timed out after {timeout_val}s"}
+                else:
+                    func_response = module_instance.result(f"Tool timed out after {timeout_val}s", success=False)
+                self.channel.log("toolcall", func_response.get("content"))
+            except Exception as e:
+                err_msg = core.detail_error(e) if core.debug else str(e)
+                if tool_name in tool_loader.meta_tool_names:
+                    func_response = {"status": "error", "content": f"Error while executing tool: {err_msg}"}
+                else:
+                    func_response = module_instance.result(f"Error while executing tool: {err_msg}", success=False)
+                self.channel.log("toolcall", func_response.get("content"))
+
+            func_response_str = None
+            if isinstance(func_response, str):
+                func_response_str = func_response
             else:
-                self.channel.log(
-                    "toolcall",
-                    f"tried to call tool {tool_name} but couldn't find it"
-                )
+                func_response_str = json.dumps(func_response)
+
+            tool_response = {
+                "role": "tool",
+                "tool_call_id": tool_call_dict['id'],
+                "content": func_response_str
+            }
+
+            yield {"type": "tool", "tool_call_id": tool_call_dict['id'], "content": func_response_str}
+            await self.channel.context.chat.messages.add(tool_response)
 
         if self.channel.manager.API.cancel_request:
             await self.channel.push("toolcalling chain cancelled")
