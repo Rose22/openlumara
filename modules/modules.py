@@ -24,7 +24,12 @@ class Modules(core.module.Module):
             "enabled": ", ".join(core.config.get("modules", "enabled", default=[])),
             "disabled": ", ".join(core.config.get("modules", "disabled", default=[]))
         }
-        return str(module_list)
+
+        prompt = str(module_list)
+        if core.config.get("model", "dynamic_tool_loading"):
+            prompt += "\n\neach module contains one or more tools. use tools_lookup with the module name to find that module's tools"
+
+        return prompt
 
     async def toggle(self, name: str):
         if not self.config.get("allow_ai_to_toggle"):
