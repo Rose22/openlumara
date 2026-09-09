@@ -6,8 +6,8 @@ import re
 class ToolLoader:
     """Manages dynamic tool loading: catalog, active set, and meta tools."""
 
-    def __init__(self, manager):
-        self.manager = manager
+    def __init__(self, channel):
+        self.channel = channel
         self.catalog = {}  # name -> {"tool": dict, "module": str, "method": str, "description": str}
         self.active_tools = []  # tool dicts sent to the API
         self.active_names = []  # active tool names
@@ -19,7 +19,7 @@ class ToolLoader:
 
     def _tool_dict_from_func(self, func, tool_name):
         """Build a tool dict from a callable using existing Manager rules."""
-        param_descriptions, docstring = self.manager.parse_tool_docstring(
+        param_descriptions, docstring = self.channel.manager.parse_tool_docstring(
             func.__doc__
         )
 
@@ -124,7 +124,7 @@ class ToolLoader:
             if not n.startswith(prefix)
         ]
         if keys_to_remove:
-            self.manager.log(
+            self.channel.log(
                 "core",
                 f"unloaded {len(keys_to_remove)} tools from '{module.name}'"
             )
@@ -158,7 +158,7 @@ class ToolLoader:
         self.active_tools = list(self._meta_tool_defs)
         self.active_names = ["tools_lookup", "tools_load"]
 
-        self.manager.log("core", "Registered meta tools: tools_lookup, tools_load")
+        self.channel.log("core", "Registered meta tools: tools_lookup, tools_load")
 
     def get_meta_callable(self, tool_name):
         """Return the bound method for a meta tool name."""
@@ -247,7 +247,7 @@ class ToolLoader:
         for name in names:
             if name in self.catalog:
                 entry = self.catalog[name]
-                module = self.manager.modules.get(entry["module"])
+                module = self.channel.manager.modules.get(entry["module"])
                 if module is None:
                     unknown.append(name)
                     continue

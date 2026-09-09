@@ -486,7 +486,7 @@ class Commands:
                 query = " ".join(args[1:])
                 if not query:
                     return "Usage: /tools search <query>"
-                result = await self.channel.manager.tool_loader.tools_lookup(query)
+                result = await self.channel.tool_loader.tools_lookup(query)
                 if result["status"] == "success" and isinstance(result["content"], list):
                     lines = [f"Found {len(result['content'])} tools matching '{query}':"]
                     for tool in result["content"]:
@@ -503,7 +503,7 @@ class Commands:
                 names = args[1:]
                 if not names:
                     return "Usage: /tools load <name> [name2 ...]"
-                result = await self.channel.manager.tool_loader.tools_load(names)
+                result = await self.channel.tool_loader.tools_load(names)
                 lines = [f"Load result for {len(names)} tool(s):"]
                 content = result["content"]
                 if content.get("loaded"):
@@ -543,7 +543,7 @@ class Commands:
 
         # Show catalog (available but not loaded)
         catalog_by_module = {}
-        for name, entry in self.channel.manager.tool_loader.catalog.items():
+        for name, entry in self.channel.tool_loader.catalog.items():
             mod = entry["module"]
             if mod not in catalog_by_module:
                 catalog_by_module[mod] = []

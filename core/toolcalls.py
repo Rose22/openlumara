@@ -118,7 +118,7 @@ class ToolcallManager:
             await self.channel.push(assistant_message)
 
         timeout_val = float(core.config.get("core", "tool_timeout", default=10.0))
-        tool_loader = self.channel.manager.tool_loader
+        tool_loader = self.channel.tool_loader
 
         # execute each tool and add their responses
         for tool_call_dict in repaired_tool_calls:

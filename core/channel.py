@@ -53,6 +53,8 @@ class Channel:
 
         self.tc_manager = core.toolcalls.ToolcallManager(self)
         self.turncollector = core.turns.TurnCollector()
+        self.tool_loader = core.tool_loader.ToolLoader(self)
+        self.tool_loader.register_meta_tools()
 
         # used to track whether to preserve reasoning
         # for only the current "agentic turn"

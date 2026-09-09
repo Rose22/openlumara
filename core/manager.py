@@ -28,7 +28,6 @@ class Manager:
         self.user_modules = {}
         self.broken_modules = [] # tracks modules that threw errors and skips them so that it doesn't break the whole framework
 
-        self.tool_loader = core.tool_loader.ToolLoader(self)
         self.pure_mode = False
         self.coding_mode = False
 
@@ -41,19 +40,21 @@ class Manager:
     # --- tools properties ---
     @property
     def tools(self):
-        return self.tool_loader.active_tools
+        return self.channel.tool_loader.active_tools if self.channel else []
 
     @tools.setter
     def tools(self, value):
-        self.tool_loader.active_tools = value
+        if self.channel:
+            self.channel.tool_loader.active_tools = value
 
     @property
     def tool_names(self):
-        return self.tool_loader.active_names
+        return self.channel.tool_loader.active_names if self.channel else []
 
     @tool_names.setter
     def tool_names(self, value):
-        self.tool_loader.active_names = value
+        if self.channel:
+            self.channel.tool_loader.active_names = value
 
     def _remove_async_task(self, task):
         self._async_tasks.discard(task)
@@ -266,10 +267,6 @@ class Manager:
         if enabled_user_modules:
             self.log("core", "Loading user modules..")
             await self._load_modules(self.modules, user_modules, enabled_user_modules, is_user_modules=True)
-
-        # Register meta tools after all modules are loaded (but not in pure_mode)
-        if not self.pure_mode:
-            self.tool_loader.register_meta_tools()
 
         if not self.args.disable_auto_installer:
             # uninstall dependencies for disabled modules (only if deps are still installed)
@@ -739,11 +736,13 @@ class Manager:
 
     async def load_module_tools(self, module):
         """Register a module's tools in the catalog (no longer adds to active set)."""
-        self.tool_loader.register_module(module)
+        for channel in self.channels.values():
+            channel.tool_loader.register_module(module)
 
     async def unload_module_tools(self, module):
         """Unregister a module's tools from the catalog and active set."""
-        self.tool_loader.unregister_module(module)
+        for channel in self.channels.values():
+            channel.tool_loader.unregister_module(module)
         return True
 
     async def add_module_class(self, module, is_user_module=False):

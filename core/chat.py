@@ -56,7 +56,7 @@ class Chat:
 
         # Reset active tools when switching to a different chat
         if old_id != new_id:
-            self.channel.manager.tool_loader.reset_for_new_chat()
+            self.channel.tool_loader.reset_for_new_chat()
 
     def _find_index(self, id: str):
         """find index of the chat with that ID"""
@@ -208,7 +208,7 @@ class Chat:
             raise Exception("No chat is currently loaded!")
 
         # Reset active tools on clear
-        self.channel.manager.tool_loader.reset_for_new_chat()
+        self.channel.tool_loader.reset_for_new_chat()
 
         await self.messages.clear()
         
