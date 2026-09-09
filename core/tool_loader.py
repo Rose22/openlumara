@@ -216,6 +216,10 @@ class ToolLoader:
 
     def register_meta_tools(self):
         """Build and register the two meta tools; set as baseline active set."""
+        # When dynamic tool loading is off, don't load meta tools
+        if not core.config.get("model", "dynamic_tool_loading", default=True):
+            return
+
         if self._meta_tool_defs:
             # Already registered (idempotent)
             return
@@ -247,11 +251,12 @@ class ToolLoader:
 
     def reset_for_new_chat(self):
         """Reset active tools to the meta-tool baseline."""
-        self.active_tools = list(self._meta_tool_defs)
-        self.active_names = list(self.meta_tool_names)
-        
-        # If dynamic tool loading is disabled, reload all tools for the new chat
-        if not core.config.get("model", "dynamic_tool_loading", default=True):
+        if core.config.get("model", "dynamic_tool_loading", default=True):
+            self.active_tools = list(self._meta_tool_defs)
+            self.active_names = list(self.meta_tool_names)
+        else:
+            self.active_tools = []
+            self.active_names = []
             self.load_all_tools()
 
     # ------------------------------------------------------------------

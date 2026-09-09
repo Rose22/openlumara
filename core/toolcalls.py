@@ -126,7 +126,20 @@ class ToolcallManager:
             tool_args = json_repair.loads(tool_call_dict['function']['arguments'])
 
             # --- 1. Meta tool check (FIRST, before module scan) ---
+            dynamic_loading = core.config.get("model", "dynamic_tool_loading", default=True)
             if tool_name in tool_loader.meta_tool_names:
+                if not dynamic_loading:
+                    rejected_msg = json.dumps({
+                        "content": "Dynamic tool loading is disabled. Meta tools (tools_lookup, tools_load) are not available. You have access to all available tools without needing to load them.",
+                        "status": "error"
+                    })
+                    await self.channel.context.chat.messages.add({
+                        "role": "tool",
+                        "tool_call_id": tool_call_dict['id'],
+                        "content": rejected_msg
+                    })
+                    yield {"type": "tool", "tool_call_id": tool_call_dict['id'], "content": rejected_msg}
+                    continue
                 func_callable = tool_loader.get_meta_callable(tool_name)
                 make_result = lambda msg, success=False: {"status": "success" if success else "error", "content": msg}
                 # fall through to shared execution block
@@ -148,10 +161,18 @@ class ToolcallManager:
                 if module_instance is None:
                     # --- 3. No module matched (hallucinated name) ---
                     self.channel.log("toolcall", f"tried to call tool {tool_name} but couldn't find it")
-                    rejected_msg = json.dumps({
-                        "content": f"No tool named {tool_name} exists. Use tools_lookup to find available tools.",
-                        "status": "error"
-                    })
+
+                    if not dynamic_loading:
+                        rejected_msg = json.dumps({
+                            "content": f"Tool named {tool_name} does not exist.",
+                            "status": "error"
+                        })
+                    else:
+                        rejected_msg = json.dumps({
+                            "content": f"No tool named {tool_name} exists. Use tools_lookup to find available tools.",
+                            "status": "error"
+                        })
+
                     await self.channel.context.chat.messages.add({
                         "role": "tool",
                         "tool_call_id": tool_call_dict['id'],
@@ -173,10 +194,16 @@ class ToolcallManager:
 
                 # Check if tool is loaded
                 if tool_name not in self.channel.manager.tool_names:
-                    rejected_msg = json.dumps({
-                        "content": f"Tool {tool_name} is not loaded. Load it first by calling tools_load with names=[\"{tool_name}\"], then call it again.",
-                        "status": "error"
-                    })
+                    if not dynamic_loading:
+                        rejected_msg = json.dumps({
+                            "content": f"Tool {tool_name} is not available. This tool may be disabled or unavailable.",
+                            "status": "error"
+                        })
+                    else:
+                        rejected_msg = json.dumps({
+                            "content": f"Tool {tool_name} is not loaded. Load it first by calling tools_load with names=[\"{tool_name}\"], then call it again.",
+                            "status": "error"
+                        })
                     await self.channel.context.chat.messages.add({
                         "role": "tool",
                         "tool_call_id": tool_call_dict['id'],
