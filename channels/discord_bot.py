@@ -226,6 +226,7 @@ class DiscordClient(discord.Client):
                             timer = time.time()
                     except Exception as e:
                         self._chan.log(self._chan.name, f"error: {core.detail_error(e)}")
+                        await self.send_to_main(f"✖ ERROR: {core.detail_error(e)}")
 
                 response = response_content
 
