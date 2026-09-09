@@ -2,6 +2,24 @@ import core
 import inspect
 import regex as re
 
+# Tools that are ALWAYS preloaded at startup, on top of the two meta tools
+# (tools_lookup / tools_load), even when dynamic tool loading is enabled.
+#
+# This keeps a small handful of frequently-used tools available immediately
+# without bloating the context with the entire catalog. Everything else stays
+# available on demand via tools_lookup -> tools_load.
+#
+# Edit this list to change which tools are preloaded by default. Names use the
+# standard "<module>_<method>" format (e.g. "memory_create").
+DEFAULT_TOOLS = [
+    "memory_create",
+    "memory_search",
+    "memory_edit",
+    "memory_delete",
+    "memory_pin",
+    "memory_unpin"
+]
+
 class ToolLoader:
     """Manages dynamic tool loading: catalog, active set, and meta tools."""
 
@@ -250,22 +268,120 @@ class ToolLoader:
             return self.tools_load
         return None
 
+    def _resolve_default_entry(self, name):
+        """Return the catalog entry for a default tool if it is currently loadable.
+
+        A tool is loadable if it is in the catalog, its module is enabled/loaded,
+        and the tool itself is not disabled.
+        """
+        entry = self.catalog.get(name)
+        if entry is None:
+            return None
+        module = self.channel.manager.modules.get(entry["module"])
+        if module is None:
+            return None
+        if entry["method"] in module.disabled_tools:
+            return None
+        return entry
+
+    def _baseline_tools(self):
+        """Return (tools, names) for the baseline active set.
+
+        The baseline is the two meta tools plus any hardcoded default tools that
+        are currently loadable.
+        """
+        tools = list(self._meta_tool_defs)
+        names = ["tools_lookup", "tools_load"]
+        for name in DEFAULT_TOOLS:
+            if name in names:
+                continue
+            entry = self._resolve_default_entry(name)
+            if entry is None:
+                continue
+            tools.append(entry["tool"])
+            names.append(name)
+        return tools, names
+
+    def load_default_tools(self):
+        """Preload the hardcoded default tools into the current active set.
+
+        Safe to call multiple times (at startup and after module reloads). Only
+        adds tools that are currently loadable and not already active. Default
+        tools are part of the baseline, so they are exempt from the max_active
+        cap.
+        """
+        if not core.config.get("model", "dynamic_tool_loading", default=True):
+            return
+        if not self._meta_tool_defs:
+            return
+
+        loaded = []
+        for name in DEFAULT_TOOLS:
+            if name in self.active_names:
+                continue
+            entry = self._resolve_default_entry(name)
+            if entry is None:
+                continue
+            self.active_tools.append(entry["tool"])
+            self.active_names.append(name)
+            loaded.append(name)
+
+        if loaded:
+            self.channel.log("core", f"Preloaded default tools: {', '.join(loaded)}")
+
     def reset_for_new_chat(self):
-        """Reset active tools to the meta-tool baseline."""
+        """Reset active tools to the baseline (meta tools + default tools)."""
         if core.config.get("model", "dynamic_tool_loading", default=True):
-            self.active_tools = list(self._meta_tool_defs)
-            self.active_names = list(self.meta_tool_names)
+            self.active_tools, self.active_names = self._baseline_tools()
         else:
             self.active_tools = []
             self.active_names = []
             self.load_all_tools()
 
     # ------------------------------------------------------------------
+    # Per-chat tool persistence
+    # ------------------------------------------------------------------
+
+    def get_active_non_baseline_names(self):
+        """Return the active tool names that are NOT part of the baseline.
+
+        The baseline is the two meta tools plus the hardcoded default tools.
+        Everything else is a tool the AI explicitly loaded for this chat, and
+        is the set we persist per-chat so it can be restored on load.
+        """
+        baseline_set = set(self.meta_tool_names) | set(DEFAULT_TOOLS)
+        return [n for n in self.active_names if n not in baseline_set]
+
+    def persist_active_tools(self):
+        """Persist the current non-baseline active tools to the active chat's metadata.
+
+        Safe to call any time; it does nothing if there is no active chat.
+        """
+        chat = self.channel.context.chat
+        if chat is None or chat.current is None:
+            return
+        chat.set_loaded_tools(self.get_active_non_baseline_names())
+
+    def restore_chat_tools(self):
+        """Load the tools persisted in the active chat's metadata into the active set.
+
+        Should be called right after reset_for_new_chat() when loading/switching
+        to a chat, so that the chat picks up the tools it had before.
+        """
+        chat = self.channel.context.chat
+        if chat is None or chat.current is None:
+            return
+        names = chat.get_loaded_tools()
+        if not names:
+            return
+        self._load_tool_names(names)
+
+    # ------------------------------------------------------------------
     # Meta tool implementations
     # ------------------------------------------------------------------
 
     async def tools_lookup(self, query: str, limit: int = 10):
-        """Search your currently available toolset by name or description. This tool ONLY lists tools that are already loaded in your current environment. It is NOT a web search, file search, or general knowledge search. Use this to discover what actions/capabilities you have access to, not to search the internet or filesystem."""
+        """Search your currently available toolset by name or description. This tool ONLY lists tools that are already available for loading into your current environment. It is NOT a web search, file search, or general knowledge search. Use this to discover what actions/capabilities you have access to, not to search the internet or filesystem."""
         if not query:
             return {
                 "status": "success",
@@ -318,8 +434,12 @@ class ToolLoader:
 
         return {"status": "success", "content": top}
 
-    async def tools_load(self, names):
-        """Load tools by exact name (from tools_lookup results)"""
+    def _load_tool_names(self, names):
+        """Core logic to load tools by exact name. Returns a result dict.
+
+        Handles catalog lookup, module availability, disabled checks, dedup,
+        and the max_active cap. Does NOT persist to chat metadata.
+        """
         if isinstance(names, str):
             names = [names]
 
@@ -372,10 +492,19 @@ class ToolLoader:
         if not result:
             result = {"loaded": []}
 
-        has_success = bool(loaded or already_loaded)
+        return result
+
+    async def tools_load(self, names):
+        """Load tools by exact name (from tools_lookup results)"""
+        result = self._load_tool_names(names)
+        has_success = bool(result.get("loaded") or result.get("already_loaded"))
+
+        # persist the current tool state to the active chat's metadata so it
+        # can be restored when this chat is loaded again
+        self.persist_active_tools()
+
         return {
-            "status": "success" if has_success else "error",
-            "content": result,
+            "status": "success" if has_success else "error"
         }
 
     def load_all_tools(self):

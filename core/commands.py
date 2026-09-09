@@ -549,6 +549,9 @@ class Commands:
         if dynamic_loading:
             catalog_by_module = {}
             for name, entry in self.channel.tool_loader.catalog.items():
+                if name in self.channel.tool_loader.active_names:
+                    # already loaded (including preloaded default tools)
+                    continue
                 mod = entry["module"]
                 if mod not in catalog_by_module:
                     catalog_by_module[mod] = []

@@ -273,6 +273,11 @@ class Manager:
             self.log("core", "Dynamic tool loading is disabled. Loading all tools at startup.")
             for channel in self.channels.values():
                 channel.tool_loader.load_all_tools()
+        else:
+            # Dynamic loading is on: preload the hardcoded default tools on top
+            # of the meta tools so a few frequently-used tools are always ready.
+            for channel in self.channels.values():
+                channel.tool_loader.load_default_tools()
 
         if not self.args.disable_auto_installer:
             # uninstall dependencies for disabled modules (only if deps are still installed)
@@ -528,6 +533,10 @@ class Manager:
 
         # re-add the module tools based on the new state (after on_ready's modifications)
         await self.load_module_tools(module)
+
+        # make sure any hardcoded default tools belonging to this module get re-preloaded
+        for channel in self.channels.values():
+            channel.tool_loader.load_default_tools()
 
         return True
 

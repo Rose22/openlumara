@@ -54,9 +54,11 @@ class Chat:
         # load this chat's Messages object
         self.messages = core.messages.Messages(self.channel, self)
 
-        # Reset active tools when switching to a different chat
+        # Reset active tools when switching to a different chat, then restore
+        # the tools this chat had loaded before, so it picks up where it left off
         if old_id != new_id:
             self.channel.tool_loader.reset_for_new_chat()
+            self.channel.tool_loader.restore_chat_tools()
 
     def _find_index(self, id: str):
         """find index of the chat with that ID"""
@@ -65,6 +67,43 @@ class Chat:
                 return index
 
         return None
+
+    def get_loaded_tools(self):
+        """Return the list of tool names persisted in this chat's metadata.
+
+        These are the non-baseline tools the AI loaded while in this chat, so
+        they can be reloaded when the chat is loaded again.
+        """
+        if self.current is None:
+            return []
+
+        metadata = self.data[self.current].get("metadata")
+        if not isinstance(metadata, dict):
+            return []
+
+        tools = metadata.get("loaded_tools", [])
+        return tools if isinstance(tools, list) else []
+
+    def set_loaded_tools(self, names):
+        """Persist a list of tool names into this chat's metadata.
+
+        Only writes to disk when the value actually changes, so it's cheap to
+        call frequently (e.g. on every tools_load).
+        """
+        if self.current is None:
+            return
+
+        chat = self.data[self.current]
+        metadata = chat.get("metadata")
+        if not isinstance(metadata, dict):
+            metadata = {}
+            chat["metadata"] = metadata
+
+        if metadata.get("loaded_tools", []) == names:
+            return  # no change, skip the disk write
+
+        metadata["loaded_tools"] = names
+        self.data.save()
 
     def _migrate_if_needed(self):
         """Automatically migrate old format chat files if detected."""
@@ -207,8 +246,10 @@ class Chat:
         if self.current is None:
             raise Exception("No chat is currently loaded!")
 
-        # Reset active tools on clear
+        # Reset active tools on clear, and wipe the persisted tool list so
+        # this chat starts fresh the next time it's loaded
         self.channel.tool_loader.reset_for_new_chat()
+        self.set_loaded_tools([])
 
         await self.messages.clear()
         
