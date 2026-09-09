@@ -268,6 +268,12 @@ class Manager:
             self.log("core", "Loading user modules..")
             await self._load_modules(self.modules, user_modules, enabled_user_modules, is_user_modules=True)
 
+        # If dynamic tool loading is disabled, load all tools at startup
+        if not core.config.get("model", "dynamic_tool_loading", default=True):
+            self.log("core", "Dynamic tool loading is disabled. Loading all tools at startup.")
+            for channel in self.channels.values():
+                channel.tool_loader.load_all_tools()
+
         if not self.args.disable_auto_installer:
             # uninstall dependencies for disabled modules (only if deps are still installed)
             disabled_channels = core.config.get("channels", "disabled", [])

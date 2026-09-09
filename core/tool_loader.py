@@ -249,6 +249,10 @@ class ToolLoader:
         """Reset active tools to the meta-tool baseline."""
         self.active_tools = list(self._meta_tool_defs)
         self.active_names = list(self.meta_tool_names)
+        
+        # If dynamic tool loading is disabled, reload all tools for the new chat
+        if not core.config.get("model", "dynamic_tool_loading", default=True):
+            self.load_all_tools()
 
     # ------------------------------------------------------------------
     # Meta tool implementations
@@ -366,3 +370,20 @@ class ToolLoader:
             "status": "success" if has_success else "error",
             "content": result,
         }
+
+    def load_all_tools(self):
+        """Load all tools from the catalog into the active set."""
+        max_active = core.config.get("core", "max_active_tools", default=50)
+        
+        for name, entry in self.catalog.items():
+            module = self.channel.manager.modules.get(entry["module"])
+            if module is None:
+                continue
+            if entry["method"] in module.disabled_tools:
+                continue
+            if name in self.active_names:
+                continue
+            self.active_tools.append(entry["tool"])
+            self.active_names.append(name)
+            if len(self.active_names) >= max_active:
+                break

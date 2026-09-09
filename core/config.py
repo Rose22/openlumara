@@ -79,6 +79,11 @@ core_settings_schema = {
             "default": True,
             "description": "Enable tool/function calling for the model. Turn this off if you just wanna talk to the AI and don't care for all this agentic stuff! Essentially turns it into a chatbot that can't actually do anything, but it can still answer your questions."
         },
+        "dynamic_tool_loading": {
+            "default": True,
+            "description": "When enabled, no tools are loaded at first, but the AI can search for tools and load them dynamically. When disabled, all available tools are loaded at startup for immediate use.",
+            "depends": "use_tools"
+        },
         "enable_thinking": {
             "default": True,
             "description": "Enable reasoning (thinking) for the model."

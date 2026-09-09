@@ -476,8 +476,10 @@ class Commands:
     
     async def cmd_tools(self, args: list):
         if not core.config.get("model").get("use_tools", False):
-            return "tools are turned off"
+            return "Tools are turned off globally."
 
+        dynamic_loading = core.config.get("model", "dynamic_tool_loading", default=True)
+        
         if args:
             subcmd = args[0].lower()
 
@@ -488,32 +490,34 @@ class Commands:
                     return "Usage: /tools search <query>"
                 result = await self.channel.tool_loader.tools_lookup(query)
                 if result["status"] == "success" and isinstance(result["content"], list):
-                    lines = [f"Found {len(result['content'])} tools matching '{query}':"]
+                    lines = [f"? Found {len(result['content'])} tools matching '{query}':"]
                     for tool in result["content"]:
-                        loaded_tag = " [LOADED]" if tool["loaded"] else ""
-                        lines.append(f"  - {tool['name']} ({tool['module']}){loaded_tag}")
+                        loaded_tag = " ✔" if tool.get("loaded") else " ○"
+                        lines.append(f"  • {tool['name']} ({tool['module']}){loaded_tag}")
                         if tool.get("description"):
-                            lines.append(f"    {tool['description'][:120]}")
+                            lines.append(f"    `{tool['description'][:120]}`")
                     return "\n".join(lines)
                 else:
                     return f"Search result: {result['content']}"
 
             # /tools load <name> [name2 ...]
             elif subcmd == "load":
+                if dynamic_loading:
+                    return "Dynamic tool loading is disabled. All tools are already loaded at startup."
                 names = args[1:]
                 if not names:
                     return "Usage: /tools load <name> [name2 ...]"
                 result = await self.channel.tool_loader.tools_load(names)
-                lines = [f"Load result for {len(names)} tool(s):"]
+                lines = [f"▣ Load result for {len(names)} tool(s):"]
                 content = result["content"]
                 if content.get("loaded"):
-                    lines.append(f"  Loaded: {', '.join(content['loaded'])}")
+                    lines.append(f"  ✔ Loaded: {', '.join(content['loaded'])}")
                 if content.get("already_loaded"):
-                    lines.append(f"  Already loaded: {', '.join(content['already_loaded'])}")
+                    lines.append(f"  ↪  Already loaded: {', '.join(content['already_loaded'])}")
                 if content.get("unknown"):
-                    lines.append(f"  Unknown: {', '.join(content['unknown'])}")
+                    lines.append(f"  ? Unknown: {', '.join(content['unknown'])}")
                 if content.get("disabled"):
-                    lines.append(f"  Disabled: {', '.join(content['disabled'])}")
+                    lines.append(f"  ✖ Disabled: {', '.join(content['disabled'])}")
                 if not any(content.get(k) for k in ("loaded", "already_loaded", "unknown", "disabled")):
                     lines.append("  (no changes)")
                 return "\n".join(lines)
@@ -525,39 +529,43 @@ class Commands:
         tool_map = {}
         for tool in self.channel.manager.tools:
             tool_name = tool.get("function").get("name")
-            # Meta tools are grouped under "core"
-            if tool_name in ("tools_lookup", "tools_load"):
-                module_name = "core"
-            else:
-                module_name = tool_name.split("_")[0]
+            module_name = "core" if tool_name in ("tools_lookup", "tools_load") else tool_name.split("_")[0]
 
-            if module_name not in tool_map.keys():
+            if module_name not in tool_map:
                 tool_map[module_name] = []
             tool_map[module_name].append(tool_name)
 
-        tool_map_display = []
-        tool_map_display.append("== active tools ==")
-        for module_name, tools in tool_map.items():
-            tools_display = "\n".join(tools)
-            tool_map_display.append(f"  {module_name}: {', '.join(tools)}")
-
-        # Show catalog (available but not loaded)
-        catalog_by_module = {}
-        for name, entry in self.channel.tool_loader.catalog.items():
-            mod = entry["module"]
-            if mod not in catalog_by_module:
-                catalog_by_module[mod] = []
-            catalog_by_module[mod].append(name)
-
-        catalog_display = []
-        catalog_display.append("== available tools (not loaded) ==")
-        if catalog_by_module:
-            for mod, names in sorted(catalog_by_module.items()):
-                catalog_display.append(f"  {mod}: {', '.join(names)}")
+        lines = []
+        lines.append("== Active Tools ==")
+        if tool_map:
+            for mod, tools in sorted(tool_map.items()):
+                lines.append(f"  ▸ {mod}:")
+                for t in sorted(tools):
+                    lines.append(f"    • {t}")
         else:
-            catalog_display.append("  (none)")
+            lines.append("  (none)")
 
-        return "\n\n".join(tool_map_display) + "\n\n" + "\n".join(catalog_display)
+        # Show catalog only if dynamic loading is enabled
+        if dynamic_loading:
+            catalog_by_module = {}
+            for name, entry in self.channel.tool_loader.catalog.items():
+                mod = entry["module"]
+                if mod not in catalog_by_module:
+                    catalog_by_module[mod] = []
+                catalog_by_module[mod].append(name)
+
+            lines.append("\n== Available Tools (Not Loaded) ==")
+            if catalog_by_module:
+                for mod, names in sorted(catalog_by_module.items()):
+                    lines.append(f"  ▸ {mod}:")
+                    for n in sorted(names):
+                        lines.append(f"    • {n}")
+            else:
+                lines.append("  (none)")
+        else:
+            lines.append("\nℹ Dynamic tool loading is disabled. All tools are pre-loaded at startup.")
+
+        return "\n".join(lines)
     
     async def cmd_config(self, args: list):
         """explore, view, and set config settings"""
