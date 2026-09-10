@@ -112,6 +112,10 @@ core_settings_schema = {
             },
             "depends": "enable_thinking"
         },
+        "preserve_multimodal_context": {
+            "default": False,
+            "description": "Whether to keep multimodal content (images, audio) in the chat history. Disabling this saves a significant amount of tokens by stripping multimedia from all but the last message."
+        },
     },
     "channels": {
         "enabled": {
