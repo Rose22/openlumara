@@ -483,24 +483,8 @@ Use tools if needed. For simple reminders, do not use tools.
     def _format_one_time_job(self, job: dict) -> str:
         try:
             trigger_dt = datetime.datetime.fromisoformat(job.get("trigger_time", ""))
-            delta = trigger_dt - datetime.datetime.now()
-            total_seconds = int(delta.total_seconds())
-
-            if total_seconds < 0:
-                return "one-time, overdue"
-
-            h, rem = divmod(total_seconds, 3600)
-            m, s = divmod(rem, 60)
-
-            parts = []
-            if h > 0:
-                parts.append(f"{h} hour{'s' if h != 1 else ''}")
-            if m > 0:
-                parts.append(f"{m} minute{'s' if m != 1 else ''}")
-            if s > 0 or not parts:
-                parts.append(f"{s} second{'s' if s != 1 else ''}")
-
-            return f"one-time, {', '.join(parts)} from now"
+            # don't do relative time here because it causes the system prompt to change every second.. oopsies
+            return f"one-time, due {trigger_dt.strftime('%Y-%m-%d %H:%M')}"
         except (ValueError, TypeError):
             return "one-time, invalid time"
 
