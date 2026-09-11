@@ -307,8 +307,7 @@ class ToolLoader:
 
         Safe to call multiple times (at startup and after module reloads). Only
         adds tools that are currently loadable and not already active. Default
-        tools are part of the baseline, so they are exempt from the max_active
-        cap.
+        tools are part of the baseline.
         """
         if not core.config.get("model", "dynamic_tool_loading", default=True):
             return
@@ -437,13 +436,12 @@ class ToolLoader:
     def _load_tool_names(self, names):
         """Core logic to load tools by exact name. Returns a result dict.
 
-        Handles catalog lookup, module availability, disabled checks, dedup,
-        and the max_active cap. Does NOT persist to chat metadata.
+        Handles catalog lookup, module availability, disabled checks, and
+        dedup. Does NOT persist to chat metadata.
         """
         if isinstance(names, str):
             names = [names]
 
-        max_active = core.config.get("core", "max_active_tools", default=50)
         unknown = []
         disabled = []
         already_loaded = []
@@ -468,10 +466,6 @@ class ToolLoader:
                 new_to_add.append(name)
             else:
                 unknown.append(name)
-
-        # Respect the cap
-        if len(self.active_names) + len(new_to_add) > max_active:
-            new_to_add = new_to_add[:max_active - len(self.active_names)]
 
         for name in new_to_add:
             entry = self.catalog[name]
@@ -509,8 +503,6 @@ class ToolLoader:
 
     def load_all_tools(self):
         """Load all tools from the catalog into the active set."""
-        max_active = core.config.get("core", "max_active_tools", default=50)
-        
         for name, entry in self.catalog.items():
             module = self.channel.manager.modules.get(entry["module"])
             if module is None:
@@ -519,7 +511,5 @@ class ToolLoader:
                 continue
             if name in self.active_names:
                 continue
-            if len(self.active_names) >= max_active:
-                break
             self.active_tools.append(entry["tool"])
             self.active_names.append(name)
