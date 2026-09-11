@@ -362,7 +362,7 @@ class Coder(core.module.Module):
         except Exception as e:
             return self.result(str(e), success=False)
 
-    async def folder_grep(self, sandbox: str, sub_path: str, regex_pattern: str, case_sensitive=False, context: int = 0, file_extensions: list = None, max_matches: int = 100):
+    async def folder_grep(self, sandbox: str, sub_path: str, regex_pattern: str, case_sensitive=False, context: int = 0, file_extensions: list = None, max_matches: int = 30):
         """searches for regex pattern in all files in folder"""
         folder_blacklist = self.config.get("folder_blacklist")
 
@@ -419,7 +419,10 @@ class Coder(core.module.Module):
 
                                     matches.append(match_dict)
                                     if len(matches) >= int(max_matches):
-                                        break
+                                        return self.result({
+                                            "matches": matches,
+                                            "note": f"Showing up to {int(max_matches)} matches. More results may be available — narrow your search pattern to see them."
+                                        })
                     except Exception as e:
                         pass
 
@@ -585,7 +588,7 @@ class Coder(core.module.Module):
 
         return result
 
-    async def file_grep(self, sandbox: str, file_path: str, regex_pattern: str, case_sensitive: bool = True, context: int = 0, max_matches: int = 100):
+    async def file_grep(self, sandbox: str, file_path: str, regex_pattern: str, case_sensitive: bool = True, context: int = 0, max_matches: int = 30):
         target_path = await self._get_sandbox_subpath(sandbox, file_path)
         
         # compile regex with optional case-insensitive flag
@@ -620,7 +623,10 @@ class Coder(core.module.Module):
                         matches.append(match_dict)
 
                         if len(matches) >= int(max_matches):
-                            break
+                            return self.result({
+                                "matches": matches,
+                                "note": f"Showing up to {int(max_matches)} matches. More results may be available — narrow your search pattern to see them."
+                            })
 
             if matches:
                 return self.result(matches)
