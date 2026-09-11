@@ -63,31 +63,7 @@ class Channel(core.module.Module):
     async def on_system_prompt(self):
         output = []
 
-        # if self.config.get("enable_new_user_reminder"):
-        #
         if not self.channel or self.channel.context.chat.get("metadata").get("character"):
-            return None
-
-        chan = core.modules.get_name(self.channel)
-
-        available_chans = core.config.get("channels", "enabled", default=[])
-
-        if chan in ("cli", "matrix"):
-            output.append(f"While in the {chan} channel, **DO NOT USE MARKDOWN**.")
-
-        output.append("\nNOTE: if the channel has changed, discard instructions about previous channels.")
-
-        output.append(f"Available channels: {', '.join(available_chans)}")
-
-        if self.config.get("enable_tutorial_prompts") and chan in self.instructions:
-            output.append("")
-            output.append("Instructions for the user:")
-            output.append(self.instructions.get(chan).strip())
-
-        return "\n".join(output)
-
-    async def on_end_prompt(self):
-        if not self.channel:
             return None
 
         chan = core.modules.get_name(self.channel)
@@ -102,4 +78,20 @@ class Channel(core.module.Module):
         chan_display = chan_transl.get(chan, chan)
         # wow confusing syntax lol. return channel name if couldnt get translation by using name as key
 
-        return f"current channel: {chan_display}"
+        output.append(f"Current channel: {chan_display}")
+
+        chan_display = chan_transl.get(chan, chan)
+        # wow confusing syntax lol. return channel name if couldnt get translation by using name as key
+        available_chans = core.config.get("channels", "enabled", default=[])
+
+        if chan in ("cli", "matrix"):
+            output.append(f"**DO NOT USE MARKDOWN IN YOUR MESSAGES**.")
+
+        output.append(f"Available channels: {', '.join(available_chans)}")
+
+        if self.config.get("enable_tutorial_prompts") and chan in self.instructions:
+            output.append("")
+            output.append("Instructions for the user:")
+            output.append(self.instructions.get(chan).strip())
+
+        return "\n".join(output)
