@@ -26,7 +26,6 @@ class Memory(core.module.Module):
     async def on_ready(self):
         self._mem = core.storage.StorageList("memory", type="msgpack")
         self._mem_deleted = core.storage.StorageList("deleted_memories", type="json")
-        self.max_pinned = 10
 
     def _get_index(self, ulid: str) -> int:
         """checks if a memory with ID exists in memories"""

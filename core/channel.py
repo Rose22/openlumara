@@ -234,7 +234,7 @@ class Channel:
     # ---------------------
     # Content Processors
     # ---------------------
-    async def _process_multimodal(self, message: str = None, files: list = None) -> list:
+    async def _process_multimodal(self, message: str = None, files: list = None) -> dict:
         """
         Converts a list of file handler objects into an openAI API multimodal message object,
         allowing the AI to process images, audio, etc.

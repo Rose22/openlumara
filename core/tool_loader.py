@@ -17,7 +17,8 @@ DEFAULT_TOOLS = [
     "memory_edit",
     "memory_delete",
     "memory_pin",
-    "memory_unpin"
+    "memory_unpin",
+    "web_search"
 ]
 
 class ToolLoader:

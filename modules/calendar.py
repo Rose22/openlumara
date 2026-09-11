@@ -178,7 +178,7 @@ class Calendar(core.module.Module):
 
         return self.result(f"appointment added with ID {event['id']}")
 
-    async def edit_event(self, id: str, title: str = None, year: int = None, month: int = None, day: int = None, hour: int = None, minute: int = None, should_notify: bool = True, notify_channel: str = None):
+    async def edit_event(self, id: str, title: str = None, year: int = None, month: int = None, day: int = None, hour: int = None, minute: int = None, should_notify: bool = None, notify_channel: str = None):
         index = await self._get_event_by_id(id)
         if index < 0:
             return self.result("Error: Event with that ID does not exist", success=False)
@@ -212,6 +212,7 @@ class Calendar(core.module.Module):
             return self.result("Error: Event with that ID does not exist", success=False)
 
         self.events.pop(index)
+        self.events.save()
         return self.result(f"event {id} deleted")
 
     @core.module.command("calendar", send_to_ai=False)

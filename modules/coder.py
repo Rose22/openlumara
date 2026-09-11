@@ -80,6 +80,8 @@ class Coder(core.module.Module):
     # events
     # -------------
     async def on_ready(self):
+        self.disabled_tools = []
+
         # enable/disable tools based on selected modes
         if self.config.get("read-only"):
             self.disabled_tools.extend(["file_create", "file_move", "file_delete", "file_edit", "folder_delete"])

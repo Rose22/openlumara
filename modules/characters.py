@@ -180,7 +180,6 @@ class Characters(core.module.Module):
             if len(await self.channel.context.chat.messages.get()) == 0:
                 first_msg = self._replace_tags(char_name, first_msg)
                 await self.channel.push({"role": "assistant", "content": first_msg})
-                await self.channel.context.chat.messages.add({"role": "assistant", "content": first_msg})
 
         return char_text
 

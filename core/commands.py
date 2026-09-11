@@ -502,7 +502,7 @@ class Commands:
 
             # /tools load <name> [name2 ...]
             elif subcmd == "load":
-                if dynamic_loading:
+                if not dynamic_loading:
                     return "Dynamic tool loading is disabled. All tools are already loaded at startup."
                 names = args[1:]
                 if not names:
