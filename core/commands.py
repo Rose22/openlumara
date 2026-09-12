@@ -483,53 +483,38 @@ class Commands:
         if args:
             subcmd = args[0].lower()
 
-            # /tools search <query>
-            if subcmd == "search":
-                query = " ".join(args[1:])
-                if not query:
-                    return "Usage: /tools search <query>"
-                result = await self.channel.tool_loader.tools_lookup(query)
-                if result["status"] == "success" and isinstance(result["content"], list):
-                    lines = [f"? Found {len(result['content'])} tools matching '{query}':"]
-                    for tool in result["content"]:
-                        loaded_tag = " ✔" if tool.get("loaded") else " ○"
-                        lines.append(f"  • {tool['name']} ({tool['module']}){loaded_tag}")
-                        if tool.get("description"):
-                            lines.append(f"    `{tool['description'][:120]}`")
-                    return "\n".join(lines)
-                else:
-                    return f"Search result: {result['content']}"
-
-            # /tools load <name> [name2 ...]
-            elif subcmd == "load":
+            # /tools load <module_name>
+            if subcmd == "load":
                 if not dynamic_loading:
                     return "Dynamic tool loading is disabled. All tools are already loaded at startup."
-                names = args[1:]
-                if not names:
-                    return "Usage: /tools load <name> [name2 ...]"
-                result = await self.channel.tool_loader.tools_load(names)
-                lines = [f"▣ Load result for {len(names)} tool(s):"]
-                content = result["content"]
-                if content.get("loaded"):
-                    lines.append(f"  ✔ Loaded: {', '.join(content['loaded'])}")
-                if content.get("already_loaded"):
-                    lines.append(f"  ↪  Already loaded: {', '.join(content['already_loaded'])}")
-                if content.get("unknown"):
-                    lines.append(f"  ? Unknown: {', '.join(content['unknown'])}")
-                if content.get("disabled"):
-                    lines.append(f"  ✖ Disabled: {', '.join(content['disabled'])}")
-                if not any(content.get(k) for k in ("loaded", "already_loaded", "unknown", "disabled")):
-                    lines.append("  (no changes)")
+                module_names = args[1:]
+                if not module_names:
+                    return "Usage: /tools load <module_name> [module_name2 ...]"
+                lines = [f"▣ Load result for {len(module_names)} module(s):"]
+                for module_name in module_names:
+                    result = await self.channel.tool_loader.tools_load(module_name)
+                    content = result.get("content", {})
+                    if result["status"] == "error" and not isinstance(content, dict):
+                        lines.append(f"  ✖ {result['content']}")
+                        continue
+                    if content.get("loaded"):
+                        lines.append(f"  ✔ Loaded {len(content['loaded'])} tool(s) from '{module_name}': {', '.join(content['loaded'])}")
+                    if content.get("already_loaded"):
+                        lines.append(f"  ↪ Already loaded: {', '.join(content['already_loaded'])}")
+                    if content.get("disabled"):
+                        lines.append(f"  ✖ Disabled: {', '.join(content['disabled'])}")
+                    if not any(content.get(k) for k in ("loaded", "already_loaded", "disabled")):
+                        lines.append(f"  (no changes for '{module_name}')")
                 return "\n".join(lines)
 
             else:
-                return f"Unknown subcommand: {subcmd}. Use /tools search, /tools load, or /tools (no args) for help."
+                return f"Unknown subcommand: {subcmd}. Use /tools load, or /tools (no args) for help."
 
         # No subcommand — show active + catalog
         tool_map = {}
         for tool in self.channel.manager.tools:
             tool_name = tool.get("function").get("name")
-            module_name = "core" if tool_name in ("tools_lookup", "tools_load") else tool_name.split("_")[0]
+            module_name = "core" if tool_name in ("tools_load",) else tool_name.split("_")[0]
 
             if module_name not in tool_map:
                 tool_map[module_name] = []

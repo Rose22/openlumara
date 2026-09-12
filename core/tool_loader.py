@@ -2,23 +2,16 @@ import core
 import inspect
 import regex as re
 
-# Tools that are ALWAYS preloaded at startup, on top of the two meta tools
-# (tools_lookup / tools_load), even when dynamic tool loading is enabled.
+# Tools that are ALWAYS preloaded at startup, on top of the tools_load meta
+# tool, even when dynamic tool loading is enabled.
 #
 # This keeps a small handful of frequently-used tools available immediately
 # without bloating the context with the entire catalog. Everything else stays
-# available on demand via tools_lookup -> tools_load.
+# available on demand via tools_load(module_name).
 #
 # Edit this list to change which tools are preloaded by default. Names use the
 # standard "<module>_<method>" format (e.g. "memory_create").
 DEFAULT_TOOLS = [
-    "memory_create",
-    "memory_search",
-    "memory_edit",
-    "memory_delete",
-    "memory_pin",
-    "memory_unpin",
-    "web_search"
 ]
 
 class ToolLoader:
@@ -29,7 +22,7 @@ class ToolLoader:
         self.catalog = {}  # name -> {"tool": dict, "module": str, "method": str, "description": str}
         self.active_tools = []  # tool dicts sent to the API
         self.active_names = []  # active tool names
-        self._meta_tool_defs = []  # the two meta tool dicts (baseline active set)
+        self._meta_tool_defs = []  # the meta tool dicts (baseline active set)
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -232,40 +225,82 @@ class ToolLoader:
 
     @property
     def meta_tool_names(self):
-        return {"tools_lookup", "tools_load"}
+        return {"tools_load"}
+
+    def _enabled_module_names(self):
+        """Return the names of all currently enabled (loaded) modules.
+
+        This never enables or disables anything; it only reflects which modules
+        are loaded in the manager, and therefore which modules' tools already
+        live in the catalog and can be loaded on demand.
+        """
+        return sorted(self.channel.manager.modules.keys())
+
+    def _tools_load_description(self):
+        """Build the dynamic tools_load description, embedding enabled modules."""
+        modules = self._enabled_module_names()
+        module_list = ", ".join(modules) if modules else "(none currently enabled)"
+        return (
+            "Loads all tools belonging to a module into your active toolset."
+            f"Currently available modules (pass one of these as module_name): {module_list}."
+        )
 
     def register_meta_tools(self):
-        """Build and register the two meta tools; set as baseline active set."""
+        """Build and register the tools_load meta tool; set as baseline active set.
+
+        The description is dynamic: it is rebuilt from scratch every time so it
+        always lists the modules that are currently enabled.
+        """
         # When dynamic tool loading is off, don't load meta tools
         if not core.config.get("model", "dynamic_tool_loading", default=True):
             return
 
-        if self._meta_tool_defs:
-            # Already registered (idempotent)
+        def tools_load(module_name: str):
+            pass
+
+        load_dict = self._tool_dict_from_func(tools_load, "tools_load")
+        load_dict["function"]["description"] = self._tools_load_description()
+
+        self._meta_tool_defs = [load_dict]
+        self.active_tools = list(self._meta_tool_defs)
+        self.active_names = ["tools_load"]
+
+        self.channel.log("core", "Registered meta tool: tools_load")
+
+    def refresh_meta_tool_descriptions(self):
+        """Rebuild the dynamic meta tool description(s) and re-sync the active set.
+
+        Call this whenever modules are enabled/disabled or module tools are
+        (re)registered, so tools_load always advertises the current module list.
+        """
+        if not self._meta_tool_defs:
             return
 
-        def tools_lookup(query: str, limit: int = 10):
-            """Search your currently available tools by name or description. Only lists tools already loaded in your environment. NOT a web search or file search."""
-            pass
+        new_defs = []
+        for tool_def in self._meta_tool_defs:
+            if tool_def["function"]["name"] == "tools_load":
+                new_defs.append(
+                    {
+                        **tool_def,
+                        "function": {
+                            **tool_def["function"],
+                            "description": self._tools_load_description(),
+                        },
+                    }
+                )
+            else:
+                new_defs.append(tool_def)
 
-        def tools_load(names: list):
-            """Load tools by exact name. Use tools_lookup first to find available tools."""
-            pass
+        self._meta_tool_defs = new_defs
 
-        search_dict = self._tool_dict_from_func(tools_lookup, "tools_lookup")
-        load_dict = self._tool_dict_from_func(tools_load, "tools_load")
-
-        self._meta_tool_defs = [search_dict, load_dict]
-        self.active_tools = list(self._meta_tool_defs)
-        self.active_names = ["tools_lookup", "tools_load"]
-
-        self.channel.log("core", "Registered meta tools: tools_lookup, tools_load")
+        # replace the meta tool dict in the active set with the refreshed one
+        for i, tool in enumerate(self.active_tools):
+            if tool["function"]["name"] == "tools_load":
+                self.active_tools[i] = self._meta_tool_defs[0]
 
     def get_meta_callable(self, tool_name):
         """Return the bound method for a meta tool name."""
-        if tool_name == "tools_lookup":
-            return self.tools_lookup
-        elif tool_name == "tools_load":
+        if tool_name == "tools_load":
             return self.tools_load
         return None
 
@@ -288,11 +323,11 @@ class ToolLoader:
     def _baseline_tools(self):
         """Return (tools, names) for the baseline active set.
 
-        The baseline is the two meta tools plus any hardcoded default tools that
-        are currently loadable.
+        The baseline is the tools_load meta tool plus any hardcoded default
+        tools that are currently loadable.
         """
         tools = list(self._meta_tool_defs)
-        names = ["tools_lookup", "tools_load"]
+        names = ["tools_load"]
         for name in DEFAULT_TOOLS:
             if name in names:
                 continue
@@ -345,7 +380,7 @@ class ToolLoader:
     def get_active_non_baseline_names(self):
         """Return the active tool names that are NOT part of the baseline.
 
-        The baseline is the two meta tools plus the hardcoded default tools.
+        The baseline is the meta tool(s) plus the hardcoded default tools.
         Everything else is a tool the AI explicitly loaded for this chat, and
         is the set we persist per-chat so it can be restored on load.
         """
@@ -376,130 +411,102 @@ class ToolLoader:
             return
         self._load_tool_names(names)
 
-    # ------------------------------------------------------------------
-    # Meta tool implementations
-    # ------------------------------------------------------------------
-
-    async def tools_lookup(self, query: str, limit: int = 10):
-        """Search your currently available toolset by name or description. This tool ONLY lists tools that are already available for loading into your current environment. It is NOT a web search, file search, or general knowledge search. Use this to discover what actions/capabilities you have access to, not to search the internet or filesystem."""
-        if not query:
-            return {
-                "status": "success",
-                "content": "No tools matched. Try different or fewer keywords.",
-            }
-
-        query_lower = query.lower()
-        query_tokens = [t for t in query_lower.split() if len(t) >= 3]
-
-        scored = []
-        for name, entry in self.catalog.items():
-            desc = entry["description"].lower()
-            module = entry["module"].lower()
-            score = 0
-
-            if name == query_lower:
-                score += 100
-            elif name.startswith(query_lower):
-                score += 80
-            elif query_lower in name:
-                score += 60
-            else:
-                for token in query_tokens:
-                    if token in name:
-                        score += 3
-                    if token in desc:
-                        score += 1
-
-            if score > 0:
-                truncated_desc = entry["description"][:160]
-                scored.append({
-                    "name": name,
-                    "description": truncated_desc,
-                    "loaded": name in self.active_names,
-                    "score": score,
-                })
-
-        scored.sort(key=lambda x: -x["score"])
-        top = scored[:limit]
-
-        if not top:
-            return {
-                "status": "success",
-                "content": "No tools matched. Try different or fewer keywords.",
-            }
-
-        # Remove the internal score field before returning
-        for item in top:
-            del item["score"]
-
-        return {"status": "success", "content": top}
-
     def _load_tool_names(self, names):
-        """Core logic to load tools by exact name. Returns a result dict.
+        """Internal: load tools by exact name. Used to restore per-chat tool state.
 
-        Handles catalog lookup, module availability, disabled checks, and
-        dedup. Does NOT persist to chat metadata.
+        Handles catalog lookup, module availability, disabled checks, and dedup.
+        Does NOT persist to chat metadata.
         """
         if isinstance(names, str):
             names = [names]
 
-        unknown = []
-        disabled = []
-        already_loaded = []
-        loaded = []
+        for name in names:
+            entry = self.catalog.get(name)
+            if entry is None:
+                continue
+            module = self.channel.manager.modules.get(entry["module"])
+            if module is None:
+                continue
+            if entry["method"] in module.disabled_tools:
+                continue
+            if name in self.active_names:
+                continue
+            self.active_tools.append(entry["tool"])
+            self.active_names.append(name)
+
+    # ------------------------------------------------------------------
+    # Meta tool implementations
+    # ------------------------------------------------------------------
+
+    def _load_module_tools(self, module_name):
+        """Core logic to load all cataloged tools for a module. Returns a result dict.
+
+        Only loads tools from modules that are already enabled and whose tools
+        are present in the catalog. This NEVER enables or disables modules.
+        Handles module availability, disabled checks, and dedup. Does NOT
+        persist to chat metadata.
+        """
+        module_name = str(module_name).lower().strip()
+        enabled = self._enabled_module_names()
+
+        module = self.channel.manager.modules.get(module_name)
+        if module is None:
+            return {
+                "status": "error",
+                "unknown_module": module_name,
+                "enabled_modules": enabled,
+            }
 
         new_to_add = []
-        for name in names:
-            if name in self.catalog:
-                entry = self.catalog[name]
-                module = self.channel.manager.modules.get(entry["module"])
-                if module is None:
-                    unknown.append(name)
-                    continue
-                if entry["method"] in module.disabled_tools:
-                    disabled.append(
-                        f"{name} is disabled by the {entry['module']} module"
-                    )
-                    continue
-                if name in self.active_names:
-                    already_loaded.append(name)
-                    continue
-                new_to_add.append(name)
-            else:
-                unknown.append(name)
+        already_loaded = []
+        disabled = []
 
+        for name, entry in self.catalog.items():
+            if entry["module"] != module_name:
+                continue
+            if entry["method"] in module.disabled_tools:
+                disabled.append(name)
+                continue
+            if name in self.active_names:
+                already_loaded.append(name)
+                continue
+            new_to_add.append(name)
+
+        loaded = []
         for name in new_to_add:
             entry = self.catalog[name]
             self.active_tools.append(entry["tool"])
             self.active_names.append(name)
             loaded.append(name)
 
-        result = {}
-        if loaded:
-            result["loaded"] = loaded
-        if already_loaded:
-            result["already_loaded"] = already_loaded
-        if unknown:
-            result["unknown"] = unknown
+        result = {"loaded": loaded, "already_loaded": already_loaded}
         if disabled:
             result["disabled"] = disabled
-
-        if not result:
-            result = {"loaded": []}
-
         return result
 
-    async def tools_load(self, names):
-        """Load tools by exact name (from tools_lookup results)"""
-        result = self._load_tool_names(names)
-        has_success = bool(result.get("loaded") or result.get("already_loaded"))
+    async def tools_load(self, module_name: str):
+        """Loads all tools of an enabled module into your active toolset. This only loads tools; it does not enable or disable modules. Pass the module name shown in this tool's description."""
+        result = self._load_module_tools(module_name)
+        has_success = result.get("status") != "error" and (
+            result.get("loaded") or result.get("already_loaded")
+        )
+
+        if result.get("status") == "error":
+            return {
+                "status": "error",
+                "content": (
+                    f"No enabled module named '{result['unknown_module']}'. "
+                    f"Enabled modules: {', '.join(result['enabled_modules'])}."
+                ),
+            }
 
         # persist the current tool state to the active chat's metadata so it
         # can be restored when this chat is loaded again
         self.persist_active_tools()
 
         return {
-            "status": "success" if has_success else "error"
+            "status": "success" if has_success else "error",
+            "content": result,
         }
 
     def load_all_tools(self):

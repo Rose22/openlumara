@@ -130,7 +130,7 @@ class ToolcallManager:
             if tool_name in tool_loader.meta_tool_names:
                 if not dynamic_loading:
                     rejected_msg = json.dumps({
-                        "content": "Dynamic tool loading is disabled. Meta tools (tools_lookup, tools_load) are not available. You have access to all available tools without needing to load them.",
+                        "content": "Dynamic tool loading is disabled. The meta tool (tools_load) is not available. You have access to all available tools without needing to load them.",
                         "status": "error"
                     })
                     await self.channel.context.chat.messages.add({
@@ -165,7 +165,7 @@ class ToolcallManager:
                         })
                     else:
                         rejected_msg = json.dumps({
-                            "content": f"No tool named {tool_name} exists. Use tools_lookup to find available tools.",
+                            "content": f"No tool named {tool_name} exists. Use tools_load with the module name to load that module's tools.",
                             "status": "error"
                         })
 
@@ -197,7 +197,7 @@ class ToolcallManager:
                         })
                     else:
                         rejected_msg = json.dumps({
-                            "content": f"Tool {tool_name} is not loaded. Load it first by calling tools_load with names=[\"{tool_name}\"], then call it again.",
+                            "content": f"Tool {tool_name} is not loaded. Load it first by calling tools_load with module_name=\"{tool_name.split('_')[0]}\", then call it again.",
                             "status": "error"
                         })
                     await self.channel.context.chat.messages.add({

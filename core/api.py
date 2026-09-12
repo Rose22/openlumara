@@ -204,6 +204,8 @@ class APIClient():
             }
         }
 
+        print(req)
+
         # add kwargs to the request
         for key, value in kwargs.items():
             if key in ("tools", "stream", "use_thinking"): continue

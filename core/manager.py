@@ -277,6 +277,9 @@ class Manager:
             # Dynamic loading is on: preload the hardcoded default tools on top
             # of the meta tools so a few frequently-used tools are always ready.
             for channel in self.channels.values():
+                # all modules are loaded now: sync the tools_load description
+                # with the final list of enabled modules
+                channel.tool_loader.refresh_meta_tool_descriptions()
                 channel.tool_loader.load_default_tools()
                 # Now that the catalog is populated, restore any tools that were
                 # persisted in the auto-resumed chat's metadata. During autoload()
@@ -679,11 +682,14 @@ class Manager:
         """Register a module's tools in the catalog (no longer adds to active set)."""
         for channel in self.channels.values():
             channel.tool_loader.register_module(module)
+            # keep the dynamic tools_load description in sync with enabled modules
+            channel.tool_loader.refresh_meta_tool_descriptions()
 
     async def unload_module_tools(self, module):
         """Unregister a module's tools from the catalog and active set."""
         for channel in self.channels.values():
             channel.tool_loader.unregister_module(module)
+            channel.tool_loader.refresh_meta_tool_descriptions()
         return True
 
     async def add_module_class(self, module, is_user_module=False):
