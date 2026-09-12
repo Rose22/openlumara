@@ -493,18 +493,10 @@ class Commands:
                 lines = [f"▣ Load result for {len(module_names)} module(s):"]
                 for module_name in module_names:
                     result = await self.channel.tool_loader.tools_load(module_name)
-                    content = result.get("content", {})
-                    if result["status"] == "error" and not isinstance(content, dict):
-                        lines.append(f"  ✖ {result['content']}")
-                        continue
-                    if content.get("loaded"):
-                        lines.append(f"  ✔ Loaded {len(content['loaded'])} tool(s) from '{module_name}': {', '.join(content['loaded'])}")
-                    if content.get("already_loaded"):
-                        lines.append(f"  ↪ Already loaded: {', '.join(content['already_loaded'])}")
-                    if content.get("disabled"):
-                        lines.append(f"  ✖ Disabled: {', '.join(content['disabled'])}")
-                    if not any(content.get(k) for k in ("loaded", "already_loaded", "disabled")):
-                        lines.append(f"  (no changes for '{module_name}')")
+                    if result.get("status") == "success":
+                        lines.append(f"  ✔ {module_name} tools loaded")
+                    else:
+                        lines.append(f"   ✖ Failed to load {module_name} tools!")
                 return "\n".join(lines)
 
             else:
