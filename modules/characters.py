@@ -89,13 +89,12 @@ class Characters(core.module.Module):
         name = " ".join(args)
         if not name:
             char = self.channel.context.chat.get("metadata").get("character")
-            self.active = True
             if char:
                 return f"currently active character: {char}"
             else:
                 return "please provide a character name."
         elif name in("reset", "default"):
-                self.channel.context.chat.get("metadata")["character"] = "character"
+                self.channel.context.chat.get("metadata")["character"] = ""
                 self.active = False
                 return "character has been reset to default"
 
@@ -121,7 +120,14 @@ class Characters(core.module.Module):
             return tool_text or None
 
         char_name = self.channel.context.chat.get("metadata").get("character")
-        char = self.characters.get(char_name)
+        char = self._find_character(char_name)
+
+        # if the character was deleted (or the metadata holds a stale/invalid
+        # value), clean it up so the rest of the prompt isn't broken
+        if not char:
+            self.channel.context.chat.get("metadata")["character"] = ""
+            self.active = False
+            return tool_text or None
 
         # the presence of the "data" key means it's
         # either character card V2 or V3 or higher
@@ -164,7 +170,7 @@ class Characters(core.module.Module):
         character_text_build = []
         character_text_build.append(f"## You: {char_name}\n{char_profile}")
 
-        if char_data and char_scenario:
+        if char_scenario:
             character_text_build.append(f"## Scenario\n{char_scenario}")
 
         user_profile = self.user_profile.get("profile")
@@ -216,14 +222,17 @@ class Characters(core.module.Module):
                 "description": char.get("identity")
             }
 
-        self.channel.context.chat.get("metadata")["character"] = char_data.get("name")
+        # prefer the canonical stored key so on_system_prompt() can always
+        # resolve the character reliably, regardless of how it was invoked
+        char_name = self._find_char_name(name) or char_data.get("name")
+
+        self.channel.context.chat.get("metadata")["character"] = char_name
         self.active = True
-        user_name = self.user_profile.get("name", "User")
 
         first_msg = char_data.get("first_mes")
         if first_msg:
             # bypass the usual tool response flow and instead send the first message as a push message
-            first_msg = self._replace_tags(name, first_msg)
+            first_msg = self._replace_tags(char_name, first_msg)
             await self.channel.push({"role": "assistant", "content": first_msg})
             await self.channel.context.chat.messages.add({"role": "assistant", "content": first_msg})
             return None
@@ -300,9 +309,12 @@ class Characters(core.module.Module):
 
         return character
 
-    async def add(self, name: str, profile: str, short_summary: str, scenario: str, category: str, tags: list = None, first_message: str = "", post_history_instructions: str = ""):
+    async def add(self, name: str, profile: str, short_summary: str, scenario: str, category: str, tags: list = None, post_history_instructions: str = ""):
         """
         Adds a new character to your character storage.
+
+        Note: new characters are created without a first message. If the user
+        wants one, they can add it later with edit().
 
         Args:
             name: The character's name
@@ -310,7 +322,6 @@ class Characters(core.module.Module):
             short_summary: A short summary of the character
             scenario: The scenario/scene in which the conversation will take place
             tags: Any tags that could be used to organize the character profile
-            first_message: The first message the character will send when starting a new chat. Optional.
             post_history_instructions: Prompt to append at the end of chat history. Optional.
         """
         if not name.strip():
@@ -335,7 +346,7 @@ class Characters(core.module.Module):
                 "description": profile,
                 "personality": short_summary,
                 "scenario": scenario,
-                "first_mes": first_message,
+                "first_mes": "",
                 "mes_example": "", # why
                 "tags": tags,
 
@@ -375,16 +386,23 @@ class Characters(core.module.Module):
         if not char_data:
             return self.result("character data doesn't exist!", False)
 
-        ver_increment = float(char.get("character_version", 1.0))+0.1
+        # always write back to the canonical (stored) key so we don't
+        # accidentally create a duplicate entry with different casing
+        canonical_name = self._find_char_name(name)
+
+        try:
+            ver_increment = float(char_data.get("character_version", 1.0))+0.1
+        except (TypeError, ValueError):
+            ver_increment = 1.1
 
         # we're using `is not None` because we need to retain the ability
         # to set stuff to blank strings
-        self.characters[name] = {
+        self.characters[canonical_name] = {
             "spec": "chara_card_v2",
             "spec_version": "2.0",
-            "category": category,
+            "category": category if category is not None else char.get("category"),
             "data": {
-                "name": name,
+                "name": canonical_name,
                 "description": profile if profile is not None else char_data.get("description"),
                 "personality": short_summary if short_summary is not None else char_data.get("personality"),
                 "scenario": scenario if scenario is not None else char_data.get("scenario"),
