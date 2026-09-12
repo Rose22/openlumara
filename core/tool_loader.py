@@ -2,16 +2,6 @@ import core
 import inspect
 import regex as re
 
-# Modules whose tools are ALWAYS preloaded at startup, on top of the tools_load
-# meta tool, even when dynamic tool loading is enabled. This keeps a small
-# handful of frequently-used tools available immediately without bloating the
-# context with the entire catalog. Everything else stays available on demand
-# via tools_load(module_name).
-DEFAULT_MODULES = [
-    "memory",
-    "web_search"
-]
-
 META_TOOL_NAMES = {"tools_load"}
 
 _TYPE_MAP = {str: "string", int: "integer", bool: "boolean", list: "array", dict: "object"}
@@ -127,12 +117,17 @@ class ToolLoader:
             return None
         return entry
 
+    def _preloaded_modules(self):
+        """Module names whose tools are preloaded at startup (model.preloaded_modules)."""
+        modules = core.config.get("model", "preloaded_modules", default=[])
+        return {str(m).lower() for m in modules} if isinstance(modules, list) else set()
+
     def _default_tools(self):
-        """Cataloged tools belonging to the DEFAULT_MODULES, as {name: entry}."""
-        default_modules = set(DEFAULT_MODULES)
+        """Cataloged tools belonging to the preloaded modules, as {name: entry}."""
+        preloaded = self._preloaded_modules()
         return {
             name: entry for name, entry in self.catalog.items()
-            if entry["module"] in default_modules
+            if entry["module"] in preloaded
         }
 
     # ------------------------------------------------------------------
@@ -255,7 +250,7 @@ class ToolLoader:
         return tools, names
 
     def load_default_tools(self):
-        """Preload all tools of the DEFAULT_MODULES (idempotent; skips active ones)."""
+        """Preload all tools of the preloaded modules (idempotent; skips active ones)."""
         if not core.config.get("model", "dynamic_tool_loading", default=True):
             return
         if not self._meta_def:
@@ -297,7 +292,7 @@ class ToolLoader:
         This is the set of modules the AI explicitly loaded for this chat; it
         gets persisted per-chat so it can be restored on load.
         """
-        baseline_modules = set(DEFAULT_MODULES)
+        baseline_modules = self._preloaded_modules()
         modules = set()
         for name in self.active_names:
             entry = self.catalog.get(name)

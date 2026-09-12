@@ -81,7 +81,13 @@ core_settings_schema = {
         },
         "dynamic_tool_loading": {
             "default": True,
-            "description": "When enabled, no tools are loaded at first, but the AI can search for tools and load them dynamically. When disabled, all available tools are loaded at startup for immediate use.",
+            "description": "When enabled, only a small selection of tools is loaded at first, but the AI can load them dynamically from enabled openlumara modules. When disabled, all available tools are loaded at startup for immediate use.",
+            "depends": "use_tools"
+        },
+        "preloaded_modules": {
+            "default": ["identity", "memory", "scheduler", "web_search", "web_reader"],
+            "description": "List of module names whose tools are always preloaded at startup, on top of the tools_load meta tool. Keeps frequently-used tools available immediately; everything else stays available on demand via tools_load(module_name).",
+            "type": "list",
             "depends": "use_tools"
         },
         "enable_thinking": {
