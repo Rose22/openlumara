@@ -179,8 +179,12 @@ class ToolLoader:
         return META_TOOL_NAMES
 
     def _enabled_module_names(self):
-        """Names of all currently enabled (loaded) modules"""
-        return sorted(self.channel.manager.modules.keys())
+        """Names of all currently enabled (loaded) modules that have tools"""
+        modules_with_tools = {entry["module"] for entry in self.catalog.values()}
+        return sorted(
+            name for name in self.channel.manager.modules
+            if name in modules_with_tools
+        )
 
     def _build_meta_def(self):
         """Build the tools_load meta tool definition."""
