@@ -179,11 +179,11 @@ class ToolLoader:
         return META_TOOL_NAMES
 
     def _enabled_module_names(self):
-        """Names of all currently enabled (loaded) modules. Never toggles anything."""
+        """Names of all currently enabled (loaded) modules"""
         return sorted(self.channel.manager.modules.keys())
 
     def _build_meta_def(self):
-        """Build the tools_load meta tool dict with its dynamic description."""
+        """Build the tools_load meta tool definition."""
         modules = ", ".join(self._enabled_module_names()) or "(none currently enabled)"
         return {
             "type": "function",
@@ -206,7 +206,7 @@ class ToolLoader:
         }
 
     def register_meta_tools(self):
-        """Register the tools_load meta tool as the baseline active set (idempotent)."""
+        """Register the tools_load meta tool."""
         if not core.config.get("model", "dynamic_tool_loading", default=True):
             return
         if self._meta_def:
@@ -250,7 +250,7 @@ class ToolLoader:
         return tools, names
 
     def load_default_tools(self):
-        """Preload all tools of the preloaded modules (idempotent; skips active ones)."""
+        """Preload all tools of the preloaded modules"""
         if not core.config.get("model", "dynamic_tool_loading", default=True):
             return
         if not self._meta_def:
@@ -321,11 +321,7 @@ class ToolLoader:
     # ------------------------------------------------------------------
 
     def _load_module_tools(self, module_name):
-        """Load all cataloged tools of an enabled module. Never enables/disables modules.
-
-        Handles module availability, disabled checks, and dedup. Does NOT
-        persist to chat metadata.
-        """
+        """Load all cataloged tools of an enabled module"""
         module_name = str(module_name).lower().strip()
         module = self.channel.manager.modules.get(module_name)
         if module is None:
@@ -356,7 +352,7 @@ class ToolLoader:
         return result
 
     async def tools_load(self, module_name: str):
-        """Loads all tools of an enabled module into your active toolset. This only loads tools; it does not enable or disable modules. Pass the module name shown in this tool's description."""
+        """Loads all tools of an enabled module into your active toolset"""
         result = self._load_module_tools(module_name)
 
         if result.get("status") == "error":
