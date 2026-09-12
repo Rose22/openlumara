@@ -15,7 +15,7 @@ class Modules(core.module.Module):
         }
     }
 
-    async def on_startup(self):
+    async def on_ready(self):
         if not self.config.get("allow_ai_to_toggle"):
             self.disabled_tools.append("toggle")
 
