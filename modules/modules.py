@@ -30,7 +30,7 @@ class Modules(core.module.Module):
             "disabled": ", ".join(core.config.get("modules", "disabled", default=[]))
         }
 
-        return prompt
+        return str(module_list)
 
     async def toggle(self, name: str):
         if not self.config.get("allow_ai_to_toggle"):
