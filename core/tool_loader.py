@@ -194,13 +194,19 @@ class ToolLoader:
             "function": {
                 "name": "tools_load",
                 "description": (
-                    "Loads all tools belonging to a module into your active toolset. "
-                    f"Currently enabled modules (pass one of these as module_name): {modules}."
+                    "Loads all tools belonging to one or more modules into your active toolset. "
+                    f"Currently enabled modules (pass these names in module_names): {modules}."
                 ),
                 "parameters": {
                     "type": "object",
-                    "properties": {"module_name": {"type": "string"}},
-                    "required": ["module_name"],
+                    "properties": {
+                        "module_names": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Names of the modules whose tools should be loaded",
+                        }
+                    },
+                    "required": ["module_names"],
                     "additionalProperties": False,
                 },
                 "strict": True,
@@ -353,16 +359,34 @@ class ToolLoader:
             result["disabled"] = disabled
         return result
 
-    async def tools_load(self, module_name: str):
-        """Loads all tools of an enabled module into your active toolset"""
-        result = self._load_module_tools(module_name)
+    async def tools_load(self, module_names: list):
+        """Loads all tools of one or more enabled modules into your active toolset.
 
-        if result.get("status") == "error":
+        Args:
+        module_names (list): Names of the modules whose tools should be loaded
+        """
+        combined = {"loaded": [], "already_loaded": [], "disabled": []}
+        unknown = []
+        enabled_modules = None
+
+        for module_name in module_names:
+            result = self._load_module_tools(module_name)
+            if result.get("status") == "error":
+                unknown.append(str(module_name).lower().strip())
+                enabled_modules = result["enabled_modules"]
+                continue
+            for key in ("loaded", "already_loaded", "disabled"):
+                combined[key].extend(result.get(key, []))
+
+        has_success = bool(combined["loaded"] or combined["already_loaded"])
+
+        if unknown and not has_success:
             return {
                 "status": "error",
                 "content": (
-                    f"No enabled module named '{result['unknown_module']}'. "
-                    f"Enabled modules: {', '.join(result['enabled_modules'])}."
+                    f"No enabled module named '{unknown[0]}'"
+                    + (f" (also unknown: {', '.join(unknown[1:])})" if len(unknown) > 1 else "")
+                    + f". Enabled modules: {', '.join(enabled_modules)}."
                 ),
             }
 
@@ -370,5 +394,11 @@ class ToolLoader:
         # can be restored when this chat is loaded again
         self.persist_active_tools()
 
-        has_success = bool(result["loaded"] or result["already_loaded"])
+        if unknown:
+            # partial success: report which modules couldn't be found
+            return {
+                "status": "success",
+                "not_found": unknown,
+                "enabled_modules": enabled_modules,
+            }
         return {"status": "success" if has_success else "error"}

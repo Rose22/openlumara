@@ -492,7 +492,7 @@ class Commands:
                     return "Usage: /tools load <module_name> [module_name2 ...]"
                 lines = [f"▣ Load result for {len(module_names)} module(s):"]
                 for module_name in module_names:
-                    result = await self.channel.tool_loader.tools_load(module_name)
+                    result = await self.channel.tool_loader.tools_load([module_name])
                     if result.get("status") == "success":
                         lines.append(f"  ✔ {module_name} tools loaded")
                     else:

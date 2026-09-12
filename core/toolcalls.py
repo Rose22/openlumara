@@ -197,7 +197,7 @@ class ToolcallManager:
                         })
                     else:
                         rejected_msg = json.dumps({
-                            "content": f"Tool {tool_name} is not loaded. Load it first by calling tools_load with module_name=\"{tool_name.split('_')[0]}\", then call it again.",
+                            "content": f"Tool {tool_name} is not loaded. Load it first by calling tools_load with module_names=[\"{tool_name.split('_')[0]}\"], then call it again.",
                             "status": "error"
                         })
                     await self.channel.context.chat.messages.add({
