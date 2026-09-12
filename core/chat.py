@@ -54,7 +54,7 @@ class Chat:
         # load this chat's Messages object
         self.messages = core.messages.Messages(self.channel, self)
 
-        # Reset active tools when switching to a different chat, then restore
+        # reset active tools when switching to a different chat, then restore
         # the tools this chat had loaded before, so it picks up where it left off
         if old_id != new_id:
             self.channel.tool_loader.reset_for_new_chat()
@@ -69,35 +69,22 @@ class Chat:
         return None
 
     def get_loaded_modules(self):
-        """Return the list of module names persisted in this chat's metadata.
-
-        These are the non-baseline modules whose tools the AI loaded while in
-        this chat, so they can be reloaded when the chat is loaded again.
-        """
+        """return the list of modules whose tools must be persisted in this chat"""
         if self.current is None:
             return []
 
         metadata = self.data[self.current].get("metadata")
-        if not isinstance(metadata, dict):
-            return []
 
         modules = metadata.get("loaded_modules", [])
-        return modules if isinstance(modules, list) else []
+        return modules
 
     def set_loaded_modules(self, names):
-        """Persist a list of module names into this chat's metadata.
-
-        Only writes to disk when the value actually changes, so it's cheap to
-        call frequently (e.g. on every tools_load).
-        """
+        """persist a list of module names into this chat's metadata"""
         if self.current is None:
             return
 
         chat = self.data[self.current]
         metadata = chat.get("metadata")
-        if not isinstance(metadata, dict):
-            metadata = {}
-            chat["metadata"] = metadata
 
         if metadata.get("loaded_modules", []) == names:
             return  # no change, skip the disk write

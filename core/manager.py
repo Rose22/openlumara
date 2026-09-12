@@ -679,7 +679,7 @@ class Manager:
 
     # --- tools ---
     async def load_module_tools(self, module):
-        """Register a module's tools in the catalog (no longer adds to active set)."""
+        """Register a module's tools in the catalog"""
         for channel in self.channels.values():
             channel.tool_loader.register_module(module)
             # keep the dynamic tools_load description in sync with enabled modules
