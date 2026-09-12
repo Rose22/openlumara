@@ -86,7 +86,7 @@ core_settings_schema = {
         },
         "preloaded_modules": {
             "default": ["identity", "memory", "scheduler", "web_search", "web_reader"],
-            "description": "List of module names whose tools are always preloaded at startup, on top of the tools_load meta tool. Keeps frequently-used tools available immediately; everything else stays available on demand via tools_load(module_name).",
+            "description": "List of module names whose tools are always preloaded at startup. Keeps frequently-used tools available immediately, everything else stays available via the dynamic tool loader.",
             "type": "list",
             "depends": "use_tools"
         },
