@@ -195,8 +195,6 @@ class ToolLoader:
                 "name": "tools_load",
                 "description": (
                     "Loads all tools belonging to a module into your active toolset. "
-                    "The module must already be enabled; this only loads its tools, "
-                    "it does not enable or disable modules. "
                     f"Currently enabled modules (pass one of these as module_name): {modules}."
                 ),
                 "parameters": {
