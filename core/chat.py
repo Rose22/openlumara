@@ -68,11 +68,11 @@ class Chat:
 
         return None
 
-    def get_loaded_tools(self):
-        """Return the list of tool names persisted in this chat's metadata.
+    def get_loaded_modules(self):
+        """Return the list of module names persisted in this chat's metadata.
 
-        These are the non-baseline tools the AI loaded while in this chat, so
-        they can be reloaded when the chat is loaded again.
+        These are the non-baseline modules whose tools the AI loaded while in
+        this chat, so they can be reloaded when the chat is loaded again.
         """
         if self.current is None:
             return []
@@ -81,11 +81,11 @@ class Chat:
         if not isinstance(metadata, dict):
             return []
 
-        tools = metadata.get("loaded_tools", [])
-        return tools if isinstance(tools, list) else []
+        modules = metadata.get("loaded_modules", [])
+        return modules if isinstance(modules, list) else []
 
-    def set_loaded_tools(self, names):
-        """Persist a list of tool names into this chat's metadata.
+    def set_loaded_modules(self, names):
+        """Persist a list of module names into this chat's metadata.
 
         Only writes to disk when the value actually changes, so it's cheap to
         call frequently (e.g. on every tools_load).
@@ -99,10 +99,10 @@ class Chat:
             metadata = {}
             chat["metadata"] = metadata
 
-        if metadata.get("loaded_tools", []) == names:
+        if metadata.get("loaded_modules", []) == names:
             return  # no change, skip the disk write
 
-        metadata["loaded_tools"] = names
+        metadata["loaded_modules"] = names
         self.data.save()
 
     def _migrate_if_needed(self):
@@ -246,10 +246,10 @@ class Chat:
         if self.current is None:
             raise Exception("No chat is currently loaded!")
 
-        # Reset active tools on clear, and wipe the persisted tool list so
+        # Reset active tools on clear, and wipe the persisted module list so
         # this chat starts fresh the next time it's loaded
         self.channel.tool_loader.reset_for_new_chat()
-        self.set_loaded_tools([])
+        self.set_loaded_modules([])
 
         await self.messages.clear()
         
