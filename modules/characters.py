@@ -384,7 +384,25 @@ class Characters(core.module.Module):
 
         char_data = char.get("data")
         if not char_data:
-            return self.result("character data doesn't exist!", False)
+            # normalize legacy openlumara and char card V1 formats to V2's
+            # data structure so editing works for every stored character
+            canonical_name = self._find_char_name(name)
+            char_data = {}
+
+            if "identity" in char.keys():
+                # legacy openlumara format
+                char_data["description"] = char.get("identity")
+                char_data["scenario"] = char.get("scenario")
+                char_data["first_mes"] = char.get("first_message", "")
+            elif "description" in char.keys():
+                # char card V1 format
+                char_data["description"] = char.get("description")
+                char_data["personality"] = char.get("personality")
+                char_data["scenario"] = char.get("scenario")
+                char_data["first_mes"] = char.get("first_mes", "")
+
+            char_data["name"] = char.get("name", canonical_name)
+            char_data["tags"] = char.get("tags", [])
 
         # always write back to the canonical (stored) key so we don't
         # accidentally create a duplicate entry with different casing
