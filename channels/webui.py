@@ -348,6 +348,7 @@ async def create_fastapi(channel):
         return channel.templates.TemplateResponse(request, "index.html", {
             "version": channel.version,
             "config": channel.config,
+            "cmd_prefix": core.config.get("core").get("cmd_prefix", "/"),
             "css_files": css_files,
             "alpine_stores": alpine_stores,
             "js_utils": js_utils,
