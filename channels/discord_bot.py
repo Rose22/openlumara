@@ -194,7 +194,11 @@ class DiscordClient(discord.Client):
                                     reasoning_content_full
                                 ).split("\n")[-5:]
                             )
-                            reasoning_snippet = "\n".join([f"> {txt}" for txt in reasoning_snippet.split("\n")])
+
+                            # truncate every line of the reasoning by 100 chars max
+                            reasoning_snippet = "\n".join(
+                                [f"> {txt if len(txt) <= 100 else txt[:97] + '..'}" for txt in reasoning_snippet.split("\n")]
+                            )
 
                             reasoning_content = "## thinking..\n"+reasoning_snippet
                         elif token_type == "content":
