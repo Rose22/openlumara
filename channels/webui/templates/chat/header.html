@@ -44,7 +44,7 @@
 
             await simpleSocketSend({
                 'type': 'user_message',
-                'content': '/clear'
+                'content': '{{ cmd_prefix }}clear'
             })
         ">
             {% include 'svg/trash.svg' %}
