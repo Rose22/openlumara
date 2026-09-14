@@ -85,12 +85,18 @@ class DiscordClient(discord.Client):
         if cmd:
             is_cmd = content.lower().strip().startswith(cmd_prefix.lower())
 
+        files = {}
+
         if is_cmd:
             # send the pure command to the AI
             # command authorization checks were moved to the core framework
             # so that it's much more secure
             pass
         else:
+            # process attachments
+            for attachment in message.attachments:
+                files[attachment.filename] = await attachment.read()
+
             orig_content = str(content)
             content = ""
 
@@ -134,7 +140,7 @@ class DiscordClient(discord.Client):
 
                 # we're using a timer to edit on an interval to avoid hitting rate limits
                 timer = time.time()
-                async for token in self._chan.send_stream(content, commands_authorized=authorized):
+                async for token in self._chan.send_stream(content, commands_authorized=authorized, files=files):
                     try:
                         token_type = token.get("type")
                         token_content = token.get("content")
@@ -253,7 +259,7 @@ class DiscordClient(discord.Client):
                             offset += CHUNK_SIZE
         else:
             async with self.target_channel.typing():
-                response_obj = await self._chan.send(content, commands_authorized=authorized)
+                response_obj = await self._chan.send(content, commands_authorized=authorized, files=files)
                 response = response_obj.get("content")
 
             if len(response) < CHUNK_SIZE:
