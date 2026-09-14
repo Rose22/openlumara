@@ -440,7 +440,7 @@ class Coder(core.module.Module):
     # tools: file management
     # ----------------------
     async def file_create(self, sandbox: str, path: str, content: str):
-        """creates new file. auto-creates parent dirs in path"""
+        """creates new file, does not support overwriting existing files. auto-creates parent dirs in path."""
         target_path = await self._get_sandbox_subpath(sandbox, path)
 
         # first, check for syntax errors
