@@ -229,15 +229,10 @@ class DiscordClient(discord.Client):
 
                             # stream only part of the reasoning
                             reasoning_snippet = "\n".join(
+                                # every line truncated to 100 chars max
+                                f"> {"..."+line[-244:].rstrip()+"..." if len(line) > 250 else line}"
                                 # last 5 lines of reasoning
-                                "".join(
-                                    reasoning_content_full
-                                ).split("\n")[-5:]
-                            )
-
-                            # truncate every line of the reasoning by 100 chars max
-                            reasoning_snippet = "\n".join(
-                                [f"> {txt if len(txt) <= 100 else txt[:97] + '..'}" for txt in reasoning_snippet.split("\n")]
+                                for line in "".join(reasoning_content_full).splitlines()[-5:]
                             )
 
                             reasoning_content = "## thinking..\n"+reasoning_snippet
