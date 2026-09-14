@@ -12,6 +12,8 @@ class DiscordClient(discord.Client):
     def __init__(self, channel, **kwargs):
         super().__init__(**kwargs)
         self._chan = channel
+        self._message_history_tracker = []
+        self._last_user_msg = ""
 
     async def on_ready(self):
         # startup flow
@@ -43,6 +45,8 @@ class DiscordClient(discord.Client):
         return f"`{bar}` {percentage:.0f}%"
 
     async def on_message(self, message):
+        cmd_prefix = core.config.get("core", "cmd_prefix")
+
         # dont reply to its own messages
         if message.author == self.user:
             return
@@ -51,7 +55,7 @@ class DiscordClient(discord.Client):
         if message.channel.id != int(self._chan.config.get("target_channel_id")):
             return
 
-        # if mentions are required, only reply if mentioned
+        # check if the bot was mentioned
         if self._chan.config.get("require_mentions"):
             mentioned = False
             # go through normal mentions first
@@ -65,8 +69,35 @@ class DiscordClient(discord.Client):
                 if keyword.lower() in message.content.lower():
                     mentioned = True
 
-            if not mentioned:
-                return
+        # clear the history tracker if mentioned
+        # so that the next message only contains chat history from that message onward
+        if mentioned:
+            self._message_history_tracker = []
+
+        # track messages said in chat that weren't mentions
+        msg_history_str = ""
+        if (
+            self._chan.config.get("require_mentions")
+            and
+            self._chan.config.get("track_chat_history")
+            and
+            not mentioned
+        ):
+            self._message_history_tracker.append(message)
+
+            for msg in self._message_history_tracker:
+                msg_history_str += f"{msg.author.name.strip(cmd_prefix)} said:\n{msg.content}\n\n"
+
+            # merge discord message history into the last user message or create a new one if it doesnt exist
+            last_msg = await self._chan.context.chat.messages.get(-1) or {}
+            if last_msg.get("role") != "user":
+                await self._chan.context.chat.messages.add({"role": "user", "content": msg_history_str})
+            else:
+                await self._chan.context.chat.messages.edit(-1, {"role": "user", "content": self._last_user_msg+"\n\n"+msg_history_str})
+
+        # if mentions are required, only reply if mentioned
+        if not mentioned:
+            return
 
         # determine whether non-public commands may be ran by the user
         authorized = (message.author.id == int(self._chan.config.get("authorized_user_id")))
@@ -81,7 +112,7 @@ class DiscordClient(discord.Client):
             content = content.strip()
 
         is_cmd = False
-        cmd_prefix, cmd, args = await self._chan.commands._extract_cmd(content)
+        _, cmd, args = await self._chan.commands._extract_cmd(content)
         if cmd:
             is_cmd = content.lower().strip().startswith(cmd_prefix.lower())
 
@@ -100,7 +131,7 @@ class DiscordClient(discord.Client):
             orig_content = str(content)
             content = ""
 
-            group_chat = self._chan.config.get("enable_group_chat")
+            group_chat = self._chan.config.get("use_group_chat")
 
             # check if the message is a reply
             if message.reference:
@@ -120,6 +151,9 @@ class DiscordClient(discord.Client):
                 content += f"{author_name} said: {orig_content}"
             else:
                 content += orig_content
+
+        # save the message for use in stuff like group chat history
+        self._last_user_msg = str(content)
 
         if self._chan.config.get("use_streaming"):
             edit_interval = float(self._chan.config.get("edit_interval"))
@@ -326,9 +360,14 @@ class DiscordBot(core.channel.Channel):
             "description": "Whether the bot should reply to your messages using discord's reply feature",
             "default": False
         },
-        "enable_group_chat": {
+        "use_group_chat": {
             "description": "Will make the bot aware of who is talking to it by injecting the name of the person into messages sent to the AI",
             "default": True
+        },
+        "track_chat_history": {
+            "description": "Whether to let the discord bot see messages sent by others in channels without having to pin it. This just makes the bot aware of the messages, it does not respond to them unless you ping.",
+            "default": False,
+            "depends": {"require_mentions": True, "use_group_chat": True}
         },
         "startup_message": {
             "description": "The message your bot will send when it's started up. Leave this blank to disable",
