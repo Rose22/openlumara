@@ -104,12 +104,12 @@ class DiscordClient(discord.Client):
 
         content = message.content
 
-        # remove mentions from message before sending
+        # remove bot mentions from message before sending
         content = content.strip()
-        for mention in message.raw_mentions:
-            content = content.replace(str(mention), "")
-            content = content.replace("<@>", "")
-            content = content.strip()
+        for mention in message.mentions:
+            if mention.id == self.user.id:
+                content = content.replace(mention.mention, "")
+        content = content.strip()
 
         is_cmd = False
         _, cmd, args = await self._chan.commands._extract_cmd(content)
