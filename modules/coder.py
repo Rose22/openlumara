@@ -311,7 +311,7 @@ class Coder(core.module.Module):
     async def list_sandboxes(self):
         return self.result(await self._get_sandbox_paths())
 
-    async def glob(self, sandbox: str, pattern: str, sub_path=None, recursive: bool = False, max_results: int = 200):
+    async def glob(self, sandbox: str, pattern: str, sub_path=None, max_results: int = 200):
         """globs path for desired files. does not support regex. paths relative to sandbox root."""
         sandbox_path = await self._get_full_sandbox_path(sandbox)
         target_path = await self._get_sandbox_subpath(sandbox, sub_path or '.')
@@ -323,16 +323,9 @@ class Coder(core.module.Module):
             if pattern.startswith(sandbox):
                 pattern = pattern[len(sandbox):]
 
-            # if the pattern doesn't contain **, prefix with **/ for recursive matching
-            if recursive:
-                if '**' not in pattern and '/' not in pattern:
-                    pattern = f"**/{pattern}"
-                elif '/' in pattern and '**' not in pattern:
-                    pattern = f"**/{pattern}"
-
             matches = sorted(glob.glob(
                 os.path.join(target_path, pattern),
-                recursive=recursive
+                recursive=True
             ))
 
             results = []
