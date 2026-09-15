@@ -12,6 +12,13 @@
         display: flex;
         flex: 1;
         overflow-y: auto;
+
+        /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-15)
+           lazy-mounted turns adjust scrollTop manually (ui.adjustScroll)
+           when their height changes above the viewport. chrome's built-in
+           scroll anchoring fights that compensation and causes the
+           "skipping past messages" jump when scrolling up. */
+        overflow-anchor: none;
         padding: 20px;
         flex-direction: column;
         gap: 18px;

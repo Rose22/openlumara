@@ -269,7 +269,10 @@ async function handleWebSocketMessage(data) {
             if (ui.scrollToTurnIndex) {
                 await ui.scrollToTurn(ui.scrollToTurnIndex);
             } else {
-                await ui.scrollToBottom();
+                // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-15)
+                // turnHistory was just wiped and rebuilt, so every turn is an
+                // unmounted placeholder again - needs the iterative scroll.
+                await ui.forceScrollToBottom();
             }
 
             break;

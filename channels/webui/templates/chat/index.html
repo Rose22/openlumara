@@ -45,14 +45,24 @@
         unmount-jank when scrolling back up), with a rough height estimate as
         placeholder to keep the scrollbar sane. the last few turns always
         mount immediately so new messages never flash.
+
+        -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-15)
+        hard cap: turns now also UNMOUNT once they drift >2500px outside the
+        viewport, so mounted dom stays bounded no matter how long the chat
+        gets. the 800px mount / 2500px unmount margins give hysteresis, so a
+        turn can never oscillate between the two states at the same scroll
+        position. remounting is cheap: the markdown cache serves the html.
+        chrome's scroll anchoring absorbs the height change when unmounting
+        above the viewport.
     -->
     <template x-for="(turn, turnIndex) in $store.chat.turnHistory" :key="turnIndex">
         <div class="fullwidth turn" :data-turn-index="turnIndex"
-            x-data="{ rendered: turnIndex > ($store.chat.turnHistory.length - 8) }"
-            x-intersect:enter.margin.800px="rendered = true">
+            x-data="{ rendered: turnIndex > ($store.chat.turnHistory.length - 2) }"
+            x-intersect:enter.parent.margin.800px="$store.ui.adjustScroll($el, () => rendered = true)"
+            x-intersect:leave.parent.margin.2500px="$store.ui.captureTurnHeight(turn, $el); $store.ui.adjustScroll($el, () => rendered = false)">
 
             <template x-if="!rendered">
-                <div class="turn-lazy" :style="`min-height: ${Math.min(400, Math.max(40, Math.round((turn.messages || []).reduce((n, m) => n + (typeof m.content === 'string' ? m.content.length : 200), 0) / 6)))}px`"></div>
+                <div class="turn-lazy" :style="`min-height: ${$store.ui.turnPlaceholderHeight(turn)}px`"></div>
             </template>
 
             <template x-if="rendered">
