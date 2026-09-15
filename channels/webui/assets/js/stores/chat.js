@@ -205,15 +205,34 @@ CHAT_STORE = {
         }
     },
 
-    async _fetchChats() {
-        const offset = this.chatOffset;
-        const catParam = this.selectedCategory ? `&category=${encodeURIComponent(this.selectedCategory)}` : '';
-        const result = await simpleApiFetch(`/api/chats?offset=${offset}&limit=${this.chatLimit}${catParam}`);
-        if (!result) { return; }
+    fetchingChats: false,
 
-        this.visibleChats.push(...result.messages);
-        this.chatOffset += result.messages.length;
-        this.hasMoreChats = result.has_more;
+    async _fetchChats() {
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+        // x-intersect can fire several times while a page is still in
+        // flight (scroll + ensureMoreChats + loadAllChats all call in),
+        // and concurrent fetches with the same offset pushed duplicate
+        // chat objects into visibleChats (bloat + duplicate x-for keys).
+        // one fetch at a time: callers wait for the in-flight page rather
+        // than no-op, so the drain loop in loadAllChats can't busy-spin
+        // without making progress.
+        while (this.fetchingChats) {
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        this.fetchingChats = true;
+
+        try {
+            const offset = this.chatOffset;
+            const catParam = this.selectedCategory ? `&category=${encodeURIComponent(this.selectedCategory)}` : '';
+            const result = await simpleApiFetch(`/api/chats?offset=${offset}&limit=${this.chatLimit}${catParam}`);
+            if (!result) { return; }
+
+            this.visibleChats.push(...result.messages);
+            this.chatOffset += result.messages.length;
+            this.hasMoreChats = result.has_more;
+        } finally {
+            this.fetchingChats = false;
+        }
     },
 
     async newChat() {

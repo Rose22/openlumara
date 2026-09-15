@@ -53,6 +53,10 @@ AUDIO_STORE = {
     setSoundEnabled(id, enabled) {
         this.sounds[`${id}SoundEnabled`] = enabled;
         localStorage.setItem(`${id}SoundEnabled`, String(enabled));
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+        // AudioManager caches the enabled flags in memory (play() used to
+        // hit localStorage per streamed token); invalidate on every write.
+        AudioManager.refreshSettings();
     },
 
     setSoundData(id, dataUrl, name) {

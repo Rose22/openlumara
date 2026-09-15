@@ -3,7 +3,14 @@
      markdown description) now unmounts when closed instead of sitting in the
      dom 24/7. side effect: activeCategory resets to appearance on reopen. -->
 <template x-if="$store.ui.currentModal === 'settings'" x-cloak>
-    <div class="settings-modal modal" x-data="settingsModal()">
+    <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+         resize/theme-changed listeners moved here from settingsModal().init():
+         as x-on bindings Alpine removes them automatically when the x-if
+         modal unmounts, instead of leaking a pair per modal open. -->
+    <div class="settings-modal modal" x-data="settingsModal()"
+        @resize.window.debounce.150ms="checkMobile()"
+        @theme-changed.window="themeFamily = $event.detail.family; themeMode = $event.detail.mode">
+
         <div class="header">
             <h2 id="title">Settings</h2>
             <button class="close" @click="closeAndSave()" aria-label="Close settings">×</button>

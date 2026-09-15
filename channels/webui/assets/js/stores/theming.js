@@ -110,7 +110,11 @@ THEME_STORE = {
         localStorage.setItem('themeMode', effectiveMode);
 
         // Dispatch event for other components to react
-        document.dispatchEvent(new CustomEvent('theme-changed', {
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+        // dispatched on window (was document) so the settings modal can
+        // listen via @theme-changed.window, which Alpine auto-removes when
+        // the modal unmounts (document-level listeners leaked per modal open)
+        window.dispatchEvent(new CustomEvent('theme-changed', {
             detail: { family, mode: effectiveMode }
         }));
     },

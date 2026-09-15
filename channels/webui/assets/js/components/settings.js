@@ -34,28 +34,28 @@ function settingsModal() {
         },
 
         // --- Init & Load ---
-        async init() {
-            window.addEventListener('resize', () => {
-                clearTimeout(this.resizeTimeout);
-                this.resizeTimeout = setTimeout(() => {
-                    const newMobile = window.innerWidth <= 768;
-                    if (newMobile !== this.mobile) {
-                        this.mobile = newMobile;
-                    }
-                }, 150);
-            });
-
-            // Sync theme state with Alpine store
+        init() {
+            // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+            // the resize + theme-changed listeners used to be attached here
+            // with raw addEventListener. the modal is x-if now, so it
+            // unmounts when closed - but these listeners were never removed,
+            // leaking a fresh pair (pinning the dead component in memory)
+            // on every single open. they now live as x-on bindings on the
+            // modal root in settings/index.html, which Alpine tears down
+            // together with the component.
             this.themeFamily = Alpine.store('theme').family;
             this.themeMode = Alpine.store('theme').mode;
-            
-            // Listen for theme changes from other parts of the app
-            document.addEventListener('theme-changed', (e) => {
-                this.themeFamily = e.detail.family;
-                this.themeMode = e.detail.mode;
-            });
 
             this.activeCategory = "appearance";
+        },
+
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+        // called from @resize.window.debounce on the modal root
+        checkMobile() {
+            const newMobile = window.innerWidth <= 768;
+            if (newMobile !== this.mobile) {
+                this.mobile = newMobile;
+            }
         },
 
         async closeAndSave() {

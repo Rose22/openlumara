@@ -137,8 +137,14 @@ async function handleWebSocketMessage(data) {
                               last_segment.tool_call_id === segment.tool_call_id;
 
             if (is_update) {
-                // backend sends FULL accumulated content, so replace in place
-                stream.turn.messages[last_idx] = segment;
+                // backend sends FULL accumulated content.
+                // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+                // this used to swap in the fresh parsed segment object every
+                // token: pure garbage for the collector, and it churned the
+                // object identity that the markdown cache + lazy-height
+                // WeakMaps key on. mutate the existing message in place
+                // instead; alpine's proxy set-trap fires the same way.
+                Object.assign(last_segment, segment);
             } else {
                 // new segment type (or new tool response), push it
                 stream.turn.messages.push(segment);
@@ -183,10 +189,13 @@ async function handleWebSocketMessage(data) {
 
         case "push":
             // it's a push messsage (like a scheduler reminder)
-            chat.turnHistory.push(data.content);
+            // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+            // removed the manual turnHistory.push(): reloadChat() fetches the
+            // authoritative history anyway, and pushing first shifted every
+            // index by one, making mergeTurnHistory see the entire chat as
+            // "changed" and re-parse the markdown of every turn.
             await chat.reloadChat();
 
-            console.log(data.content);
             await AudioManager.play('response_start');
             await Alpine.store('notifications').send(data.content.content);
 

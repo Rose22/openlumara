@@ -13,9 +13,23 @@ function globalSearch() {
             this.activeIndex = -1;
             this.loading = false;
             this.searchInContent = true;
-            setTimeout(() => {
-                document.getElementById("global-search-input").focus();
+            // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+            // the modal is x-if now, so it can unmount before this fires:
+            // guard the lookup and keep the timer handle so destroy() can
+            // clear it.
+            this.focusTimer = setTimeout(() => {
+                const input = document.getElementById("global-search-input");
+                if (input) input.focus();
             }, 50);
+        },
+
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+        // alpine calls destroy() on x-if teardown: cancel the pending
+        // debounce/focus timers so a search can't resolve against an
+        // unmounted component.
+        destroy() {
+            clearTimeout(this.debounceTimer);
+            clearTimeout(this.focusTimer);
         },
 
         highlightQuery(text, query) {

@@ -21,6 +21,37 @@ const AudioManager = {
     processingChain: null,
     synthLPF: null, // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-15) shared lowpass for synth fallback tones, built once instead of per play() call
 
+    // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+    // play() fires on every streamed token, and it was doing 3-5 synchronous
+    // localStorage reads per call (enabled flag, token freq, token vol,
+    // typing freq). localStorage is a slow synchronous api; this caches the
+    // settings in memory. every writer of these keys goes through
+    // AudioManager or the audio store, and the store calls
+    // refreshSettings() on change, so the cache can never go stale.
+    enabledFlags: null,
+    typingFreq: null,
+    tokenFreq: null,
+
+    refreshSettings: function() {
+        // drop the cached enabled-flags so the next play() re-reads from storage
+        this.enabledFlags = null;
+    },
+
+    isSoundEnabled: function(id) {
+        if (this.enabledFlags === null) {
+            const flags = {};
+            const ids = ['send_message', 'response_start', 'processing', 'typewriter',
+                         'typing', 'token', 'completion', 'reasoning_end'];
+            for (const sid of ids) {
+                let stored = null;
+                try { stored = localStorage.getItem(`${sid}SoundEnabled`); } catch (e) {}
+                flags[sid] = stored !== null ? stored === 'true' : this.SOUND_DEFAULTS[sid] !== false;
+            }
+            this.enabledFlags = flags;
+        }
+        return Boolean(this.enabledFlags[id]);
+    },
+
     // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-15)
     // the lowpass used by the synth fallbacks was being created fresh on every
     // play() call (including per-token) even though its config is static, and
@@ -90,6 +121,10 @@ const AudioManager = {
         return new Promise((resolve, reject) => {
             // Load volume from storage
             this.volume = parseFloat(localStorage.getItem('sfxVolume') || '1.0');
+            // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+            // seed the token volume cache so playback uses the stored value
+            // even before the audio store's init() calls setTokenVolume()
+            this.tokenVolume = parseFloat(localStorage.getItem('sfxTokenVolume') || '0.7');
 
             // 1. Open IndexedDB
             const request = indexedDB.open('TypewriterSoundsDB', 1);
@@ -176,12 +211,15 @@ const AudioManager = {
         this.tokenVolume = vol;
         localStorage.setItem('sfxTokenVolume', vol);
 
-        // Update the master gain node immediately if it exists
-        if (this.masterGainNode) {
-            this.masterGainNode.gain.value = vol;
-        }
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+        // note: this used to also clobber the MASTER gain node with the
+        // token volume, which made every sound play at token volume. master
+        // gain now only follows setVolume().
     },
     setTokenFreq: function(freq) {
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+        // this.tokenFreq doubles as the cached value read by the per-token
+        // playback path, so updating it here keeps the cache in sync.
         this.tokenFreq = freq;
         localStorage.setItem('sfxTokenFreq', freq);
     },
@@ -259,23 +297,10 @@ const AudioManager = {
 
     // Play the sound asynchronously to avoid UI blocking
     play: function(id) {
-        // ── Check Storage or Fallback to Built-in Defaults ──
-        let isEnabled = true;
-        try {
-            if (typeof localStorage !== 'undefined') {
-                const stored = localStorage.getItem(`${id}SoundEnabled`);
-                if (stored !== null) {
-                    isEnabled = stored === 'true';
-                } else {
-                    // If storage is empty/failed, use the built-in default
-                    isEnabled = this.SOUND_DEFAULTS[id] !== false;
-                }
-            }
-        } catch (e) {
-            isEnabled = this.SOUND_DEFAULTS[id] !== false;
-        }
-
-        if (!isEnabled) return;
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+        // enabled check now hits the in-memory cache instead of reading
+        // localStorage on every streamed token.
+        if (!this.isSoundEnabled(id)) return;
 
         // ── Critical: Resume context synchronously on user gesture ──
         this.resumeContext();
@@ -286,7 +311,12 @@ const AudioManager = {
         }
 
         const buffer = this.buffers[id];
-        const typingFreq = Number(localStorage.getItem('typingFreq')) || 440;
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+        // cached instead of a synchronous localStorage read per play() call
+        if (this.typingFreq === null) {
+            this.typingFreq = Number(localStorage.getItem('typingFreq')) || 440;
+        }
+        const typingFreq = this.typingFreq;
 
         if (!buffer) {
             const ctx = this.getAudioContext();
@@ -356,8 +386,14 @@ const AudioManager = {
             };
 
             if (id === 'token') {
-                const tokenFreq = Number(localStorage.getItem('sfxTokenFreq')) || 400;
-                const tokenVol = parseFloat(localStorage.getItem('sfxTokenVolume')) || 0.7; // New independent volume setting
+                // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+                // per-token localStorage reads replaced with in-memory values
+                // (kept in sync by setTokenFreq/setTokenVolume below)
+                if (this.tokenFreq === null) {
+                    this.tokenFreq = Number(localStorage.getItem('sfxTokenFreq')) || 400;
+                }
+                const tokenFreq = this.tokenFreq;
+                const tokenVol = this.tokenVolume;
                 ctx.resume();
 
                 const osc1 = ctx.createOscillator();
@@ -493,7 +529,12 @@ const AudioManager = {
     },
 
     playProcessingSound: function() {
-        if (localStorage.getItem(`processingSoundEnabled`) !== 'true') {
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+        // fires on every prompt_progress token; enabled check now hits the
+        // in-memory cache instead of localStorage. (note: this is also a
+        // behavior fix - the old check required an explicit 'true' in
+        // storage, so it disagreed with play()'s default handling.)
+        if (!this.isSoundEnabled('processing')) {
             return;
         }
 
