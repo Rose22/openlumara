@@ -103,6 +103,10 @@ async function handleWebSocketMessage(data) {
             break;
 
         case "user_message_added":
+            // keep a reference to the user message so stream_complete can push
+            // it to the turn history without it being null
+            stream.userMsg = data.message;
+
             // reload chat from backend so that the new user message shows up
             await chat.reloadChat();
 
@@ -284,6 +288,7 @@ async function handleWebSocketMessage(data) {
             await stream.clear();
 
             // finalize the stream
+            responseSoundPlayed = false;
             AudioManager.play("completion");
             await ui.scrollToBottom();
 
