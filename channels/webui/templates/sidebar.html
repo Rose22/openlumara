@@ -37,12 +37,30 @@
 </div>
 
 <!-- list of chats -->
-<div id="chat-list" x-ref="chat-list" x-data="{query: ''}"
+<div id="chat-list" x-ref="chat-list" x-data="{
+        query: '',
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+        // $watch fires only on actual query changes (never on init), so
+        // drain/reset runs exactly once per change instead of re-triggering
+        // itself when the store mutates.
+        init() {
+            this.$watch('query', (q) => {
+                if (q) { $store.chat.loadAllChats(); }
+                else { $store.chat.resetChatPages(); }
+            });
+        }
+    }"
     x-show="!$store.ui.isMobile || $store.ui.showChatList" x-cloak
 >
     <button class="header-btn" x-text="$store.chat.selectedCategory" x-show="$store.ui.isMobile" x-cloak @click="$store.ui.toggleMobileSidebarView()"></button>
 
     <div class="search">
+        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+             while a query is active, drain all chat pages so the client-side
+             filter can see matches beyond page 1; clearing the query resets
+             pagination back to page 1. uses $watch, NOT x-effect: the effect
+             tracked chatOffset/visibleChats reads inside the store methods,
+             so the reload itself retriggered it -> infinite reload loop. -->
         <input name="search" type="text" placeholder="Search through your chats.." x-model="query">
     </div>
 
@@ -136,7 +154,10 @@
 
         <!-- make sure there's always more chats than the viewport -->
         <template x-if="$store.chat.hasMoreChats">
-            <div id="chat-scroll-loader" x-intersect="$store.chat.loadMoreChats()" class="item">loading more..</div>
+            <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+                 .parent: observe intersection against the .chats scroll
+                 container, not the viewport (same as the chat turns). -->
+            <div id="chat-scroll-loader" x-intersect.parent="$store.chat.loadMoreChats()" class="item">loading more..</div>
         </template>
     </div>
 

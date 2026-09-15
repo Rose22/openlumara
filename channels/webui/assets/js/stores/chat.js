@@ -146,7 +146,40 @@ CHAT_STORE = {
 
     async loadMoreChats() {
         if (!this.hasMoreChats) { return; }
+        const before = this.visibleChats.length;
         await this._fetchChats();
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+        // if the api returned nothing new, stop so callers that loop
+        // (like the search loader) can't spin forever.
+        if (this.visibleChats.length === before) { this.hasMoreChats = false; }
+    },
+
+    drainingChats: false,
+
+    async resetChatPages() {
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+        // called when the search query is cleared: undo the drain and go
+        // back to page 1. no-op if pagination never grew, so the initial
+        // x-effect run (empty query) doesn't double-fetch on page load.
+        if (this.chatOffset <= this.chatLimit && this.visibleChats.length <= this.chatLimit) { return; }
+        await this.reloadChats();
+        await this.ensureChatVisible(this.selectedChat);
+    },
+
+    async loadAllChats() {
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+        // used when a search query is active: the filtered match may live
+        // beyond the loaded page, and the x-intersect loader can't re-fire
+        // while it stays visible, so we just drain all pages.
+        if (this.drainingChats) { return; }
+        this.drainingChats = true;
+        try {
+            while (this.hasMoreChats) {
+                await this.loadMoreChats();
+            }
+        } finally {
+            this.drainingChats = false;
+        }
     },
 
     async ensureMoreChats(el) {
@@ -158,9 +191,16 @@ CHAT_STORE = {
         const intersect_el = document.getElementById("chat-scroll-loader");
         if (!intersect_el) { return; }
 
-        const rect = intersect_el.getBoundingClientRect();
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+        // compare against the .chats scroll container, not the window -
+        // the loader scrolls inside that box, not with the page.
+        const container = intersect_el.parentElement;
+        if (!container) { return; }
 
-        if (rect.top < window.innerHeight && rect.bottom > 0) {
+        const rect = intersect_el.getBoundingClientRect();
+        const crect = container.getBoundingClientRect();
+
+        if (rect.top < crect.bottom && rect.bottom > crect.top) {
             await this.loadMoreChats();
         }
     },
