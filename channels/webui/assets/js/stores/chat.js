@@ -1,3 +1,64 @@
+/*
+ * structural equality check between two turns.
+ *
+ * used so that reloading a chat can keep the *existing* turn objects around
+ * for every turn that didn't actually change. alpine's x-for keys turns by
+ * index, so if you hand it a fresh array of fresh objects it re-seeds the
+ * scope of every single turn, which re-runs every x-html in the chat, which
+ * re-parses the markdown of your entire conversation on every reload.
+ *
+ * keeping the object identity stable means only genuinely new/changed turns
+ * ever re-render.
+ */
+function turnsEqual(a, b) {
+    if (!a || !b) return false;
+    if (a.role !== b.role) return false;
+    if (a.first_message_index !== b.first_message_index) return false;
+    if (a.last_message_index !== b.last_message_index) return false;
+
+    const am = a.messages || [];
+    const bm = b.messages || [];
+    if (am.length !== bm.length) return false;
+
+    for (let i = 0; i < am.length; i++) {
+        const x = am[i];
+        const y = bm[i];
+
+        if (x === y) continue;
+        if (!x || !y) return false;
+
+        if (x.index !== y.index) return false;
+        if (x.role !== y.role) return false;
+        if (x.content !== y.content) return false;
+        if (x.reasoning_content !== y.reasoning_content) return false;
+        if (x._metadata?.is_cmd !== y._metadata?.is_cmd) return false;
+
+        const xc = x.tool_calls || [];
+        const yc = y.tool_calls || [];
+        if (xc.length !== yc.length) return false;
+
+        for (let j = 0; j < xc.length; j++) {
+            if (xc[j].id !== yc[j].id) return false;
+            if (xc[j].response !== yc[j].response) return false;
+        }
+    }
+
+    return true;
+}
+
+function mergeTurnHistory(existing, incoming) {
+    incoming = incoming || [];
+    if (!Array.isArray(existing) || existing.length === 0) return incoming;
+
+    const merged = new Array(incoming.length);
+
+    for (let i = 0; i < incoming.length; i++) {
+        merged[i] = turnsEqual(existing[i], incoming[i]) ? existing[i] : incoming[i];
+    }
+
+    return merged;
+}
+
 CHAT_STORE = {
     /*
      * alpine.js store for chat state
@@ -159,7 +220,10 @@ CHAT_STORE = {
         this.selectedChat = result.id;
         this.selectedCategory = result.category;
 
-        this.turnHistory = result.turn_history;
+        // reuse the existing turn objects for every turn that didn't actually
+        // change, so alpine doesn't re-render (and re-parse the markdown of)
+        // the entire conversation on every single reload
+        this.turnHistory = mergeTurnHistory(this.turnHistory, result.turn_history);
     },
 
     async reloadCategories() {

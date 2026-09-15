@@ -6,7 +6,7 @@
 
     <!-- Content block -->
     <template x-if="message.type === 'content'">
-        <div class="content" x-html="renderMarkdown(message.content)"></div>
+        <div class="content" x-md="{ message: message, live: messageIndex === $store.stream.turn.messages.length - 1 }"></div>
     </template>
 
     <!-- Tool calls block -->
