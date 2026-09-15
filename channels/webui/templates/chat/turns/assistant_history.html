@@ -14,7 +14,7 @@
             </template>
             <template x-if="$store.chat.editingMessageIndex === turn.last_message_index">
                 <div class="flex fullwidth editing">
-                    <textarea x-model="$store.chat.editContent" rows="3"></textarea>
+                    <textarea x-model="$store.chat.editContent" rows="3" x-autosize @focus="$autosize($el)"></textarea>
                     <div class="edit-actions">
                         <button @click="$store.chat.saveEdit($store.chat.editingMessageIndex)">Save</button>
                         <button @click="$store.chat.cancelEdit()">Cancel</button>

@@ -33,10 +33,22 @@
 
 <template x-if="$store.chat.editingMessageIndex === turn.first_message_index">
     <div class="flex fullwidth editing">
-        <textarea x-model="$store.chat.editContent" rows="3"></textarea>
+        <textarea x-model="$store.chat.editContent" rows="3" x-autosize @focus="$autosize($el)"></textarea>
         <div class="edit-actions">
             <button @click="$store.chat.saveEdit($store.chat.editingMessageIndex)">Save</button>
             <button @click="$store.chat.cancelEdit()">Cancel</button>
         </div>
+        <template x-if="$store.chat.editAttached.length > 0">
+            <div class="edit-files">
+                <template x-for="fname in $store.chat.editAttached" :key="fname">
+                    <div class="edit-file-row">
+                        <button class="edit-file-remove" title="Remove file" @click="$store.chat.removeEditFile(fname)">
+                            {% include 'svg/cross.svg' %}
+                        </button>
+                        <span class="edit-file-name" x-text="fname"></span>
+                    </div>
+                </template>
+            </div>
+        </template>
     </div>
 </template>
