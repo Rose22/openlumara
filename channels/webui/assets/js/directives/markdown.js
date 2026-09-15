@@ -25,7 +25,10 @@ function markdownRender(el, { expression }, { evaluateLater, effect }) {
         getData((data) => {
             if (!data || !data.message) return;
 
-            const html = renderMarkdownFor(data.message, Boolean(data.live));
+            // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-15)
+            // raw flag: escape instead of markdown-render (for is_cmd messages),
+            // so history templates can all use this directive instead of x-html.
+            const html = renderMarkdownFor(data.message, Boolean(data.live), Boolean(data.raw));
 
             // nothing changed (or this message is cached and already rendered),
             // so don't touch the dom at all

@@ -19,6 +19,25 @@ const AudioManager = {
     processingStartTime: 0, // Track when processing started
     toneTimer: null, // Timer for processing tones
     processingChain: null,
+    synthLPF: null, // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-15) shared lowpass for synth fallback tones, built once instead of per play() call
+
+    // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-15)
+    // the lowpass used by the synth fallbacks was being created fresh on every
+    // play() call (including per-token) even though its config is static, and
+    // the token path never even connected it. one cached filter, pre-connected
+    // to the master gain.
+    getSynthLPF: function(ctx) {
+        if (this.synthLPF) return this.synthLPF;
+
+        const lpf = ctx.createBiquadFilter();
+        lpf.type = 'lowpass';
+        lpf.frequency.value = 1800;
+        lpf.Q.value = 0.8;
+        lpf.connect(this.masterGainNode);
+
+        this.synthLPF = lpf;
+        return lpf;
+    },
 
     // -- AI GENERATED CODE (Qwen3.8-Flash-Next) - (2026-09-15)
     // builds the reverb chain for the synth processing fallback exactly once.
@@ -284,11 +303,10 @@ const AudioManager = {
             const vol = this.volume;
             const master = this.masterGainNode;
 
-            // ── Warmer: Lower cutoff + smoother roll-off ──
-            const lpf = ctx.createBiquadFilter();
-            lpf.type = 'lowpass';
-            lpf.frequency.value = 1800; // Reduced from 2kHz for more warmth
-            lpf.Q.value = 0.8; // Gentler slope, less harsh transition
+            // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-15)
+            // lpf creation moved below the token branch (token never used it)
+            // and now reuses a single cached filter via getSynthLPF().
+            let lpf = null;
 
             // ── Helper: Schedule a single sine tone with smoother attack ──
             const playTone = (freq, startTime, attack = 0, decay = 0.01, volScale = 0.8) => {
@@ -298,9 +316,11 @@ const AudioManager = {
                 osc.type = 'sine';
                 osc.frequency.value = freq;
 
+                // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-15)
+                // the shared lpf is pre-connected to master inside getSynthLPF(),
+                // so the per-call lpf.connect(master) here is removed.
                 osc.connect(gain);
                 gain.connect(lpf);
-                lpf.connect(master);
 
                 // 3ms attack for a rounder, less clicky onset
                 gain.gain.setValueAtTime(0, startTime);
@@ -321,10 +341,10 @@ const AudioManager = {
                 osc.frequency.value = cfg.freq * freqMultiplier;
                 panner.pan.value = pan;
 
+                // lpf pre-connected to master in getSynthLPF()
                 osc.connect(gain);
                 gain.connect(panner);
                 panner.connect(lpf);
-                lpf.connect(master);
 
                 const t2 = t + delay;
                 gain.gain.setValueAtTime(0, t2);
@@ -369,6 +389,11 @@ const AudioManager = {
             }
 
 
+            // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-15)
+            // grab the shared lowpass only now that we know this isn't the
+            // token path (which never uses a filter at all).
+            lpf = this.getSynthLPF(ctx);
+
             if (id === 'typing') {
                 const freq = typingFreq;
 
@@ -379,10 +404,12 @@ const AudioManager = {
                 const gain = ctx.createGain();
                 gain.gain.value = 0;
 
-                // Chain: osc → LPF → gain → master
-                osc.connect(lpf);
-                lpf.connect(gain);
-                gain.connect(master);
+                // Chain: osc → gain → shared LPF → master
+                // (gain must come first: the shared lpf is permanently wired
+                // to master, so envelope-shaped audio can't pass through it
+                // on a second parallel path)
+                osc.connect(gain);
+                gain.connect(lpf);
 
                 osc.start(t);
 

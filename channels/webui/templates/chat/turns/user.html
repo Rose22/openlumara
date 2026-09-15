@@ -25,8 +25,12 @@
             </div>
         </template>
 
+        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-15)
+             switched from x-html+renderMarkdown to the x-md directive: uses the
+             per-message cache, skips Alpine's initTree walk on the injected
+             subtree, and avoids re-parsing markdown whenever the effect re-runs -->
         <template x-if="typeof message.content === 'string'">
-            <div x-html="renderMarkdown(message.content)" :class="{'command': message._metadata?.is_cmd}"></div>
+            <div x-md="{ message: message, live: false, raw: message._metadata?.is_cmd }" :class="{'command': message._metadata?.is_cmd}"></div>
         </template>
     </div>
 </template>

@@ -11,7 +11,11 @@
         </svg>
     </div>
 
-    <div class="block" x-show="!collapsed">
+    <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-15)
+         x-if instead of x-show: collapsed reasoning text is now fully
+         unmounted instead of sitting in the dom for the lifetime of the tab.
+         reasoning blocks are often the largest text in tool-heavy chats. -->
+    <div class="block" x-if="!collapsed">
         <div class="content" x-text="message.reasoning_content" x-auto-scroll></div>
     </div>
 </div>

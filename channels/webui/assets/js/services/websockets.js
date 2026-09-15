@@ -194,7 +194,11 @@ async function handleWebSocketMessage(data) {
             break;
 
         case "log":
-            Alpine.store('system').logs.push(data);
+            // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-15)
+            // cap the log buffer so a chatty backend can't grow it forever
+            const logs = Alpine.store('system').logs;
+            logs.push(data);
+            if (logs.length > 1000) logs.splice(0, 500);
             break;
 
         case "ready":

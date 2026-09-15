@@ -47,19 +47,21 @@ const _mdCache = new WeakMap();
  * once a message is no longer the last one in its turn, its content is final,
  * so it gets rendered exactly once and served from cache after that.
  */
-function renderMarkdownFor(message, live) {
+function renderMarkdownFor(message, live, raw) {
     if (!message) return '';
 
     const content = message.content || '';
 
     if (!live) {
         const cached = _mdCache.get(message);
-        if (cached && cached.source === content) return cached.html;
+        if (cached && cached.source === content && Boolean(raw) === Boolean(cached.raw)) return cached.html;
     }
 
-    const html = renderMarkdown(content);
+    // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-15)
+    // raw mode: plain escaped text, no markdown pipeline at all.
+    const html = raw ? escapeHtml(content) : renderMarkdown(content);
 
-    if (!live && content) _mdCache.set(message, { source: content, html });
+    if (!live && content) _mdCache.set(message, { source: content, html, raw: Boolean(raw) });
 
     return html;
 }

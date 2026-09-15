@@ -9,7 +9,10 @@
         <div>
             <template x-if="$store.chat.editingMessageIndex !== turn.last_message_index">
                 <div>
-                    <div class="content" x-html="message._metadata?.is_cmd ? escapeHtml(message.content) : renderMarkdown(message.content)" :class="{'command': message._metadata?.is_cmd}"></div>
+                    <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-15)
+                         x-md instead of x-html+renderMarkdown: cached render,
+                         no initTree walk, no re-parse on effect re-runs -->
+                    <div class="content" x-md="{ message: message, live: false, raw: message._metadata?.is_cmd }" :class="{'command': message._metadata?.is_cmd}"></div>
                 </div>
             </template>
             <template x-if="$store.chat.editingMessageIndex === turn.last_message_index">
