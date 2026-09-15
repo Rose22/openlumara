@@ -1,7 +1,12 @@
 // create a temporary div that gets used to syntax highlight
 const _tempHighlightDiv = document.createElement('div');
 
-function renderMarkdown(text) {
+// -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-15)
+// cache of highlighted code blocks, keyed by language + code content.
+// keeps live-streaming re-renders cheap (only the growing block re-highlights).
+const _hlCache = new Map();
+
+function renderMarkdown(text, live = false) {
     if (!text) return '';
 
     // parse the markdown to HTML
@@ -11,12 +16,44 @@ function renderMarkdown(text) {
     html = DOMPurify.sanitize(html);
 
     // syntax highlighting
+    // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-15)
+    // per-block highlight cache. during streaming the whole message is
+    // re-rendered per paint, which used to re-highlight every code block
+    // from scratch - including finished ones. with the cache, only the
+    // block that is still growing actually pays for hljs; everything else
+    // is a map lookup. (keyed by lang+code, so identical blocks across
+    // the whole app share the result too.)
     if (typeof hljs !== 'undefined') {
         _tempHighlightDiv.innerHTML = html;
 
-        _tempHighlightDiv.querySelectorAll('pre code').forEach((block) => {
+        const blocks = _tempHighlightDiv.querySelectorAll('pre code');
+
+        blocks.forEach((block, i) => {
             const lang = block.className.replace('language-', '') || undefined;
-            hljs.highlightElement(block);
+            const code = block.textContent;
+            const key = (lang || 'auto') + '\0' + code;
+
+            // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-15)
+            // during live renders, the LAST code block is the one still being
+            // streamed: its content is new every frame, so caching it would
+            // retain a full highlighted copy of every intermediate state
+            // (= ram climbing during streams). skip the cache for it; its
+            // final state gets cached on the final (live=false) render.
+            const cacheable = !(live && i === blocks.length - 1);
+
+            let highlighted = cacheable ? _hlCache.get(key) : undefined;
+            if (highlighted === undefined) {
+                highlighted = (lang && hljs.getLanguage(lang))
+                    ? hljs.highlight(code, { language: lang }).value
+                    : hljs.highlightAuto(code).value;
+
+                // simple bound so a long session can't grow it forever
+                if (_hlCache.size > 400) _hlCache.clear();
+                if (cacheable) _hlCache.set(key, highlighted);
+            }
+
+            block.innerHTML = highlighted;
+            block.classList.add('hljs');
         });
 
         html = _tempHighlightDiv.innerHTML;
@@ -59,7 +96,10 @@ function renderMarkdownFor(message, live, raw) {
 
     // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-15)
     // raw mode: plain escaped text, no markdown pipeline at all.
-    const html = raw ? escapeHtml(content) : renderMarkdown(content);
+    // live mode: full pipeline including hljs - affordable now that the
+    // per-block cache means only the still-growing block gets highlighted,
+    // and the directive throttles live paints to ~8fps.
+    const html = raw ? escapeHtml(content) : renderMarkdown(content, Boolean(live));
 
     if (!live && content) _mdCache.set(message, { source: content, html, raw: Boolean(raw) });
 
