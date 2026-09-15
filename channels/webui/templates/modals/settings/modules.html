@@ -30,20 +30,28 @@
             <p class="section-desc" x-html="renderMarkdown($store.settings.categories[activeCategory].descriptions[activeModule]) || ''"></p>
             
             <template x-if="$store.settings.categories[activeCategory].settings[activeModule] && $store.settings.categories[activeCategory].settings[activeModule].value">
+                <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+                     dependency x-show -> x-if templates: settings whose dependencies
+                     are unmet now unmount their whole field widget instead of
+                     just hiding it. -->
                 <template x-for="hierarchyItem in getHierarchicalSettings()" :key="hierarchyItem.key">
                     <template x-if="$store.settings.showUnsafe || !hierarchyItem.setting.unsafe">
-                        <div class="setting-item setting-parent" :class="{ 'unsafe': hierarchyItem.setting.unsafe }" x-show="checkDependency(hierarchyItem.setting.depends)" x-data="{ setting: hierarchyItem.setting }">
+                        <template x-if="checkDependency(hierarchyItem.setting.depends)">
+                        <div class="setting-item setting-parent" :class="{ 'unsafe': hierarchyItem.setting.unsafe }" x-data="{ setting: hierarchyItem.setting }">
                             {% include 'modals/settings/fields.html' %}
                             
                             <!-- Render dependent children -->
                             <template x-for="child in hierarchyItem.children" :key="child.key">
                                 <template x-if="$store.settings.showUnsafe || !child.setting.unsafe">
-                                    <div class="setting-item setting-child" :class="{ 'unsafe': child.setting.unsafe }" x-show="checkDependency(child.setting.depends)" x-data="{ setting: child.setting }">
+                                    <template x-if="checkDependency(child.setting.depends)">
+                                    <div class="setting-item setting-child" :class="{ 'unsafe': child.setting.unsafe }" x-data="{ setting: child.setting }">
                                         {% include 'modals/settings/fields.html' %}
                                     </div>
+                                    </template>
                                 </template>
                             </template>
                         </div>
+                        </template>
                     </template>
                 </template>
             </template>

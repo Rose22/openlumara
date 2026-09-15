@@ -1,10 +1,8 @@
-<div
-    x-show="$store.upload.files.length > 0"
-    id="upload-queue-container"
-    class="upload-queue"
->
-    <!-- Pending files -->
-    <template x-if="$store.upload.files.length > 0">
+<!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+     outer x-show -> x-if (on a proper template): queue unmounts entirely
+     when empty. the previously duplicated inner x-if was folded away. -->
+<template x-if="$store.upload.files.length > 0">
+    <div id="upload-queue-container" class="upload-queue">
         <div class="upload-section">
             <template x-for="(file, index) in $store.upload.files" :key="'pending-' + index">
                 <div class="item">
@@ -23,5 +21,5 @@
                 </div>
             </template>
         </div>
-    </template>
-</div>
+    </div>
+</template>

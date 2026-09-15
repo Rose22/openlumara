@@ -1,6 +1,8 @@
-<div x-show="!$store.system.running || $store.system.restarting" x-cloak>
+<!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+     x-show -> x-if: restart overlay unmounts entirely when system is running. -->
+<template x-if="!$store.system.running || $store.system.restarting" x-cloak>
     <div class="restart-modal">
         <div class="spinner"></div>
         <p x-text="$store.system.message"></p>
     </div>
-</div>
+</template>

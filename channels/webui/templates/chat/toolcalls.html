@@ -17,7 +17,13 @@
                         </template>
                     </div>
 
-                    <div class="body" x-show="!collapsed">
+                    <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+                         x-show -> x-if: collapsed tool cards now unmount their
+                         body entirely, so the args rows and the (potentially
+                         huge) toolResultsRenderer output of completed tool
+                         calls don't sit in the dom while collapsed. -->
+                    <template x-if="!collapsed">
+                    <div class="body">
                         <div class="section">
                             <div class="args">
                                 <div class="title">Arguments</div>
@@ -57,6 +63,7 @@
                             </div>
                         </div>
                     </div>
+                    </template>
                 </div>
             </div>
         </div>
