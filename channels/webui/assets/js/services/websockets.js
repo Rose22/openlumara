@@ -280,8 +280,17 @@ async function handleWebSocketMessage(data) {
              * this prevents UI flicker that comes from re-rendering the entire turn history
              */
 
-            // push the user message + the fully collected assistant turn to the history
-            chat.turnHistory.push({"role": "user", "messages": [stream.userMsg]});
+            // push the user message + the fully collected assistant turn to the history.
+            // user_message_added already reloads the chat, so the user turn is usually
+            // already displayed - only push it if it's missing, otherwise we render a
+            // duplicate bubble that shifts the scroll height right when we scroll to bottom
+            const lastTurn = chat.turnHistory[chat.turnHistory.length - 1];
+            const userAlreadyShown = lastTurn && lastTurn.role === 'user' &&
+                stream.userMsg && lastTurn.messages?.[0]?.index === stream.userMsg.index;
+
+            if (!userAlreadyShown) {
+                chat.turnHistory.push({"role": "user", "messages": [stream.userMsg]});
+            }
             chat.turnHistory.push(stream.turn);
             
             // then clear the user message placeholder and the current turn
@@ -295,6 +304,11 @@ async function handleWebSocketMessage(data) {
             // and finally, sync back up with the backend
             await chat.reloadChat();
             await chat.reloadChats();
+
+            // the reload can swap in finalized turn objects after the earlier
+            // scroll fired, which changes content heights - scroll once more so
+            // we end up at the true bottom (no-op if the user scrolled up)
+            await ui.scrollToBottom();
 
             stream.state = 'idle';
 
