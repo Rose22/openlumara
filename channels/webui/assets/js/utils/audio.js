@@ -18,6 +18,42 @@ const AudioManager = {
     processingSound: null, // Track processing sound state
     processingStartTime: 0, // Track when processing started
     toneTimer: null, // Timer for processing tones
+    processingChain: null,
+
+    // -- AI GENERATED CODE (Qwen3.8-Flash-Next) - (2026-09-15)
+    // builds the reverb chain for the synth processing fallback exactly once.
+    // generating the impulse response costs ~235KB per call and prompt_progress
+    // tokens fire many times per second, so rebuilding it per call was pure churn.
+    getProcessingChain: function(ctx) {
+        if (this.processingChain) return this.processingChain;
+
+        const convolver = ctx.createConvolver();
+        const masterFilter = ctx.createBiquadFilter();
+
+        // Create atmospheric reverb
+        const rate = ctx.sampleRate;
+        const length = rate * 1.2;
+        const impulse = ctx.createBuffer(2, length, rate);
+        const dataL = impulse.getChannelData(0);
+        const dataR = impulse.getChannelData(1);
+        for (let i = 0; i < length; i++) {
+            const decay = Math.pow(1 - i / length, 2.5) * Math.sin((i / length) * Math.PI);
+            dataL[i] = (Math.random() * 2 - 1) * decay;
+            dataR[i] = (Math.random() * 2 - 1) * decay;
+        }
+        convolver.buffer = impulse;
+
+        // Filter to soften the tones
+        masterFilter.type = 'lowpass';
+        masterFilter.frequency.value = 1200;
+        masterFilter.Q.value = 0.5;
+
+        masterFilter.connect(convolver);
+        convolver.connect(this.masterGainNode);
+
+        this.processingChain = { convolver, masterFilter };
+        return this.processingChain;
+    },
 
     SOUND_DEFAULTS: {
         send_message: true,
@@ -434,8 +470,11 @@ const AudioManager = {
             return;
         }
 
-        // Stop any sound currently playing immediately
-        if (this.processingSound) this.stopProcessingSound();
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) - (2026-09-15)
+        // if a processing sound is already running, leave it alone. this gets
+        // called on every prompt_progress token, and restarting the tone chain
+        // per token churned nodes and reset the elapsed timer constantly.
+        if (this.processingSound) return;
 
         // Synchronously resume context for mobile compatibility
         this.resumeContext();
@@ -458,33 +497,26 @@ const AudioManager = {
             // --- FALLBACK TO SYNTH (Optional) ---
             // Plays soft, intermittent waiting tones
             const ctx = this.getAudioContext();
-            const convolver = ctx.createConvolver();
-            const masterFilter = ctx.createBiquadFilter();
 
-            // Create atmospheric reverb
-            const rate = ctx.sampleRate;
-            const length = rate * 1.2;
-            const impulse = ctx.createBuffer(2, length, rate);
-            const dataL = impulse.getChannelData(0);
-            const dataR = impulse.getChannelData(1);
-            for (let i = 0; i < length; i++) {
-                const decay = Math.pow(1 - i / length, 2.5) * Math.sin((i / length) * Math.PI);
-                dataL[i] = (Math.random() * 2 - 1) * decay;
-                dataR[i] = (Math.random() * 2 - 1) * decay;
-            }
-            convolver.buffer = impulse;
-
-            // Filter to soften the tones
-            masterFilter.type = 'lowpass';
-            masterFilter.frequency.value = 1200;
-            masterFilter.Q.value = 0.5;
+            // reuse the cached reverb chain
+            const chain = this.getProcessingChain(ctx);
+            const masterFilter = chain.masterFilter;
 
             // Single frequency
             const baseFrequency = 196.00;
 
+            // if a previous stop() muted the cached chain to kill the reverb
+            // tail, reconnect it before scheduling new tones
+            if (chain.muted) {
+                chain.convolver.connect(this.masterGainNode);
+                chain.muted = false;
+            }
+
             // --- TRACK START TIME ---
             this.processingStartTime = ctx.currentTime;
             let isPlaying = true;
+            let activeOsc = null;
+            let activeGain = null;
 
             const playSoftTone = () => {
                 if (!isPlaying) return;
@@ -512,11 +544,15 @@ const AudioManager = {
 
                 osc.connect(gain);
                 gain.connect(masterFilter);
-                masterFilter.connect(convolver);
-                convolver.connect(this.masterGainNode);
 
                 osc.start(now);
                 osc.stop(now + 1.5);
+
+                activeOsc = osc;
+                activeGain = gain;
+                osc.onended = () => {
+                    if (activeOsc === osc) { activeOsc = null; activeGain = null; }
+                };
 
                 // Fixed 2 second delay for the next tone
                 const delay = 2000;
@@ -526,11 +562,39 @@ const AudioManager = {
             // Start the first tone (it will internally wait if < 0.2s elapsed)
             playSoftTone();
 
-            // Cleanup function
+            // -- AI GENERATED CODE (Qwen3.8-Flash-Next) - (2026-09-15)
+            // cleanup function: previously stop() only killed the timer chain,
+            // so an already-scheduled tone rang out its full 1.5s envelope and
+            // its reverb tail kept decaying. now we hard-stop the live
+            // oscillator (tiny 20ms fade to avoid a click) and mute the reverb
+            // chain to cut the tail.
             this.processingSound = {
                 stop: () => {
                     isPlaying = false;
                     if (this.toneTimer) clearTimeout(this.toneTimer);
+
+                    if (activeOsc) {
+                        try {
+                            const now = ctx.currentTime;
+                            // fade out over 20ms to avoid a click, then stop
+                            if (activeGain) {
+                                activeGain.gain.cancelScheduledValues(now);
+                                activeGain.gain.setValueAtTime(activeGain.gain.value, now);
+                                activeGain.gain.linearRampToValueAtTime(0, now + 0.02);
+                            }
+                            activeOsc.onended = null;
+                            activeOsc.stop(now + 0.02);
+                        } catch(e) {}
+                        activeOsc = null;
+                        activeGain = null;
+                    }
+
+                    // cut the reverb tail by disconnecting the chain from output
+                    if (!chain.muted) {
+                        try { chain.convolver.disconnect(); } catch(e) {}
+                        chain.muted = true;
+                    }
+
                     this.processingSound = null;
                 }
             };

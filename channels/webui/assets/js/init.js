@@ -22,7 +22,10 @@ document.addEventListener('alpine:init', async () => {
     await Alpine.store('notifications').init();
 
     // defined in directives/
-    Alpine.directive('auto-scroll', autoScroll);
+    // -- AI GENERATED CODE (Qwen3.8-Flash-Next) - (2026-09-15)
+    // pass Alpine's cleanup hook through, otherwise the teardown fn returned by
+    // autoScroll() is ignored and scroll listeners + MutationObservers leak per element
+    Alpine.directive('auto-scroll', (el, modifiers, { cleanup }) => cleanup(autoScroll(el)));
     Alpine.directive('md', markdownRender);
 
     self.notice = "Please wait, connecting to backend server..";
