@@ -125,7 +125,19 @@ CHAT_STORE = {
         await ui.forceScrollToBottom();
     },
 
+    // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+    // the in-flight chat-list request. reloadChats()/resetChatPages() abort
+    // it, so clearing the search box mid-drain kills the fetch instead of
+    // letting stale pages land on top of the freshly-reset page 1 (and the
+    // drain loop stops, because its await resolves with nothing).
+    chatsAbort: null,
+
+    cancelChatFetch() {
+        if (this.chatsAbort) { this.chatsAbort.abort(); this.chatsAbort = null; }
+    },
+
     async reloadChats() {
+        this.cancelChatFetch();
         this.chatOffset = 0;
         this.visibleChats = [];
         await this._fetchChats();
@@ -137,30 +149,41 @@ CHAT_STORE = {
     async ensureChatVisible(chatId) {
         const exists = this.visibleChats.some(c => c.id === chatId);
         if (exists) { return; }
-        
+
         // keep loading more chats until the target chat appears
+        // (break if a page was cancelled by a newer reload)
         while (this.hasMoreChats && !this.visibleChats.some(c => c.id === chatId)) {
-            await this.loadMoreChats();
+            if (!await this.loadMoreChats()) { break; }
         }
     },
 
+    // resolves to true if a page was actually loaded, false if it was
+    // cancelled or failed
     async loadMoreChats() {
-        if (!this.hasMoreChats) { return; }
+        if (!this.hasMoreChats) { return false; }
+
         const before = this.visibleChats.length;
-        await this._fetchChats();
-        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+        const loaded = await this._fetchChats();
+        if (!loaded) { return false; }
+
         // if the api returned nothing new, stop so callers that loop
         // (like the search loader) can't spin forever.
         if (this.visibleChats.length === before) { this.hasMoreChats = false; }
+
+        return true;
     },
 
     drainingChats: false,
 
     async resetChatPages() {
         // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
-        // called when the search query is cleared: undo the drain and go
-        // back to page 1. no-op if pagination never grew, so the initial
-        // x-effect run (empty query) doesn't double-fetch on page load.
+        // called when the search query is cleared: kill any in-flight page
+        // first (even when the reset below no-ops with a page 2 fetch still
+        // in flight), then go back to page 1.
+        this.cancelChatFetch();
+
+        // no-op if pagination never grew, so the initial
+        // page load doesn't double-fetch.
         if (this.chatOffset <= this.chatLimit && this.visibleChats.length <= this.chatLimit) { return; }
         await this.reloadChats();
         await this.ensureChatVisible(this.selectedChat);
@@ -174,8 +197,10 @@ CHAT_STORE = {
         if (this.drainingChats) { return; }
         this.drainingChats = true;
         try {
+            // a cancelled page (search cleared -> cancelChatFetch) breaks
+            // the loop immediately
             while (this.hasMoreChats) {
-                await this.loadMoreChats();
+                if (!await this.loadMoreChats()) { break; }
             }
         } finally {
             this.drainingChats = false;
@@ -207,6 +232,8 @@ CHAT_STORE = {
 
     fetchingChats: false,
 
+    // resolves to true if the page was loaded into visibleChats,
+    // false if it was cancelled or failed
     async _fetchChats() {
         // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
         // x-intersect can fire several times while a page is still in
@@ -221,15 +248,23 @@ CHAT_STORE = {
         }
         this.fetchingChats = true;
 
+        const controller = new AbortController();
+        this.chatsAbort = controller;
+
         try {
             const offset = this.chatOffset;
             const catParam = this.selectedCategory ? `&category=${encodeURIComponent(this.selectedCategory)}` : '';
-            const result = await simpleApiFetch(`/api/chats?offset=${offset}&limit=${this.chatLimit}${catParam}`);
-            if (!result) { return; }
+            const result = await simpleApiFetch(`/api/chats?offset=${offset}&limit=${this.chatLimit}${catParam}`, controller.signal);
+            if (!result) { return false; }
 
             this.visibleChats.push(...result.messages);
             this.chatOffset += result.messages.length;
             this.hasMoreChats = result.has_more;
+            return true;
+        } catch (err) {
+            // aborted (search cleared / list reloaded) or network hiccup:
+            // either way, nothing was pushed and callers should stop
+            return false;
         } finally {
             this.fetchingChats = false;
         }

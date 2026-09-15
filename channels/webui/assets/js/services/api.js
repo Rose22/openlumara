@@ -1,10 +1,12 @@
 /* 
  * --- useful functions for sending/receiving to/from the backend API and websockets
  */
-async function simpleApiFetch(url) {
+async function simpleApiFetch(url, signal = null) {
     // fetches something from the API and returns the data extracted from the JSON response
+    // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+    // optional AbortSignal, so callers (chat pagination) can cancel in-flight requests
     raw_data = await(
-        await fetch(url)
+        await fetch(url, signal ? { signal } : {})
     ).json()
 
     if (!raw_data.success) {
