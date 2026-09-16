@@ -267,11 +267,16 @@ class DiscordClient(discord.Client):
                         self._chan.log(self._chan.name, f"error: {core.detail_error(e)}")
                         await self.send_to_main(f"✖ ERROR: {core.detail_error(e)}")
 
-                response = response_content
+                # strip any tool-call wrapper tags the inference server leaked into the
+                # content stream (see core/sanitize.py) so they don't stay on screen
+                response = core.sanitize_leaked_tool_tags(response_content)
+                chunk_content = core.sanitize_leaked_tool_tags(chunk_content)
 
                 if should_stream_text:
-                    # do a final edit at the end
-                    msg = await msg.edit(content=chunk_content)
+                    # do a final edit at the end. if sanitizing left this chunk empty
+                    # (it was nothing but leaked tags), keep the message non-empty so
+                    # discord doesn't reject the edit
+                    msg = await msg.edit(content=chunk_content or "...")
                 else:
                     # apply the same logic as non-streaming mode
                     if len(response) < CHUNK_SIZE:
