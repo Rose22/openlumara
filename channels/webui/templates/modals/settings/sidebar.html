@@ -34,6 +34,17 @@
         >
             <span>Restart Server</span>
         </button>
+
+        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+             logout button moved here from the chat header -->
+        {% if login_enabled %}
+            <button
+                class="item"
+                @click="if(confirm('Log out?')) window.location.href='/logout'"
+            >
+                <span>Logout</span>
+            </button>
+        {% endif %}
     </nav>
 </aside>
 
