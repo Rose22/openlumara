@@ -2,9 +2,13 @@
    move-chat-to-category modal: tiny box with a category dropdown and
    a checkmark accept button (disabled until the target category
    actually differs from the chat's current one). */
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+       the base .modal is position:fixed with inset:0, so height:auto
+       stretches it to the 90vh max-height. fit-content keeps it a
+       single snug row (select + accept button + header). */
 .move-chat-modal {
     width: 380px;
-    height: auto;
+    height: fit-content;
 
     .move-chat-content {
         padding: 16px;
