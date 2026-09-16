@@ -441,12 +441,22 @@ CHAT_STORE = {
        options for the sidebar category dropdown. always includes the
        selected category, even if the backend list doesn't contain it
        yet (e.g. a chat was just loaded/created in a brand new category)
-       - a select whose value matches no option renders blank. */
+       - a select whose value matches no option renders blank.
+       sorted alphabetically, with 'general' pinned to the top. */
     dropdownCategories() {
-        const cats = this.categories ?? [];
+        let cats = [...(this.categories ?? [])];
         if (this.selectedCategory && !cats.includes(this.selectedCategory)) {
-            return [this.selectedCategory, ...cats];
+            cats.push(this.selectedCategory);
         }
+
+        cats.sort((a, b) => (a ?? '').localeCompare(b ?? ''));
+
+        const generalIndex = cats.indexOf('general');
+        if (generalIndex > 0) {
+            cats.splice(generalIndex, 1);
+            cats.unshift('general');
+        }
+
         return cats;
     },
 
