@@ -1,0 +1,33 @@
+<!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+     move-chat-to-category modal, opened from the folder button on a
+     chat item. small: one dropdown + a checkmark accept button. -->
+<template x-if="$store.ui.currentModal === 'move_chat'" x-cloak>
+    <div @keydown.escape.window="$store.ui.closeModal()">
+        <div class="modal move-chat-modal" x-data="{ target: $store.chat.moveChatTarget, category: ($store.chat.moveChatTarget?.category || 'general') }">
+            <div class="header">
+                <h2>Move chat</h2>
+                <button class="close" @click="$store.ui.closeModal()" aria-label="Close">&times;</button>
+            </div>
+
+            <div class="move-chat-content">
+                <p class="move-chat-title" x-text="'move &quot;' + (target?.title || 'New chat') + '&quot; to:'"></p>
+
+                <div class="move-chat-row">
+                    <select x-model="category">
+                        <template x-for="category in $store.chat.dropdownCategories()" :key="category">
+                            <option :value="category" x-text="category"></option>
+                        </template>
+                    </select>
+
+                    <button class="move-chat-accept"
+                        :disabled="!category || category === (target?.category || 'general')"
+                        @click="$store.chat.moveChat($store.chat.moveChatTarget.id, category); $store.ui.closeModal()"
+                        title="Move"
+                    >
+                        {% include 'svg/checkmark.svg' %}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>

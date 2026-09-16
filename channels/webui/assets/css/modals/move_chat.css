@@ -1,0 +1,88 @@
+/* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+   move-chat-to-category modal: tiny box with a category dropdown and
+   a checkmark accept button (disabled until the target category
+   actually differs from the chat's current one). */
+.move-chat-modal {
+    width: 380px;
+    height: auto;
+
+    .move-chat-content {
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .move-chat-title {
+        margin: 0;
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .move-chat-row {
+        display: flex;
+        gap: 8px;
+
+        select {
+            flex: 1;
+            min-width: 0;
+            padding: 9px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            font-size: 14px;
+            font-family: var(--font-primary);
+            cursor: pointer;
+            transition: border-color 0.15s;
+            box-sizing: border-box;
+            height: 36px;
+            -webkit-appearance: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23a0a0a0' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            padding-right: 32px;
+
+            &:focus {
+                outline: none;
+                border-color: var(--accent);
+                box-shadow: 0 0 0 3px rgba(171, 171, 171, 0.15);
+            }
+        }
+
+        .move-chat-accept {
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            background: var(--accent);
+            border: 1px solid var(--accent);
+            border-radius: var(--radius-sm);
+            color: var(--bg-primary);
+            cursor: pointer;
+            transition: all 0.15s ease;
+
+            svg {
+                width: 14px;
+                height: 14px;
+            }
+
+            &:hover:not(:disabled) {
+                filter: brightness(1.1);
+                box-shadow: 0 0 12px var(--accent-glow);
+            }
+
+            &:disabled {
+                opacity: 0.4;
+                cursor: not-allowed;
+            }
+        }
+    }
+}

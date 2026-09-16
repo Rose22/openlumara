@@ -69,6 +69,12 @@ CHAT_STORE = {
     chatLimit: 10,
     hasMoreChats: true,
 
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+       the chat object the 'move to category' modal targets (the whole
+       object, not just the id: moved chats can come from search results,
+       which don't live in visibleChats) */
+    moveChatTarget: null,
+
     categories: [],
     chat: {},
     selectedChat: null,
@@ -357,6 +363,22 @@ CHAT_STORE = {
 
     async renameChat(chat_id, newTitle) {
         await simpleApiPost(`/api/chat/rename/${chat_id}`, {title: newTitle});
+        await this.reloadChats();
+    },
+
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+       move a chat to another category. if it's the open chat, its own
+       category changed too - reload it and re-scope the sidebar list so
+       the moved chat (and the now-current category's chats) stay visible. */
+    async moveChat(chat_id, category) {
+        await simpleApiPost(`/api/chat/set-category/${chat_id}`, { category: category });
+
+        if (chat_id === this.selectedChat) {
+            this.selectedCategory = category;
+            await this.reloadChat();
+        }
+
+        await this.reloadCategories();
         await this.reloadChats();
     },
 

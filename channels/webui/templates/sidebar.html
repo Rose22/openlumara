@@ -149,6 +149,14 @@
                                     <button class="action-btn" @click="renaming = true; renameValue = chat.title; $nextTick(() => { $refs.renameInput.focus(); $refs.renameInput.select(); })" title="Rename">
                                         {% include 'svg/edit.svg' %}
                                     </button>
+                                    <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+                                         opens the move-to-category modal.
+                                         stores the whole chat object: moved
+                                         chats can come from search results,
+                                         which aren't in visibleChats -->
+                                    <button class="action-btn" @click="$store.chat.moveChatTarget = chat; $store.ui.openModal('move_chat')" title="Move to category">
+                                        {% include 'svg/folder.svg' %}
+                                    </button>
                                     <button class="action-btn delete" @click="$store.chat.deleteChat(chat.id)" title="Delete">
                                         {% include 'svg/trash.svg' %}
                                     </button>
