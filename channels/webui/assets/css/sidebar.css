@@ -19,7 +19,7 @@
     flex-direction: column;
     overflow: hidden;
 
-    gap: 2px;
+    gap: var(--gap);
     background: var(--bg-secondary);
 
     /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
@@ -27,7 +27,7 @@
        category sidebar pane). styling mirrors the settings modal's
        select dropdowns (modals/fields.css) */
     .category-select {
-        padding: 4px;
+        padding: 0px;
 
         select {
             width: 100%;
@@ -319,7 +319,7 @@
     }
 
     .search {
-        padding: 4px;
+        padding: 0px;
         border-bottom: 1px solid var(--border-sidebar);
         position: relative;
         display: flex;
