@@ -89,11 +89,15 @@
                 >
                     <!-- give selected chats a nice border via the CSS class -->
                     <div
-                        x-data="{ 
-                            active: false, 
-                            renaming: false, 
-                            renameValue: ''
+                        x-data="{
+                            active: false,
+                            renaming: false,
+                            renameValue: '',
+                            menuOpen: false,
+                            menuTop: 0,
+                            menuLeft: 0
                         }"
+                        @contextmenu.prevent="menuTop = $event.clientY; menuLeft = Math.min($event.clientX, window.innerWidth - 184); menuOpen = true"
                         :id="`chat-${chat.id}`"
                         class="item"
                         :class="{
@@ -145,32 +149,72 @@
                                 </div>
                             </template>
                             
+                            <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+                                 tags now sit inline after the date; overflow
+                                 tags hide and show in a hover popup -->
                             <div class="meta">
-                                <span class="date" x-text="formatDate(chat.updated) || 'No date known'"></span>
-                                
-                                <div class="item-actions" @click.stop>
-                                    <button class="action-btn" @click="renaming = true; renameValue = chat.title; $nextTick(() => { $refs.renameInput.focus(); $refs.renameInput.select(); })" title="Rename">
-                                        {% include 'svg/edit.svg' %}
+                                <div class="meta-inline">
+                                    <span class="date" x-text="formatDate(chat.updated) || 'No date known'"></span>
+                                    <template x-if="(chat.tags ?? []).length > 0">
+                                        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+                                             popup is teleported to body (chat cards
+                                             transform on hover, which would trap and
+                                             clip a fixed child) and anchored via the
+                                             cluster's viewport rect on mouseenter -->
+                                        <span class="inline-tags" x-data="{ open: false, top: 0, left: 0 }"
+                                            @mouseenter="const r = $el.getBoundingClientRect(); top = r.top - 8; left = Math.max(8, Math.min(r.left, window.innerWidth - 236)); open = true"
+                                            @mouseleave="open = false">
+                                            <span class="inline-tag" x-text="(chat.tags ?? [])[0]"></span>
+                                            <span
+                                                x-show="(chat.tags ?? []).length > 1"
+                                                class="tag-more"
+                                                x-text="'+' + ((chat.tags ?? []).length - 1)"
+                                            ></span>
+                                            <template x-teleport="body">
+                                                <div class="tag-popup" x-show="open && (chat.tags ?? []).length > 1"
+                                                    :style="`top: ${top}px; left: ${left}px`"
+                                                    @mouseenter="open = true" @mouseleave="open = false"
+                                                    @click.stop>
+                                                    <template x-for="tag in (chat.tags ?? []).slice(1)" :key="'popup-' + tag">
+                                                        <span class="inline-tag" x-text="tag"></span>
+                                                    </template>
+                                                </div>
+                                            </template>
+                                        </span>
+                                    </template>
+                                </div>
+
+                                <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+                                     three-dot button replaces the inline action
+                                     buttons; dropdown is teleported to body so
+                                     the card's overflow can't clip it -->
+                                <div class="item-actions" @click.stop
+                                    :class="{ 'menu-open': menuOpen }">
+                                    <button class="action-btn" :class="{ active: menuOpen }" title="Actions"
+                                        @click.stop="const r = $el.getBoundingClientRect(); menuTop = r.bottom + 4; menuLeft = Math.max(8, r.right - 176); menuOpen = !menuOpen">
+                                        {% include 'svg/more_vertical.svg' %}
                                     </button>
-                                    <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
-                                         opens the move-to-category modal.
-                                         stores the whole chat object: moved
-                                         chats can come from search results,
-                                         which aren't in visibleChats -->
-                                    <button class="action-btn" @click="$store.chat.moveChatTarget = chat; $store.ui.openModal('move_chat')" title="Move to category">
-                                        {% include 'svg/folder.svg' %}
-                                    </button>
-                                    <button class="action-btn delete" @click="$store.chat.deleteChat(chat.id)" title="Delete">
-                                        {% include 'svg/trash.svg' %}
-                                    </button>
+                                    <template x-teleport="body">
+                                        <div class="chat-action-menu" x-show="menuOpen"
+                                            :style="`top: ${menuTop}px; left: ${menuLeft}px`"
+                                            @click.stop @click.away="menuOpen = false">
+                                            <button @click="renaming = true; renameValue = chat.title; menuOpen = false; $nextTick(() => { $refs.renameInput.focus(); $refs.renameInput.select(); })">
+                                                {% include 'svg/edit.svg' %}
+                                                Rename
+                                            </button>
+                                            <button @click="$store.chat.moveChatTarget = chat; $store.ui.openModal('move_chat'); menuOpen = false">
+                                                {% include 'svg/folder.svg' %}
+                                                Move to category
+                                            </button>
+                                            <button class="danger" @click="$store.chat.deleteChat(chat.id); menuOpen = false">
+                                                {% include 'svg/trash.svg' %}
+                                                Delete
+                                            </button>
+                                        </div>
+                                    </template>
                                 </div>
                             </div>
                             
-                            <ul class="tags">
-                                <template x-for="tag in (chat.tags ?? []).slice(0,3)" :key="tag">
-                                    <li x-text="tag" class="tag"></li>
-                                </template>
-                            </ul>
                         </div>
                     </div>
                 </template>
