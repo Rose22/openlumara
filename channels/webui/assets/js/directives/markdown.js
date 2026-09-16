@@ -28,14 +28,29 @@ function markdownRender(el, { expression }, { evaluateLater, effect, cleanup }) 
     // beyond one per frame cannot be seen and are pure garbage. the final
     // (live=false) render is immediate.
     let pendingHtml = null;
+    let pendingLen = 0;
     let rafId = null;
 
-    const paint = (html) => {
+    // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+    // per-token fade via the shared timeline machinery (fade_tail.js):
+    // everything streamed within the last window gets re-wrapped in
+    // .token-fade spans with negative animation-delays, so fades continue
+    // seamlessly across the wholesale innerHTML replacement of each paint.
+    const timeline = new TailFadeTimeline();
+    let lastLen = 0;
+
+    const paint = (html, batches) => {
         if (html === lastHtml) return;
         lastHtml = html;
 
         Alpine.mutateDom(() => {
             el.innerHTML = html;
+            if (batches) {
+                const nodes = collectTextNodes(el);
+                // newest batch first; wrapTailChars skips already-wrapped
+                // nodes, so successive calls peel further back from the tail
+                for (const b of batches) wrapTailChars(nodes, b.count, b.delay);
+            }
         });
     };
 
@@ -56,14 +71,28 @@ function markdownRender(el, { expression }, { evaluateLater, effect, cleanup }) 
                 // keep only the newest html; one paint per frame, at vsync.
                 // worst-case latency is a single frame (~8ms on 120hz),
                 // which is far below perception.
+
+                // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+                // record the content length so each paint frame becomes a
+                // timeline sample for the fade continuation logic.
                 pendingHtml = renderMarkdownFor(data.message, true, raw);
+                pendingLen = (data.message.content || '').length;
 
                 if (rafId === null) {
                     rafId = requestAnimationFrame(() => {
                         rafId = null;
                         const latest = pendingHtml;
+                        const latestLen = pendingLen;
                         pendingHtml = null;
-                        if (latest !== null) paint(latest);
+                        if (latest === null) return;
+
+                        const now = performance.now();
+
+                        // content shrank (regenerate/edit): no fade, reset
+                        if (latestLen < lastLen) timeline.reset();
+                        lastLen = latestLen;
+
+                        paint(latest, timeline.record(latestLen, now));
                     });
                 }
                 return;
@@ -71,7 +100,9 @@ function markdownRender(el, { expression }, { evaluateLater, effect, cleanup }) 
 
             // final render: cancel any pending frame paint and replace it
             // immediately with the definitive (cached) version
-            if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null; pendingHtml = null; }
+            if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null; pendingHtml = null; pendingLen = 0; }
+            timeline.reset();
+            lastLen = (data.message.content || '').length;
             paint(renderMarkdownFor(data.message, false, raw));
         });
     });

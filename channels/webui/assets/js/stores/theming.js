@@ -86,6 +86,14 @@ THEME_STORE = {
         const messageWidth = localStorage.getItem('messageMaxWidth') || 70;
         root.style.setProperty('--message-max-width', `${messageWidth}%`);
 
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+        // streamed-token fade duration: keep the CSS animation duration in
+        // sync with the user setting (the JS timeline reads the same keys)
+        const fadeEnabled = localStorage.getItem('tokenFadeEnabled') !== 'false';
+        const fadeMs = parseInt(localStorage.getItem('tokenFadeMs'), 10);
+        root.style.setProperty('--token-fade-duration',
+            `${fadeEnabled && !Number.isNaN(fadeMs) ? fadeMs : TOKEN_FADE_DEFAULT_MS}ms`);
+
         // Apply theme vars on top of base
         if (finalTheme) {
             for (const [varName, value] of Object.entries(finalTheme)) {

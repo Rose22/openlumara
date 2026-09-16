@@ -15,8 +15,10 @@
                         </svg>
                         {% include 'svg/wrench.svg' %}
                         <span class="name" x-show="tool.function?.name">
-                          <span class="module" x-text="tool.function?.name.split('_')[0].replace(/^\w/, c => c.toUpperCase())+': '"></span>
-                          <span x-text="tool.function?.name.split('_').slice(1).join(' ')"></span>
+                          <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+                               function names also stream in via tool_call_delta -->
+                          <span class="module" x-fade-text="tool.function?.name.split('_')[0].replace(/^\w/, c => c.toUpperCase())+': '"></span>
+                          <span x-fade-text="tool.function?.name.split('_').slice(1).join(' ')"></span>
                         </span>
                         <span class="name" x-show="!tool.function?.name">unknown</span>
                         <template x-if="!tool.response">
@@ -36,8 +38,10 @@
                                 <div class="title">Arguments</div>
                                 <template x-for="(value, key) in partialJsonParse(tool.function?.arguments ?? '{}')">
                                     <div class="arg-row">
-                                        <span class="arg-name" x-text="key"></span>
-                                        <span class="arg-value" x-text="value"></span>
+                                        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+                                             x-fade-text: streamed tool call args fade in per token -->
+                                        <span class="arg-name" x-fade-text="key"></span>
+                                        <span class="arg-value" x-fade-text="value"></span>
                                     </div>
                                 </template>
 
@@ -57,11 +61,11 @@
                                                 }">
                                                  <!-- if it's json, use our complex function to show the response in a fancy way -->
                                                 <template x-if="isJson">
-                                                    <div class="content" x-html="toolResultsRenderer(JSON.parse(tool.response), 0)"></div>
+                                                    <div class="content" x-fade-html="toolResultsRenderer(JSON.parse(tool.response), 0)"></div>
                                                 </template>
                                                 <!-- if not, show it as a raw string, formatted nicely -->
                                                 <template x-if="!isJson">
-                                                    <p x-text="tool.response" class="raw-response"></p>
+                                                    <p x-fade-text="tool.response" class="raw-response"></p>
                                                 </template>
                                             </div>
                                         </div>

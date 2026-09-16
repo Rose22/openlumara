@@ -28,6 +28,12 @@ document.addEventListener('alpine:init', async () => {
     Alpine.directive('auto-scroll', (el, modifiers, { cleanup }) => cleanup(autoScroll(el)));
     Alpine.directive('md', markdownRender);
 
+    // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+    // x-text / x-html variants that fade newly streamed content in
+    // (reasoning, tool call args, tool responses)
+    Alpine.directive('fade-text', Alpine.skipDuringClone(fadeTextRender));
+    Alpine.directive('fade-html', Alpine.skipDuringClone((el, d, c) => fadeTextRender(el, d, c, true)));
+
     self.notice = "Please wait, connecting to backend server..";
     await connectWebSocket();
 

@@ -152,6 +152,22 @@
 }
 
 /* ==========================================================================
+ *  Chat - Streamed Tokens
+ *  ========================================================================== */
+
+/* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+   applied by the x-md directive to the freshly streamed tail of the live
+   message, so each batch of new tokens fades in instead of popping */
+@keyframes tokenFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.token-fade {
+    animation: tokenFadeIn var(--token-fade-duration, 0.35s) ease-out;
+}
+
+/* ==========================================================================
  *  Chat - Typing Indicator
  *  ========================================================================== */
 

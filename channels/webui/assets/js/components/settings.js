@@ -28,6 +28,12 @@ function settingsModal() {
         messageWidth: localStorage.getItem('messageMaxWidth') || '60',
         expandReasoning: localStorage.getItem('expandReasoning') || false,
 
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+        // streamed-token fade settings (localStorage; applied live, no save needed).
+        // literal 350 default: this file loads before directives/fade_tail.js.
+        tokenFadeEnabled: localStorage.getItem('tokenFadeEnabled') !== 'false',
+        tokenFadeMs: localStorage.getItem('tokenFadeMs') || '350',
+
         get activeNavCategory() {
             return this.activeModule ? 'modules' : 
                    this.activeChannel ? 'channels' : this.activeCategory;
@@ -254,6 +260,21 @@ function settingsModal() {
             this.chatWidth = width;
             localStorage.setItem('chatContentWidth', width);
             document.documentElement.style.setProperty('--chat-content-width', `${width}%`);
+        },
+
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+        // streamed-token fade: stored in localStorage and applied live.
+        // the fade directives read the same keys on every paint, and the
+        // CSS animation duration follows the --token-fade-duration var.
+        handleTokenFadeToggle() {
+            this.tokenFadeEnabled = !this.tokenFadeEnabled;
+            localStorage.setItem('tokenFadeEnabled', this.tokenFadeEnabled);
+        },
+
+        handleTokenFadeSpeed(ms) {
+            this.tokenFadeMs = ms;
+            localStorage.setItem('tokenFadeMs', ms);
+            document.documentElement.style.setProperty('--token-fade-duration', `${ms}ms`);
         },
         
         // Alpine-reactive message width change
