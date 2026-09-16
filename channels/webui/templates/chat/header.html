@@ -49,5 +49,13 @@
         ">
             {% include 'svg/trash.svg' %}
         </button>
+        {% if login_enabled %}
+            <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+                 logout moved out of the (now removed) category sidebar
+                 pane into the header, icon-only, rightmost -->
+            <button class="btn" title="Logout" @click="if(confirm('Log out?')) window.location.href='/logout'">
+                {% include 'svg/logout.svg' %}
+            </button>
+        {% endif %}
     </div>
 </header>

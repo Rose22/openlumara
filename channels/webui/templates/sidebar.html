@@ -168,13 +168,4 @@
         New Chat
     </button>
 
-    {% if login_enabled %}
-        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
-             logout moved here since the category sidebar pane it used to
-             live in no longer exists -->
-        <button class="sidebar-btn" @click="if(confirm('Log out?')) window.location.href='/logout'">
-            {% include 'svg/download.svg' %}
-            <span>Logout</span>
-        </button>
-    {% endif %}
 </div>
