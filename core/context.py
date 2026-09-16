@@ -97,7 +97,8 @@ class Context:
                 messages = messages[-max_messages:]
 
             # Strip multimodal data from all messages except the last one to save tokens
-            if messages:
+            # ONLY if the preserve_multimodal_context setting is disabled
+            if messages and not core.config.get("model", "preserve_multimodal_context"):
                 for i in range(len(messages) - 1):
                     msg = messages[i]
                     if msg.get("role") in ("tool", "tool_calls"):
