@@ -1,117 +1,68 @@
 #sidebar {
-    /* divides the sidebar into the category list and the chat list */
-    width: 30%;
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+       the category pane is gone, the chat list fills the sidebar */
+    width: 22%;
     box-sizing: border-box;
     display: flex;
     flex-direction: row;
     height: 100%;
 }
 
-/* category list */
-#category-list {
-    width: 40%;
-    min-width: 40%;
-    background: var(--bg-secondary);
-    border-right: 1px solid var(--border-sidebar);
-    display: flex;
-    flex-direction: column;
-    flex-shrink: 0;
-    transition: width 0.3s ease, transform 0.3s ease;
-    padding: 8px;
-
-    .list {
-        display: flex;
-        flex-direction: column;
-        overflow-x: hidden;
-        text-overflow: ellipsis;
-        overflow-y: auto;
-        height: 100%;
-    }
-
-    .item {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        width: 100%;
-        padding: 10px 12px;
-        background: transparent;
-        border: none;
-        border-radius: var(--radius-sm);
-        color: var(--text-secondary);
-        font-size: 0.9rem;
-        cursor: pointer;
-        text-align: left;
-        transition: all 0.15s ease;
-        margin-bottom: 4px;
-
-        .header {
-            padding: 16px 12px;
-            border-bottom: 1px solid var(--border-sidebar);
-
-            h3 {
-                font-size: 0.75rem;
-                text-transform: uppercase;
-                letter-spacing: 0.08em;
-                color: var(--text-muted);
-                font-weight: 600;
-            }
-        }
-
-        .icon {
-            width: 18px;
-            height: 18px;
-            opacity: 0.9;
-            flex-shrink: 0;
-        }
-
-        .name {
-            flex: 1;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        svg {
-            width: 20px;
-            height: 20px;
-        }
-
-        &.disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            &:hover {
-                transform: none;
-                background: var(--bg-tertiary);
-                opacity: 0.5;
-                border-color: transparent;
-            }
-        }
-    }
-
-    .item:hover {
-        background: var(--bg-tertiary);
-        color: var(--text-primary);
-    }
-    .item.active {
-        background: rgba(var(--primary-rgb), 0.15);
-        color: var(--accent);
-        font-weight: 600;
-    }
-}
-
 /* list of chats */
 #chat-list {
     padding: 7px;
     flex: 1;
-    min-width: 50%;
-    width: 50%;
+    min-width: 0;
+    width: 100%;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
     overflow: hidden;
 
-    gap: var(--gap);
+    gap: 2px;
     background: var(--bg-secondary);
+
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+       category dropdown, sits above the search box (replaces the old
+       category sidebar pane). styling mirrors the settings modal's
+       select dropdowns (modals/fields.css) */
+    .category-select {
+        padding: 4px;
+
+        select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+               bg-tertiary instead of the modal's bg-primary: blends
+               better with the sidebar's own background */
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            font-size: 14px;
+            font-family: var(--font-primary);
+            cursor: pointer;
+            transition: border-color 0.15s;
+            box-sizing: border-box;
+            -webkit-appearance: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23a0a0a0' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            padding-right: 32px;
+
+            &:focus {
+                outline: none;
+                border-color: var(--accent);
+                box-shadow: 0 0 0 3px rgba(171, 171, 171, 0.15);
+            }
+
+            &:disabled {
+                opacity: 0.5;
+                cursor: not-allowed;
+            }
+        }
+    }
 
     .chats {
         display: flex;
@@ -368,7 +319,7 @@
     }
 
     .search {
-        padding: 10px;
+        padding: 4px;
         border-bottom: 1px solid var(--border-sidebar);
         position: relative;
         display: flex;

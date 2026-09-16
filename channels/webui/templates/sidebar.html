@@ -1,52 +1,28 @@
-<!-- list of categories -->
-<div id="category-list" x-ref="category-list"
-    x-show="!$store.ui.isMobile || $store.ui.showCategories" x-cloak
-    >
-    <div class="list">
-        <template x-for="category in $store.chat.categories" :key="category">
-            <ul :class="{'item': true, 'active': category == $store.chat.selectedCategory, 'disabled': $store.stream.state !== 'idle' && category !== $store.chat.selectedCategory}" @click="
-                if ($store.stream.state !== 'idle') { return }
-
-                $store.chat.selectCategory(category);
-                if ($store.ui.isMobile) {
-                    await $store.ui.toggleMobileSidebarView();
-                }
-                ">
-                <span class="icon">
-                    <template x-if="category === 'general'">
-                        {% include 'svg/home.svg' %}
-                    </template>
-                    <template x-if="category != 'general'">
-                        {% include 'svg/chat.svg' %}
-                    </template>
-                </span>
-                <span class="title" x-text="category"></span>
-            </ul>
-        </template>
-    </div>
-
-    {% if login_enabled %}
-        <div class="buttons">
-            <!-- Logout button -->
-            <button class="sidebar-btn" @click="if(confirm('Log out?')) window.location.href='/logout'">
-                {% include 'svg/download.svg' %}
-                <span>Logout</span>
-            </button>
-        </div>
-    {% endif %}
-</div>
-
 <!-- list of chats -->
 <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
-     search now goes through the backend (/api/chats/search, same endpoint
+     the category sidebar pane is gone - categories now live in a dropdown
+     above the search box. mobile drill-down logic was dropped along with
+     it (the dropdown replaces it on mobile too).
+     search goes through the backend (/api/chats/search, same endpoint
      as the global search modal): one debounced request returns ALL matches
      for the current category, no pagination. the paginated visibleChats
      list is untouched while searching (scroll loader hidden), so clearing
      the box is an instant switch back with no refetch. -->
-<div id="chat-list" x-ref="chat-list"
-    x-show="!$store.ui.isMobile || $store.ui.showChatList" x-cloak
->
-    <button class="header-btn" x-text="$store.chat.selectedCategory" x-show="$store.ui.isMobile" x-cloak @click="$store.ui.toggleMobileSidebarView()"></button>
+<div id="chat-list" x-ref="chat-list" x-cloak>
+    <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+         category picker dropdown, replaces the old category sidebar -->
+    <div class="category-select">
+        <select
+            :value="$store.chat.dropdownValue()"
+            :disabled="$store.stream.state !== 'idle'"
+            @change="$store.chat.selectCategory($event.target.value)"
+            title="Filter chats by category"
+        >
+            <template x-for="category in $store.chat.dropdownCategories()" :key="category">
+                <option :value="category" x-text="category"></option>
+            </template>
+        </select>
+    </div>
 
     <div class="search">
         <input name="search" type="text" placeholder="Search through your chats.."
@@ -191,4 +167,14 @@
         {% include 'svg/add.svg' %}
         New Chat
     </button>
+
+    {% if login_enabled %}
+        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+             logout moved here since the category sidebar pane it used to
+             live in no longer exists -->
+        <button class="sidebar-btn" @click="if(confirm('Log out?')) window.location.href='/logout'">
+            {% include 'svg/download.svg' %}
+            <span>Logout</span>
+        </button>
+    {% endif %}
 </div>

@@ -85,7 +85,6 @@ CHAT_STORE = {
 
     async load() {
         // called by Alpine.init
-        await this.reloadChats();
         await this.reloadCategories();
 
         const result = await simpleApiFetch(`/api/chat/current`);
@@ -96,6 +95,13 @@ CHAT_STORE = {
         this.selectedCategory = result.category;
         this.turnHistory = result.turn_history;
         this.currentTokenUsage = result.token_usage;
+
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+        // only fetch the chat list AFTER selectedCategory is known: it
+        // used to load first (scoped to 'general'), then the category
+        // flipped to the loaded chat's category, and the x-if category
+        // filter hid every (wrongly-scoped) chat in the sidebar.
+        await this.reloadChats();
 
         // ensure the chat exists in the visible sidebar list before scrolling
         await this.ensureChatVisible(this.selectedChat);
@@ -326,7 +332,10 @@ CHAT_STORE = {
     },
 
     async newChat() {
-        await simpleApiPost('/api/chat/new');
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+        // create the chat inside the currently selected category
+        // (the endpoint defaults to 'general' when nothing is sent)
+        await simpleApiPost('/api/chat/new', { category: this.selectedCategory });
 
         result = await simpleApiFetch('/api/chat/current');
         if (!result) { return; }
@@ -338,6 +347,8 @@ CHAT_STORE = {
         this.currentTokenUsage = result.token_usage;
         this.turnHistory = result.turn_history;
 
+        // the new chat may live in a category the dropdown doesn't list yet
+        await this.reloadCategories();
         await this.reloadChats();
         await this.reloadChat();
     },
@@ -351,6 +362,21 @@ CHAT_STORE = {
         if (!confirm("Are you sure you want to delete this chat?")) { return }
 
         await simpleApiPost(`/api/chat/delete/${chat_id}`);
+
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+        // refreshing the category list after every delete keeps the
+        // dropdown in sync: if the last chat of a category was removed,
+        // its option disappears; if that was the selected category,
+        // fall back to 'general' (or the first remaining one).
+        await this.reloadCategories();
+
+        const cats = this.categories ?? [];
+        if (this.selectedCategory && !cats.includes(this.selectedCategory)) {
+            this.selectedCategory = cats.includes('general')
+                ? 'general'
+                : (cats[0] ?? 'general');
+        }
+
         await this.reloadChats();
     },
 
@@ -365,6 +391,8 @@ CHAT_STORE = {
         const result = await simpleApiFetch(`/api/chat/current`);
         if (!result) { return }
 
+        const prevCategory = this.selectedCategory;
+
         this.chat = result;
         this.selectedChat = result.id;
         this.selectedCategory = result.category;
@@ -373,13 +401,52 @@ CHAT_STORE = {
         // change, so alpine doesn't re-render (and re-parse the markdown of)
         // the entire conversation on every single reload
         this.turnHistory = mergeTurnHistory(this.turnHistory, result.turn_history);
+
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+        // if the backend switched us to a chat in another category, the
+        // sidebar list is now scoped to the wrong category (everything
+        // would vanish behind the x-if filter) - refetch it, and make
+        // sure the newly selected chat is in the list.
+        if (result.category !== prevCategory) {
+            await this.reloadCategories();
+            await this.reloadChats();
+            await this.ensureChatVisible(result.id);
+        }
     },
 
     async reloadCategories() {
         this.categories = await simpleApiFetch('/api/chats/categories');
     },
 
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+       options for the sidebar category dropdown. always includes the
+       selected category, even if the backend list doesn't contain it
+       yet (e.g. a chat was just loaded/created in a brand new category)
+       - a select whose value matches no option renders blank. */
+    dropdownCategories() {
+        const cats = this.categories ?? [];
+        if (this.selectedCategory && !cats.includes(this.selectedCategory)) {
+            return [this.selectedCategory, ...cats];
+        }
+        return cats;
+    },
+
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+       the select's :value binding goes through this instead of
+       selectedCategory directly: touching this.categories makes alpine's
+       effect re-run when the option list changes, so the value is
+       re-applied even if it was set before the options existed (a plain
+       :value effect only tracks selectedCategory and would leave the
+       dropdown blank). */
+    dropdownValue() {
+        void (this.categories ?? []).length;
+        return this.selectedCategory;
+    },
+
     async selectCategory(category) {
+        // no-op when the dropdown fires a change back to the current value
+        if (category === this.selectedCategory) { return; }
+
         this.selectedCategory = category;
         // reloadChats() re-runs the sidebar search when active, so the
         // results are already re-scoped to the new category after this

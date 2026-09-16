@@ -508,9 +508,19 @@ async def create_fastapi(channel):
 
     # -- POST
     @app.post("/api/chat/new")
-    async def chat_new():
+    async def chat_new(request: fastapi.Request):
         """Creates a new chat"""
-        return api_result(await channel.context.chat.new())
+        # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+        # optional json body with a category, so the webui can create
+        # the chat inside the currently selected category.
+        category = "general"
+        try:
+            data = await request.json()
+            category = (data.get("category") or "general").strip() or "general"
+        except Exception:
+            pass
+
+        return api_result(await channel.context.chat.new(category=category))
 
     @app.post("/api/chat/rename/{chat_id}")
     async def chat_rename(chat_id: str, request: fastapi.Request):

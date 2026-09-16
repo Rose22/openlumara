@@ -65,8 +65,6 @@ UI_STORE = {
     isMobile: false,
 
     showSidebar: true,
-    showCategories: true,
-    showChatList: true,
 
     expandReasoning: true,
 
@@ -78,32 +76,11 @@ UI_STORE = {
         // hide sidebar on mobile (in favor of a hamburger button)
         this.showSidebar = !this.isMobile;
 
-        // on mobile, the sidebar is a drill-down navigator rather than a two-column pane
-        this.showCategories = !this.isMobile;
-        this.showChatList = true;
-
         this.expandReasoning = localStorage.getItem("expandReasoning") !== 'false';
     },
 
     async toggleSidebar() {
         this.showSidebar = !this.showSidebar;
-    },
-    async toggleCategories() {
-        this.showCategories = !this.showCategories;
-    },
-    async toggleChatList() {
-        this.showChatList = !this.showChatList;
-    },
-
-    async toggleMobileSidebarView() {
-        // toggles between the chatlist and the categories list
-        if (this.showChatList) {
-            this.showChatList = false;
-            this.showCategories = true;
-        } else {
-            this.showChatList = true;
-            this.showCategories = false;
-        }
     },
 
     async openModal(name) {

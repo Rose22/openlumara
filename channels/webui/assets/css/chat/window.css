@@ -5,6 +5,7 @@
     width: 100%;
     min-width: 40%;
     max-height: 100%;
+    background-color: var(--bg-primary);
 
     border: 1px solid var(--border-sidebar);
     #messages {
@@ -12,6 +13,8 @@
         display: flex;
         flex: 1;
         overflow-y: auto;
+        background-image: var(--bg-pattern);
+        background-size: var(--bg-pattern-size);
 
         /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-15)
            lazy-mounted turns adjust scrollTop manually (ui.adjustScroll)
@@ -22,9 +25,6 @@
         padding: 20px;
         flex-direction: column;
         gap: 18px;
-        background-color: var(--bg-primary);
-        background-image: var(--bg-pattern);
-        background-size: var(--bg-pattern-size);
         width: var(--chat-content-width, 100%);
         margin: 0 auto;
         min-height: 0;

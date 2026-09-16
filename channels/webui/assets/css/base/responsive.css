@@ -66,8 +66,9 @@
         width: 100% !important;
         overflow: hidden;
 
-        /* Both panes stack full-width, slide relative to each other */
-        #category-list,
+        /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+           category pane and its drill-down slides are gone (categories
+           now live in a dropdown above the search box) */
         #chat-list {
             top: 0;
             left: 0;
@@ -75,29 +76,6 @@
             height: 100%;
         }
 
-        .cat-enter-from { transform: translateX(-100%); }
-        .cat-leave-to   { transform: translateX(-100%); }
-
-        .chat-enter-from { transform: translateX(100%); }
-        .chat-leave-to   { transform: translateX(100%); }
-
-        .header-btn {
-            width: 100%;
-            padding: 14px 16px;
-            background: transparent;
-            border: none;
-            border-bottom: 1px solid var(--border-sidebar);
-            color: var(--text-primary);
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            text-align: left;
-            transition: background 0.2s ease;
-
-            &:hover {
-                background: var(--bg-tertiary);
-            }
-        }
     }
 
     /* Header — constrained so it doesn't push content off-screen */
