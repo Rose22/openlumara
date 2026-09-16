@@ -1,4 +1,12 @@
-<div :class="{'reasoning-wrapper': true, 'collapsed': collapsed, 'expanded': !collapsed}" x-data="{collapsed: $store.stream.state === 'idle'}" @click="collapsed = !collapsed">
+<!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+     Auto-collapse reasoning once it's done thinking: a reasoning block is
+     finished when it's no longer the last segment of the live stream (a
+     content/tool_calls segment followed it) or the stream went idle.
+     autoCollapsed guards against re-collapsing if the user expands it again. -->
+<div :class="{'reasoning-wrapper': true, 'collapsed': collapsed, 'expanded': !collapsed, 'is-reasoning-active': !done}"
+     x-data="{collapsed: $store.stream.state === 'idle', autoCollapsed: false, done: $store.stream.state === 'idle'}"
+     x-effect="const msgs = $store.stream.turn?.messages ?? []; const isLast = msgs[msgs.length - 1] === message; done = $store.stream.state === 'idle' || !isLast; if (done && !autoCollapsed) { autoCollapsed = true; collapsed = true }"
+     @click="collapsed = !collapsed">
     <div class="header">
         <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16) -->
         <!-- Chevron now rotates on collapse/expand to match tool call cards. -->
@@ -7,9 +15,11 @@
         </svg>
         {% include 'svg/thought_bubble.svg' %}
         <span class="text">
-            <!-- TODO: add `Thought` after done thinking -->
-            <span class="label">Thoughts</span>
-            <span class="dots"><span aria-hidden="true">&nbsp;</span><span aria-hidden="true">&nbsp;</span><span aria-hidden="true">&nbsp;</span></span>
+            <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+                 Label flips from 'Thinking..' to 'Thoughts' once the block is
+                 done; animated dots only show while actively thinking. -->
+            <span class="label" x-text="done ? 'Thoughts' : 'Thinking..'"></span>
+            <span class="dots" x-show="!done"><span aria-hidden="true">&nbsp;</span><span aria-hidden="true">&nbsp;</span><span aria-hidden="true">&nbsp;</span></span>
         </span>
     </div>
 

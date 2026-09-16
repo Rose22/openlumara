@@ -22,7 +22,7 @@
     z-index: 1001;
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-sm);
     box-shadow: var(--shadow-strong);
     margin: auto;
     backface-visibility: hidden;

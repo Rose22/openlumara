@@ -41,10 +41,7 @@
             padding: 10px 12px;
             border: 1px solid var(--border-color);
             border-radius: var(--radius-sm);
-            /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
-               bg-tertiary instead of the modal's bg-primary: blends
-               better with the sidebar's own background */
-            background: var(--bg-tertiary);
+            background: none;
             color: var(--text-primary);
             font-size: 14px;
             font-family: var(--font-primary);
@@ -80,8 +77,8 @@
         gap: var(--gap);
 
         .item {
-            padding: 12px 14px;
-            background: var(--bg-tertiary);
+            padding: 4px 7px;
+            background: none;
             border: 1px solid transparent;
             border-radius: var(--radius-sm);
             cursor: pointer;
@@ -105,7 +102,7 @@
                 cursor: not-allowed;
                 &:hover {
                     transform: none;
-                    background: var(--bg-tertiary);
+                    background: none;
                     opacity: 0.5;
                     border-color: transparent;
                 }
@@ -176,7 +173,7 @@
                     border-radius: var(--radius-sm);
                     padding: 4px 4px;
                     max-height: 2rem;
-                    background-color: var(--bg-secondary);
+                    background-color: none;
                     text-overflow: ellipsis;
                     overflow: hidden;
                 }
@@ -242,7 +239,7 @@
                 .rename-input {
                     flex: 1;
                     min-width: 0;
-                    background: var(--bg-secondary);
+                    background: none;
                     border: 1px solid var(--accent);
                     border-radius: var(--radius-sm);
                     color: var(--text-primary);
@@ -309,23 +306,24 @@
 
         .item.active {
             background: var(--bg-secondary);
-            border-color: color-mix(in oklch, var(--accent) 60%, black);
+            border: 1px solid var(--border-color);
 
             &:hover {
-                border-color: color-mix(in oklch, var(--accent) 60%, black);
+                background: var(--bg-secondary);
+                border: 1px solid var(--border-color);
             }
         }
         .item:hover {
-            background: var(--bg-secondary);
+            /*
             border-color: var(--border-color);
+            */
+            background: var(--bg-secondary);
             transform: translateX(4px);
-            opacity: 1;
         }
     }
 
     .search {
         padding: 0px;
-        border-bottom: 1px solid var(--border-sidebar);
         position: relative;
         display: flex;
         flex-wrap: nowrap;
@@ -336,7 +334,7 @@
             min-width: 0;
             box-sizing: border-box;
             padding: 9px 12px;
-            background: var(--bg-tertiary) !important;
+            background: none;
             border: 1px solid var(--border-color);
             border-radius: var(--radius-sm);
             color: var(--text-primary);
@@ -364,7 +362,7 @@
             width: 36px;
             height: 36px;
             padding: 0;
-            background: var(--bg-tertiary);
+            background: none;
             border: 1px solid var(--border-color);
             border-radius: var(--radius-sm);
             color: var(--text-muted);
@@ -397,7 +395,7 @@
     width: 100%;
     min-height: 42px;
     padding: 0.75rem;
-    background: var(--bg-secondary);
+    background: none;
     border: none;
     border-top: 1px solid var(--border-color);
     color: var(--text-primary, #eee);

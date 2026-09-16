@@ -155,10 +155,6 @@
                 <template x-for="(message, messageIndex) in streamTurnSplit($store.stream.turn).final" :key="'final-'+messageIndex">
                     {% include 'chat/turns/assistant_stream.html' %}
                 </template>
-
-                <div x-data="{ get targetIndex() { return $store.stream.turn.first_message_index }, turn: {} }" class="fullwidth">
-                    {% include 'chat/message_buttons.html' %}
-                </div>
             </div>
         </div>
     </template>

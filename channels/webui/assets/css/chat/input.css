@@ -131,7 +131,6 @@
 
         #stop {
             background: var(--error-bg);
-            border: 1px solid var(--error-border);
             color: var(--error);
 
             &:hover {

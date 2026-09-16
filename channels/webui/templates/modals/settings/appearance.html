@@ -118,19 +118,6 @@
                        @input="handleChatWidth($event.target.value)">
             </div>
             
-            <!-- Message Width Slider -->
-            <div class="setting-item">
-                <div class="slider-header">
-                    <span class="slider-label">Message Width</span>
-                    <span class="slider-value" x-text="messageWidth + '%'"></span>
-                </div>
-                <input type="range" 
-                       x-model.number="messageWidth" 
-                       min="30" 
-                       max="100"
-                       @input="handleMessageWidth($event.target.value)">
-            </div>
-
             <div class="item">
                 <div class="toggle-row">
                     <label>Expand Reasoning by Default</label>

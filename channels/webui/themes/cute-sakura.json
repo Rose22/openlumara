@@ -1,6 +1,6 @@
 {
   "dark": {
-    "--radius-sm": "16px",
+    "--radius-sm": "7px",
     "--radius-md": "28px",
     "--radius-lg": "36px",
     "--radius-xl": "999px",
