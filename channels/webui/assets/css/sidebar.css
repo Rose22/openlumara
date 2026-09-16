@@ -34,51 +34,9 @@
        select dropdowns (modals/fields.css) */
     .category-select {
         padding: 0px;
-        /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
-           flex row so the manage-categories button sits beside the
-           dropdown (styled like .search-toggle below) */
-        display: flex;
-        flex-wrap: nowrap;
-        gap: 8px;
-
-        /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
-           36x36 to match the search-toggle button below exactly;
-           align-self keeps it centered next to the taller select */
-        .category-manage-btn {
-            flex-shrink: 0;
-            align-self: center;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 36px;
-            height: 36px;
-            padding: 0;
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-sm);
-            color: var(--text-muted);
-            cursor: pointer;
-            transition: all 0.2s ease;
-
-            svg {
-                width: 16px;
-                height: 16px;
-            }
-
-            &:hover:not(:disabled) {
-                color: var(--text-primary);
-                border-color: var(--accent);
-            }
-
-            &:disabled {
-                opacity: 0.5;
-                cursor: not-allowed;
-            }
-        }
 
         select {
-            flex: 1;
-            min-width: 0;
+            width: 100%;
             padding: 10px 12px;
             border: 1px solid var(--border-color);
             border-radius: var(--radius-sm);

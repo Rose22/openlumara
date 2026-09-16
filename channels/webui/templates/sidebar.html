@@ -11,27 +11,30 @@
 <div id="chat-list" x-ref="chat-list" x-cloak>
     <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
          category picker dropdown, replaces the old category sidebar -->
+    <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+         the manage-categories modal is opened from a pseudo-option at
+         the bottom of the dropdown. picking it never changes the
+         selected category: the select value snaps back and the modal
+         opens instead. -->
     <div class="category-select">
         <select
             :value="$store.chat.dropdownValue()"
             :disabled="$store.stream.state !== 'idle'"
-            @change="$store.chat.selectCategory($event.target.value)"
+            @change="
+                if ($event.target.value === '__manage__') {
+                    $event.target.value = $store.chat.dropdownValue();
+                    $store.ui.openModal('categories');
+                } else {
+                    $store.chat.selectCategory($event.target.value);
+                }
+            "
             title="Filter chats by category"
         >
             <template x-for="category in $store.chat.dropdownCategories()" :key="category">
                 <option :value="category" x-text="category"></option>
             </template>
+            <option value="__manage__">manage categories...</option>
         </select>
-
-        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
-             opens the manage categories modal (add / delete) -->
-        <button type="button" class="category-manage-btn"
-            @click="$store.ui.openModal('categories')"
-            :disabled="$store.stream.state !== 'idle'"
-            title="Manage categories"
-        >
-            {% include 'svg/pencil.svg' %}
-        </button>
     </div>
 
     <div class="search">
