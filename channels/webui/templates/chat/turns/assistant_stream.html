@@ -5,8 +5,11 @@
     </template>
 
     <!-- Content block -->
+    <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+         live check now uses object identity instead of index, since the
+         chain/final split makes per-loop indexes meaningless -->
     <template x-if="message.type === 'content'">
-        <div class="content" x-md="{ message: message, live: messageIndex === $store.stream.turn.messages.length - 1 }"></div>
+        <div class="content" x-md="{ message: message, live: message === $store.stream.turn.messages[$store.stream.turn.messages.length - 1] }"></div>
     </template>
 
     <!-- Tool calls block -->

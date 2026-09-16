@@ -83,7 +83,30 @@
             <template x-if="turn.role === 'assistant'">
                 <div class="message-wrapper assistant">
                     <div class="message assistant">
-                        <template x-for="(message, messageIndex) in turn.messages" :key="messageIndex">
+                        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+                             everything that isn't the turn's final content (the
+                             thinking -> toolcall -> thinking chain) is grouped into
+                             a collapsible wrapper. history turns start collapsed -->
+                        <template x-if="historyTurnSplit(turn).chain.length > 0">
+                            <div class="agent-chain" x-data="{ collapsed: true }">
+                                <div class="agent-chain-header" @click="collapsed = !collapsed">
+                                    <svg :class="{'toggle': true, 'toggle-expanded': !collapsed}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="9 18 15 12 9 6"></polyline>
+                                    </svg>
+                                    {% include 'svg/gear.svg' %}
+                                    <span class="label">Process</span>
+                                </div>
+                                <template x-if="!collapsed">
+                                    <div class="agent-chain-body">
+                                        <template x-for="(message, messageIndex) in historyTurnSplit(turn).chain" :key="messageIndex">
+                                            {% include 'chat/turns/assistant_history.html' %}
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+
+                        <template x-for="(message, messageIndex) in historyTurnSplit(turn).final" :key="'final-'+messageIndex">
                             {% include 'chat/turns/assistant_history.html' %}
                         </template>
 
@@ -103,7 +126,30 @@
     <template x-if="$store.stream.turn.messages">
         <div class="message-wrapper assistant">
             <div class="message assistant">
-                <template x-for="(message, messageIndex) in $store.stream.turn.messages" :key="messageIndex">
+                <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+                     streaming chain wrapper: expanded while streaming (content
+                     renders standalone until a newer segment pulls it back into
+                     the chain), but manually toggable -->
+                <template x-if="streamTurnSplit($store.stream.turn).chain.length > 0">
+                    <div class="agent-chain is-streaming" x-data="{ collapsed: false }">
+                        <div class="agent-chain-header" @click="collapsed = !collapsed">
+                            <svg :class="{'toggle': true, 'toggle-expanded': !collapsed}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                            {% include 'svg/gear.svg' %}
+                            <span class="label">Process</span>
+                        </div>
+                        <template x-if="!collapsed">
+                            <div class="agent-chain-body">
+                                <template x-for="(message, messageIndex) in streamTurnSplit($store.stream.turn).chain" :key="messageIndex">
+                                    {% include 'chat/turns/assistant_stream.html' %}
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+
+                <template x-for="(message, messageIndex) in streamTurnSplit($store.stream.turn).final" :key="'final-'+messageIndex">
                     {% include 'chat/turns/assistant_stream.html' %}
                 </template>
 

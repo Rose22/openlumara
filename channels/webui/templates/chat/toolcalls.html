@@ -1,7 +1,7 @@
 <div class="flex fullwidth nogaps">
     <template x-for="tool in message.tool_calls">
         <div>
-            <div class="tool-calls-container" x-data="{ collapsed: false }">
+            <div class="tool-calls-container" x-data="{ collapsed: $store.stream.state === 'idle' }">
                 <div class="tool-call-card">
                     <div class="header" @click="collapsed = !collapsed">
                         <svg :class="{'toggle': true, 'toggle-expanded': !collapsed}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

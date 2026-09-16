@@ -1,4 +1,4 @@
-<div :class="{'reasoning-wrapper': true, 'collapsed': collapsed, 'expanded': !collapsed}" x-data="{collapsed: !$store.ui.expandReasoning}" @click="collapsed = !collapsed">
+<div :class="{'reasoning-wrapper': true, 'collapsed': collapsed, 'expanded': !collapsed}" x-data="{collapsed: $store.stream.state === 'idle'}" @click="collapsed = !collapsed">
     <div class="header">
         <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16) -->
         <!-- Chevron now rotates on collapse/expand to match tool call cards. -->

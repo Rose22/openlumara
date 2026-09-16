@@ -1,0 +1,47 @@
+/* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16) */
+/* collapsible wrapper around the agentic chain (reasoning, tool calls,
+   intermediate content) that sits between the user's request and the
+   final answer. styled to match the reasoning header. */
+.agent-chain {
+    width: 100%;
+    display: inline-block;
+
+    .agent-chain-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        user-select: none;
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        border-radius: var(--radius-sm);
+        transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+                    background-color 0.2s ease;
+
+        .label {
+            font-weight: 500;
+        }
+    }
+
+    .agent-chain-header:hover {
+        filter: brightness(1.03);
+    }
+
+    .toggle {
+        width: 14px;
+        height: 14px;
+        transition: transform 0.2s ease;
+        flex-shrink: 0;
+    }
+
+    .toggle-expanded {
+        transform: rotate(90deg);
+    }
+
+    .agent-chain-body {
+        margin-top: 4px;
+        margin-left: 6px;
+        padding-left: 12px;
+        border-left: 1px solid var(--border-color);
+    }
+}

@@ -54,7 +54,7 @@
         overflow-y: auto;
 
         margin-left: 12px;
-        padding: 12px 7px;
+        padding: 0px 7px;
         border-left: 1px solid var(--border-color);
         font-size: 0.9rem;
         color: var(--text-secondary);
