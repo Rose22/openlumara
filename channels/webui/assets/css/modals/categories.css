@@ -1,0 +1,222 @@
+/* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+   manage categories modal (opened from the sidebar's category dropdown) */
+.categories-modal {
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+       fixed half-width / 40vh box; .categories-content scrolls when the
+       category list overflows */
+    width: 50%;
+    height: 40vh;
+    max-width: 560px;
+    max-height: 40vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+
+    .categories-content {
+        padding: 12px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .category-rows {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .category-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 8px 12px;
+        background: var(--bg-tertiary);
+        border: 1px solid transparent;
+        border-radius: var(--radius-sm);
+
+        .category-info {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            min-width: 0;
+
+            .category-name {
+                font-size: 0.9rem;
+                color: var(--text-primary);
+                font-weight: 500;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .category-count {
+                font-size: 0.75rem;
+                color: var(--text-muted);
+                flex-shrink: 0;
+            }
+        }
+
+        .category-actions {
+            display: flex;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .action-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 26px;
+            height: 26px;
+            padding: 0;
+            background: transparent;
+            border: none;
+            border-radius: var(--radius-sm);
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.15s ease;
+
+            svg {
+                width: 13px;
+                height: 13px;
+            }
+
+            &:hover {
+                background: var(--bg-secondary);
+                color: var(--text-primary);
+            }
+
+            &.delete:hover {
+                color: var(--error);
+            }
+        }
+
+        .confirm-inline {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+
+            .confirm-text {
+                font-size: 0.75rem;
+                color: var(--text-secondary);
+                white-space: nowrap;
+            }
+        }
+
+        /* save/cancel buttons, same look as the sidebar chat rename */
+        .rename-action-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            padding: 0;
+            border: none;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: all 0.15s ease;
+            flex-shrink: 0;
+
+            svg {
+                width: 12px;
+                height: 12px;
+            }
+
+            &.save {
+                background: var(--accent);
+                color: var(--bg-primary);
+
+                &:hover:not(:disabled) {
+                    filter: brightness(1.15);
+                    transform: scale(1.05);
+                }
+
+                &:disabled {
+                    opacity: 0.5;
+                    cursor: not-allowed;
+                }
+            }
+
+            &.cancel {
+                background: var(--bg-secondary);
+                color: var(--text-muted);
+                border: 1px solid var(--border-color);
+
+                &:hover {
+                    color: var(--text-primary);
+                    border-color: var(--accent);
+                }
+            }
+        }
+    }
+
+    .add-category {
+        display: flex;
+        gap: 8px;
+        margin-top: 4px;
+
+        input {
+            flex: 1;
+            min-width: 0;
+            box-sizing: border-box;
+            padding: 9px 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            font-size: 0.85rem;
+            font-family: inherit;
+            outline: none;
+            transition: all 0.2s ease;
+            height: 36px;
+
+            &::placeholder {
+                color: var(--text-muted);
+            }
+
+            &:focus {
+                border-color: var(--accent);
+                box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 15%, transparent);
+            }
+        }
+
+        .add-btn {
+            flex-shrink: 0;
+            padding: 0 18px;
+            height: 36px;
+            background: var(--accent);
+            border: 1px solid var(--accent);
+            border-radius: var(--radius-md);
+            color: var(--bg-primary);
+            font-size: 0.85rem;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.15s ease;
+
+            &:hover:not(:disabled) {
+                filter: brightness(1.1);
+                box-shadow: 0 0 12px var(--accent-glow);
+            }
+
+            &:disabled {
+                opacity: 0.4;
+                cursor: not-allowed;
+            }
+        }
+    }
+
+    .category-error {
+        font-size: 0.8rem;
+        color: var(--error);
+    }
+
+    .category-hint {
+        margin: 0;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        font-style: italic;
+    }
+}

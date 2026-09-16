@@ -1,0 +1,64 @@
+<!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+     manage categories modal, opened from the button next to the
+     sidebar's category dropdown. rows show a chat count per category
+     and an inline delete-confirm; bottom row creates a new category
+     (by starting a fresh chat inside it). -->
+<template x-if="$store.ui.currentModal === 'categories'" x-cloak>
+    <div @keydown.escape.window="$store.ui.closeModal()">
+        <div class="modal categories-modal" x-data="categoryManager()">
+            <div class="header">
+                <h2>Manage categories</h2>
+                <button class="close" @click="$store.ui.closeModal()" aria-label="Close">&times;</button>
+            </div>
+
+            <div class="categories-content">
+                <div class="category-rows">
+                    <template x-for="category in $store.chat.dropdownCategories()" :key="category">
+                        <div class="category-row">
+                            <div class="category-info">
+                                <span class="category-name" x-text="category"></span>
+                                <span class="category-count" x-text="countFor(category) + (countFor(category) === 1 ? ' chat' : ' chats')"></span>
+                            </div>
+
+                            <!-- general is undeletable -->
+                            <template x-if="category !== 'general'">
+                                <div class="category-actions">
+                                    <template x-if="confirming !== category">
+                                        <button class="action-btn delete" @click="confirming = category" title="Delete category">
+                                            {% include 'svg/trash.svg' %}
+                                        </button>
+                                    </template>
+                                    <template x-if="confirming === category">
+                                        <div class="confirm-inline">
+                                            <span class="confirm-text" x-text="'move ' + countFor(category) + (countFor(category) === 1 ? ' chat' : ' chats') + ' to general?'"></span>
+                                            <button class="rename-action-btn save" @click="confirmDelete(category)" :disabled="busy" title="Confirm">
+                                                {% include 'svg/checkmark.svg' %}
+                                            </button>
+                                            <button class="rename-action-btn cancel" @click="confirming = null" title="Cancel">
+                                                {% include 'svg/cross.svg' %}
+                                            </button>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+
+                <div class="add-category">
+                    <input
+                        type="text"
+                        x-model="newCategory"
+                        placeholder="New category name"
+                        @keydown.enter.prevent="add()"
+                    >
+                    <button class="add-btn" @click="add()" :disabled="busy || !newCategory.trim()">Add</button>
+                </div>
+
+                <template x-if="error">
+                    <div class="category-error" x-text="error"></div>
+                </template>
+            </div>
+        </div>
+    </div>
+</template>

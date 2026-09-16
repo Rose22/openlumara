@@ -474,6 +474,33 @@ async def create_fastapi(channel):
         """Returns a list of all existing chat categories"""
         return api_result(channel.context.chat.get_categories(), True)
 
+    # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+    # deleting a category = moving all of its chats to 'general'.
+    # the category field is set to 'general' explicitly rather than
+    # blanked: a blank category would make those chats invisible to the
+    # sidebar's category filter (which matches with ==).
+    @app.post("/api/chats/categories/delete")
+    async def delete_chat_category(request: fastapi.Request):
+        """Moves every chat in the given category to 'general', removing the category"""
+        data = await request.json()
+        name = (data.get("name") or "").strip()
+
+        if not name or name == "general":
+            return api_result("'general' cannot be deleted", False)
+
+        chat_store = channel.context.chat
+
+        moved = 0
+        for chat in chat_store.data:
+            if chat.get("category") == name:
+                chat["category"] = "general"
+                moved += 1
+
+        if moved:
+            chat_store.data.save()
+
+        return api_result({"moved": moved}, True)
+
     @app.post("/api/chats/search")
     async def search_chats(request: fastapi.Request):
         """Searches across all chats for messages matching a query"""

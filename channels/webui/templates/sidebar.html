@@ -22,6 +22,16 @@
                 <option :value="category" x-text="category"></option>
             </template>
         </select>
+
+        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+             opens the manage categories modal (add / delete) -->
+        <button type="button" class="category-manage-btn"
+            @click="$store.ui.openModal('categories')"
+            :disabled="$store.stream.state !== 'idle'"
+            title="Manage categories"
+        >
+            {% include 'svg/pencil.svg' %}
+        </button>
     </div>
 
     <div class="search">

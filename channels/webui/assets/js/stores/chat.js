@@ -331,11 +331,13 @@ CHAT_STORE = {
         }
     },
 
-    async newChat() {
+    async newChat(category = null) {
         // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
-        // create the chat inside the currently selected category
-        // (the endpoint defaults to 'general' when nothing is sent)
-        await simpleApiPost('/api/chat/new', { category: this.selectedCategory });
+        // create the chat inside the given category, falling back to the
+        // currently selected one (the endpoint defaults to 'general' when
+        // nothing is sent). the category modal passes an explicit name to
+        // create a brand new category: a category exists once a chat uses it.
+        await simpleApiPost('/api/chat/new', { category: category ?? this.selectedCategory });
 
         result = await simpleApiFetch('/api/chat/current');
         if (!result) { return; }
@@ -378,6 +380,23 @@ CHAT_STORE = {
         }
 
         await this.reloadChats();
+    },
+
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+       delete a category: the backend moves all of its chats to 'general'.
+       if it was the selected category, fall back; reloadChat() because the
+       currently open chat may itself have just moved to 'general'. */
+    async deleteCategory(name) {
+        await simpleApiPost('/api/chats/categories/delete', { name: name });
+
+        await this.reloadCategories();
+
+        if (this.selectedCategory === name) {
+            this.selectedCategory = 'general';
+        }
+
+        await this.reloadChats();
+        await this.reloadChat();
     },
 
     async reloadChat() {
