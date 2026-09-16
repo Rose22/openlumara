@@ -68,6 +68,10 @@
     </div>
 
     <div class="search">
+        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+             magnifier sits inside the field on the left (absolute, so
+             it doesn't join the flex row); input gets left padding -->
+        <span class="search-icon">{% include 'svg/search.svg' %}</span>
         <input name="search" type="text" placeholder="Search through your chats.."
             :value="$store.chat.searchQuery"
             @input.debounce="$store.chat.setSearchQuery($event.target.value)"

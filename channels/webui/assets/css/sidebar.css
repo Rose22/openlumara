@@ -41,7 +41,12 @@
             display: flex;
             align-items: center;
             gap: 8px;
-            padding: 10px 12px;
+            /* same 36px height as the search field; vertical padding
+               dropped since the height + flex centering handles it */
+            height: 36px;
+            /* 10px left pad (+1px border) = 11px, aligning the icon
+               with the search field's magnifier */
+            padding: 0 12px 0 10px;
             border: 1px solid var(--border-color);
             border-radius: var(--radius-sm);
             background: none;
@@ -412,11 +417,31 @@
         flex-wrap: nowrap;
         gap: 8px;
 
+        /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+           magnifier inside the field, left side; absolute so it stays
+           out of the flex row, vertically centered on the 36px input */
+        .search-icon {
+            position: absolute;
+            left: 11px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: inline-flex;
+            align-items: center;
+            pointer-events: none;
+            color: var(--text-muted);
+            z-index: 1;
+
+            svg {
+                width: 14px;
+                height: 14px;
+            }
+        }
+
         input {
             flex: 1;
             min-width: 0;
             box-sizing: border-box;
-            padding: 9px 12px;
+            padding: 9px 12px 9px 33px; /* extra left pad clears the icon */
             background: none;
             border: 1px solid var(--border-color);
             border-radius: var(--radius-sm);
@@ -530,16 +555,17 @@
     border-radius: 0 0 var(--radius-sm) var(--radius-sm);
 
     /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
-       rows match the trigger's metrics: 14px font, and 4px menu
-       padding + 8px row padding = the trigger's 12px inset, so the
-       icons and labels line up with the header. */
+       rows match the trigger's metrics (14px font) and share its
+       11px icon inset, so icons and labels line up with the header. */
     .category-option {
         display: flex;
         align-items: center;
         gap: 8px;
         width: 100%;
         min-width: 0;
-        padding: 6px 8px;
+        /* 1px menu border + 4px menu padding + 6px here = 11px, so
+           row icons line up with the trigger's and the magnifier */
+        padding: 6px 8px 6px 6px;
         background: none;
         border: none;
         border-radius: var(--radius-sm);
@@ -566,14 +592,6 @@
             width: 14px;
             height: 14px;
             flex-shrink: 0;
-        }
-
-        /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
-           the trigger's 10px bottom padding still adds extra air above
-           the seam, so pull the first row up to match the row-to-row
-           rhythm. */
-        &:first-child {
-            margin-top: -4px;
         }
 
         &:hover {
