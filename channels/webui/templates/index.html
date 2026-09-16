@@ -73,11 +73,20 @@
             we use alpine stores for data access across the app,
             as putting every possible thing in one massive data object was no fun
         -->
+        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+             the sidebar hide/show only fires when the mobile state
+             actually flips: focusing an input on mobile pops the soft
+             keyboard, which fires a resize event and used to slam the
+             overlay sidebar shut mid-search -->
         <div id="main" x-data="{}" @resize.window="
+            const wasMobile = $store.ui.isMobile;
+
             $store.ui.windowWidth = window.innerWidth;
             $store.ui.isMobile = window.innerWidth <= 768;
 
-            $store.ui.showSidebar = !$store.ui.isMobile;
+            if (wasMobile !== $store.ui.isMobile) {
+                $store.ui.showSidebar = !$store.ui.isMobile;
+            }
         ">
             <section id="main-wrapper">
                 {% if config.get("enable_sidebar") %}
