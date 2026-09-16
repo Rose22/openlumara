@@ -35,8 +35,9 @@ function globalSearch() {
         highlightQuery(text, query) {
             if (!query || !text) return text;
             const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const text_escaped = escapeHtml(text);
             const regex = new RegExp(`(${escaped})`, 'gi');
-            return text.replace(regex, '<strong class="search-highlight">$1</strong>');
+            return text_escaped.replace(regex, '<strong class="search-highlight">$1</strong>');
         },
 
         async search() {
