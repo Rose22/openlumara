@@ -15,7 +15,7 @@
                         id="global-search-input"
                         type="text" 
                         x-model="query" 
-                        @input="search()"
+                        @input.debounce="search()"
                         class="global-search-input" 
                         placeholder="Search all chats..."
                         aria-label="Search all chats"
