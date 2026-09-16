@@ -511,9 +511,12 @@ class Channel:
         if final_reasoning is None:
             final_reasoning = []
 
+        # strip any leaked/orphan tool-call wrapper tags the model may have emitted as
+        # plain content (this handles the compounding case where a leaked </tool_call>
+        # got imitated by the model and now arrives as stray content on a plain reply)
         assistant_message = {
             "role": "assistant",
-            "content": "".join(final_content)
+            "content": core.sanitize_leaked_tool_tags("".join(final_content))
         }
 
         if final_reasoning:

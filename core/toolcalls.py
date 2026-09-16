@@ -110,6 +110,15 @@ class ToolcallManager:
 
         repaired_tool_calls = self._repair_tool_calls(assistant_message["tool_calls"])
 
+        # some inference servers (e.g. vLLM's streaming qwen3 tool parser) leak the
+        # tool-call closing wrapper into the content deltas that arrive alongside the
+        # structured tool_calls. strip that leaked residue so we don't persist orphan
+        # </tool_call> tags into history (where the model imitates them and it compounds)
+        # or render them to the user.
+        assistant_message["content"] = core.sanitize_leaked_tool_tags(
+            assistant_message.get("content"), has_tool_calls=True
+        )
+
         # add it to context
         await self.channel.context.chat.messages.add(assistant_message)
 
@@ -305,7 +314,7 @@ class ToolcallManager:
             # if we're finally out of the recursive call loop (so, this was the last toolcall)
             # we return the final message for the caller (usually the channel) to do stuff with
             if not had_recursive_call and (final_content or final_reasoning):
-                final_msg = {"role": "assistant", "content": "".join(final_content)}
+                final_msg = {"role": "assistant", "content": core.sanitize_leaked_tool_tags("".join(final_content))}
                 if final_reasoning:
                     final_msg["reasoning_content"] = "".join(final_reasoning)
 
@@ -317,7 +326,7 @@ class ToolcallManager:
         except asyncio.CancelledError:
             # cancellation during recursive toolcalling, so we just take the content/reasoning accumulated so far and add it to context
             if final_content or final_reasoning:
-                final_msg = {"role": "assistant", "content": "".join(final_content)}
+                final_msg = {"role": "assistant", "content": core.sanitize_leaked_tool_tags("".join(final_content))}
                 if final_reasoning:
                     final_msg["reasoning_content"] = "".join(final_reasoning)
 
