@@ -28,6 +28,15 @@ function fadeTextRender(el, { expression }, { evaluateLater, effect, cleanup }, 
             if (asHtml) el.innerHTML = value;
             else el.textContent = value;
 
+            // fade disabled: skip the subtree walk + counting entirely,
+            // the timeline would just clear itself anyway. record keeps
+            // lastLen roughly synced so re-enabling mid-stream doesn't
+            // produce one giant bogus batch off a stale length.
+            if (tokenFadeDuration() <= 0) {
+                timeline.record(value.length, performance.now());
+                return;
+            }
+
             // count the actually rendered text chars (skipping copy
             // buttons), so the fade window tracks what's on screen rather
             // than raw source length

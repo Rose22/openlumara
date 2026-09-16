@@ -45,7 +45,9 @@ function markdownRender(el, { expression }, { evaluateLater, effect, cleanup }) 
 
         Alpine.mutateDom(() => {
             el.innerHTML = html;
-            if (batches) {
+            // NOTE: [] is truthy, must check length - otherwise a disabled
+            // fade still pays for the full subtree walk every frame
+            if (batches && batches.length) {
                 const nodes = collectTextNodes(el);
                 // newest batch first; wrapTailChars skips already-wrapped
                 // nodes, so successive calls peel further back from the tail
