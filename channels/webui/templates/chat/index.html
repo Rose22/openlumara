@@ -180,9 +180,13 @@
 {% include 'chat/upload.html' %}
 
 <!-- token usage bar -->
-{% include 'chat/token_bar.html' %}
+<div class="input-wrapper">
+</div>
 
 <!-- input field -->
 <div id="input">
-    {% include 'chat/input.html' %}
+    {% include 'chat/token_bar.html' %}
+    <div class="input-wrapper">
+        {% include 'chat/input.html' %}
+    </div>
 </div>
