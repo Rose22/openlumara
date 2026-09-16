@@ -485,7 +485,10 @@ async def create_fastapi(channel):
         if not query:
             return api_result([])
 
-        results = await channel.context.chat.search(query)
+        # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16) (rosie-approved task: sidebar search)
+        # search_in_content was accepted but never forwarded to the search;
+        # title-only searches no longer need to read every history file.
+        results = await channel.context.chat.search(query, search_in_content=search_in_content)
 
         # filter by category if provided
         if category and category != 'general':
