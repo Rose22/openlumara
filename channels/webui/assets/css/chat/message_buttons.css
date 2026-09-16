@@ -2,8 +2,6 @@
     display: flex;
     justify-content: flex-end;
     width: 100%;
-    margin-top: 4px;
-    border-top: 1px dashed var(--text-muted);
     gap: var(--gap);
 
     button {

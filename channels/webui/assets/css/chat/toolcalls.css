@@ -21,25 +21,22 @@
  *  ============================================================================= */
 
 .tool-call-card {
-    background: var(--bg-secondary);
-    border: 1px solid var(--tool-border);
-    border-radius: var(--radius-sm);
     overflow: hidden;
-    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
-                box-shadow 0.2s ease;
     position: relative;
-    box-shadow: var(--shadow-soft);
     width: 100%;
 
     .name {
-        font-weight: 600;
-        color: var(--accent);
         font-size: 0.9rem;
+        color: var(--text-muted);
         flex: 1;
         min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+
+        .module {
+            font-weight: bold;
+        }
     }
 
     .streaming {
@@ -59,7 +56,6 @@
         display: flex;
         align-items: center;
         gap: 8px;
-        padding: 8px 12px;
         cursor: pointer;
         user-select: none;
         transition: background 0.15s ease;
@@ -80,7 +76,7 @@
     .icon {
         width: 16px;
         height: 16px;
-        color: var(--accent);
+        color: var(--text-muted);
         flex-shrink: 0;
     }
 
@@ -117,22 +113,9 @@
         font-weight: 500;
         flex-shrink: 0;
 
-        &.streaming {
-            background: rgba(99, 102, 241, 0.2);
-            color: var(--accent);
-        }
         &.pending {
-            background: var(--tool-pending-bg);
             color: var(--tool-pending-color);
             animation: statusPulse 1.5s ease-in-out infinite;
-        }
-        &.completed {
-            background: var(--tool-completed-bg);
-            color: var(--tool-completed-color);
-        }
-        &.error {
-            background: var(--error-bg);
-            color: var(--error);
         }
     }
 
@@ -153,19 +136,20 @@
     .body {
         max-height: none;
         overflow-y: auto;
+        border-left: 1px solid var(--border-color);
+        margin-left: 12px;
+        padding: 4px 0px;
         transition: max-height 0.3s ease, opacity 0.2s ease, padding 0.2s ease;
     }
     
     .section {
-        padding: 12px 14px;
-        border-top: 1px solid var(--border-color);
+        padding: 0px 14px;
 
         .title {
             font-size: 0.7rem;
             color: var(--text-muted);
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            margin-bottom: 8px;
         }
     }
 
@@ -186,7 +170,6 @@
         display: flex;
         align-items: flex-start;
         gap: 12px;
-        padding: 6px 10px;
         border-radius: var(--radius-sm);
         font-size: 0.85rem;
 
@@ -301,7 +284,7 @@
         .kv-row {
             gap: 8px;
             border-radius: var(--radius-sm);
-            padding: 6px 10px;
+            padding: 2px 10px;
 
             .key {
                 color: var(--accent);

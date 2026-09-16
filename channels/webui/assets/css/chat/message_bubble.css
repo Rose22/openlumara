@@ -1,6 +1,9 @@
 .message-wrapper {
     display: flex;
     flex-direction: column;
+    margin: 0 auto;
+    width: var(--chat-content-width, 100%);
+    min-width: var(--chat-content-width, 100%);
 
     .message {
         display: flex;
@@ -9,7 +12,7 @@
         padding: 14px 16px;
         border-radius: var(--radius-sm);
         border: 1px solid transparent;
-        box-shadow: var(--shadow-soft);
+        /* box-shadow: var(--shadow-soft); */
         word-wrap: break-word;
         overflow: hidden;
         position: relative;
@@ -155,17 +158,25 @@
         }
 
         &.assistant {
-            background: var(--bg-message-ai);
-            border: 1px solid var(--border-message);
-            border-bottom-left-radius: var(--radius-sm);
+            background: none;
+            backdrop-filter: none;
+            border: none;
+            box-shadow: none;
             color: var(--text-primary);
-            min-width: 80px;
+            min-width: 100%;
+            width: 100%;
+            flex-shrink: 0;
 
-            gap: var(--gap);
+            gap: 0;
+
+            .segment {
+                gap: 2px;
+            }
 
             .content.reasoning {
                 font-family: monospace;
             }
+
         }
 
         &.user, &.assistant {

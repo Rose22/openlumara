@@ -1,14 +1,16 @@
 <div :class="{'reasoning-wrapper': true, 'collapsed': collapsed, 'expanded': !collapsed}" x-data="{collapsed: !$store.ui.expandReasoning}" @click="collapsed = !collapsed">
     <div class="header">
+        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16) -->
+        <!-- Chevron now rotates on collapse/expand to match tool call cards. -->
+        <svg :class="{'toggle': true, 'toggle-expanded': !collapsed}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="9 18 15 12 9 6"></polyline>
+        </svg>
         {% include 'svg/thought_bubble.svg' %}
         <span class="text">
             <!-- TODO: add `Thought` after done thinking -->
             <span class="label">Thoughts</span>
             <span class="dots"><span aria-hidden="true">&nbsp;</span><span aria-hidden="true">&nbsp;</span><span aria-hidden="true">&nbsp;</span></span>
         </span>
-        <svg class="toggle" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="6 9 12 15 18 9"></polyline>
-        </svg>
     </div>
 
     <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-15)

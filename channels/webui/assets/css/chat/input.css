@@ -12,7 +12,7 @@
             padding: 0;
             width: 48px;
             height: 48px;
-            background: var(--bg-secondary);
+            background: none;
             border: none;
             border-right: 1px solid var(--border-color);
             color: var(--text-primary);
@@ -36,7 +36,6 @@
             &:hover {
                 background: var(--bg-tertiary);
                 color: var(--accent);
-                border-color: var(--accent);
 
                 ::before {
                     opacity: 0.1;
@@ -60,7 +59,7 @@
             min-height: auto;
             resize: vertical;
             border: none;
-            background: var(--bg-input);
+            background: var(--bg-primary);
             color: var(--text-primary);
             font-size: 1rem;
             outline: none;
@@ -93,6 +92,7 @@
         }
 
         #send, #stop {
+            background: none;
             padding: 0 24px;
             height: 48px;
             border: none;
@@ -117,12 +117,9 @@
         }
 
         #send {
-            background: var(--bg-secondary);
-
             &:hover {
                 background: var(--bg-tertiary);
                 color: var(--accent);
-                border-color: var(--accent);
             }
 
             &:disabled {
@@ -139,7 +136,6 @@
 
             &:hover {
                 background: var(--button-stop-hover);
-                border-color: var(--accent);
                 transform: translateY(-2px);
             }
 

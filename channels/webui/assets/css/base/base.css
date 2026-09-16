@@ -38,6 +38,9 @@ div  {
     &.fullwidth {
         width: 100%;
     }
+    &.nogaps {
+        gap: 0;
+    }
 }
 
 /* Pattern overlay for chat background */

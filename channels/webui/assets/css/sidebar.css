@@ -27,7 +27,7 @@
     overflow: hidden;
 
     gap: var(--gap);
-    background: var(--bg-secondary);
+    background: var(--bg-primary);
 
     /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
        category dropdown, sits above the search box (replaces the old

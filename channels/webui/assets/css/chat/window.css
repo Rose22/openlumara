@@ -13,8 +13,10 @@
         display: flex;
         flex: 1;
         overflow-y: auto;
+        /*
         background-image: var(--bg-pattern);
         background-size: var(--bg-pattern-size);
+        */
 
         /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-15)
            lazy-mounted turns adjust scrollTop manually (ui.adjustScroll)
@@ -25,7 +27,6 @@
         padding: 20px;
         flex-direction: column;
         gap: 18px;
-        width: var(--chat-content-width, 100%);
         margin: 0 auto;
         min-height: 0;
 

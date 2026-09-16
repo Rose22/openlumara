@@ -1,13 +1,6 @@
 .reasoning-wrapper {
     width: 100%;
     display: inline-block;
-    box-shadow: var(--shadow-soft);
-    border: 1px solid var(--tool-border);
-    border-radius: var(--radius-sm);
-
-    &:hover {
-        border: 1px solid var(--tool-border-hover);
-    }
 
     &.collapsed {
         .header {
@@ -19,8 +12,6 @@
         display: flex;
         align-items: center;
         gap: 8px;
-        padding: 8px 12px;
-        background: var(--bg-secondary);
         cursor: pointer;
         user-select: none;
         font-size: 0.85rem;
@@ -53,7 +44,6 @@
     }
 
     .block {
-        background: var(--bg-secondary);
         border-radius: 0px 0px var(--radius-sm) var(--radius-sm);
         overflow: hidden;
         opacity: 1;
@@ -63,7 +53,9 @@
         max-height: 120px;
         overflow-y: auto;
 
-        padding: 12px;
+        margin-left: 12px;
+        padding: 12px 7px;
+        border-left: 1px solid var(--border-color);
         font-size: 0.9rem;
         color: var(--text-secondary);
         white-space: pre-wrap;
@@ -90,6 +82,12 @@
         height: 14px;
         transition: transform 0.2s ease;
         flex-shrink: 0;
+    }
+
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16) */
+    /* Rotate chevron when expanded, matching the tool call cards. */
+    .toggle-expanded {
+        transform: rotate(90deg);
     }
 
     .is-reasoning-active .header {

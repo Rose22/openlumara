@@ -1,4 +1,4 @@
-<div class="flex fullwidth">
+<div class="flex fullwidth nogaps">
     <template x-for="tool in message.tool_calls">
         <div>
             <div class="tool-calls-container" x-data="{ collapsed: false }">
@@ -8,10 +8,11 @@
                             <polyline points="9 18 15 12 9 6"></polyline>
                         </svg>
                         {% include 'svg/wrench.svg' %}
-                        <span class="name" x-text="tool.function?.name || 'unknown'"></span>
-                        <template x-if="tool.response">
-                            <span class="status completed" x-init="collapsed = true">done</span>
-                        </template>
+                        <span class="name" x-show="tool.function?.name">
+                          <span class="module" x-text="tool.function?.name.split('_')[0].replace(/^\w/, c => c.toUpperCase())+': '"></span>
+                          <span x-text="tool.function?.name.split('_').slice(1).join(' ')"></span>
+                        </span>
+                        <span class="name" x-show="!tool.function?.name">unknown</span>
                         <template x-if="!tool.response">
                             <span class="status pending">calling...</span>
                         </template>
