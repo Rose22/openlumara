@@ -12,6 +12,7 @@
     flex-direction: row;
     height: 100%;
     overflow: hidden;
+    border-right: 1px solid var(--border-color);
 }
 
 /* list of chats */
@@ -114,7 +115,6 @@
                 min-width: 0;
                 display: flex;
                 flex-direction: column;
-                gap: var(--gap);
                 overflow: hidden;
                 flex: 1;
             }
@@ -309,11 +309,10 @@
 
         .item.active {
             background: var(--bg-secondary);
-            border-color: var(--accent);
-            box-shadow: 0 0 0 1px var(--accent-glow), inset 0 0 0 1px var(--accent);
+            border-color: color-mix(in oklch, var(--accent) 60%, black);
 
             &:hover {
-                border-color: var(--accent);
+                border-color: color-mix(in oklch, var(--accent) 60%, black);
             }
         }
         .item:hover {
@@ -339,7 +338,7 @@
             padding: 9px 12px;
             background: var(--bg-tertiary) !important;
             border: 1px solid var(--border-color);
-            border-radius: var(--radius-md);
+            border-radius: var(--radius-sm);
             color: var(--text-primary);
             font-size: 0.85rem;
             outline: none;
@@ -367,7 +366,7 @@
             padding: 0;
             background: var(--bg-tertiary);
             border: 1px solid var(--border-color);
-            border-radius: var(--radius-md);
+            border-radius: var(--radius-sm);
             color: var(--text-muted);
             cursor: pointer;
             transition: all 0.2s ease;
@@ -396,12 +395,12 @@
 /* New Chat Button - Modern Style */
 .sidebar-btn {
     width: 100%;
-    min-height: 46px;
+    min-height: 42px;
     padding: 0.75rem;
     background: var(--bg-secondary);
-    border: 1px solid var(--border, #333);
+    border: none;
+    border-top: 1px solid var(--border-color);
     color: var(--text-primary, #eee);
-    border-radius: 6px;
     cursor: pointer;
     margin-top: auto;  /* Pushes button to bottom of flex container */
     display: flex;

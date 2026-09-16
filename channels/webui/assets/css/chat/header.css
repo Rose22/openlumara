@@ -1,6 +1,6 @@
 header {
-    padding: 7px 14px;
-    background: linear-gradient(180deg, var(--bg-tertiary) 0%, var(--bg-primary) 100%);
+    padding: 6px 14px;
+    background: var(--bg-secondary);
     border-bottom: 1px solid var(--border-color);
     display: flex;
     align-items: center;
