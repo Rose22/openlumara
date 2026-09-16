@@ -62,7 +62,16 @@
         bottom: 0;
         z-index: 100;
         box-shadow: var(--shadow-strong);
-        min-width: 50%;
+
+        /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+           full-width overlay on mobile, overriding the desktop's locked
+           22% flex sizing (basis, min and max all need an override or
+           the flex rules keep clamping it). !important is required:
+           css loads alphabetically, so sidebar.css comes AFTER this
+           file and would otherwise win the equal-specificity tie. */
+        flex: 0 0 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
         width: 100% !important;
         overflow: hidden;
 
