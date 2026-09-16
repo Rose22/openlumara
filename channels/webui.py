@@ -576,6 +576,30 @@ async def create_fastapi(channel):
         await channel.context.chat.delete(chat_id)
         return api_result(success=True)
 
+    # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+    # move a chat to a different category. chat.set() mutates the index
+    # without saving (rename gets away with it via later saves), so the
+    # save is called explicitly here.
+    @app.post("/api/chat/set-category/{chat_id}")
+    async def chat_set_category(chat_id: str, request: fastapi.Request):
+        """Changes the category of a chat by its ID"""
+        try:
+            data = await request.json()
+            category = (data.get('category') or '').strip()
+            if not category:
+                return api_result("Category cannot be empty", success=False)
+
+            index = channel.context.chat._find_index(chat_id)
+            if index is None:
+                return api_result("Chat not found", success=False)
+
+            await channel.context.chat.set("category", category, index=index)
+            channel.context.chat.data.save()
+
+            return api_result(success=True)
+        except Exception as e:
+            return api_result(str(e), success=False)
+
     # --- Settings
     # -- GET
     @app.get("/api/settings/load")
