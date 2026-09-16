@@ -42,7 +42,11 @@ class Chat:
     # ------------------
     async def _set_current(self, index: int):
         """load a chat and its messages by index"""
-        old_id = self.data[self.current]["id"] if self.current is not None else None
+        # guard against a stale current index (e.g. after the chat it pointed
+        # to was deleted, so the index may now be out of range)
+        old_id = None
+        if self.current is not None and 0 <= self.current < len(self.data):
+            old_id = self.data[self.current]["id"]
         new_id = self.data[index]["id"]
 
         self.current = index
@@ -402,7 +406,7 @@ class Chat:
         else:
             return default
 
-    async def search(self, query: str, max_results: int = 100):
+    async def search(self, query: str, max_results: int = 100, search_in_content: bool = True):
         """search across all chats for messages matching the query"""
         import json
         
@@ -419,6 +423,13 @@ class Chat:
             
             if query_lower in chat_meta.get("title").lower():
                 found["title_match"] = True
+
+            # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16) (rosie-approved task: sidebar search)
+            # title-only mode: skip loading history files entirely
+            if not search_in_content:
+                if found.get("title_match"):
+                    found_chats.append(found)
+                continue
             
             # Load messages from the history file
             history_path = core.get_data_path(os.path.join(self.path, "history", f"{chat_id}.json"))
@@ -477,7 +488,15 @@ class Chat:
                     "message_snippets": found_messages
                 })
                 found_chats.append(found)
-                    
+
+            # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16) (rosie-approved task: sidebar search)
+            # bugfix: a title match with a readable history but no content
+            # match was never appended (it only got appended in the
+            # no-history / unreadable-history branches), so chats whose
+            # title matched but whose messages didn't were silently lost.
+            elif found.get("title_match"):
+                found_chats.append(found)
+
             if len(found_chats) >= max_results:
                 return found_chats
 
