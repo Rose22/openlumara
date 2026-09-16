@@ -14,7 +14,6 @@
             height: 48px;
             background: none;
             border: none;
-            border-right: 1px solid var(--border-color);
             color: var(--text-primary);
             cursor: pointer;
             transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -54,7 +53,7 @@
 
         #user-input {
             flex: 1;
-            padding: 14px 20px;
+            padding: 14px 0px;
             height: 48px;
             min-height: auto;
             resize: vertical;
@@ -92,11 +91,9 @@
         }
 
         #send, #stop {
-            background: none;
             padding: 0 24px;
             height: 48px;
             border: none;
-            border-left: 1px solid var(--border-color);
             font-size: 0.95rem;
             font-weight: 600;
             cursor: pointer;
@@ -117,6 +114,7 @@
         }
 
         #send {
+            background: var(--bg-secondary);
             &:hover {
                 background: var(--bg-tertiary);
                 color: var(--accent);

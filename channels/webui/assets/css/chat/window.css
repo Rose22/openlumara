@@ -26,7 +26,7 @@
            scroll anchoring fights that compensation and causes the
            "skipping past messages" jump when scrolling up. */
         overflow-anchor: none;
-        padding: 20px;
+        padding: 4px 20px;
         flex-direction: column;
         gap: 4px;
         margin: 0 auto;
