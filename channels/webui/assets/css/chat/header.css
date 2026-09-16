@@ -1,5 +1,5 @@
 header {
-    padding: 6px 14px;
+    padding: 6px 7px;
     background: var(--bg-primary);
     border-bottom: 1px solid var(--border-color);
     display: flex;
@@ -22,7 +22,7 @@ header {
             font-size: 0.85rem;
             padding: 4px 17px;
             border: 1px solid var(--border-color);
-            border-radius: var(--radius-md);
+            border-radius: var(--radius-sm);
             color: var(--text-primary);
             transition: all 0.2s ease;
             display: flex;
@@ -44,7 +44,7 @@ header {
         padding: 8px 12px;
         background: none;
         border: 1px solid var(--border-color);
-        border-radius: var(--radius-md);
+        border-radius: var(--radius-sm);
         color: var(--text-secondary);
         font-size: 0.85rem;
         cursor: pointer;
@@ -70,10 +70,10 @@ header {
     }
 
     .menu-btn {
-        padding: 8px;
+        padding: 4px 7px;
         background: transparent;
         border: 1px solid var(--border-color);
-        border-radius: var(--radius-md);
+        border-radius: var(--radius-sm);
         color: var(--text-secondary);
         cursor: pointer;
         transition: all 0.2s ease;
