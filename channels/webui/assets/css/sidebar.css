@@ -184,6 +184,29 @@
                 text-overflow: ellipsis;
             }
 
+            /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+               3-line content snippet shown under search results when
+               content search is toggled on */
+            .snippet.snippet-3 {
+                display: -webkit-box;
+                -webkit-line-clamp: 3;
+                -webkit-box-orient: vertical;
+                line-clamp: 3;
+                white-space: normal;
+                overflow: hidden;
+                text-overflow: unset;
+                word-break: break-word;
+                font-style: normal;
+                color: var(--text-secondary);
+                max-height: calc(3 * 1.2em);
+            }
+
+            .snippet .search-highlight {
+                color: var(--accent);
+                font-weight: 700;
+                font-style: normal;
+            }
+
             .tags {
                 display: flex;
                 flex-direction: row;
@@ -349,11 +372,12 @@
         border-bottom: 1px solid var(--border-sidebar);
         position: relative;
         display: flex;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
         gap: 8px;
 
         input {
-            width: 100%;
+            flex: 1;
+            min-width: 0;
             box-sizing: border-box;
             padding: 9px 12px;
             background: var(--bg-tertiary) !important;
@@ -372,6 +396,40 @@
         input:focus {
             border-color: var(--accent);
             box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 15%, transparent);
+        }
+
+        /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+           toggle for searching message content in addition to titles */
+        .search-toggle {
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s ease;
+
+            svg {
+                width: 16px;
+                height: 16px;
+            }
+
+            &:hover {
+                color: var(--text-primary);
+                border-color: var(--accent);
+            }
+
+            &.active {
+                color: var(--accent);
+                border-color: var(--accent);
+                background: rgba(var(--primary-rgb), 0.15);
+            }
         }
     }
 }

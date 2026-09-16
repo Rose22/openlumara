@@ -125,15 +125,86 @@ CHAT_STORE = {
         await ui.forceScrollToBottom();
     },
 
+    /* ----------------------
+     * sidebar search
+     * ----------------------- */
     // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
-    // the in-flight chat-list request. reloadChats()/resetChatPages() abort
-    // it, so clearing the search box mid-drain kills the fetch instead of
-    // letting stale pages land on top of the freshly-reset page 1 (and the
-    // drain loop stops, because its await resolves with nothing).
-    chatsAbort: null,
+    // searching now uses the backend /api/chats/search endpoint (the same
+    // one the global search modal uses): one request, all matches, no
+    // pagination. while searching, the paginated visibleChats list simply
+    // freezes (the scroll loader is hidden), so clearing the box is a pure
+    // mode switch back to it - no refetch needed.
+    searchQuery: '',
+    searchResults: [],
+    searchLoading: false,
+    searchDebounce: null,
 
-    cancelChatFetch() {
-        if (this.chatsAbort) { this.chatsAbort.abort(); this.chatsAbort = null; }
+    // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+    // content search is opt-in via the toggle button next to the search
+    // field (default: titles only), persisted across sessions.
+    searchInContent: localStorage.getItem('sidebarSearchInContent') === 'true',
+
+    get searching() { return Boolean(this.searchQuery.trim()); },
+
+    sidebarChats() {
+        return this.searching ? this.searchResults : this.visibleChats;
+    },
+
+    setSearchInContent(on) {
+        this.searchInContent = Boolean(on);
+        localStorage.setItem('sidebarSearchInContent', this.searchInContent);
+
+        // re-run the active search so the mode switch applies immediately
+        clearTimeout(this.searchDebounce);
+        if (this.searching) { this._runChatSearch(this.searchQuery.trim()); }
+    },
+
+    sidebarSnippet(chat) {
+        // 3-line content preview for search results (shown when content
+        // search is on). returns html with the query highlighted.
+        if (!this.searchInContent) { return ''; }
+
+        const snippets = chat.message_snippets;
+        if (!snippets || snippets.length === 0) { return ''; }
+
+        const text = escapeHtml(snippets[0]);
+        const q = this.searchQuery.trim();
+        if (!q) { return text; }
+
+        // both sides escaped identically before regexing, so queries with
+        // & < > " ' still match the escaped text
+        const pattern = escapeHtml(q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return text.replace(
+            new RegExp(pattern, 'gi'),
+            (m) => `<strong class="search-highlight">${m}</strong>`
+        );
+    },
+
+    setSearchQuery(q) {
+        this.searchQuery = q;
+        clearTimeout(this.searchDebounce);
+
+        if (!q.trim()) {
+            // back to pagination mode: visibleChats was frozen (not
+            // mutated) during the search, so just switch back.
+            this.searchResults = [];
+            this.searchLoading = false;
+            return;
+        }
+
+        // debounce so we don't hit the backend on every keystroke
+        this.searchDebounce = setTimeout(() => this._runChatSearch(q.trim()), 200);
+    },
+
+    async _runChatSearch(q) {
+        this.searchLoading = true;
+        const results = await this.searchGlobal(q, this.searchInContent, this.selectedCategory);
+
+        // stale: query changed or was cleared while the request was in flight
+        if (this.searchQuery.trim() !== q) { return; }
+
+        this.searchResults = results;
+        this.searchLoading = false;
     },
 
     async reloadChats() {
@@ -144,6 +215,11 @@ CHAT_STORE = {
 
         // ensure there are always more chats loaded than what fits in the current viewport
         await this.ensureMoreChats();
+
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+        // refresh search results alongside pagination, so renames/deletes
+        // (which reload the list) don't leave the search mode list stale.
+        if (this.searching) { await this._runChatSearch(this.searchQuery.trim()); }
     },
 
     async ensureChatVisible(chatId) {
@@ -167,44 +243,20 @@ CHAT_STORE = {
         if (!loaded) { return false; }
 
         // if the api returned nothing new, stop so callers that loop
-        // (like the search loader) can't spin forever.
+        // (like ensureChatVisible) can't spin forever.
         if (this.visibleChats.length === before) { this.hasMoreChats = false; }
 
         return true;
     },
 
-    drainingChats: false,
+    // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+    // aborts an in-flight pagination request. kept because x-intersect can
+    // still fire loadMoreChats right as a reload starts (category switch),
+    // and an uncancelled page would land on top of the fresh page 1.
+    chatsAbort: null,
 
-    async resetChatPages() {
-        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
-        // called when the search query is cleared: kill any in-flight page
-        // first (even when the reset below no-ops with a page 2 fetch still
-        // in flight), then go back to page 1.
-        this.cancelChatFetch();
-
-        // no-op if pagination never grew, so the initial
-        // page load doesn't double-fetch.
-        if (this.chatOffset <= this.chatLimit && this.visibleChats.length <= this.chatLimit) { return; }
-        await this.reloadChats();
-        await this.ensureChatVisible(this.selectedChat);
-    },
-
-    async loadAllChats() {
-        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
-        // used when a search query is active: the filtered match may live
-        // beyond the loaded page, and the x-intersect loader can't re-fire
-        // while it stays visible, so we just drain all pages.
-        if (this.drainingChats) { return; }
-        this.drainingChats = true;
-        try {
-            // a cancelled page (search cleared -> cancelChatFetch) breaks
-            // the loop immediately
-            while (this.hasMoreChats) {
-                if (!await this.loadMoreChats()) { break; }
-            }
-        } finally {
-            this.drainingChats = false;
-        }
+    cancelChatFetch() {
+        if (this.chatsAbort) { this.chatsAbort.abort(); this.chatsAbort = null; }
     },
 
     async ensureMoreChats(el) {
@@ -213,6 +265,9 @@ CHAT_STORE = {
          * than what the viewport can show,
          * so that x-intersect always works (because it needs to be out of view first)
          */
+        // search mode shows backend results, pagination is frozen
+        if (this.searching) { return; }
+
         const intersect_el = document.getElementById("chat-scroll-loader");
         if (!intersect_el) { return; }
 
@@ -237,12 +292,12 @@ CHAT_STORE = {
     async _fetchChats() {
         // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
         // x-intersect can fire several times while a page is still in
-        // flight (scroll + ensureMoreChats + loadAllChats all call in),
-        // and concurrent fetches with the same offset pushed duplicate
-        // chat objects into visibleChats (bloat + duplicate x-for keys).
-        // one fetch at a time: callers wait for the in-flight page rather
-        // than no-op, so the drain loop in loadAllChats can't busy-spin
-        // without making progress.
+        // flight (scroll + ensureMoreChats + ensureChatVisible all call
+        // in), and concurrent fetches with the same offset pushed
+        // duplicate chat objects into visibleChats (bloat + duplicate
+        // x-for keys). one fetch at a time: callers wait for the in-flight
+        // page rather than no-op, so loop callers can't busy-spin without
+        // making progress.
         while (this.fetchingChats) {
             await new Promise(resolve => setTimeout(resolve, 50));
         }
@@ -326,6 +381,8 @@ CHAT_STORE = {
 
     async selectCategory(category) {
         this.selectedCategory = category;
+        // reloadChats() re-runs the sidebar search when active, so the
+        // results are already re-scoped to the new category after this
         await this.reloadChats();
     },
 
