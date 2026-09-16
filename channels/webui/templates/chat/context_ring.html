@@ -1,0 +1,78 @@
+<!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+     replaced the token bar with a circular ring that fills up as the context
+     window gets fuller. clicking it opens a popup with a detailed context
+     breakdown, fetched from the backend via /api/system/context_size
+     (channel.context.get_size()). -->
+<div id="context-ring" x-cloak x-data="{
+        open: false,
+        details: null,
+        loading: false,
+
+        get percentage() {
+            const max = $store.system.data?.max_context;
+            if (!max) return 0;
+            return Math.min(($store.chat.currentTokenUsage / max) * 100, 100);
+        },
+
+        get dash_offset() {
+            // circumference of the r=18 svg circle
+            const circ = 2 * Math.PI * 18;
+            return circ * (1 - this.percentage / 100);
+        },
+
+        async toggle() {
+            this.open = !this.open;
+            if (this.open) await this.refresh();
+        },
+
+        async refresh() {
+            this.loading = true;
+            try {
+                this.details = await simpleApiFetch('/api/system/context_size');
+            } catch (e) {
+                this.details = { 'error': String(e) };
+            } finally {
+                this.loading = false;
+            }
+        }
+     }"
+     @click.outside="open = false">
+
+    <button class="ring-button"
+            :class="{ 'active': percentage >= 70, 'warning': percentage >= 75 }"
+            @click="toggle()"
+            :title="`${$store.chat.currentTokenUsage.toLocaleString()} / ${( $store.system.data.max_context || 0 ).toLocaleString()} tokens`"
+            :aria-label="'Context usage: ' + Math.round(percentage) + '%'">
+        <svg viewBox="0 0 42 42">
+            <circle class="ring-bg" cx="21" cy="21" r="18" fill="none" stroke-width="4"></circle>
+            <circle class="ring-fill" cx="21" cy="21" r="18" fill="none" stroke-width="4"
+                    stroke-dasharray="113.1"
+                    :stroke-dashoffset="dash_offset"
+                    stroke-linecap="round"
+                    transform="rotate(-90 21 21)"></circle>
+        </svg>
+        <span class="ring-pct" x-text="Math.round(percentage) + '%'"></span>
+    </button>
+
+    <template x-if="open">
+        <div class="context-popup">
+            <div class="popup-header">
+                <span class="popup-title">Context</span>
+                <button class="popup-refresh" @click="refresh()" :disabled="loading" title="Refresh">&#x21bb;</button>
+            </div>
+            <template x-if="loading && !details">
+                <div class="popup-loading">Loading..</div>
+            </template>
+            <template x-if="details">
+                <div class="popup-rows">
+                    <template x-for="(value, key) in details" :key="key">
+                        <div class="popup-row">
+                            <span class="popup-key" x-text="key"></span>
+                            <span class="popup-value" x-text="value"></span>
+                        </div>
+                    </template>
+                </div>
+            </template>
+        </div>
+    </template>
+</div>

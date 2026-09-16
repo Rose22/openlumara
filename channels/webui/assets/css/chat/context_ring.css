@@ -1,0 +1,148 @@
+/* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+   styles for the context ring that replaced the old token usage bar. */
+#context-ring {
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+       sits inline in the input row, left of the send button */
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    z-index: 30;
+
+    .ring-button {
+        position: relative;
+        right: 7px;
+        width: 34px;
+        height: 34px;
+        padding: 0;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: border-color 0.2s ease, transform 0.2s ease;
+
+        &:hover {
+            border-color: var(--accent);
+            transform: scale(1.06);
+        }
+
+        svg {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            inset: 0;
+        }
+
+        .ring-bg {
+            stroke: var(--border-color);
+        }
+
+        .ring-fill {
+            stroke: var(--accent);
+            transition: stroke-dashoffset 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), stroke 0.3s ease;
+        }
+
+        .ring-pct {
+            position: relative;
+            font-size: 0.5rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            pointer-events: none;
+        }
+
+        &.active .ring-fill {
+            stroke: var(--accent);
+        }
+
+        &.warning {
+            .ring-fill {
+                stroke: var(--error);
+            }
+            .ring-pct {
+                color: var(--error);
+            }
+        }
+    }
+
+    .context-popup {
+        position: absolute;
+        bottom: calc(100% + 8px);
+        right: 0;
+        min-width: 360px;
+        max-width: 450px;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-sm);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+        padding: 10px 12px;
+        font-size: 0.75rem;
+        color: var(--text-primary);
+
+        .popup-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+
+            .popup-title {
+                font-weight: 700;
+                color: var(--text-secondary);
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                font-size: 0.65rem;
+            }
+
+            .popup-refresh {
+                background: none;
+                border: none;
+                color: var(--text-muted);
+                cursor: pointer;
+                font-size: 0.9rem;
+                line-height: 1;
+                padding: 2px 4px;
+                border-radius: 4px;
+
+                &:hover {
+                    color: var(--accent);
+                    background: var(--bg-tertiary);
+                }
+
+                &:disabled {
+                    opacity: 0.5;
+                    cursor: not-allowed;
+                }
+            }
+        }
+
+        .popup-loading {
+            color: var(--text-muted);
+            padding: 4px 0;
+        }
+
+        .popup-rows {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+
+            .popup-row {
+                display: flex;
+                justify-content: space-between;
+                align-items: baseline;
+                gap: 12px;
+
+                .popup-key {
+                    color: var(--text-muted);
+                    white-space: nowrap;
+                }
+
+                .popup-value {
+                    text-align: right;
+                    color: var(--text-primary);
+                }
+            }
+        }
+    }
+}
