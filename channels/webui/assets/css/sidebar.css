@@ -30,13 +30,17 @@
 
     /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
        category dropdown, sits above the search box (replaces the old
-       category sidebar pane). styling mirrors the settings modal's
-       select dropdowns (modals/fields.css) */
+       category sidebar pane). now a custom button + teleported menu
+       (native options can't hold icons); trigger styling mirrors the
+       old select look. menu styles live top-level below. */
     .category-select {
         padding: 0px;
 
-        select {
+        .category-trigger {
             width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 8px;
             padding: 10px 12px;
             border: 1px solid var(--border-color);
             border-radius: var(--radius-sm);
@@ -47,17 +51,57 @@
             cursor: pointer;
             transition: border-color 0.15s;
             box-sizing: border-box;
-            -webkit-appearance: none;
-            appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23a0a0a0' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-position: right 12px center;
-            padding-right: 32px;
+
+            .cat-label {
+                flex: 1;
+                min-width: 0;
+                text-align: left;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .cat-icon {
+                display: inline-flex;
+                align-items: center;
+                flex-shrink: 0;
+
+                svg {
+                    width: 14px;
+                    height: 14px;
+                }
+            }
+
+            .cat-chevron {
+                flex-shrink: 0;
+                color: var(--text-secondary, #a0a0a0);
+                transition: transform 0.15s;
+            }
+
+            &.open .cat-chevron {
+                transform: rotate(180deg);
+            }
+
+            /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+               while open, the trigger and the teleported menu form ONE
+               box: drop the bottom corners/border (menu overlaps by 1px
+               and continues the side borders), keep the accent border
+               on the remaining sides */
+            &.open {
+                border-color: var(--border-color);
+                border-bottom: 1px solid transparent;
+                border-bottom-left-radius: 0;
+                border-bottom-right-radius: 0;
+            }
 
             &:focus {
                 outline: none;
-                border-color: var(--accent);
+                border-color: var(--border-color);
                 box-shadow: 0 0 0 3px rgba(171, 171, 171, 0.15);
+            }
+
+            &.open:focus {
+                box-shadow: none;
             }
 
             &:disabled {
@@ -458,6 +502,90 @@
    reveal the three-dot button when hovering anywhere on the card */
 .item:hover .item-actions {
     opacity: 1;
+}
+
+/* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+   category dropdown menu; teleported to body like the chat action
+   menu, positioned from the trigger's viewport rect. icons: home.svg
+   for 'general', folder.svg for all other categories.
+   designed as the trigger's continuation: same width/background,
+   accent side+bottom borders, no top border or top corners, and it
+   overlaps the trigger by 1px so the seam is invisible. */
+.category-menu {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    margin-top: -4px;
+    z-index: 1000;
+    max-height: 60vh;
+    overflow-y: auto;
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+       no top padding: the trigger's own 10px bottom padding already
+       sits above the seam, adding more pushed the first row too far
+       down from the header item. */
+    padding: 0 4px 4px;
+    background: var(--bg-primary, #1a1a1a);
+    border: 1px solid var(--border-color);
+    border-top: none;
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+       rows match the trigger's metrics: 14px font, and 4px menu
+       padding + 8px row padding = the trigger's 12px inset, so the
+       icons and labels line up with the header. */
+    .category-option {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        min-width: 0;
+        padding: 6px 8px;
+        background: none;
+        border: none;
+        border-radius: var(--radius-sm);
+        color: var(--text-primary);
+        font-size: 14px;
+        font-family: var(--font-primary);
+        text-align: left;
+        cursor: pointer;
+
+        /* menu width matches the trigger, so long names ellipsize */
+        span:not(.cat-icon) {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .cat-icon {
+            display: inline-flex;
+            align-items: center;
+        }
+
+        svg {
+            width: 14px;
+            height: 14px;
+            flex-shrink: 0;
+        }
+
+        /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
+           the trigger's 10px bottom padding still adds extra air above
+           the seam, so pull the first row up to match the row-to-row
+           rhythm. */
+        &:first-child {
+            margin-top: -4px;
+        }
+
+        &:hover {
+            background: var(--bg-tertiary, #2a2a2a);
+        }
+    }
+
+    .category-menu-divider {
+        height: 1px;
+        margin: 4px 0; /* flush with the rows' edges */
+        background: var(--border-color);
+    }
 }
 
 /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)

@@ -12,29 +12,59 @@
     <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
          category picker dropdown, replaces the old category sidebar -->
     <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
-         the manage-categories modal is opened from a pseudo-option at
-         the bottom of the dropdown. picking it never changes the
-         selected category: the select value snaps back and the modal
-         opens instead. -->
-    <div class="category-select">
-        <select
-            :value="$store.chat.dropdownValue()"
+         custom dropdown (native <option>s can't render icons): trigger
+         shows the active category's icon + name, menu is teleported to
+         body like the chat action menu. 'general' gets home.svg, every
+         other category gets folder.svg. -->
+    <div class="category-select" x-data="{ open: false, top: 0, left: 0, width: 0 }">
+        <button
+            type="button"
+            class="category-trigger"
+            :class="{ 'open': open }"
             :disabled="$store.stream.state !== 'idle'"
-            @change="
-                if ($event.target.value === '__manage__') {
-                    $event.target.value = $store.chat.dropdownValue();
-                    $store.ui.openModal('categories');
-                } else {
-                    $store.chat.selectCategory($event.target.value);
-                }
-            "
             title="Filter chats by category"
+            @click="
+                const r = $el.getBoundingClientRect();
+                /* overlap by 1px so the menu's top edge merges with the
+                   trigger's (whose bottom border/radius is hidden while
+                   open) - they read as one element */
+                top = r.bottom - 1;
+                left = r.left;
+                width = r.width;
+                open = !open;
+            "
         >
-            <template x-for="category in $store.chat.dropdownCategories()" :key="category">
-                <option :value="category" x-text="category"></option>
-            </template>
-            <option value="__manage__">manage categories...</option>
-        </select>
+            <span class="cat-icon" x-show="$store.chat.selectedCategory === 'general'">{% include 'svg/home.svg' %}</span>
+            <span class="cat-icon" x-show="$store.chat.selectedCategory !== 'general'">{% include 'svg/folder.svg' %}</span>
+            <span class="cat-label" x-text="$store.chat.selectedCategory"></span>
+            <svg class="cat-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" width="12" height="12"><path fill="currentColor" d="M6 8L1 3h10z"/></svg>
+        </button>
+        <template x-teleport="body">
+            <div class="category-menu" x-show="open" x-transition.opacity.duration.120ms
+                :style="`top: ${top}px; left: ${left}px; width: ${width}px`"
+                @click.stop @click.away="open = false"
+                @keydown.escape.window="open = false">
+                <!-- the selected category lives in the trigger, so it's
+                     left out of the list (no duplicate row) -->
+                <template x-for="category in $store.chat.dropdownCategories().filter(c => c !== $store.chat.selectedCategory)" :key="category">
+                    <button
+                        type="button"
+                        class="category-option"
+                        @click="$store.chat.selectCategory(category); open = false"
+                    >
+                        <span class="cat-icon" x-show="category === 'general'">{% include 'svg/home.svg' %}</span>
+                        <span class="cat-icon" x-show="category !== 'general'">{% include 'svg/folder.svg' %}</span>
+                        <span x-text="category"></span>
+                    </button>
+                </template>
+                <div class="category-menu-divider"></div>
+                <button type="button" class="category-option manage"
+                    @click="$store.ui.openModal('categories'); open = false">
+                    {% include 'svg/gear.svg' %}
+                    <span>manage categories...</span>
+                </button>
+            </div>
+        </template>
     </div>
 
     <div class="search">
