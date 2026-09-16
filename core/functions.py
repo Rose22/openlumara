@@ -5,6 +5,9 @@ import time
 import traceback
 import urllib.parse
 
+# re-exported so it's reachable as core.sanitize_leaked_tool_tags (via `from core.functions import *`)
+from core.sanitize import sanitize_leaked_tool_tags
+
 def log(category: str, msg: str):
     """
     simple console log
