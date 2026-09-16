@@ -13,6 +13,8 @@
         display: flex;
         flex: 1;
         overflow-y: auto;
+        width: 100%;
+        min-width: 100%;
         /*
         background-image: var(--bg-pattern);
         background-size: var(--bg-pattern-size);
@@ -26,7 +28,7 @@
         overflow-anchor: none;
         padding: 20px;
         flex-direction: column;
-        gap: 18px;
+        gap: 4px;
         margin: 0 auto;
         min-height: 0;
 

@@ -40,7 +40,9 @@
     <div class="search">
         <input name="search" type="text" placeholder="Search through your chats.."
             :value="$store.chat.searchQuery"
-            @input.debounce="$store.chat.setSearchQuery($event.target.value)">
+            @input.debounce="$store.chat.setSearchQuery($event.target.value)"
+            :disabled="$store.stream.state !== 'idle'"
+            >
 
         <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
              toggles searching message content in addition to titles.
@@ -52,6 +54,7 @@
                 ? 'Searching titles + message content (click for titles only)'
                 : 'Search message content too (currently: titles only)'"
             :aria-pressed="$store.chat.searchInContent"
+            :disabled="$store.stream.state !== 'idle'"
         >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                 <line x1="4" y1="6" x2="20" y2="6"/>
