@@ -3,9 +3,9 @@
        the category pane is gone, the chat list fills the sidebar.
        flex-basis + shrink 0 + grow 0 so the width is locked to 22%
        regardless of how long chat titles/content are */
-    flex: 0 0 15%;
-    width: 22%;
-    max-width: 15%;
+    flex: 0 0 288px;
+    width: 288px;
+    max-width: 288px;
     box-sizing: border-box;
     display: flex;
     flex-direction: row;
