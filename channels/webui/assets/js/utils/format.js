@@ -49,7 +49,6 @@ function formatDate(dateString) {
 const _dayWeekdayFmt = new Intl.DateTimeFormat('en', { weekday: 'long' });
 const _dayMonthDayFmt = new Intl.DateTimeFormat('en', { month: 'long', day: 'numeric' });
 const _dayFullFmt = new Intl.DateTimeFormat('en', { month: 'long', day: 'numeric', year: 'numeric' });
-const _monthFmt = new Intl.DateTimeFormat('en', { month: 'long' });
 const _monthYearFmt = new Intl.DateTimeFormat('en', { month: 'long', year: 'numeric' });
 
 function parseChatDate(dateString) {
@@ -97,11 +96,10 @@ function dayLabelFromKey(key) {
 
     // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
     // month group keys are 'YYYY-MM' (older than last week,
-    // mirroring the backend's grouping tiers)
+    // mirroring the backend's grouping tiers). always show the year:
+    // month groups can span years and 'September' alone gets ambiguous.
     if (parts.length === 2) {
-        const monthFmt = date.getFullYear() === new Date().getFullYear()
-            ? _monthFmt : _monthYearFmt;
-        return monthFmt.format(date);
+        return _monthYearFmt.format(date);
     }
 
     const diffDays = Math.round((startOfDayMs(new Date()) - startOfDayMs(date)) / 86400000);
