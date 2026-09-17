@@ -8,11 +8,12 @@
             <div class="tool-calls-container"
                  x-data="{ collapsed: $store.stream.state === 'idle' || !!tool.response, autoCollapsed: false }"
                  x-effect="if (tool.response && !autoCollapsed) { autoCollapsed = true; collapsed = true }">
-                <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+            <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
                  tool-pending marks in-flight calls (no response yet) so the
-                 timeline can pulse exactly the active nodes, regardless of
-                 collapse state -->
-            <div class="tool-call-card" :class="{ 'tool-pending': !tool.response }">
+                 timeline pulses exactly the active nodes regardless of
+                 collapse state; tool-error marks calls whose response has
+                 status:"error" -->
+            <div class="tool-call-card" :class="{ 'tool-pending': !tool.response, 'tool-error': toolCallFailed(tool) }">
                     <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
                          timeline node: circle + chevron on the spine (design B) -->
                     <div class="node-dot" :class="{expanded: !collapsed}" @click.stop="collapsed = !collapsed">

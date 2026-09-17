@@ -58,9 +58,39 @@ function historyTurnSplit(turn) {
 }
 
 // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
-// one-line arg summary for a COMPLETED tool call header, eg.
-// docs_list(folder="openlumara_docs", subfolder="dev_docs")
-// every value truncated to 20 chars; css keeps it on a single line.
+// a tool call failed when its parsed response is {status: "error", ..}
+function toolCallFailed(tool) {
+    try {
+        const p = JSON.parse(tool.response);
+        return p !== null && typeof p === 'object' && p.status === 'error';
+    } catch {
+        return false;
+    }
+}
+
+// -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+// one-line arg summary for a COMPLETED tool call header: the single most
+// informative argument, value only (no key), eg. "Coder: file edit
+// (toolcalls.css)". paths keep their TAIL (the interesting end).
+const ARG_PRIORITY = [
+    'path', 'file_path', 'filepath', 'file', 'filename', 'url',
+    'query', 'pattern', 'regex_pattern', 'sub_path', 'subfolder',
+    'folder', 'id', 'name', 'content', 'text'
+];
+
+// keep the end of path-ish strings, the end of everything else
+function truncateArg(s) {
+    if (s.length <= 70) return s;
+    if (s.includes('/') || s.includes('\\')) return '..' + s.slice(-68);
+    return s.slice(0, 69).trimEnd() + '..';
+}
+
+function argToString(v) {
+    if (v !== null && typeof v === 'object') return JSON.stringify(v);
+    if (typeof v === 'string') return v;
+    return String(v);
+}
+
 function toolCallArgsSummary(tool) {
     let args;
     try {
@@ -69,15 +99,18 @@ function toolCallArgsSummary(tool) {
         return '';
     }
     if (!args || typeof args !== 'object' || Array.isArray(args)) return '';
-    const parts = Object.entries(args).map(([k, v]) => {
-        let s;
-        if (v !== null && typeof v === 'object') s = JSON.stringify(v);
-        else if (typeof v === 'string') s = `"${v}"`;
-        else s = String(v);
-        if (s.length > 30) s = s.slice(0, 29).trimEnd() + '..';
-        return `${k}=${s}`;
-    });
-    return parts.length ? `(${parts.join(', ')})` : '';
+    const entries = Object.entries(args);
+    if (entries.length === 0) return '';
+    // highest-priority known key wins; otherwise the first string value;
+    // otherwise the first value, period
+    let chosen = null;
+    for (const pk of ARG_PRIORITY) {
+        const hit = entries.find(([k]) => k === pk);
+        if (hit) { chosen = hit; break; }
+    }
+    if (!chosen) chosen = entries.find(([, v]) => typeof v === 'string');
+    if (!chosen) chosen = entries[0];
+    return '(' + truncateArg(argToString(chosen[1])) + ')';
 }
 
 // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)

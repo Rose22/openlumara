@@ -213,6 +213,32 @@
         color: var(--accent);
     }
 
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+       failed tool call: red node ring + red wrench, visible even when
+       the card is collapsed (error responses have status:"error") */
+    .tool-call-card.tool-error .node-dot {
+        border-color: var(--error, #f87171);
+    }
+
+    .tool-call-card.tool-error .node-dot:hover {
+        border-color: var(--error, #f87171);
+        color: var(--error, #f87171);
+    }
+
+    .tool-call-card.tool-error .header .icon {
+        color: var(--error, #f87171);
+    }
+
+    .tool-call-card.tool-error .call-args {
+        color: var(--error, #f87171);
+        opacity: 0.7;
+    }
+
+    .tool-call-card.tool-error .header,
+    .tool-call-card.tool-error .header .name {
+        color: var(--error, #f87171);
+    }
+
     /* the station feeding the finish flag keeps its dot; instead its rail
        extends through the flag's top padding so the line never breaks */
     .chain-station:has(+ .chain-end) .chain-rail::before {

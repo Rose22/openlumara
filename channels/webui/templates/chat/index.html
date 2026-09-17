@@ -98,6 +98,10 @@
                                     </svg>
                                     {% include 'svg/gear.svg' %}
                                     <span class="label">Process</span>
+                                    <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+                                         step count so you know if expanding is
+                                         worth it before clicking -->
+                                    <span class="activity" x-show="collapsed" x-text="'(' + historyTurnSplit(turn).chain.length + (historyTurnSplit(turn).chain.length === 1 ? ' step)' : ' steps)')"></span>
                                 </div>
                                 <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
                                      timeline layout: each chain segment is a station
