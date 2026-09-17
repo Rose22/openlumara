@@ -1,5 +1,5 @@
 <div class="flex fullwidth nogaps">
-    <template x-for="tool in message.tool_calls">
+    <template x-for="(tool, toolIdx) in message.tool_calls">
         <div>
             <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
                  Auto-collapse each tool card the moment its response arrives
@@ -36,12 +36,19 @@
                         <div class="section">
                             <div class="args">
                                 <div class="title">Arguments</div>
-                                <template x-for="(value, key) in partialJsonParse(tool.function?.arguments ?? '{}')">
+                                <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+                                     pass a stable cache key so the parser can
+                                     hold on to the last good parse instead of
+                                     toggling between parsed rows and _raw -->
+                                <template x-for="(value, key) in partialJsonParse(tool.function?.arguments ?? '{}', tool.id ?? (message.tool_call_id + ':' + toolIdx))">
                                     <div class="arg-row">
                                         <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
                                              x-fade-text: streamed tool call args fade in per token -->
                                         <span class="arg-name" x-fade-text="key"></span>
-                                        <span class="arg-value" x-fade-text="value"></span>
+                                        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+                                             nested objects/arrays now render as a growing
+                                             json string instead of '[object object]' -->
+                                        <span class="arg-value" x-fade-text="(value !== null && typeof value === 'object') ? JSON.stringify(value, null, 2) : value"></span>
                                     </div>
                                 </template>
 
