@@ -50,7 +50,7 @@
                                      }
                                  }">
                             <template x-if="parsed !== null">
-                                <div class="content" x-html="toolResultsRenderer(parsed, 0)"></div>
+                                <div class="content" x-html="toolResponseRenderer(parsed)"></div>
                             </template>
                             <template x-if="parsed === null">
                                 <p x-fade-text="tool.response" class="raw-response"></p>

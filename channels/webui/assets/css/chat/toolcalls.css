@@ -112,6 +112,8 @@
     /* response: content behind a hairline, rows styled identically to args */
     .response-row {
         border-top: 1px solid var(--border-color);
+        margin-top: 8px;
+        padding-top: 8px;
         display: flex;
         flex-direction: column;
         gap: 2px;
@@ -128,6 +130,39 @@
     .content {
         font-size: 0.84rem;
         line-height: 1.7;
+
+        /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+           keyless row for a response's unwrapped `content` field: spans the
+           FULL row width, no key column */
+        .content-row {
+            display: flex;
+            line-height: 1.7;
+
+            .value {
+                color: var(--text-primary);
+                font-size: 0.85rem;
+                word-break: break-word;
+                white-space: pre-wrap;
+                flex: 1;
+                min-width: 0;
+                max-height: 120px;
+                overflow-y: auto;
+
+                &.boxed {
+                    border: 1px solid var(--border-color);
+                    border-radius: 8px;
+                    padding: 8px 10px;
+                }
+            }
+        }
+
+        /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+           fields after the content block, separated by a hairline */
+        .response-rest {
+            border-top: 1px solid var(--border-color);
+            margin-top: 8px;
+            padding-top: 8px;
+        }
 
         .string {
             white-space: pre-wrap;
@@ -171,9 +206,16 @@
                 white-space: pre-wrap;
                 flex: 1;
                 min-width: 0;
-                /* same cap as streaming arg values, plain overflow - no box */
+                /* same cap as streaming arg values, plain overflow - no box.
+                   only applies to scalar cells (marked with x-box); nested
+                   row-groups render uncapped */
                 max-height: 120px;
                 overflow-y: auto;
+            }
+
+            .value:not([x-box]) {
+                max-height: none;
+                overflow: visible;
             }
 
             .nested {
@@ -182,10 +224,10 @@
                 border-left: 1px solid var(--border-color);
             }
 
-            .array-item {
-                display: flex;
-                align-items: flex-start;
-                gap: 8px;
+            /* wrappers for itemized arrays / object rows: plain blocks */
+            .array-rows,
+            .kv-rows {
+                display: block;
             }
 
             .value.boxed {
@@ -194,7 +236,8 @@
                 padding: 8px 10px;
             }
 
-            .index {
+            /* array indices: small muted number in the key column */
+            .key.index {
                 color: var(--text-muted);
                 font-size: 0.7rem;
                 font-weight: 500;
