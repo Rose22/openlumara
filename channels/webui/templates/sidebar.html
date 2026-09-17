@@ -109,18 +109,25 @@
             <div class="item">no chats found</div>
         </template>
 
-        <div class="flex fullwidth">
-            <template x-for="chat in $store.chat.sidebarChats()" :key="chat.id">
-                <!-- search results are already category-scoped by the
-                     backend; in pagination mode only the category check
-                     applies (the old client-side title filter is gone -
-                     the backend does the filtering now) -->
-                <template
-                    x-if="
-                        $store.chat.searching
-                        || chat.category === $store.chat.selectedCategory
-                    "
-                >
+        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+             chats grouped by relative day under collapsible headers:
+             today expanded by default, other days collapsed (an explicit
+             toggle always wins over the default). category filtering
+             moved into the store (groupedSidebarChats), so the old
+             per-item x-if is gone. -->
+        <template x-for="group in $store.chat.groupedSidebarChats()" :key="group.key">
+            <div class="day-group">
+                <button type="button" class="day-header"
+                    :class="{ 'expanded': !$store.chat.isGroupCollapsed(group.key) }"
+                    :aria-expanded="!$store.chat.isGroupCollapsed(group.key)"
+                    @click="$store.chat.toggleDayGroup(group.key)">
+                    <svg class="day-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" width="10" height="10"><path fill="currentColor" d="M4 1l5 5-5 5z"/></svg>
+                    <span class="day-label" x-text="group.label"></span>
+                </button>
+
+                <template x-if="!$store.chat.isGroupCollapsed(group.key)">
+                    <div class="day-chats">
+                        <template x-for="chat in group.chats" :key="chat.id">
                     <!-- give selected chats a nice border via the CSS class -->
                     <div
                         x-data="{
@@ -155,73 +162,58 @@
                         "
                     >
                         <div>
-                            <template x-if="!renaming">
-                                <span class="title" x-text="chat.title || 'New chat'"></span>
-                            </template>
+                            <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+                                 meta line is gone (date is redundant under the day
+                                 headers): single row with title on the left, then the
+                                 tag icon (hover popup, same as the old pill) and the
+                                 three-dot actions on the right. -->
+                            <div class="title-row">
+                                <template x-if="!renaming">
+                                    <span class="title" x-text="chat.title || 'New chat'"></span>
+                                </template>
 
-                            <!-- 3-line content snippet (only in content-search mode) -->
-                            <template x-if="$store.chat.searching && $store.chat.searchInContent && $store.chat.sidebarSnippet(chat)">
-                                <div class="snippet snippet-3" x-html="$store.chat.sidebarSnippet(chat)"></div>
-                            </template>
-                            <template x-if="renaming">
-                                <div class="rename-container">
-                                    <input 
-                                        x-ref="renameInput"
-                                        type="text" 
-                                        x-model="renameValue" 
-                                        @keydown.enter="if (renameValue.trim()) { $store.chat.renameChat(chat.id, renameValue.trim()); } renaming = false; renameValue = ''"
-                                        @keydown.escape="renaming = false; renameValue = ''"
-                                        @blur="setTimeout(() => { if (renaming) { renaming = false; renameValue = ''; } }, 150)"
-                                        class="rename-input"
-                                    >
-                                    <button @click="if (renameValue.trim()) { $store.chat.renameChat(chat.id, renameValue.trim()); } renaming = false; renameValue = ''" class="rename-action-btn save" title="Save">
-                                        {% include 'svg/checkmark.svg' %}
-                                    </button>
-                                    <button @click="renaming = false; renameValue = ''" class="rename-action-btn cancel" title="Cancel">
-                                        {% include 'svg/cross.svg' %}
-                                    </button>
-                                </div>
-                            </template>
-                            
-                            <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
-                                 tags now sit inline after the date; overflow
-                                 tags hide and show in a hover popup -->
-                            <div class="meta">
-                                <div class="meta-inline">
-                                    <span class="date" x-text="formatDate(chat.updated) || 'No date known'"></span>
-                                    <template x-if="(chat.tags ?? []).length > 0">
-                                        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
-                                             popup is teleported to body (chat cards
-                                             transform on hover, which would trap and
-                                             clip a fixed child) and anchored via the
-                                             cluster's viewport rect on mouseenter -->
-                                        <span class="inline-tags" x-data="{ open: false, top: 0, left: 0 }"
-                                            @mouseenter="const r = $el.getBoundingClientRect(); top = r.top - 8; left = Math.max(8, Math.min(r.left, window.innerWidth - 236)); open = true"
-                                            @mouseleave="open = false">
-                                            <span class="inline-tag" x-text="(chat.tags ?? [])[0]"></span>
-                                            <span
-                                                x-show="(chat.tags ?? []).length > 1"
-                                                class="tag-more"
-                                                x-text="'+' + ((chat.tags ?? []).length - 1)"
-                                            ></span>
-                                            <template x-teleport="body">
-                                                <div class="tag-popup" x-show="open && (chat.tags ?? []).length > 1"
-                                                    :style="`top: ${top}px; left: ${left}px`"
-                                                    @mouseenter="open = true" @mouseleave="open = false"
-                                                    @click.stop>
-                                                    <template x-for="tag in (chat.tags ?? []).slice(1)" :key="'popup-' + tag">
-                                                        <span class="inline-tag" x-text="tag"></span>
-                                                    </template>
-                                                </div>
-                                            </template>
-                                        </span>
-                                    </template>
-                                </div>
+                                <template x-if="renaming">
+                                    <div class="rename-container">
+                                        <input 
+                                            x-ref="renameInput"
+                                            type="text" 
+                                            x-model="renameValue" 
+                                            @keydown.enter="if (renameValue.trim()) { $store.chat.renameChat(chat.id, renameValue.trim()); } renaming = false; renameValue = ''"
+                                            @keydown.escape="renaming = false; renameValue = ''"
+                                            @blur="setTimeout(() => { if (renaming) { renaming = false; renameValue = ''; } }, 150)"
+                                            class="rename-input"
+                                        >
+                                        <button @click="if (renameValue.trim()) { $store.chat.renameChat(chat.id, renameValue.trim()); } renaming = false; renameValue = ''" class="rename-action-btn save" title="Save">
+                                            {% include 'svg/checkmark.svg' %}
+                                        </button>
+                                        <button @click="renaming = false; renameValue = ''" class="rename-action-btn cancel" title="Cancel">
+                                            {% include 'svg/cross.svg' %}
+                                        </button>
+                                    </div>
+                                </template>
 
-                                <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
-                                     three-dot button replaces the inline action
-                                     buttons; dropdown is teleported to body so
-                                     the card's overflow can't clip it -->
+                                <template x-if="(chat.tags ?? []).length > 0">
+                                    <!-- popup teleported to body (chat cards
+                                         transform on hover, which would trap
+                                         and clip a fixed child), anchored via
+                                         the icon's viewport rect -->
+                                    <span class="tag-icon-wrap" x-data="{ open: false, top: 0, left: 0 }"
+                                        @mouseenter="const r = $el.getBoundingClientRect(); top = r.top - 8; left = Math.max(8, Math.min(r.left, window.innerWidth - 236)); open = true"
+                                        @mouseleave="open = false">
+                                        {% include 'svg/tag.svg' %}
+                                        <template x-teleport="body">
+                                            <div class="tag-popup" x-show="open"
+                                                :style="`top: ${top}px; left: ${left}px`"
+                                                @mouseenter="open = true" @mouseleave="open = false"
+                                                @click.stop>
+                                                <template x-for="tag in (chat.tags ?? [])" :key="'popup-' + tag">
+                                                    <span class="inline-tag" x-text="tag"></span>
+                                                </template>
+                                            </div>
+                                        </template>
+                                    </span>
+                                </template>
+
                                 <div class="item-actions" @click.stop
                                     :class="{ 'menu-open': menuOpen }">
                                     <button class="action-btn" :class="{ active: menuOpen }" title="Actions"
@@ -248,12 +240,18 @@
                                     </template>
                                 </div>
                             </div>
-                            
+
+                            <!-- 3-line content snippet (only in content-search mode) -->
+                            <template x-if="$store.chat.searching && $store.chat.searchInContent && $store.chat.sidebarSnippet(chat)">
+                                <div class="snippet snippet-3" x-html="$store.chat.sidebarSnippet(chat)"></div>
+                            </template>
                         </div>
                     </div>
+                        </template>
+                    </div>
                 </template>
-            </template>
-        </div>
+            </div>
+        </template>
 
         <!-- make sure there's always more chats than the viewport
              (hidden while searching: search mode is unpaginated) -->
@@ -261,7 +259,12 @@
             <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
                  .parent: observe intersection against the .chats scroll
                  container, not the viewport (same as the chat turns). -->
-            <div id="chat-scroll-loader" x-intersect.parent="$store.chat.loadMoreChats()" class="item">loading more..</div>
+            <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+                 goes through ensureMoreChats (loops while the loader is
+                 still visible) instead of a single loadMoreChats: pages
+                 that land entirely in collapsed day groups don't push the
+                 loader out of view, and x-intersect only fires on entry. -->
+            <div id="chat-scroll-loader" x-intersect.parent="$store.chat.ensureMoreChats()" class="item">loading more..</div>
         </template>
     </div>
 

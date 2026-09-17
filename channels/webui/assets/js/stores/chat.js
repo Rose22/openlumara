@@ -111,6 +111,10 @@ CHAT_STORE = {
 
         // ensure the chat exists in the visible sidebar list before scrolling
         await this.ensureChatVisible(this.selectedChat);
+
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+        // the loaded chat's day group must be open, even if it isn't today
+        this.expandDayOfChat(this.selectedChat);
     },
 
     /* ----------------------
@@ -132,6 +136,10 @@ CHAT_STORE = {
 
         ui = Alpine.store('ui');
         this.currentTokenUsage = result.token_usage;
+
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+        // keep the open chat's day group expanded in the sidebar
+        this.expandDayOfChat(chatId);
 
         // make sure it always shows the bottom of the chat
         await ui.forceScrollToBottom();
@@ -160,6 +168,65 @@ CHAT_STORE = {
 
     sidebarChats() {
         return this.searching ? this.searchResults : this.visibleChats;
+    },
+
+    /* ----------------------
+     * date grouping (sidebar)
+     * ----------------------- */
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+       chats are grouped by relative calendar day under collapsible
+       headers. default: today expanded, every other day collapsed;
+       once the user toggles a group, their explicit choice wins. */
+    collapsedDays: {},
+
+    todayKey() {
+        return new Date().toDateString();
+    },
+
+    isGroupCollapsed(key) {
+        if (key in this.collapsedDays) { return this.collapsedDays[key]; }
+        return key !== this.todayKey();
+    },
+
+    toggleDayGroup(key) {
+        this.collapsedDays[key] = !this.isGroupCollapsed(key);
+    },
+
+    // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+    // the group of the open chat is always expanded (on load/chat switch)
+    // so the active item is never hidden behind a collapsed header.
+    expandDayOfChat(chatId) {
+        const chat = this.visibleChats.find(c => c.id === chatId)
+            || this.searchResults.find(c => c.id === chatId);
+        if (!chat) { return; }
+
+        this.collapsedDays[dayKeyOf(chat.updated) || 'undated'] = false;
+    },
+
+    groupedSidebarChats() {
+        // pagination mode filters by category here (the template used to
+        // do it per-item); search results are already category-scoped
+        // by the backend.
+        const source = this.searching
+            ? this.searchResults
+            : this.visibleChats.filter(c => c.category === this.selectedCategory);
+
+        // chats arrive newest-first, so first-seen order = correct day
+        // order; the byKey map merges late-arriving pages into the day
+        // they belong to instead of spawning duplicate headers.
+        const groups = [];
+        const byKey = {};
+
+        for (const chat of source) {
+            const key = dayKeyOf(chat.updated) || 'undated';
+            if (!(key in byKey)) {
+                byKey[key] = { key: key, label: dayLabelOf(chat.updated), chats: [] };
+                groups.push(byKey[key]);
+            }
+            byKey[key].chats.push(chat);
+        }
+
+        return groups;
     },
 
     setSearchInContent(on) {
@@ -289,11 +356,21 @@ CHAT_STORE = {
         const container = intersect_el.parentElement;
         if (!container) { return; }
 
-        const rect = intersect_el.getBoundingClientRect();
-        const crect = container.getBoundingClientRect();
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+        // loop instead of a one-shot check: with date grouping, a loaded
+        // page can land entirely in collapsed groups, so the loader never
+        // leaves the viewport and x-intersect (entry-only) won't re-fire.
+        // keep going until the loader is out of view or no progress was
+        // made (cancelled fetch / no more chats), so this can't spin.
+        while (true) {
+            const rect = intersect_el.getBoundingClientRect();
+            const crect = container.getBoundingClientRect();
 
-        if (rect.top < crect.bottom && rect.bottom > crect.top) {
-            await this.loadMoreChats();
+            const visible = rect.top < crect.bottom && rect.bottom > crect.top;
+            if (!visible) { break; }
+
+            const loaded = await this.loadMoreChats();
+            if (!loaded) { break; }
         }
     },
 

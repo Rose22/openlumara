@@ -41,6 +41,50 @@ function formatDate(dateString) {
     return date.toLocaleDateString();
 }
 
+/* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+   relative-day helpers for the sidebar date grouping. parsing mirrors
+   formatDate (naive timestamps are treated as UTC), but grouping and
+   labelling happen in the user's local calendar day. */
+const _dayWeekdayFmt = new Intl.DateTimeFormat('en', { weekday: 'long' });
+const _dayMonthDayFmt = new Intl.DateTimeFormat('en', { month: 'long', day: 'numeric' });
+const _dayFullFmt = new Intl.DateTimeFormat('en', { month: 'long', day: 'numeric', year: 'numeric' });
+
+function parseChatDate(dateString) {
+    if (!dateString) { return null; }
+
+    const cleanDate = dateString.endsWith('Z') || dateString.endsWith('+00:00')
+        ? dateString
+        : dateString + 'Z';
+
+    const date = new Date(cleanDate);
+    return isNaN(date.getTime()) ? null : date;
+}
+
+function dayKeyOf(dateString) {
+    const date = parseChatDate(dateString);
+    return date ? date.toDateString() : '';
+}
+
+function startOfDayMs(date) {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+}
+
+// relative day label, no clock time: Today / Yesterday / weekday name
+// for the past week / 'September 12' (year appended when not this year)
+function dayLabelOf(dateString) {
+    const date = parseChatDate(dateString);
+    if (!date) { return 'Undated'; }
+
+    const diffDays = Math.round((startOfDayMs(new Date()) - startOfDayMs(date)) / 86400000);
+
+    if (diffDays === 0) { return 'Today'; }
+    if (diffDays === 1) { return 'Yesterday'; }
+    if (diffDays > 1 && diffDays < 7) { return _dayWeekdayFmt.format(date); }
+    if (date.getFullYear() === new Date().getFullYear()) { return _dayMonthDayFmt.format(date); }
+
+    return _dayFullFmt.format(date);
+}
+
 function formatLabel(key) {
     if (typeof key !== 'string') return key;
     return key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());

@@ -124,8 +124,70 @@
         overflow-y: scroll;
         gap: var(--gap);
 
+        /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+           collapsible relative-day headers. header is sticky so the
+           current group's label stays visible while scrolling through
+           its chats. */
+        .day-group {
+            display: flex;
+            flex-direction: column;
+            gap: var(--gap);
+            flex-shrink: 0;
+        }
+
+        .day-header {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            width: 100%;
+            padding: 5px 8px;
+            background: var(--bg-primary);
+            border: none;
+            border-radius: var(--radius-sm);
+            color: var(--text-muted);
+            font-size: 0.72rem;
+            font-weight: 600;
+            font-family: var(--font-primary);
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            text-align: left;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: color 0.15s ease;
+
+            .day-chevron {
+                flex-shrink: 0;
+                color: var(--text-muted);
+                transition: transform 0.15s ease;
+            }
+
+            &.expanded .day-chevron {
+                transform: rotate(90deg);
+            }
+
+            .day-label {
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            &:hover {
+                color: var(--text-primary);
+            }
+        }
+
+        .day-chats {
+            display: flex;
+            flex-direction: column;
+            gap: var(--gap);
+        }
+
         .item {
-            padding: 4px 7px;
+            padding: 4px 14px;
+            margin-left: 4px;
             background: none;
             border: 1px solid transparent;
             border-radius: var(--radius-sm);
@@ -138,18 +200,19 @@
             display: flex;
             flex-direction: column;
             gap: var(--gap);
-            width: 97%;
-            max-width: 97%;
+            width: 100%;
             overflow: hidden;
             max-height: 10rem;
             flex-shrink: 0;
             min-width: 0;
 
+            /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+               reveal tag icon + action dots when hovering anywhere on
+               the card */
             &:hover {
-                .meta {
-                    .item-actions {
-                        opacity: 0.7;
-                    }
+                .tag-icon-wrap,
+                .item-actions {
+                    opacity: 1;
                 }
             }
 
@@ -217,102 +280,77 @@
                 font-style: normal;
             }
 
-            /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
-               tags inline with the date; overflow tags in a hover popup */
-            .meta-inline {
+            /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+               single-line chat row: title fills the left, tag icon and
+               three-dot actions sit right. (the old .meta line with the
+               date/pill is gone - dates live in the day headers now) */
+            .title-row {
                 display: flex;
                 align-items: center;
                 gap: 6px;
                 min-width: 0;
 
-                .date {
-                    white-space: nowrap;
-                    flex-shrink: 0;
-                }
-
-                /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
-                   the single tag + overflow counter live together in one
-                   bordered, background-less pill */
-                .inline-tags {
-                    display: flex;
-                    align-items: center;
-                    gap: 4px;
+                .title {
+                    flex: 1;
                     min-width: 0;
-                    position: relative;
-                    border: 1px solid var(--border-color);
-                    border-radius: var(--radius-sm);
-                    padding: 3px 7px;
-                    background: none;
-                }
-
-                /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
-                   only one tag shows inline now, so give it room to
-                   breathe instead of crushing it into a tiny pill */
-                .inline-tag {
-                    font-size: 0.7rem;
-                    line-height: 1;
-                    color: var(--accent);
-                    white-space: nowrap;
-                    text-overflow: ellipsis;
-                    overflow: hidden;
-                    min-width: 0;
-                }
-
-                .tag-more {
-                    font-size: 0.68rem;
-                    line-height: 1;
-                    color: var(--text-muted);
-                    cursor: default;
-                    flex-shrink: 0;
                 }
             }
 
-            .meta {
-                font-size: 0.75rem;
-                color: var(--text-muted);
-                display: flex;
-                margin-top: auto;
-                justify-content: space-between;
+            /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+               tag icon: hidden until card hover (same reveal as the
+               action dots); hover popup is the shared .tag-popup */
+            .tag-icon-wrap {
+                display: inline-flex;
                 align-items: center;
+                flex-shrink: 0;
+                color: var(--accent);
+                opacity: 0;
+                transition: opacity 0.2s ease;
 
-                .item-actions {
-                    display: flex;
-                    gap: 4px;
-                    opacity: 0;
-                    transition: opacity 0.2s ease;
+                svg {
+                    width: 12px;
+                    height: 12px;
+                }
+            }
 
-                    &.menu-open {
-                        opacity: 0.7;
-                    }
+            .item-actions {
+                display: flex;
+                gap: 4px;
+                flex-shrink: 0;
+                opacity: 0;
+                transition: opacity 0.2s ease;
+
+                &.menu-open {
+                    opacity: 0.7;
+                }
+            }
+
+            .action-btn {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 24px;
+                height: 24px;
+                padding: 0;
+                background: transparent;
+                border: none;
+                border-radius: var(--radius-sm);
+                color: var(--text-muted);
+                cursor: pointer;
+                transition: all 0.15s ease;
+
+                svg {
+                    width: 12px;
+                    height: 12px;
                 }
 
-                .action-btn {
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    width: 24px;
-                    height: 24px;
-                    padding: 0;
-                    background: transparent;
-                    border: none;
-                    border-radius: var(--radius-sm);
-                    color: var(--text-muted);
-                    cursor: pointer;
-                    transition: all 0.15s ease;
+                &:hover {
+                    background: var(--bg-tertiary);
+                    color: var(--text-primary);
+                }
 
-                    svg {
-                        width: 12px;
-                        height: 12px;
-                    }
-
-                    &:hover {
-                        background: var(--bg-tertiary);
-                        color: var(--text-primary);
-                    }
-
-                    &.delete:hover {
-                        color: var(--error);
-                    }
+                &.delete:hover {
+                    color: var(--error);
                 }
             }
 
@@ -320,9 +358,9 @@
                 display: flex;
                 align-items: center;
                 gap: 6px;
-                width: 100%;
+                flex: 1;
+                min-width: 0;
                 box-sizing: border-box;
-                margin-top: var(--gap);
 
                 .rename-input {
                     flex: 1;
@@ -406,7 +444,6 @@
             border-color: var(--border-color);
             */
             background: var(--bg-secondary);
-            transform: translateX(4px);
         }
     }
 
