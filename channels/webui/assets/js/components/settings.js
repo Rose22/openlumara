@@ -35,6 +35,9 @@ function settingsModal() {
         // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
         // start the live processing chain collapsed (localStorage; default off)
         collapseChainDefault: localStorage.getItem('collapseChainDefault') === 'true',
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+        // stream tool calls collapsed (localStorage; default off)
+        collapseToolcallsDefault: localStorage.getItem('collapseToolcallsDefault') === 'true',
         tokenFadeMs: localStorage.getItem('tokenFadeMs') || '350',
 
         get activeNavCategory() {
@@ -280,6 +283,12 @@ function settingsModal() {
         handleCollapseChainToggle() {
             this.collapseChainDefault = !this.collapseChainDefault;
             localStorage.setItem('collapseChainDefault', this.collapseChainDefault);
+        },
+
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+        handleCollapseToolcallsToggle() {
+            this.collapseToolcallsDefault = !this.collapseToolcallsDefault;
+            localStorage.setItem('collapseToolcallsDefault', this.collapseToolcallsDefault);
         },
 
         handleTokenFadeSpeed(ms) {

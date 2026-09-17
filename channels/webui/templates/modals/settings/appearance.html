@@ -129,6 +129,17 @@
                 <span class="description">Hide the details of what your AI is doing from you, and instead only show the basics on one line while your AI works. You can still expand the chain by clicking on it.</span>
             </div>
 
+            <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+             Tool call cards: collapsed while streaming, details on expand. -->
+            <div class="item">
+                <div class="toggle-row">
+                    <label>Collapse tool calls by default</label>
+                    <button class="toggle" type="button" :class="{ active: collapseToolcallsDefault }" @click="handleCollapseToolcallsToggle()">
+                    </button>
+                </div>
+                <span class="description">Keep streaming tool calls collapsed to just their header. You can still expand them by clicking to see arguments and responses.</span>
+            </div>
+
             <div class="item">
                 <div class="toggle-row">
                     <label>Fade tokens</label>
