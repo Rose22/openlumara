@@ -48,7 +48,9 @@
                                         <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
                                              nested objects/arrays now render as a growing
                                              json string instead of '[object object]' -->
-                                        <span class="arg-value" x-fade-text="(value !== null && typeof value === 'object') ? JSON.stringify(value, null, 2) : value"></span>
+                                        <!-- x-auto-scroll: streamed values chase the bottom
+                                             inside their own 120px scroll container -->
+                                        <span class="arg-value" x-auto-scroll x-fade-text="(value !== null && typeof value === 'object') ? JSON.stringify(value, null, 2) : value"></span>
                                     </div>
                                 </template>
 
@@ -68,11 +70,11 @@
                                                 }">
                                                  <!-- if it's json, use our complex function to show the response in a fancy way -->
                                                 <template x-if="isJson">
-                                                    <div class="content" x-fade-html="toolResultsRenderer(JSON.parse(tool.response), 0)"></div>
+                                                    <div class="content" x-auto-scroll x-fade-html="toolResultsRenderer(JSON.parse(tool.response), 0)"></div>
                                                 </template>
                                                 <!-- if not, show it as a raw string, formatted nicely -->
                                                 <template x-if="!isJson">
-                                                    <p x-fade-text="tool.response" class="raw-response"></p>
+                                                    <p x-auto-scroll x-fade-text="tool.response" class="raw-response"></p>
                                                 </template>
                                             </div>
                                         </div>
