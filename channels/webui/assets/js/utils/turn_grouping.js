@@ -58,6 +58,29 @@ function historyTurnSplit(turn) {
 }
 
 // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+// one-line arg summary for a COMPLETED tool call header, eg.
+// docs_list(folder="openlumara_docs", subfolder="dev_docs")
+// every value truncated to 20 chars; css keeps it on a single line.
+function toolCallArgsSummary(tool) {
+    let args;
+    try {
+        args = JSON.parse(tool.function?.arguments ?? '{}');
+    } catch {
+        return '';
+    }
+    if (!args || typeof args !== 'object' || Array.isArray(args)) return '';
+    const parts = Object.entries(args).map(([k, v]) => {
+        let s;
+        if (v !== null && typeof v === 'object') s = JSON.stringify(v);
+        else if (typeof v === 'string') s = `"${v}"`;
+        else s = String(v);
+        if (s.length > 30) s = s.slice(0, 29).trimEnd() + '..';
+        return `${k}=${s}`;
+    });
+    return parts.length ? `(${parts.join(', ')})` : '';
+}
+
+// -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
 // short human label for a chain segment, shown in parentheses on the
 // collapsed Process header (what is the agent busy with right now?)
 function chainItemLabel(message) {

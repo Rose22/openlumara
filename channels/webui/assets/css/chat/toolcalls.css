@@ -56,7 +56,9 @@
     .name {
         font-size: 0.85rem;
         color: var(--text-muted);
-        flex: 1;
+        /* was flex:1 - now shrinkable-auto so the arg summary sits right
+           after the tool name instead of being pushed to the far edge */
+        flex: 0 1 auto;
         min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -65,6 +67,21 @@
         .module {
             font-weight: 600;
         }
+    }
+
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+       completed-call arg summary: smaller + fainter than the tool name,
+       hard single line (ellipsis eats the overflow) */
+    .call-args {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        opacity: 0.8;
+        font-family: var(--code-font);
+        flex: 0 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
 

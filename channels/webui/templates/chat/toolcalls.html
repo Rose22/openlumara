@@ -27,6 +27,13 @@
                           <span x-fade-text="tool.function?.name.split('_').slice(1).join(' ')"></span>
                         </span>
                         <span class="name" x-show="!tool.function?.name">unknown</span>
+                        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+                             once the call completes, the header shows its args
+                             inline, eg. docs_list(folder="x", sub="y") - each
+                             value cut to 20 chars, whole thing on one line,
+                             de-emphasized vs the tool name -->
+                        <span class="call-args" x-show="tool.response"
+                              x-text="toolCallArgsSummary(tool)"></span>
                     </div>
 
                     <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
