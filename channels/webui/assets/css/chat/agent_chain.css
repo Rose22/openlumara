@@ -228,8 +228,12 @@
         animation: statusPulse 1.5s ease-in-out infinite;
     }
 
-    /* tool stations pulse their LAST card's node (the active call) */
-    &.is-streaming .chain-station:last-child .tool-call-card:last-child .node-dot {
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+       pulse exactly the IN-FLIGHT calls: a card only renders a response-row
+       once its response arrives, so "no response-row" == still being called.
+       handles parallel calls too (each pending card pulses on its own), and
+       the pulse dies the moment a response lands. */
+    &.is-streaming .tool-call-card.tool-pending .node-dot {
         border-color: var(--accent);
         color: var(--accent);
         animation: statusPulse 1.5s ease-in-out infinite;
