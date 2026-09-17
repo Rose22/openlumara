@@ -105,9 +105,13 @@
         gap: 4px;
     }
 
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+         flex-end: long values auto-scroll to the bottom while streaming,
+         so the key is anchored to the last (always fully visible) line.
+         single-line values are unaffected, box height == line height. */
     .arg-row {
         display: flex;
-        align-items: flex-start;
+        align-items: flex-end;
         gap: 12px;
         font-size: 0.85rem;
         line-height: 1.6;
@@ -118,6 +122,9 @@
         min-width: 80px;
         flex-shrink: 0;
         font-weight: 500;
+        /* same line-height as the value box's lines, so bottom-anchored
+           rows keep key + last value line on one baseline */
+        line-height: 1.6;
 
         &:after {
             content: ':';
