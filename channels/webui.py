@@ -499,25 +499,58 @@ async def create_fastapi(channel):
         dt = dt - datetime.timedelta(minutes=tz_offset_min)
         return dt.date().isoformat()
 
+    # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+    # sidebar grouping tiers (ISO weeks, Monday start):
+    # - this week (Mon..today): one group per day ('YYYY-MM-DD')
+    # - last week (Mon..Sun):   one group, key 'last-week-<monday>'
+    # - older:                  one group per month ('YYYY-MM')
+    # cutoffs are computed in the browser's local day (tz_offset
+    # shifted) so they match the client's labels exactly.
+    def _local_today(tz_offset_min):
+        return (datetime.datetime.utcnow() - datetime.timedelta(minutes=tz_offset_min)).date()
+
+    def _group_key(updated_str, tz_offset_min):
+        day = _local_day(updated_str, tz_offset_min)
+        if not day:
+            return ""
+
+        today = _local_today(tz_offset_min)
+        this_monday = today - datetime.timedelta(days=today.weekday())
+        last_monday = this_monday - datetime.timedelta(days=7)
+
+        if day >= this_monday.isoformat():
+            return day
+        if day >= last_monday.isoformat():
+            return f"last-week-{last_monday.isoformat()}"
+        return day[:7]
+
     @app.get("/api/chats/days")
     async def get_chat_days(request: fastapi.Request):
-        """Returns the distinct local days that have chats, newest first, with counts"""
+        """Returns the day/last-week/month groups that have chats, newest first, with counts"""
         category = request.query_params.get("category", None)
         tz_offset = int(request.query_params.get("tz_offset", 0))
 
+        # max local day per group key: mixed-format keys ('YYYY-MM-DD',
+        # 'last-week-...', 'YYYY-MM') can't be string-sorted against each
+        # other, so groups are ordered by their newest member instead
         counts = {}
+        newest = {}
         for chat in _chats_for_category(category):
-            day = _local_day(chat.get("updated", ""), tz_offset)
-            counts[day] = counts.get(day, 0) + 1
+            updated = chat.get("updated", "")
+            key = _group_key(updated, tz_offset)
+            day = _local_day(updated, tz_offset)
+            counts[key] = counts.get(key, 0) + 1
+            if day > newest.get(key, ""):
+                newest[key] = day
 
-        days = [{"day": d, "count": c} for d, c in counts.items()]
-        days.sort(key=lambda entry: entry["day"], reverse=True)
+        groups = [{"key": k, "count": c} for k, c in counts.items()]
+        groups.sort(key=lambda entry: newest.get(entry["key"], ""), reverse=True)
 
-        return api_result(days, success=True)
+        return api_result(groups, success=True)
 
     @app.get("/api/chats/day")
     async def get_chats_for_day(request: fastapi.Request):
-        """Returns the chats of one local day (YYYY-MM-DD), newest first, paginated"""
+        """Returns the chats of one day/month group, newest first, paginated"""
         day = request.query_params.get("day", "")
         offset = int(request.query_params.get("offset", 0))
         limit = int(request.query_params.get("limit", 50))
@@ -526,7 +559,7 @@ async def create_fastapi(channel):
 
         day_chats = [
             c for c in _chats_for_category(category)
-            if _local_day(c.get("updated", ""), tz_offset) == day
+            if _group_key(c.get("updated", ""), tz_offset) == day
         ]
 
         paginated = day_chats[offset:offset + limit]

@@ -84,6 +84,11 @@ function startOfDayMs(date) {
 function dayLabelFromKey(key) {
     if (!key) { return 'Undated'; }
 
+    // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+    // 'last week' group (key embeds its monday, so toggle state stays
+    // stable within the week but rolls over automatically)
+    if (key.startsWith('last-week')) { return 'Last Week'; }
+
     // parsed as LOCAL midnight (component ctor), unlike new Date('YYYY-MM-DD')
     // which would parse as UTC and shift the day
     const parts = key.split('-').map(Number);
@@ -91,8 +96,8 @@ function dayLabelFromKey(key) {
     if (isNaN(date.getTime())) { return 'Undated'; }
 
     // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
-    // month group keys are 'YYYY-MM' (everything older than the past
-    // week, mirroring the backend's grouping cutoff)
+    // month group keys are 'YYYY-MM' (older than last week,
+    // mirroring the backend's grouping tiers)
     if (parts.length === 2) {
         const monthFmt = date.getFullYear() === new Date().getFullYear()
             ? _monthFmt : _monthYearFmt;
@@ -110,16 +115,22 @@ function dayLabelFromKey(key) {
 }
 
 // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
-// client-side mirror of the backend's grouping cutoff: the past week
-// (incl. today) groups by day ('YYYY-MM-DD'), older chats by month
-// ('YYYY-MM'). used for search results, which are grouped in the
-// browser; the backend applies the same rule for the day list.
+// client-side mirror of the backend's grouping tiers (ISO weeks,
+// Monday start): this week groups by day, last week is one group
+// ('last-week-<monday>'), older chats group by month ('YYYY-MM').
+// used for search results, which are grouped in the browser; the
+// backend applies the same rule for the group list.
 function groupKeyOf(dateString) {
     const date = parseChatDate(dateString);
     if (!date) { return ''; }
 
-    const diffDays = Math.round((startOfDayMs(new Date()) - startOfDayMs(date)) / 86400000);
-    if (diffDays < 7) { return localDayKey(date); }
+    const today = new Date();
+    const thisMonday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - today.getDay() + (today.getDay() === 0 ? -6 : 1));
+    const lastMonday = new Date(thisMonday);
+    lastMonday.setDate(lastMonday.getDate() - 7);
+
+    if (date >= thisMonday) { return localDayKey(date); }
+    if (date >= lastMonday) { return `last-week-${localDayKey(lastMonday)}`; }
 
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 }
