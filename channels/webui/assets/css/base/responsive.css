@@ -83,6 +83,23 @@
             left: 0;
             width: 100%;
             height: 100%;
+
+            /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+               mobile chat-list density: tight 2px row gaps like desktop,
+               but rows keep a ~44px min touch target (fingers need it),
+               so pitch lands at ~46px instead of desktop's ~38px */
+            .chats {
+                gap: 12px;
+
+                .day-chats {
+                    gap: 2px;
+                }
+
+                .item {
+                    min-height: 44px;
+                    box-sizing: border-box;
+                }
+            }
         }
 
     }
