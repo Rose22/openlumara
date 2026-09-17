@@ -121,6 +121,12 @@
     50% { border-left-color: var(--accent-glow); }
 }
 
+/* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+   slow spin for the Process header gear while the agent chain runs */
+@keyframes gearSpin {
+    to { transform: rotate(360deg); }
+}
+
 @keyframes statusPulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.6; }

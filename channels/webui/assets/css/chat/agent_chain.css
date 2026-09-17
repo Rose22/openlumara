@@ -44,6 +44,27 @@
         filter: brightness(1.03);
     }
 
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+       slow gear spin while the chain is still running. NOTE: `&.is-streaming`
+       - the class is on the .agent-chain element ITSELF, a plain nested
+       `.is-streaming` selector would compile to a descendant match and never
+       fire (which is why the spin, and the node pulses below, were dead) */
+    &.is-streaming .gear {
+        animation: gearSpin 9s linear infinite;
+    }
+
+    /* last chain item in parentheses, only shown when collapsed */
+    .activity {
+        color: var(--text-muted);
+        opacity: 0.75;
+        font-size: 0.95em;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        min-width: 0;
+        flex: 0 1 auto;
+    }
+
     /* process header chevron: sits directly above the spine (14px wide,
        centered at x=7) and doubles as the collapse indicator */
     .toggle {
@@ -194,14 +215,14 @@
     /* while streaming, the newest station is the last child (no finish
        flag yet), so its node pulses. once the answer starts, the flag
        renders, no station is last anymore, and the pulse stops. */
-    .is-streaming .chain-station:last-child .chain-dot {
+    &.is-streaming .chain-station:last-child .chain-dot {
         background: var(--accent);
         border-color: var(--accent);
         animation: statusPulse 1.5s ease-in-out infinite;
     }
 
     /* tool stations pulse their LAST card's node (the active call) */
-    .is-streaming .chain-station:last-child .tool-call-card:last-child .node-dot {
+    &.is-streaming .chain-station:last-child .tool-call-card:last-child .node-dot {
         border-color: var(--accent);
         color: var(--accent);
         animation: statusPulse 1.5s ease-in-out infinite;

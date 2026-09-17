@@ -148,13 +148,36 @@
                      renders standalone until a newer segment pulls it back into
                      the chain), but manually toggable -->
                 <template x-if="streamTurnSplit($store.stream.turn).chain.length > 0">
-                    <div class="agent-chain is-streaming" x-data="{ collapsed: false }">
+                    <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+                         header shows "Processing.." + spinning gear while the
+                         stream is active; when collapsed, the last chain item's
+                         label appears in parentheses so you can see what the
+                         agent is busy with without expanding -->
+                    <div class="agent-chain" :class="{ 'is-streaming': processing }" x-data="{
+                             // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+                             // initial collapse state follows the Appearance
+                             // setting (read fresh at mount, so it applies
+                             // starting from the next turn)
+                             collapsed: localStorage.getItem('collapseChainDefault') === 'true',
+                             get processing() { return $store.stream.state !== 'idle' },
+                             get lastLabel() {
+                                 /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+                                    look at the turn's LAST segment overall, not just
+                                    the chain: once final content arrives it moves
+                                    OUT of the chain, so checking the chain alone
+                                    kept showing the previous 'thinking' label */
+                                 const split = streamTurnSplit($store.stream.turn);
+                                 const items = split.chain.concat(split.final);
+                                 return items.length ? chainItemLabel(items[items.length - 1]) : '';
+                             }
+                         }">
                         <div class="agent-chain-header" @click="collapsed = !collapsed">
                             <svg :class="{'toggle': true, 'toggle-expanded': !collapsed}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="9 6 15 12 9 18"></polyline>
                             </svg>
                             {% include 'svg/gear.svg' %}
-                            <span class="label">Process</span>
+                            <span class="label" x-text="processing ? 'Processing..' : 'Process'"></span>
+                            <span class="activity" x-show="collapsed && lastLabel" x-text="'(' + lastLabel + ')'"></span>
                         </div>
                         <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
                              timeline layout (see history chain). no finish flag

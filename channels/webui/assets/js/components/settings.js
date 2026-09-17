@@ -32,6 +32,9 @@ function settingsModal() {
         // streamed-token fade settings (localStorage; applied live, no save needed).
         // literal 350 default: this file loads before directives/fade_tail.js.
         tokenFadeEnabled: localStorage.getItem('tokenFadeEnabled') !== 'false',
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+        // start the live processing chain collapsed (localStorage; default off)
+        collapseChainDefault: localStorage.getItem('collapseChainDefault') === 'true',
         tokenFadeMs: localStorage.getItem('tokenFadeMs') || '350',
 
         get activeNavCategory() {
@@ -269,6 +272,14 @@ function settingsModal() {
         handleTokenFadeToggle() {
             this.tokenFadeEnabled = !this.tokenFadeEnabled;
             localStorage.setItem('tokenFadeEnabled', this.tokenFadeEnabled);
+        },
+
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+        // processing chain default-collapse toggle (localStorage; read fresh
+        // when a streaming chain mounts, so it applies to the next turn)
+        handleCollapseChainToggle() {
+            this.collapseChainDefault = !this.collapseChainDefault;
+            localStorage.setItem('collapseChainDefault', this.collapseChainDefault);
         },
 
         handleTokenFadeSpeed(ms) {

@@ -57,6 +57,26 @@ function historyTurnSplit(turn) {
     return { chain, final };
 }
 
+// -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+// short human label for a chain segment, shown in parentheses on the
+// collapsed Process header (what is the agent busy with right now?)
+function chainItemLabel(message) {
+    if (Array.isArray(message.tool_calls) && message.tool_calls.length > 0) {
+        const fn = message.tool_calls[message.tool_calls.length - 1].function?.name;
+        if (fn) {
+            const parts = fn.split('_');
+            return parts[0].replace(/^\w/, c => c.toUpperCase()) + ': ' + parts.slice(1).join(' ');
+        }
+    }
+    if (message.reasoning_content && message.reasoning_content.trim() !== '') return 'thinking';
+    if (message.role === 'assistant' && typeof message.content === 'string' && message.content.trim() !== '') {
+        // content segments: the ai is putting words together, not reasoning -
+        // 'writing' reads better than a raw snippet here
+        return 'writing';
+    }
+    return '';
+}
+
 // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
 // while streaming we can't know which content will be the final one:
 // content only counts as final while it is the most recent segment. if a

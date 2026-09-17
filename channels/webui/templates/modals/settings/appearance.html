@@ -118,7 +118,16 @@
                        @input="handleChatWidth($event.target.value)">
             </div>
 
-            <h4>Animations</h4>
+            <h4>Preferences</h4>
+
+            <div class="item">
+                <div class="toggle-row">
+                    <label>Collapse processing chain by default</label>
+                    <button class="toggle" type="button" :class="{ active: collapseChainDefault }" @click="handleCollapseChainToggle()">
+                    </button>
+                </div>
+                <span class="description">Hide the details of what your AI is doing from you, and instead only show the basics on one line while your AI works. You can still expand the chain by clicking on it.</span>
+            </div>
 
             <div class="item">
                 <div class="toggle-row">
