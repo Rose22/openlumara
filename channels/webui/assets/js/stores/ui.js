@@ -17,6 +17,48 @@ UI_STORE = {
     scrollToTurnIndex: null,
 
     /*
+     * -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17) (02:25)
+     * bottom-detection suppression for smooth streaming autoscroll: while
+     * our own smooth animation is in flight, the intermediate positions
+     * would otherwise flip shouldScroll off and stall the follow. when the
+     * animation settles (including when the user hijacks it mid-flight -
+     * scrollend fires wherever they land) the resting position is
+     * re-evaluated. falls back to instant for reduced motion.
+     */
+    _suppressScroll: false,
+    _suppressTimer: null,
+
+    _updateShouldScroll(el) {
+        const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+        this.shouldScroll = distFromBottom < this.scrollThreshold;
+    },
+
+    _smoothScrollToBottom(el) {
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            el.scrollTop = el.scrollHeight;
+            return;
+        }
+
+        this._suppressScroll = true;
+        el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+
+        const settle = () => {
+            this._suppressScroll = false;
+            el.removeEventListener('scrollend', settle);
+            // evaluate the resting position: covers both a natural finish at
+            // the bottom AND a user interrupting the animation with their
+            // wheel/touch (scrollend fires wherever they stopped)
+            this._updateShouldScroll(el);
+        };
+
+        el.addEventListener('scrollend', settle);
+
+        // scrollend isn't universally supported; timeout as a safety net
+        clearTimeout(this._suppressTimer);
+        this._suppressTimer = setTimeout(settle, 500);
+    },
+
+    /*
      * -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-15)
      * lazy-mount scroll stability:
      * - _turnHeights remembers the real rendered height of a turn so its
@@ -115,14 +157,12 @@ UI_STORE = {
         const el = document.getElementById(containerId);
         if (!el) return;
 
-        const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-        const wasAtBottom = this.shouldScroll;
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17) (02:25)
+        // ignore the intermediate positions of our own smooth autoscroll;
+        // the resting position is evaluated when the animation settles.
+        if (this._suppressScroll) return;
 
-        if (distFromBottom < this.scrollThreshold) {
-            this.shouldScroll = true;
-        } else {
-            this.shouldScroll = false;
-        }
+        this._updateShouldScroll(el);
     },
 
     async scrollToBottom(containerId = 'messages') {
@@ -131,8 +171,12 @@ UI_STORE = {
         const el = document.getElementById(containerId);
         if (!el) return;
 
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17) (02:25)
+        // smooth glide for the streaming follow; each incoming token
+        // retargets the in-flight animation, so it reads as one continuous
+        // drift instead of a jump per token
         Alpine.nextTick(() => {
-            el.scrollTop = el.scrollHeight;
+            this._smoothScrollToBottom(el);
         });
     },
 
