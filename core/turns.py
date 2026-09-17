@@ -74,6 +74,18 @@ class TurnCollector:
                     for tool in msg["tool_calls"]:
                         if tool.get("id") in response_map:
                             tool["response"] = response_map[tool["id"]]
+
+        # flag the final content turn
+        for turn in reversed(turns):
+            if turn["role"] != "assistant":
+                continue
+            has_content = any(
+                m.get("role") == "assistant" and m.get("content") and not m.get("tool_calls")
+                for m in turn["messages"]
+            )
+            if has_content:
+                turn["final"] = True
+            break
                             
         return turns
 
@@ -174,7 +186,9 @@ class TurnCollector:
                 elif segment_type == 'content':
                     current_segment.setdefault("content", token.get("content", ''))
                 elif segment_type == 'tool_calls':
-                    current_segment.setdefault("tool_calls", token.get("tool_calls", []))
+                    # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+                    # copy the list since we now mutate it in place during merges
+                    current_segment.setdefault("tool_calls", list(token.get("tool_calls", [])))
                     last_tool_calls_segment = current_segment  # remember this for later merging
                 elif segment_type == 'tool':
                     current_segment["type"] = "tool_response"
@@ -189,8 +203,27 @@ class TurnCollector:
                 # so here's where we do the streaming magic
                 # that merges new tokens into the existing segment
                 if segment_type == 'tool_calls':
+                    # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+                    # merge streamed tool calls by id instead of replacing the whole
+                    # array: each delta only carries the single buffered call for its
+                    # index, so a blunt replace wiped out all previously streamed calls.
                     if token.get("tool_calls"):
-                        current_segment["tool_calls"] = token["tool_calls"]
+                        existing_calls = current_segment.setdefault("tool_calls", [])
+                        for incoming_call in token["tool_calls"]:
+                            call_id = incoming_call.get("id")
+                            if call_id:
+                                for idx, existing_call in enumerate(existing_calls):
+                                    if existing_call.get("id") == call_id:
+                                        existing_calls[idx] = incoming_call
+                                        break
+                                else:
+                                    existing_calls.append(incoming_call)
+                            elif existing_calls and not existing_calls[-1].get("id"):
+                                # no id to match on: assume it continues the last
+                                # id-less call (providers that stream ids late/never)
+                                existing_calls[-1] = incoming_call
+                            else:
+                                existing_calls.append(incoming_call)
                 elif segment_type == 'tool':
                     current_segment["content"] = (current_segment.get("content") or '') + (token.get("content") or '')
                 else:
