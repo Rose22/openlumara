@@ -43,9 +43,12 @@
         }
     }
 
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+       wrench icon in em (16px = 1.18em at 0.85rem) so headers scale
+       with font size like the timeline nodes */
     .icon {
-        width: 16px;
-        height: 16px;
+        width: 1.18em;
+        height: 1.18em;
         color: var(--text-muted);
         flex-shrink: 0;
     }

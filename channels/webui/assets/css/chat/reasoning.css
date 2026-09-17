@@ -13,7 +13,7 @@
     .header {
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 0.6em;
         cursor: pointer;
         user-select: none;
         font-size: 0.85rem;
@@ -26,9 +26,12 @@
             flex-shrink: 0;
         }
 
+        /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+           thought bubble in em (16px = 1.18em at 0.85rem) so it scales
+           with font size like the timeline nodes */
         .icon {
-            width: 16px;
-            height: 16px;
+            width: 1.18em;
+            height: 1.18em;
         }
         .text {
             display: flex;
@@ -110,8 +113,8 @@
    chevron only outside an agent chain; inside one, the node dot already
    shows the expand/collapse state */
 .standalone-chevron {
-    width: 14px;
-    height: 14px;
+    width: 1em;
+    height: 1em;
     color: var(--text-muted);
     flex-shrink: 0;
     transition: transform 0.2s ease;
