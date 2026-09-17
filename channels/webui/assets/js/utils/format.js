@@ -44,7 +44,8 @@ function formatDate(dateString) {
 /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
    relative-day helpers for the sidebar date grouping. parsing mirrors
    formatDate (naive timestamps are treated as UTC), but grouping and
-   labelling happen in the user's local calendar day. */
+   labelling happen in the user's local calendar day. day keys are
+   local 'YYYY-MM-DD' strings, matching the /api/chats/days endpoint. */
 const _dayWeekdayFmt = new Intl.DateTimeFormat('en', { weekday: 'long' });
 const _dayMonthDayFmt = new Intl.DateTimeFormat('en', { month: 'long', day: 'numeric' });
 const _dayFullFmt = new Intl.DateTimeFormat('en', { month: 'long', day: 'numeric', year: 'numeric' });
@@ -60,9 +61,16 @@ function parseChatDate(dateString) {
     return isNaN(date.getTime()) ? null : date;
 }
 
+function localDayKey(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
 function dayKeyOf(dateString) {
     const date = parseChatDate(dateString);
-    return date ? date.toDateString() : '';
+    return date ? localDayKey(date) : '';
 }
 
 function startOfDayMs(date) {
@@ -71,9 +79,14 @@ function startOfDayMs(date) {
 
 // relative day label, no clock time: Today / Yesterday / weekday name
 // for the past week / 'September 12' (year appended when not this year)
-function dayLabelOf(dateString) {
-    const date = parseChatDate(dateString);
-    if (!date) { return 'Undated'; }
+function dayLabelFromKey(key) {
+    if (!key) { return 'Undated'; }
+
+    // parsed as LOCAL midnight (component ctor), unlike new Date('YYYY-MM-DD')
+    // which would parse as UTC and shift the day
+    const parts = key.split('-').map(Number);
+    const date = new Date(parts[0], parts[1] - 1, parts[2]);
+    if (isNaN(date.getTime())) { return 'Undated'; }
 
     const diffDays = Math.round((startOfDayMs(new Date()) - startOfDayMs(date)) / 86400000);
 
@@ -83,6 +96,10 @@ function dayLabelOf(dateString) {
     if (date.getFullYear() === new Date().getFullYear()) { return _dayMonthDayFmt.format(date); }
 
     return _dayFullFmt.format(date);
+}
+
+function dayLabelOf(dateString) {
+    return dayLabelFromKey(dayKeyOf(dateString));
 }
 
 function formatLabel(key) {

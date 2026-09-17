@@ -17,6 +17,7 @@ import core
 import os
 import json
 import asyncio
+import datetime
 import time
 
 # webui stuff
@@ -469,6 +470,69 @@ async def create_fastapi(channel):
         has_more = offset + limit < len(all_chats)
 
         return api_result({"messages": paginated, "has_more": has_more}, success=True)
+
+    # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+    # day-grouped chat listing for the sidebar's collapsible date
+    # headers. 'updated' is naive UTC, so days are bucketed in the
+    # browser's local day: the frontend sends its tz offset (JS
+    # getTimezoneOffset, minutes behind UTC) and the backend shifts
+    # before bucketing so headers and client-side grouping agree.
+    def _chats_for_category(category):
+        all_chats = channel.context.chat.get_all()
+        if category:
+            all_chats = [c for c in all_chats if c.get("category") == category]
+        return all_chats
+
+    def _local_day(updated_str, tz_offset_min):
+        # naive UTC isoformat -> local date string 'YYYY-MM-DD'
+        if not updated_str:
+            return ""
+
+        try:
+            dt = datetime.datetime.fromisoformat(updated_str)
+        except ValueError:
+            return ""
+
+        if dt.tzinfo is not None:
+            dt = dt.astimezone(datetime.timezone.utc).replace(tzinfo=None)
+
+        dt = dt - datetime.timedelta(minutes=tz_offset_min)
+        return dt.date().isoformat()
+
+    @app.get("/api/chats/days")
+    async def get_chat_days(request: fastapi.Request):
+        """Returns the distinct local days that have chats, newest first, with counts"""
+        category = request.query_params.get("category", None)
+        tz_offset = int(request.query_params.get("tz_offset", 0))
+
+        counts = {}
+        for chat in _chats_for_category(category):
+            day = _local_day(chat.get("updated", ""), tz_offset)
+            counts[day] = counts.get(day, 0) + 1
+
+        days = [{"day": d, "count": c} for d, c in counts.items()]
+        days.sort(key=lambda entry: entry["day"], reverse=True)
+
+        return api_result(days, success=True)
+
+    @app.get("/api/chats/day")
+    async def get_chats_for_day(request: fastapi.Request):
+        """Returns the chats of one local day (YYYY-MM-DD), newest first, paginated"""
+        day = request.query_params.get("day", "")
+        offset = int(request.query_params.get("offset", 0))
+        limit = int(request.query_params.get("limit", 50))
+        category = request.query_params.get("category", None)
+        tz_offset = int(request.query_params.get("tz_offset", 0))
+
+        day_chats = [
+            c for c in _chats_for_category(category)
+            if _local_day(c.get("updated", ""), tz_offset) == day
+        ]
+
+        paginated = day_chats[offset:offset + limit]
+        has_more = offset + limit < len(day_chats)
+
+        return api_result({"messages": paginated, "has_more": has_more, "count": len(day_chats)}, success=True)
 
     @app.get("/api/chats/categories")
     async def get_chat_categories():

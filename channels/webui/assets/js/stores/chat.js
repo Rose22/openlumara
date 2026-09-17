@@ -64,15 +64,20 @@ CHAT_STORE = {
      * alpine.js store for chat state
      */
 
-    visibleChats: [],
-    chatOffset: 0,
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+       option d: the sidebar shows ALL day headers at once (cheap
+       /api/chats/days listing), and chats are fetched per-day only when
+       a group is expanded (paginated per day via /api/chats/day).
+       group shape: {key, label, count, chats, offset, hasMore, loading,
+       loaded}. the old flat visibleChats/chatOffset pagination is gone. */
+    dayGroups: [],
     chatLimit: 10,
-    hasMoreChats: true,
+    dayFetchGen: 0,
 
     /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
        the chat object the 'move to category' modal targets (the whole
        object, not just the id: moved chats can come from search results,
-       which don't live in visibleChats) */
+       which don't live in the day groups) */
     moveChatTarget: null,
 
     categories: [],
@@ -111,10 +116,6 @@ CHAT_STORE = {
 
         // ensure the chat exists in the visible sidebar list before scrolling
         await this.ensureChatVisible(this.selectedChat);
-
-        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
-        // the loaded chat's day group must be open, even if it isn't today
-        this.expandDayOfChat(this.selectedChat);
     },
 
     /* ----------------------
@@ -138,8 +139,9 @@ CHAT_STORE = {
         this.currentTokenUsage = result.token_usage;
 
         // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
-        // keep the open chat's day group expanded in the sidebar
-        this.expandDayOfChat(chatId);
+        // the open chat's day group must be expanded (and the chat
+        // itself loaded), so the active item is never hidden
+        await this.ensureChatVisible(chatId);
 
         // make sure it always shows the bottom of the chat
         await ui.forceScrollToBottom();
@@ -166,67 +168,175 @@ CHAT_STORE = {
 
     get searching() { return Boolean(this.searchQuery.trim()); },
 
-    sidebarChats() {
-        return this.searching ? this.searchResults : this.visibleChats;
-    },
-
     /* ----------------------
-     * date grouping (sidebar)
+     * day groups (sidebar)
      * ----------------------- */
     /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
-       chats are grouped by relative calendar day under collapsible
-       headers. default: today expanded, every other day collapsed;
-       once the user toggles a group, their explicit choice wins. */
+       option d: /api/chats/days lists every day that has chats (cheap,
+       no chat data), so all headers render instantly. chats are only
+       fetched for EXPANDED groups, paginated per day. default: today
+       expanded, everything else collapsed; an explicit toggle wins. */
     collapsedDays: {},
 
+    tzOffset() {
+        // JS getTimezoneOffset: minutes behind UTC (CEST -> -120)
+        return new Date().getTimezoneOffset();
+    },
+
+    catParam() {
+        return this.selectedCategory ? `&category=${encodeURIComponent(this.selectedCategory)}` : '';
+    },
+
     todayKey() {
-        return new Date().toDateString();
+        return localDayKey(new Date());
     },
 
-    isGroupCollapsed(key) {
-        if (key in this.collapsedDays) { return this.collapsedDays[key]; }
-        return key !== this.todayKey();
+    isGroupCollapsed(group) {
+        // search results are always shown fully - hiding matches behind
+        // a collapsed header would be maddening
+        if (this.searching) { return false; }
+        if (group.key in this.collapsedDays) { return Boolean(this.collapsedDays[group.key]); }
+        return group.key !== this.todayKey();
     },
 
-    toggleDayGroup(key) {
-        this.collapsedDays[key] = !this.isGroupCollapsed(key);
+    toggleDayGroup(group) {
+        const collapse = !this.isGroupCollapsed(group);
+        this.collapsedDays[group.key] = collapse;
+
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+        // on expand, fill the viewport: the per-group loader can appear
+        // already in view, and x-intersect (entry-only) won't fire for
+        // it. run the fill loop after the DOM updated.
+        if (!collapse) {
+            Alpine.nextTick(() => this.ensureDayChatsFilled(group));
+        }
     },
 
     // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
-    // the group of the open chat is always expanded (on load/chat switch)
-    // so the active item is never hidden behind a collapsed header.
-    expandDayOfChat(chatId) {
-        const chat = this.visibleChats.find(c => c.id === chatId)
-            || this.searchResults.find(c => c.id === chatId);
-        if (!chat) { return; }
+    // keep loading pages for one day group while its loader is visible
+    // in the .chats scroll container, so a newly expanded group always
+    // shows chats (and x-intersect can take over from there: once
+    // content pushes the loader out of view, entry events drive it).
+    async ensureDayChatsFilled(group, el) {
+        while (true) {
+            // the x-if may have (re)rendered the loader: re-resolve it
+            if (!el || !el.isConnected) {
+                el = document.querySelector(`[data-day-loader="${group.key}"]`);
+            }
+            if (!el || !el.isConnected) { break; }
 
-        this.collapsedDays[dayKeyOf(chat.updated) || 'undated'] = false;
+            const container = el.closest('.chats');
+            if (!container || !group.hasMore) { break; }
+
+            // another call is fetching this group: wait for it
+            if (group.loading) {
+                await new Promise(resolve => setTimeout(resolve, 50));
+                continue;
+            }
+
+            const rect = el.getBoundingClientRect();
+            const crect = container.getBoundingClientRect();
+            const visible = rect.top < crect.bottom && rect.bottom > crect.top;
+            if (!visible) { break; }
+
+            const progressed = await this.loadDayChats(group);
+            if (!progressed) { break; }
+
+            // let alpine render the new chats before re-measuring
+            await Alpine.nextTick();
+        }
     },
 
-    groupedSidebarChats() {
-        // pagination mode filters by category here (the template used to
-        // do it per-item); search results are already category-scoped
-        // by the backend.
-        const source = this.searching
-            ? this.searchResults
-            : this.visibleChats.filter(c => c.category === this.selectedCategory);
+    // the x-for source in sidebar.html: day groups while browsing,
+    // client-side grouped search results while searching
+    displayGroups() {
+        if (!this.searching) { return this.dayGroups; }
 
-        // chats arrive newest-first, so first-seen order = correct day
-        // order; the byKey map merges late-arriving pages into the day
-        // they belong to instead of spawning duplicate headers.
+        // search results arrive newest-first, so first-seen order is
+        // the correct (descending) day order
         const groups = [];
         const byKey = {};
 
-        for (const chat of source) {
+        for (const chat of this.searchResults) {
             const key = dayKeyOf(chat.updated) || 'undated';
             if (!(key in byKey)) {
-                byKey[key] = { key: key, label: dayLabelOf(chat.updated), chats: [] };
+                byKey[key] = { key: key, label: dayLabelFromKey(key), chats: [] };
                 groups.push(byKey[key]);
             }
             byKey[key].chats.push(chat);
         }
 
         return groups;
+    },
+
+    // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+    // fetch the day header list, then (re)load the chats of every group
+    // that is currently expanded. a generation counter discards stale
+    // in-flight requests when the list reloads again (fast category
+    // switches, deletes, etc).
+    async reloadDayGroups() {
+        const gen = ++this.dayFetchGen;
+
+        const days = await simpleApiFetch(`/api/chats/days?tz_offset=${this.tzOffset()}${this.catParam()}`);
+
+        // stale: a newer reload superseded this one
+        if (gen !== this.dayFetchGen) { return; }
+
+        this.dayGroups = (days ?? []).map(d => ({
+            key: d.day,
+            label: dayLabelFromKey(d.day),
+            count: d.count,
+            chats: [],
+            offset: 0,
+            hasMore: d.count > 0,
+            loading: false,
+            loaded: false
+        }));
+
+        await Promise.all(
+            this.dayGroups.filter(g => !this.isGroupCollapsed(g))
+                .map(g => this.loadDayChats(g))
+        );
+
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+        // first pages are in: fill the viewport of every expanded group
+        // (a loader that renders already-visible never fires x-intersect)
+        await Alpine.nextTick();
+        await Promise.all(
+            this.dayGroups.filter(g => !this.isGroupCollapsed(g))
+                .map(g => this.ensureDayChatsFilled(g))
+        );
+    },
+
+    // loads one page of chats for a single day group. resolves to true
+    // if progress was made, false if nothing more can load (already
+    // loading / exhausted / failed / stale).
+    async loadDayChats(group) {
+        if (!group || group.loading || !group.hasMore) { return false; }
+
+        group.loading = true;
+        const gen = this.dayFetchGen;
+        const before = group.chats.length;
+
+        const result = await simpleApiFetch(
+            `/api/chats/day?day=${group.key}&offset=${group.offset}` +
+            `&limit=${this.chatLimit}&tz_offset=${this.tzOffset()}${this.catParam()}`
+        );
+
+        group.loading = false;
+
+        // stale (list reloaded mid-flight) or failed: mark exhausted so
+        // loop callers can't spin; a reload rebuilds the group anyway.
+        if (gen !== this.dayFetchGen || !this.dayGroups.includes(group)) { return false; }
+
+        if (!result) { group.hasMore = false; return false; }
+
+        group.chats.push(...result.messages);
+        group.offset += result.messages.length;
+        group.hasMore = result.has_more;
+        group.loaded = true;
+
+        return group.chats.length > before;
     },
 
     setSearchInContent(on) {
@@ -286,132 +396,47 @@ CHAT_STORE = {
         this.searchLoading = false;
     },
 
+    // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+    // option d: reloading the sidebar = reloading the day header list
+    // (which re-fetches the chats of every expanded group). collapsed
+    // groups cost one cheap day-list request, nothing else.
     async reloadChats() {
-        this.cancelChatFetch();
-        this.chatOffset = 0;
-        this.visibleChats = [];
-        await this._fetchChats();
+        await this.reloadDayGroups();
 
-        // ensure there are always more chats loaded than what fits in the current viewport
-        await this.ensureMoreChats();
-
-        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
-        // refresh search results alongside pagination, so renames/deletes
-        // (which reload the list) don't leave the search mode list stale.
+        // refresh search results alongside, so renames/deletes (which
+        // reload the list) don't leave the search mode list stale.
         if (this.searching) { await this._runChatSearch(this.searchQuery.trim()); }
     },
 
+    // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+    // walk the day groups (newest first), loading each one's chats
+    // until the target chat shows up, then expand its group. usually it
+    // hits immediately in the already-loaded today group; opening an old
+    // chat walks back through the days (without expanding them).
     async ensureChatVisible(chatId) {
-        const exists = this.visibleChats.some(c => c.id === chatId);
-        if (exists) { return; }
+        for (const group of this.dayGroups) {
+            if (group.chats.some(c => c.id === chatId)) {
+                this.collapsedDays[group.key] = false;
+                return true;
+            }
 
-        // keep loading more chats until the target chat appears
-        // (break if a page was cancelled by a newer reload)
-        while (this.hasMoreChats && !this.visibleChats.some(c => c.id === chatId)) {
-            if (!await this.loadMoreChats()) { break; }
+            while (group.hasMore) {
+                // a concurrent per-group loader fetch is in flight: wait
+                // for it instead of treating 'false' as 'no progress'
+                while (group.loading) {
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                }
+
+                const progressed = await this.loadDayChats(group);
+                if (group.chats.some(c => c.id === chatId)) {
+                    this.collapsedDays[group.key] = false;
+                    return true;
+                }
+                if (!progressed) { break; }
+            }
         }
-    },
 
-    // resolves to true if a page was actually loaded, false if it was
-    // cancelled or failed
-    async loadMoreChats() {
-        if (!this.hasMoreChats) { return false; }
-
-        const before = this.visibleChats.length;
-        const loaded = await this._fetchChats();
-        if (!loaded) { return false; }
-
-        // if the api returned nothing new, stop so callers that loop
-        // (like ensureChatVisible) can't spin forever.
-        if (this.visibleChats.length === before) { this.hasMoreChats = false; }
-
-        return true;
-    },
-
-    // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
-    // aborts an in-flight pagination request. kept because x-intersect can
-    // still fire loadMoreChats right as a reload starts (category switch),
-    // and an uncancelled page would land on top of the fresh page 1.
-    chatsAbort: null,
-
-    cancelChatFetch() {
-        if (this.chatsAbort) { this.chatsAbort.abort(); this.chatsAbort = null; }
-    },
-
-    async ensureMoreChats(el) {
-        /* 
-         * makes sure there are always more chats loaded
-         * than what the viewport can show,
-         * so that x-intersect always works (because it needs to be out of view first)
-         */
-        // search mode shows backend results, pagination is frozen
-        if (this.searching) { return; }
-
-        const intersect_el = document.getElementById("chat-scroll-loader");
-        if (!intersect_el) { return; }
-
-        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
-        // compare against the .chats scroll container, not the window -
-        // the loader scrolls inside that box, not with the page.
-        const container = intersect_el.parentElement;
-        if (!container) { return; }
-
-        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
-        // loop instead of a one-shot check: with date grouping, a loaded
-        // page can land entirely in collapsed groups, so the loader never
-        // leaves the viewport and x-intersect (entry-only) won't re-fire.
-        // keep going until the loader is out of view or no progress was
-        // made (cancelled fetch / no more chats), so this can't spin.
-        while (true) {
-            const rect = intersect_el.getBoundingClientRect();
-            const crect = container.getBoundingClientRect();
-
-            const visible = rect.top < crect.bottom && rect.bottom > crect.top;
-            if (!visible) { break; }
-
-            const loaded = await this.loadMoreChats();
-            if (!loaded) { break; }
-        }
-    },
-
-    fetchingChats: false,
-
-    // resolves to true if the page was loaded into visibleChats,
-    // false if it was cancelled or failed
-    async _fetchChats() {
-        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
-        // x-intersect can fire several times while a page is still in
-        // flight (scroll + ensureMoreChats + ensureChatVisible all call
-        // in), and concurrent fetches with the same offset pushed
-        // duplicate chat objects into visibleChats (bloat + duplicate
-        // x-for keys). one fetch at a time: callers wait for the in-flight
-        // page rather than no-op, so loop callers can't busy-spin without
-        // making progress.
-        while (this.fetchingChats) {
-            await new Promise(resolve => setTimeout(resolve, 50));
-        }
-        this.fetchingChats = true;
-
-        const controller = new AbortController();
-        this.chatsAbort = controller;
-
-        try {
-            const offset = this.chatOffset;
-            const catParam = this.selectedCategory ? `&category=${encodeURIComponent(this.selectedCategory)}` : '';
-            const result = await simpleApiFetch(`/api/chats?offset=${offset}&limit=${this.chatLimit}${catParam}`, controller.signal);
-            if (!result) { return false; }
-
-            this.visibleChats.push(...result.messages);
-            this.chatOffset += result.messages.length;
-            this.hasMoreChats = result.has_more;
-            return true;
-        } catch (err) {
-            // aborted (search cleared / list reloaded) or network hiccup:
-            // either way, nothing was pushed and callers should stop
-            return false;
-        } finally {
-            this.fetchingChats = false;
-        }
+        return false;
     },
 
     async newChat(category = null) {
@@ -434,6 +459,12 @@ CHAT_STORE = {
 
         // the new chat may live in a category the dropdown doesn't list yet
         await this.reloadCategories();
+
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+        // a new chat always lives in 'today' - force that group open even
+        // if it was manually collapsed, so the new chat is visible
+        this.collapsedDays[this.todayKey()] = false;
+
         await this.reloadChats();
         await this.reloadChat();
     },
@@ -740,22 +771,11 @@ CHAT_STORE = {
                 category: category
             });
             
-            const queryLower = (query || '').toLowerCase();
-
-            // Priority sort:
-            // 1. Chats whose title contains the query come first
-            // 2. Within each group, sorted by updated descending (newest first)
-            result.sort((a, b) => {
-                const aMatches = (a.title || '').toLowerCase().includes(queryLower);
-                const bMatches = (b.title || '').toLowerCase().includes(queryLower);
-
-                // Primary: matching titles first
-                if (aMatches && !bMatches) return -1;
-                if (!aMatches && bMatches) return 1;
-
-                // Secondary: both match or both don't → sort by date descending
-                return (b.updated || '').localeCompare(a.updated || '');
-            });
+            // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+            // pure updated-descending sort (the old title-matches-first
+            // priority scrambled the day groups in the sidebar, which
+            // rely on strict newest-first order).
+            result.sort((a, b) => (b.updated || '').localeCompare(a.updated || ''));
 
             return result;
         } catch (err) {
