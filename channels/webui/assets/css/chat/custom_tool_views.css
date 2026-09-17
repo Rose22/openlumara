@@ -1,0 +1,129 @@
+/* =============================================================================
+ *  Custom tool call views
+ *  styling for the inline markup views in templates/chat/tool_displays.html
+ *  (see js/renderers/tool_display.js for the system, and
+ *  js/renderers/custom_tool_views.js for the per-view helpers/registrations).
+ *  scoped under .tool-call-card like the core tool call styles.
+ *  ============================================================================= */
+
+.tool-call-card {
+
+    /* single line below a custom display box (eg. file: foo.py) */
+    .display-footer {
+        margin-top: 6px;
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        opacity: 0.8;
+        font-family: var(--code-font);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+       diff display (coder file edits): +/- gutter lines, tinted.
+       streams live from args */
+    .tool-display {
+        font-family: var(--code-font);
+        font-size: 0.8rem;
+        line-height: 1.55;
+        max-height: 260px;
+        overflow-y: auto;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 8px 10px;
+
+        .diff-line {
+            display: flex;
+            gap: 8px;
+            white-space: pre-wrap;
+            word-break: break-word;
+            border-radius: 3px;
+
+            .diff-gutter {
+                flex-shrink: 0;
+                width: 1em;
+                user-select: none;
+                opacity: 0.7;
+            }
+
+            &.diff-del {
+                background: color-mix(in srgb, var(--error, #f87171) 10%, transparent);
+                .diff-gutter { color: var(--error, #f87171); }
+            }
+
+            &.diff-add {
+                background: color-mix(in srgb, #4ade80 10%, transparent);
+                .diff-gutter { color: #4ade80; }
+            }
+
+            /* collapsed unchanged stretch */
+            &.diff-gap {
+                opacity: 0.55;
+                .diff-text { font-style: italic; }
+            }
+        }
+    }
+
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-18)
+       web search results view: titled link cards with url + snippet */
+    .search-results {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        max-height: 320px;
+        overflow-y: auto;
+
+        .search-card {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            padding: 8px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+        }
+
+        .search-title-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .search-title {
+            font-weight: 600;
+            color: var(--accent);
+            text-decoration: none;
+            min-width: 0;
+
+            &:hover { text-decoration: underline; }
+
+            &.plain { color: var(--text-primary); }
+        }
+
+        .search-thumb {
+            flex-shrink: 0;
+            width: 56px;
+            height: 42px;
+            object-fit: cover;
+            border-radius: 6px;
+        }
+
+        .search-url {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            opacity: 0.75;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+    }
+
+    /* snippet text inside result cards AND the bare error fallback that
+       renders outside .search-results, so scoped at the card level */
+    .search-snippet {
+        font-size: 0.82rem;
+        line-height: 1.5;
+        color: var(--text-primary);
+        opacity: 0.85;
+    }
+}

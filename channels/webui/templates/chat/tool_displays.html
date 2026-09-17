@@ -1,9 +1,40 @@
-<!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
-     custom body views for claimed tool calls (see js/renderers/tool_display.js).
+<!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-18)
+     custom body views for claimed tool calls. this file holds the VIEW
+     MARKUP only; the display system lives in js/renderers/tool_display.js,
+     the per-view helpers/registrations in js/renderers/custom_tool_views.js,
+     and the view styling in css/chat/custom_tool_views.css.
      one branch per view name; toolDisplayView(tool) picks it. plugins will
      later contribute their own branches the same way. no html string
      generation anywhere - everything here is plain alpine markup.
      `tool` and `cacheKey` come from the including template's scope. -->
+
+<template x-if="toolDisplayView(tool) === 'web-search'"
+          x-data="{ get response() { return toolResponse(tool) },
+                    get results() { return searchResults(this.response) },
+                    get errorText() {
+                        if (!this.response || this.response.status !== 'error') return '';
+                        const c = this.response.content;
+                        return typeof c === 'string' ? c : JSON.stringify(c);
+                    } }">
+    <div>
+        <!-- search failed: show the error text instead of an empty body -->
+        <div class="search-snippet" x-show="errorText" x-text="errorText"></div>
+        <div class="search-results" x-show="results.length">
+            <template x-for="res in results">
+                <div class="search-card">
+                    <div class="search-title-row">
+                        <a class="search-title" x-show="res.url" :href="res.url"
+                           target="_blank" rel="noopener noreferrer" x-text="res.title"></a>
+                        <span class="search-title plain" x-show="!res.url" x-text="res.title"></span>
+                        <img class="search-thumb" x-show="res.thumb" :src="res.thumb" loading="lazy" alt="">
+                    </div>
+                    <div class="search-url" x-show="res.url" x-text="res.url"></div>
+                    <div class="search-snippet" x-show="res.snippet" x-text="res.snippet"></div>
+                </div>
+            </template>
+        </div>
+    </div>
+</template>
 
 <template x-if="toolDisplayView(tool) === 'coder-file-edit'"
           x-data="{ get args() { return toolArgs(tool, cacheKey) },
