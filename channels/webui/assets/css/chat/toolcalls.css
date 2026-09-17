@@ -64,6 +64,7 @@
         }
     }
 
+
     /* body: generous vertical rhythm. left border/indent removed - the
        timeline spine of the agent chain provides the structure now */
     .body {
@@ -144,34 +145,35 @@
             color: var(--text-muted);
         }
 
+        /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+           kv rows mirror the tool argument rows exactly: same key column,
+           gap and rhythm, no border-left on values */
         .kv-row {
-            gap: 8px;
-            padding: 0px 4px;
+            display: flex;
+            align-items: baseline;
+            gap: 14px;
+            line-height: 1.7;
 
             .key {
                 color: var(--accent);
+                min-width: 90px;
+                flex-shrink: 0;
                 font-weight: 500;
                 font-size: 0.85rem;
-                flex-shrink: 0;
-                max-width: 150px;
                 overflow: hidden;
                 text-overflow: ellipsis;
-            }
-
-            .colon {
-                color: var(--text-muted);
-                opacity: 0.4;
             }
 
             .value {
                 color: var(--text-primary);
                 font-size: 0.85rem;
                 word-break: break-word;
+                white-space: pre-wrap;
                 flex: 1;
                 min-width: 0;
-                margin-left: 4px;
-                padding-left: 7px;
-                border-left: 1px solid var(--border-color);
+                /* same cap as streaming arg values, plain overflow - no box */
+                max-height: 120px;
+                overflow-y: auto;
             }
 
             .nested {
@@ -184,6 +186,12 @@
                 display: flex;
                 align-items: flex-start;
                 gap: 8px;
+            }
+
+            .value.boxed {
+                border: 1px solid var(--border-color);
+                border-radius: 8px;
+                padding: 8px 10px;
             }
 
             .index {

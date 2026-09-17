@@ -38,17 +38,6 @@
                             </div>
                         </template>
 
-                        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
-                             response has no key label: json responses render their
-                             key/value rows directly, anything else as raw text. -->
-                        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
-                             response renders directly in the flow: no scroll
-                             container, no wrapper. json -> key/value rows,
-                             anything else -> raw text. -->
-                        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
-                             object responses render as key/value rows in the exact
-                             same style as the arg rows (individual long values get
-                             boxed the same way). non-object responses render raw. -->
                         <template x-if="tool.response">
                             <div class="response-row" x-data="{
                                      get parsed() {
@@ -61,12 +50,7 @@
                                      }
                                  }">
                             <template x-if="parsed !== null">
-                                <template x-for="(value, key) in parsed">
-                                    <div class="arg-row">
-                                        <span class="arg-name" x-text="key"></span>
-                                        <span class="arg-value" x-box x-fade-text="(value !== null && typeof value === 'object') ? JSON.stringify(value, null, 2) : value"></span>
-                                    </div>
-                                </template>
+                                <div class="content" x-html="toolResultsRenderer(parsed, 0)"></div>
                             </template>
                             <template x-if="parsed === null">
                                 <p x-fade-text="tool.response" class="raw-response"></p>

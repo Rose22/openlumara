@@ -106,5 +106,24 @@
     margin-top: 0;
 }
 
+/* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+   chevron only outside an agent chain; inside one, the node dot already
+   shows the expand/collapse state */
+.standalone-chevron {
+    width: 14px;
+    height: 14px;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    transition: transform 0.2s ease;
+
+    &.expanded {
+        transform: rotate(90deg);
+    }
+}
+
+.agent-chain .standalone-chevron {
+    display: none;
+}
+
 
 

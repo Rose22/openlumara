@@ -29,7 +29,7 @@ function toolResultsRenderer(data, depth = 0) {
         visible.forEach((item, i) => {
             html += `<div class="array-item">`;
             html += `<span class="index">${i}</span>`;
-            html += `<span class="value">${toolResultsRenderer(item, depth + 1)}</span>`;
+            html += `<div class="value" x-auto-scroll>${toolResultsRenderer(item, depth + 1)}</div>`;
             html += `</div>`;
         });
         html += `<span class="truncated" style="cursor:pointer;">+ ${remaining} more</span>`;
@@ -46,9 +46,12 @@ function toolResultsRenderer(data, depth = 0) {
         const depthClass = depth >= 2 ? ' depth-2' : depth === 1 ? ' depth-1' : '';
         const nestedClass = depth > 0 ? ' nested' : '';
 
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+        // values are wrapped in a div.value so css can cap their height and
+        // scroll them; spans can't do max-height.
         if (!hasMore) {
             const kvs = visible.map(([k, v]) =>
-                `<div class="kv-row"><span class="key">${escapeHtml(k)}</span><span class="colon">: </span>${toolResultsRenderer(v, depth + 1)}</div>`
+                `<div class="kv-row"><span class="key">${escapeHtml(k)}</span><div class="value" x-box x-auto-scroll>${toolResultsRenderer(v, depth + 1)}</div></div>`
             );
             return kvs.join('');
         }
@@ -57,8 +60,7 @@ function toolResultsRenderer(data, depth = 0) {
         visible.forEach(([key, value]) => {
             html += `<div class="kv-row">`;
             html += `<span class="key">${escapeHtml(key)}</span>`;
-            html += `<span class="colon">:</span>`;
-            html += `<span class="value">${toolResultsRenderer(value, depth + 1)}</span>`;
+            html += `<div class="value" x-box x-auto-scroll>${toolResultsRenderer(value, depth + 1)}</div>`;
             html += `</div>`;
         });
         html += `<span class="truncated" style="cursor:pointer;">+ ${remaining} more keys</span>`;

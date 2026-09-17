@@ -39,6 +39,8 @@ document.addEventListener('alpine:init', async () => {
     // so tool call values only get the soft background when they scroll
     Alpine.directive('box', (el, modifiers, { cleanup }) => cleanup(boxIfScrolls(el)));
 
+
+
     self.notice = "Please wait, connecting to backend server..";
     await connectWebSocket();
 
