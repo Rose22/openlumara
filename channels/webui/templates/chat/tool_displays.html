@@ -36,6 +36,77 @@
     </div>
 </template>
 
+<template x-if="toolDisplayView(tool) === 'file-read'"
+          x-data="{ get args() { return toolArgs(tool, cacheKey) },
+                    get response() { return toolResponse(tool) },
+                    get isError() { return !!this.response && this.response.status === 'error' },
+                    get html() { return highlightedCode(this.response?.content, langForPath(this.args.path)) } }">
+    <div>
+        <!-- failed read: plain error text -->
+        <div class="search-snippet" x-show="isError" x-text="response?.content ?? ''"></div>
+        <!-- successful read: highlighted code block. x-html is the one
+             sanctioned escape hatch: hljs output is escaped markup -->
+        <div class="file-read-box hljs" x-show="!isError && html" x-html="html"></div>
+        <div class="display-footer" x-show="args.path" x-text="'file: ' + (args.path ?? '')"></div>
+        <div class="grep-note" x-show="response?.truncation_note" x-text="response?.truncation_note ?? ''"></div>
+    </div>
+</template>
+
+<template x-if="toolDisplayView(tool) === 'file-create'"
+          x-data="{ get args() { return toolArgs(tool, cacheKey) },
+                    get response() { return toolResponse(tool) },
+                    get isError() { return !!this.response && this.response.status === 'error' },
+                    get html() { return highlightedCode(this.args.content, langForPath(this.args.path)) } }">
+    <div>
+        <!-- failed create: plain error text -->
+        <div class="search-snippet" x-show="isError" x-text="typeof response?.content === 'string' ? response.content : ''"></div>
+        <!-- the new file's content, highlighted, streaming live from the
+             args (no response needed - creation is the last step).
+             x-fade-html fades in the new tail chars per paint; faded chars
+             sit inside their hljs token spans so they keep their colors -->
+        <div class="file-read-box hljs" x-show="!isError && html" x-auto-scroll x-fade-html="html"></div>
+        <div class="display-footer" x-show="args.path" x-text="'file: ' + (args.path ?? '')"></div>
+    </div>
+</template>
+
+<template x-if="toolDisplayView(tool) === 'grep'"
+          x-data="{ get args() { return toolArgs(tool, cacheKey) },
+                    get response() { return toolResponse(tool) },
+                    get groups() { return grepGroups(this.response, this.args) },
+                    get errorText() {
+                        if (!this.response || this.response.status !== 'error') return '';
+                        const c = this.response.content;
+                        return typeof c === 'string' ? c : JSON.stringify(c);
+                    } }">
+    <!-- single root element: x-if only renders the template's FIRST child -->
+    <div>
+        <!-- while running (no response yet): live preview of the args, eg.
+             "searching 'pattern' in sub/path" - streams in as they arrive -->
+        <div class="grep-running" x-show="!response">
+            <span class="grep-running-label">searching</span>
+            <span class="grep-running-pattern" x-show="args.regex_pattern" x-text="args.regex_pattern"></span>
+            <span class="grep-running-label" x-show="args.regex_pattern && (args.file_path || args.sub_path)">in</span>
+            <span class="grep-running-pattern" x-show="args.file_path || args.sub_path" x-text="args.file_path ?? args.sub_path ?? ''"></span>
+        </div>
+        <div class="search-snippet" x-show="errorText" x-text="errorText"></div>
+        <div class="grep-results" x-show="groups.length">
+            <template x-for="g in groups">
+                <div class="grep-file">
+                    <div class="grep-file-name" x-text="g.file"></div>
+                    <div class="grep-box">
+                        <template x-for="row in grepRows(g.matches)">
+                            <div class="grep-line" :class="'grep-' + row.kind">
+                                <span class="grep-num" x-text="row.num"></span>
+                                <span class="grep-text" x-text="row.text"></span>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+</template>
+
 <template x-if="toolDisplayView(tool) === 'coder-file-edit'"
           x-data="{ get args() { return toolArgs(tool, cacheKey) },
                     get rows() { return diffRows(this.args.original_code, this.args.replacement_code) } }">

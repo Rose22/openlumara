@@ -126,4 +126,119 @@
         color: var(--text-primary);
         opacity: 0.85;
     }
+
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-18)
+       file read view: highlighted code block (hljs output via x-html).
+       the hljs class on the box picks up the active code theme's token
+       colors; layout is ours */
+    .file-read-box {
+        font-family: var(--code-font);
+        font-size: 0.8rem;
+        line-height: 1.55;
+        max-height: 320px;
+        overflow: auto;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 8px 10px;
+        white-space: pre-wrap;
+        word-break: break-word;
+        tab-size: 4;
+        /* the .hljs class pulls token colors from the active code theme,
+           but themes also set an opaque .hljs background - kill it, the
+           box keeps the card's own background */
+        background: transparent;
+    }
+
+    /* grep variant of the box: NO pre-wrap on the container itself - the
+       box holds template markup, and pre-wrap would render the whitespace
+       between tags as blank lines. wrapping lives on .grep-text instead */
+    .grep-box {
+        font-family: var(--code-font);
+        font-size: 0.8rem;
+        line-height: 1.55;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 8px 10px;
+        tab-size: 4;
+    }
+
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-18)
+       grep view: file-grouped match lists. line-number gutter like the
+       diff, match lines highlighted, context lines dimmed */
+    .grep-results {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        max-height: 360px;
+        overflow-y: auto;
+
+        .grep-file {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .grep-file-name {
+            font-family: var(--code-font);
+            font-size: 0.78rem;
+            color: var(--accent);
+        }
+
+        .grep-line {
+            display: flex;
+            gap: 10px;
+
+            .grep-num {
+                flex-shrink: 0;
+                min-width: 2.5em;
+                text-align: right;
+                user-select: none;
+                opacity: 0.55;
+            }
+
+            .grep-text {
+                white-space: pre-wrap;
+                word-break: break-word;
+                min-width: 0;
+            }
+
+            &.grep-ctx {
+                opacity: 0.5;
+            }
+
+            &.grep-hit {
+                background: color-mix(in srgb, var(--accent) 10%, transparent);
+                border-radius: 3px;
+            }
+        }
+    }
+
+    /* grep while running: dim one-liner of the streamed args */
+    .grep-running {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+
+        .grep-running-label {
+            opacity: 0.7;
+            font-style: italic;
+        }
+
+        .grep-running-pattern {
+            font-family: var(--code-font);
+            color: var(--accent);
+            word-break: break-all;
+        }
+    }
+
+    /* truncation/cap notes under a view box */
+    .grep-note {
+        margin-top: 6px;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        opacity: 0.75;
+        font-style: italic;
+    }
 }

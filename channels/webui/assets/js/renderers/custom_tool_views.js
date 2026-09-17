@@ -109,6 +109,73 @@ function searchResults(response) {
     }));
 }
 
+// -- coder_file_read: highlighted code block ----------------------------------
+
+// pick an hljs language from the file extension; undefined -> auto-detect.
+const READ_LANG_BY_EXT = {
+    py: 'python', js: 'javascript', mjs: 'javascript', ts: 'typescript',
+    json: 'json', html: 'html', xml: 'xml', css: 'css', scss: 'scss',
+    yml: 'yaml', yaml: 'yaml', md: 'markdown', rs: 'rust', go: 'go',
+    c: 'c', h: 'c', cpp: 'cpp', hpp: 'cpp', sh: 'bash', bash: 'bash',
+    toml: 'ini', ini: 'ini', sql: 'sql', java: 'java', rb: 'ruby',
+    php: 'php', txt: 'plaintext',
+};
+
+function langForPath(path) {
+    const ext = (path || '').split('.').pop()?.toLowerCase();
+    return READ_LANG_BY_EXT[ext];
+}
+
+// highlighted html for a read file. hljs escapes the code itself, so the
+// output is safe markup regardless of content. huge dumps skip highlight
+// (auto-detect on megabytes would stutter); plain escaped instead.
+function highlightedCode(code, lang) {
+    const esc = escapeHtml(code ?? '');
+    if (!code || code.length > 200000 || typeof hljs === 'undefined') return esc;
+    try {
+        return (lang && hljs.getLanguage(lang))
+            ? hljs.highlight(code, { language: lang }).value
+            : hljs.highlightAuto(code).value;
+    } catch {
+        return esc;
+    }
+}
+
+// -- coder_folder_grep / coder_file_grep: match lists --------------------------
+
+// normalize the grep response into [{ file, matches }]. content is a flat
+// array of match dicts, or { matches, note } when the max_matches cap hit.
+// folder_grep matches carry a per-match file; file_grep matches don't, so
+// those group under the file_path argument instead.
+function grepGroups(response, args) {
+    if (!response || response.status !== 'success') return [];
+    const c = response.content;
+    const items = Array.isArray(c) ? c : (Array.isArray(c?.matches) ? c.matches : []);
+    const fallbackFile = args?.file_path ?? args?.sub_path ?? 'matches';
+    const groups = new Map();
+    for (const m of items) {
+        const file = m.file ?? fallbackFile;
+        if (!groups.has(file)) groups.set(file, []);
+        groups.get(file).push(m);
+    }
+    return [...groups.entries()].map(([file, matches]) => ({ file, matches }));
+}
+
+// flatten one file's matches into display rows: dimmed context_before, the
+// highlighted match line, dimmed context_after. line numbers only on the
+// match itself (context lines get a blank gutter).
+function grepRows(matches) {
+    const rows = [];
+    for (const m of matches ?? []) {
+        for (const line of m.context_before ?? [])
+            rows.push({ num: '', text: line, kind: 'ctx' });
+        rows.push({ num: m.line_num, text: m.line, kind: 'hit' });
+        for (const line of m.context_after ?? [])
+            rows.push({ num: '', text: line, kind: 'ctx' });
+    }
+    return rows;
+}
+
 // -- registrations ------------------------------------------------------------
 
 document.addEventListener('alpine:init', () => {
@@ -122,5 +189,23 @@ document.addEventListener('alpine:init', () => {
     registerToolDisplay({
         match: /^web_search_(text|images|news|videos|books)$/,
         view: 'web-search'
+    });
+
+    // coder file reads: highlighted code block
+    registerToolDisplay({
+        match: /^coder_file_read$/,
+        view: 'file-read'
+    });
+
+    // coder file creates: the new file's content, highlighted, streamed live
+    registerToolDisplay({
+        match: /^coder_file_create$/,
+        view: 'file-create'
+    });
+
+    // grep calls: file-grouped match lists with line numbers + context
+    registerToolDisplay({
+        match: /^coder_(folder|file)_grep$/,
+        view: 'grep'
     });
 });
