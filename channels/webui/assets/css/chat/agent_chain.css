@@ -15,17 +15,21 @@
     display: none;
 }
 
+/* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+   rail/dot/chevron geometry is all in em now, anchored to the 0.85rem
+   font-size on .agent-chain, so the whole timeline scales with text.
+   (1em = 0.85rem = 13.6px, so 14px ~= 1em, 7px ~= 0.5em, etc) */
 .agent-chain {
     width: 100%;
     display: inline-block;
+    font-size: 0.85rem;
 
     .agent-chain-header {
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 0.6em;
         cursor: pointer;
         user-select: none;
-        font-size: 0.85rem;
         color: var(--text-muted);
         border-radius: var(--radius-sm);
         transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
@@ -43,10 +47,21 @@
     /* process header chevron: sits directly above the spine (14px wide,
        centered at x=7) and doubles as the collapse indicator */
     .toggle {
-        width: 14px;
-        height: 14px;
+        width: 1em;
+        height: 1em;
         color: var(--text-muted);
         transition: transform 0.2s ease;
+        flex-shrink: 0;
+    }
+
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+       gear icon: the svg hardcodes 16px, which kept its center fixed while
+       the em-based rail grew -> override so gear center stays on the spine:
+       1em (toggle) + 0.6em (gap) + 1.18em/2 = 2.19em = margin-left(1.69em)
+       + spine(0.5em) */
+    .agent-chain-header svg:not(.toggle) {
+        width: 1.18em;
+        height: 1.18em;
         flex-shrink: 0;
     }
 
@@ -57,24 +72,24 @@
     .agent-chain-body {
         /* flush against the header so the spine grows out of the chevron */
         margin-top: 0;
-        margin-left: 23px;
+        margin-left: 1.7em;
         display: flex;
         flex-direction: column;
     }
 
     /* one station = spine segment (rail) + content, no nesting.
-       rail(4) + gap(18) puts the content column at x=22, so node dots
-       (14px, centered on the spine at x=7) sit at left:-22 with a proper
-       8px breathing gap before the headers */
+       all geometry in em (1em = 0.85rem = 13.6px): rail(0.3em=4px) +
+       gap(1.18em=16px) puts the content column at x=22px, so the spine
+       line sits at x=7px and node dots (1em) center on it at left:-1.54em */
     .chain-station {
         display: flex;
-        gap: 16px;
+        gap: 1.18em;
         min-width: 0;
     }
 
     .chain-rail {
         position: relative;
-        width: 4px;
+        width: 0.3em;
         flex-shrink: 0;
 
         &::before {
@@ -82,18 +97,19 @@
             position: absolute;
             top: 0;
             bottom: 0;
-            left: 7px;
+            left: 0.5em;
             width: 1px;
             background: var(--border-color);
         }
 
         .chain-dot {
             position: absolute;
-            /* centered on the 0.85rem/1.6 header row (21.8px -> center 10.9) */
-            top: 7.5px;
-            left: 4px;
-            width: 7px;
-            height: 7px;
+            /* centered on the header row of the station */
+            top: 0.55em;
+            /* centered on the spine line (0.5em - half dot width) */
+            left: 0.25em;
+            width: 0.5em;
+            height: 0.5em;
             border-radius: 50%;
             /* hollow ring by default; only the active streaming node fills */
             background: transparent;
@@ -108,7 +124,7 @@
        (nested properly this time - the earlier version double-prefixed
        .agent-chain and never matched) */
     .chain-station:first-child .chain-rail::before {
-        top: -6px;
+        top: -0.45em;
     }
 
     .chain-content {
@@ -135,10 +151,12 @@
        so it can bind to their local collapsed state. */
     .node-dot {
         position: absolute;
-        left: -20px;
-        top: 4px;
-        width: 14px;
-        height: 14px;
+        /* content column starts at 0.3em + 1.18em = 1.48em; spine is at
+           0.5em, so centering a 1em dot on it -> left = -(1.48 - 0.5) - 0.5 */
+        left: -1.48em;
+        top: 0.3em;
+        width: 1em;
+        height: 1em;
         border-radius: 50%;
         background: var(--bg-primary);
         border: 1px solid var(--text-muted);
@@ -152,8 +170,8 @@
         transition: border-color 0.15s ease;
 
         svg {
-            width: 9px;
-            height: 9px;
+            width: 0.65em;
+            height: 0.65em;
             transition: transform 0.2s ease;
         }
 
@@ -170,7 +188,7 @@
     /* the station feeding the finish flag keeps its dot; instead its rail
        extends through the flag's top padding so the line never breaks */
     .chain-station:has(+ .chain-end) .chain-rail::before {
-        bottom: -8px;
+        bottom: -0.6em;
     }
 
     /* while streaming, the newest station is the last child (no finish
@@ -211,14 +229,13 @@
     .chain-end {
         display: flex;
         align-items: center;
-        gap: 10px;
-        padding-top: 8px;
+        gap: 0.75em;
+        padding-top: 0.6em;
         color: var(--text-muted);
-        font-size: 0.85rem;
 
         svg {
-            width: 15px;
-            height: 15px;
+            width: 1.1em;
+            height: 1.1em;
             flex-shrink: 0;
             /* pole top meets the incoming line instead of starting 1px under it */
             margin-top: -2px;
