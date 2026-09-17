@@ -161,7 +161,14 @@
     }
 
     /* safety net: a station that rendered nothing renders no node */
-    .chain-station:not(:has(.tool-call-card, .reasoning-wrapper, .content, .prompt-processing-indicator-wrapper)) > .chain-rail .chain-dot {
+    .chain-station:not(:has(.tool-call-card, .reasoning-wrapper, .content)) > .chain-rail .chain-dot {
+        display: none;
+    }
+
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+       the tool processing indicator is a transient wait-state, not a real
+       chain event: keep the rail line running through it, but no node */
+    .chain-station:has(.prompt-processing-indicator-wrapper) > .chain-rail .chain-dot {
         display: none;
     }
 
