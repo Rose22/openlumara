@@ -35,39 +35,61 @@
                              de-emphasized vs the tool name -->
                         <span class="call-args" x-show="tool.response"
                               x-text="toolCallArgsSummary(tool)"></span>
+                        <!-- result hint from the display registry (default:
+                             displays define no summary, so this stays empty) -->
+                        <span class="call-result" x-show="tool.response"
+                              x-text="toolCallResultSummary(tool)"></span>
                     </div>
 
                     <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
                          roomier skeleton: uppercase section titles dropped,
                          args + response are rows in one grid, long values get
                          a soft scroll box (via x-box) only when they overflow. -->
+                    <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+                         the display registry can CLAIM a call's body: when a
+                         registered display returns html (from args, response,
+                         or both - possibly partial mid-stream), it replaces
+                         the default args+response rows entirely. -->
                     <template x-if="!collapsed">
-                    <div class="body">
-                        <template x-for="(value, key) in partialJsonParse(tool.function?.arguments ?? '{}', tool.id ?? (message.tool_call_id + ':' + toolIdx))">
-                            <div class="arg-row">
-                                <span class="arg-name" x-fade-text="key"></span>
-                                <span class="arg-value" x-box x-auto-scroll x-fade-text="(value !== null && typeof value === 'object') ? JSON.stringify(value, null, 2) : value"></span>
-                            </div>
+                    <div class="body" x-data="{ get displayBody() { return toolDisplayBody(tool, tool.id ?? (message.tool_call_id + ':' + toolIdx)) } }">
+                        <template x-if="hasToolDisplay(tool)">
+                            <!-- registry html is raw (Alpine doesn't compile
+                                 directives inside x-html), so the auto-scroll
+                                 convention for .tool-display boxes is wired
+                                 here via a helper, after x-html repaints -->
+                            <div class="content"
+                                 x-html="displayBody"
+                                 x-effect="autoScrollToolDisplay($el, displayBody)"></div>
                         </template>
+                        <template x-if="!hasToolDisplay(tool)">
+                        <div class="default-display">
+                            <template x-for="(value, key) in partialJsonParse(tool.function?.arguments ?? '{}', tool.id ?? (message.tool_call_id + ':' + toolIdx))">
+                                <div class="arg-row">
+                                    <span class="arg-name" x-fade-text="key"></span>
+                                    <span class="arg-value" x-box x-auto-scroll x-fade-text="(value !== null && typeof value === 'object') ? JSON.stringify(value, null, 2) : value"></span>
+                                </div>
+                            </template>
 
-                        <template x-if="tool.response">
-                            <div class="response-row" x-data="{
-                                     get parsed() {
-                                        try {
-                                            const p = JSON.parse(this.tool.response);
-                                            return (p !== null && typeof p === 'object') ? p : null;
-                                        } catch {
-                                            return null;
-                                        }
-                                     }
-                                 }">
-                            <template x-if="parsed !== null">
-                                <div class="content" x-html="toolResponseRenderer(parsed)"></div>
+                            <template x-if="tool.response">
+                                <div class="response-row" x-data="{
+                                         get parsed() {
+                                            try {
+                                                const p = JSON.parse(this.tool.response);
+                                                return (p !== null && typeof p === 'object') ? p : null;
+                                            } catch {
+                                                return null;
+                                            }
+                                         }
+                                     }">
+                                <template x-if="parsed !== null">
+                                    <div class="content" x-html="toolResponseRenderer(parsed)"></div>
+                                </template>
+                                <template x-if="parsed === null">
+                                    <p x-fade-text="tool.response" class="raw-response"></p>
+                                </template>
+                                </div>
                             </template>
-                            <template x-if="parsed === null">
-                                <p x-fade-text="tool.response" class="raw-response"></p>
-                            </template>
-                            </div>
+                        </div>
                         </template>
                     </div>
                     </template>

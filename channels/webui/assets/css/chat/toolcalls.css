@@ -84,6 +84,73 @@
         white-space: nowrap;
     }
 
+    /* single line below a custom display box (eg. file: foo.py).
+       emitted by the display's body() itself - registry owns its markup */
+    .display-footer {
+        margin-top: 6px;
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        opacity: 0.8;
+        font-family: var(--code-font);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* result hint on the header (registry summaries; empty by default) */
+    .call-result {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        opacity: 0.8;
+        flex: 0 0 auto;
+        white-space: nowrap;
+    }
+
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+       diff display (coder file edits): +/- gutter lines, tinted.
+       rendered by the tool display registry, streams live from args */
+    .tool-display {
+        font-family: var(--code-font);
+        font-size: 0.8rem;
+        line-height: 1.55;
+        max-height: 260px;
+        overflow-y: auto;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 8px 10px;
+
+        .diff-line {
+            display: flex;
+            gap: 8px;
+            white-space: pre-wrap;
+            word-break: break-word;
+            border-radius: 3px;
+
+            .diff-gutter {
+                flex-shrink: 0;
+                width: 1em;
+                user-select: none;
+                opacity: 0.7;
+            }
+
+            &.diff-del {
+                background: color-mix(in srgb, var(--error, #f87171) 10%, transparent);
+                .diff-gutter { color: var(--error, #f87171); }
+            }
+
+            &.diff-add {
+                background: color-mix(in srgb, #4ade80 10%, transparent);
+                .diff-gutter { color: #4ade80; }
+            }
+
+            /* collapsed unchanged stretch */
+            &.diff-gap {
+                opacity: 0.55;
+                .diff-text { font-style: italic; }
+            }
+        }
+    }
+
 
     /* body: generous vertical rhythm. left border/indent removed - the
        timeline spine of the agent chain provides the structure now */
