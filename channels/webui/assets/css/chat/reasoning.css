@@ -1,6 +1,8 @@
 .reasoning-wrapper {
     width: 100%;
     display: inline-block;
+    /* anchor for the timeline node-dot */
+    position: relative;
 
     &.collapsed {
         .header {
@@ -49,13 +51,14 @@
         opacity: 1;
     }
 
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+         left border + indent removed: inside the agent chain, the timeline
+         spine provides the visual structure */
     .content {
         max-height: 120px;
         overflow-y: auto;
 
-        margin-left: 12px;
-        padding: 0px 7px;
-        border-left: 1px solid var(--border-color);
+        padding: 0px 2px;
         font-size: 0.9rem;
         color: var(--text-secondary);
         white-space: pre-wrap;
@@ -75,19 +78,6 @@
             border-radius: 50%;
             opacity: 0;
         }
-    }
-
-    .toggle {
-        width: 14px;
-        height: 14px;
-        transition: transform 0.2s ease;
-        flex-shrink: 0;
-    }
-
-    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16) */
-    /* Rotate chevron when expanded, matching the tool call cards. */
-    .toggle-expanded {
-        transform: rotate(90deg);
     }
 
     .is-reasoning-active .header {

@@ -21,34 +21,26 @@
 
 .tool-call-card {
     width: 100%;
+    /* anchor for the timeline node-dot */
+    position: relative;
 
+    /* header shares font metrics with the reasoning header (0.85rem, no
+       padding) so the timeline nodes center on every header alike */
     .header {
         display: flex;
         align-items: center;
         gap: 8px;
         cursor: pointer;
         user-select: none;
-        font-size: 0.9rem;
+        font-size: 0.85rem;
         color: var(--text-muted);
         border-radius: var(--radius-sm);
-        padding: 2px 0;
+        padding: 0;
         transition: filter 0.2s ease;
 
         &:hover {
             filter: brightness(1.03);
         }
-    }
-
-    .toggle {
-        width: 14px;
-        height: 14px;
-        color: var(--text-muted);
-        transition: transform 0.2s ease;
-        flex-shrink: 0;
-    }
-
-    .toggle-expanded {
-        transform: rotate(90deg);
     }
 
     .icon {
@@ -59,7 +51,7 @@
     }
 
     .name {
-        font-size: 0.9rem;
+        font-size: 0.85rem;
         color: var(--text-muted);
         flex: 1;
         min-width: 0;
@@ -72,15 +64,12 @@
         }
     }
 
-    /* body: left-border indent, generous vertical rhythm */
+    /* body: generous vertical rhythm. left border/indent removed - the
+       timeline spine of the agent chain provides the structure now */
     .body {
-        margin-left: 12px;
-        margin-top: 8px;
-        padding: 12px 0 6px 18px;
-        border-left: 1px solid var(--border-color);
         display: flex;
         flex-direction: column;
-        gap: 14px;
+        gap: 2px;
     }
 
     .arg-row {
@@ -122,10 +111,9 @@
     /* response: content behind a hairline, rows styled identically to args */
     .response-row {
         border-top: 1px solid var(--border-color);
-        padding-top: 14px;
         display: flex;
         flex-direction: column;
-        gap: 14px;
+        gap: 2px;
     }
 
 

@@ -1,7 +1,20 @@
-/* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16) */
-/* collapsible wrapper around the agentic chain (reasoning, tool calls,
-   intermediate content) that sits between the user's request and the
-   final answer. styled to match the reasoning header. */
+/* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17) */
+/* collapsible "Process" wrapper around the agentic chain, rendered as a
+   timeline: a spine starts under the header chevron, every chain segment is
+   a station with a node dot on it, and the chain terminates on a finish
+   flag. no per-block left borders or nesting - the spine is the container.
+
+   alignment math: the chevron is 14px wide, so its center sits at 7px from
+   the left edge of the chain. the rail line is therefore placed at left:7px
+   (dots centered on it), and the finish flag is nudged left so ITS pole
+   (x=4/24 of the svg) lands on the same 7px line. */
+/* node dots only exist inside the timeline; outside an agent chain (e.g. a
+   final message that carries reasoning_content) the raw svg would render
+   unstyled at full size, so hide the whole thing there */
+.node-dot {
+    display: none;
+}
+
 .agent-chain {
     width: 100%;
     display: inline-block;
@@ -27,9 +40,12 @@
         filter: brightness(1.03);
     }
 
+    /* process header chevron: sits directly above the spine (14px wide,
+       centered at x=7) and doubles as the collapse indicator */
     .toggle {
         width: 14px;
         height: 14px;
+        color: var(--text-muted);
         transition: transform 0.2s ease;
         flex-shrink: 0;
     }
@@ -39,9 +55,173 @@
     }
 
     .agent-chain-body {
-        margin-top: 4px;
-        margin-left: 6px;
-        padding-left: 12px;
-        border-left: 1px solid var(--border-color);
+        /* flush against the header so the spine grows out of the chevron */
+        margin-top: 0;
+        margin-left: 23px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* one station = spine segment (rail) + content, no nesting.
+       rail(4) + gap(18) puts the content column at x=22, so node dots
+       (14px, centered on the spine at x=7) sit at left:-22 with a proper
+       8px breathing gap before the headers */
+    .chain-station {
+        display: flex;
+        gap: 16px;
+        min-width: 0;
+    }
+
+    .chain-rail {
+        position: relative;
+        width: 4px;
+        flex-shrink: 0;
+
+        &::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 7px;
+            width: 1px;
+            background: var(--border-color);
+        }
+
+        .chain-dot {
+            position: absolute;
+            /* centered on the 0.85rem/1.6 header row (21.8px -> center 10.9) */
+            top: 7.5px;
+            left: 4px;
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            /* hollow ring by default; only the active streaming node fills */
+            background: transparent;
+            border: 1.5px solid var(--text-muted);
+            box-sizing: border-box;
+        }
+    }
+
+    /* the header row is taller than the 14px chevron, so the chevron's
+       bottom edge sits a few px above the body. pull the first rail
+       segment up so the line starts AT the chevron, no gap.
+       (nested properly this time - the earlier version double-prefixed
+       .agent-chain and never matched) */
+    .chain-station:first-child .chain-rail::before {
+        top: -6px;
+    }
+
+    .chain-content {
+        flex: 1;
+        min-width: 0;
+    }
+
+    /* stations whose content draws its own nodes (reasoning, tool cards)
+       hide the plain station dot so there's never a double */
+    .chain-station:has(.tool-call-card) > .chain-rail .chain-dot,
+    .chain-station:has(.reasoning-wrapper) > .chain-rail .chain-dot {
+        display: none;
+    }
+
+    /* safety net: a station that rendered nothing renders no node */
+    .chain-station:not(:has(.tool-call-card, .reasoning-wrapper, .content, .prompt-processing-indicator-wrapper)) > .chain-rail .chain-dot {
+        display: none;
+    }
+
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+       design B: the timeline node IS the expand/collapse affordance - a
+       14px circle with a chevron inside, centered on the spine. collapsible
+       components (reasoning, tool cards) draw one inside their own markup
+       so it can bind to their local collapsed state. */
+    .node-dot {
+        position: absolute;
+        left: -20px;
+        top: 4px;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: var(--bg-primary);
+        border: 1px solid var(--text-muted);
+        box-sizing: border-box;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-muted);
+        cursor: pointer;
+        z-index: 1;
+        transition: border-color 0.15s ease;
+
+        svg {
+            width: 9px;
+            height: 9px;
+            transition: transform 0.2s ease;
+        }
+
+        &.expanded svg {
+            transform: rotate(90deg);
+        }
+    }
+
+    .node-dot:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+    }
+
+    /* the station feeding the finish flag keeps its dot; instead its rail
+       extends through the flag's top padding so the line never breaks */
+    .chain-station:has(+ .chain-end) .chain-rail::before {
+        bottom: -8px;
+    }
+
+    /* while streaming, the newest station is the last child (no finish
+       flag yet), so its node pulses. once the answer starts, the flag
+       renders, no station is last anymore, and the pulse stops. */
+    .is-streaming .chain-station:last-child .chain-dot {
+        background: var(--accent);
+        border-color: var(--accent);
+        animation: statusPulse 1.5s ease-in-out infinite;
+    }
+
+    /* tool stations pulse their LAST card's node (the active call) */
+    .is-streaming .chain-station:last-child .tool-call-card:last-child .node-dot {
+        border-color: var(--accent);
+        color: var(--accent);
+        animation: statusPulse 1.5s ease-in-out infinite;
+    }
+
+    /* actively thinking reasoning pulses its node too */
+    .reasoning-wrapper.is-reasoning-active .node-dot {
+        border-color: var(--accent);
+        color: var(--accent);
+        animation: statusPulse 1.5s ease-in-out infinite;
+    }
+
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+         intermediate content inside the chain (the model talking to itself
+         between tool calls) reads as process, not as the answer: muted and
+         one step smaller than the final reply */
+    .chain-content .content {
+        color: var(--text-secondary);
+        font-size: 0.85rem;
+    }
+
+    /* finish flag: the last station's rail already runs to its bottom, so
+       the flag just continues the line by sitting ON it - padding-left
+       puts the svg pole (2.5px into the 15px icon) at x=7px */
+    .chain-end {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding-top: 8px;
+        color: var(--text-muted);
+        font-size: 0.85rem;
+
+        svg {
+            width: 15px;
+            height: 15px;
+            flex-shrink: 0;
+            /* pole top meets the incoming line instead of starting 1px under it */
+            margin-top: -2px;
+        }
     }
 }

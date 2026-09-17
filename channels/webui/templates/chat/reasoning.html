@@ -7,12 +7,12 @@
      x-data="{collapsed: $store.stream.state === 'idle', autoCollapsed: false, done: $store.stream.state === 'idle'}"
      x-effect="const msgs = $store.stream.turn?.messages ?? []; const isLast = msgs[msgs.length - 1] === message; done = $store.stream.state === 'idle' || !isLast; if (done && !autoCollapsed) { autoCollapsed = true; collapsed = true }"
      @click="collapsed = !collapsed">
+    <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+         timeline node: circle + chevron on the spine, mirrors collapsed state -->
+    <div class="node-dot" :class="{expanded: !collapsed}">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"></polyline></svg>
+    </div>
     <div class="header">
-        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16) -->
-        <!-- Chevron now rotates on collapse/expand to match tool call cards. -->
-        <svg :class="{'toggle': true, 'toggle-expanded': !collapsed}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="9 18 15 12 9 6"></polyline>
-        </svg>
         {% include 'svg/thought_bubble.svg' %}
         <span class="text">
             <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)

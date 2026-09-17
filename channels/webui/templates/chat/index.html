@@ -94,16 +94,30 @@
                             <div class="agent-chain" x-data="{ collapsed: true }">
                                 <div class="agent-chain-header" @click="collapsed = !collapsed">
                                     <svg :class="{'toggle': true, 'toggle-expanded': !collapsed}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <polyline points="9 18 15 12 9 6"></polyline>
+                                        <polyline points="9 6 15 12 9 18"></polyline>
                                     </svg>
                                     {% include 'svg/gear.svg' %}
                                     <span class="label">Process</span>
                                 </div>
+                                <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+                                     timeline layout: each chain segment is a station
+                                     with a node dot on the spine that starts at the
+                                     Process chevron; the turn's chain ends on a
+                                     finish flag. -->
                                 <template x-if="!collapsed">
                                     <div class="agent-chain-body">
                                         <template x-for="(message, messageIndex) in historyTurnSplit(turn).chain" :key="messageIndex">
-                                            {% include 'chat/turns/assistant_history.html' %}
+                                            <div class="chain-station">
+                                                <div class="chain-rail"><div class="chain-dot"></div></div>
+                                                <div class="chain-content">
+                                                    {% include 'chat/turns/assistant_history.html' %}
+                                                </div>
+                                            </div>
                                         </template>
+                                        <div class="chain-end">
+                                            {% include 'svg/finish_flag.svg' %}
+                                            <span class="chain-end-label">Finished</span>
+                                        </div>
                                     </div>
                                 </template>
                             </div>
@@ -137,20 +151,36 @@
                     <div class="agent-chain is-streaming" x-data="{ collapsed: false }">
                         <div class="agent-chain-header" @click="collapsed = !collapsed">
                             <svg :class="{'toggle': true, 'toggle-expanded': !collapsed}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="9 18 15 12 9 6"></polyline>
+                                <polyline points="9 6 15 12 9 18"></polyline>
                             </svg>
                             {% include 'svg/gear.svg' %}
                             <span class="label">Process</span>
                         </div>
+                        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+                             timeline layout (see history chain). no finish flag
+                             while streaming: we can't know which content segment
+                             is the final one until the stream ends. the newest
+                             station's node pulses instead. -->
                         <template x-if="!collapsed">
                             <div class="agent-chain-body">
                                 <template x-for="(message, messageIndex) in streamTurnSplit($store.stream.turn).chain" :key="messageIndex">
-                                    {% include 'chat/turns/assistant_stream.html' %}
+                                    <div class="chain-station">
+                                        <div class="chain-rail"><div class="chain-dot"></div></div>
+                                        <div class="chain-content">
+                                            {% include 'chat/turns/assistant_stream.html' %}
+                                        </div>
+                                    </div>
                                 </template>
                                 <template x-if="$store.stream.state === 'processing_tools'">
-                                    {% set pp_variant = 'tool' %}
-                                    {% include 'chat/prompt_processing.html' %}
+                                    <div class="chain-station">
+                                        <div class="chain-rail"><div class="chain-dot"></div></div>
+                                        <div class="chain-content">
+                                            {% set pp_variant = 'tool' %}
+                                            {% include 'chat/prompt_processing.html' %}
+                                        </div>
+                                    </div>
                                 </template>
+
                             </div>
                         </template>
                     </div>
