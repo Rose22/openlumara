@@ -1,7 +1,8 @@
 /* =============================================================================
  *  Tool Calls
- *  cardless design: bare header row + left-border indent body, matching the
- *  reasoning block. no backgrounds, no borders, no chrome.
+ *  cardless + roomy: bare header, left-border indent body where args and the
+ *  response are rows in one grid. long values get a soft scroll box that only
+ *  appears when they actually overflow (x-box toggles .boxed).
  *  ============================================================================= */
 
 .tool-calls-container {
@@ -27,9 +28,10 @@
         gap: 8px;
         cursor: pointer;
         user-select: none;
-        font-size: 0.85rem;
+        font-size: 0.9rem;
         color: var(--text-muted);
         border-radius: var(--radius-sm);
+        padding: 2px 0;
         transition: filter 0.2s ease;
 
         &:hover {
@@ -57,7 +59,7 @@
     }
 
     .name {
-        font-size: 0.85rem;
+        font-size: 0.9rem;
         color: var(--text-muted);
         flex: 1;
         min-width: 0;
@@ -66,117 +68,79 @@
         white-space: nowrap;
 
         .module {
-            font-weight: 500;
+            font-weight: 600;
         }
     }
 
-    .status {
-        font-size: 0.7rem;
-        color: var(--text-muted);
-        flex-shrink: 0;
-
-        &.pending {
-            animation: statusPulse 1.5s ease-in-out infinite;
-        }
-    }
-
-    /* body: same left-border indent treatment as reasoning .content */
+    /* body: left-border indent, generous vertical rhythm */
     .body {
         margin-left: 12px;
-        padding: 4px 7px;
+        margin-top: 8px;
+        padding: 12px 0 6px 18px;
         border-left: 1px solid var(--border-color);
-        font-size: 0.9rem;
-        color: var(--text-secondary);
-    }
-
-    .section {
-        .title {
-            font-size: 0.7rem;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 4px;
-        }
-    }
-
-    .args {
         display: flex;
         flex-direction: column;
-        gap: 4px;
+        gap: 14px;
     }
 
-    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
-         flex-end: long values auto-scroll to the bottom while streaming,
-         so the key is anchored to the last (always fully visible) line.
-         single-line values are unaffected, box height == line height. */
     .arg-row {
         display: flex;
-        align-items: flex-end;
-        gap: 12px;
+        align-items: baseline;
+        gap: 14px;
         font-size: 0.85rem;
-        line-height: 1.6;
+        line-height: 1.7;
     }
 
     .arg-name {
         color: var(--accent);
-        min-width: 80px;
+        min-width: 90px;
         flex-shrink: 0;
         font-weight: 500;
-        /* same line-height as the value box's lines, so bottom-anchored
-           rows keep key + last value line on one baseline */
-        line-height: 1.6;
-
-        &:after {
-            content: ':';
-            margin-left: 2px;
-        }
     }
 
     /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
-         long values scroll in their own container, like the reasoning
-         block: same max-height, same scrollbar, no header of its own */
+         max-height is ALWAYS on (so overflow can actually be detected and
+         autoscroll works); x-box only toggles the soft background for values
+         that overflow. single-line values stay plain text on the row. */
     .arg-value {
         color: var(--text-primary);
         word-break: break-word;
         white-space: pre-wrap;
         flex: 1;
         min-width: 0;
-        display: block;
         max-height: 120px;
         overflow-y: auto;
+
+        &.boxed {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 0.84rem;
+        }
     }
 
-    .no-args {
-        color: var(--text-muted);
-        font-style: italic;
-        font-size: 0.85rem;
+    /* response: content behind a hairline, rows styled identically to args */
+    .response-row {
+        border-top: 1px solid var(--border-color);
+        padding-top: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
     }
-}
 
-/* =============================================================================
- *  Tool Response Section
- *  ============================================================================= */
 
-.tool-response-section {
-    margin-top: 8px;
 
     .raw-response {
         font-family: var(--code-font);
         white-space: pre-wrap;
         word-break: break-word;
-        max-height: 120px;
-        overflow-y: auto;
-        line-height: 1.6;
     }
 
     .content {
-        font-size: 0.85rem;
-        max-height: 120px;
-        overflow-y: auto;
-        line-height: 1.6;
+        font-size: 0.84rem;
+        line-height: 1.7;
 
         .string {
-            line-height: 1.6;
             white-space: pre-wrap;
             word-break: break-word;
             color: var(--text-primary);

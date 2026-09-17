@@ -34,6 +34,11 @@ document.addEventListener('alpine:init', async () => {
     Alpine.directive('fade-text', Alpine.skipDuringClone(fadeTextRender));
     Alpine.directive('fade-html', Alpine.skipDuringClone((el, d, c) => fadeTextRender(el, d, c, true)));
 
+    // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+    // toggles .boxed when an element's content overflows its max-height,
+    // so tool call values only get the soft background when they scroll
+    Alpine.directive('box', (el, modifiers, { cleanup }) => cleanup(boxIfScrolls(el)));
+
     self.notice = "Please wait, connecting to backend server..";
     await connectWebSocket();
 

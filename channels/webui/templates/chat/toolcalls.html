@@ -21,67 +21,56 @@
                           <span x-fade-text="tool.function?.name.split('_').slice(1).join(' ')"></span>
                         </span>
                         <span class="name" x-show="!tool.function?.name">unknown</span>
-                        <template x-if="!tool.response">
-                            <span class="status pending">calling...</span>
-                        </template>
                     </div>
 
-                    <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
-                         x-show -> x-if: collapsed tool cards now unmount their
-                         body entirely, so the args rows and the (potentially
-                         huge) toolResultsRenderer output of completed tool
-                         calls don't sit in the dom while collapsed. -->
+                    <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+                         roomier skeleton: uppercase section titles dropped,
+                         args + response are rows in one grid, long values get
+                         a soft scroll box (via x-box) only when they overflow. -->
                     <template x-if="!collapsed">
                     <div class="body">
-                        <div class="section">
-                            <div class="args">
-                                <div class="title">Arguments</div>
-                                <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
-                                     pass a stable cache key so the parser can
-                                     hold on to the last good parse instead of
-                                     toggling between parsed rows and _raw -->
-                                <template x-for="(value, key) in partialJsonParse(tool.function?.arguments ?? '{}', tool.id ?? (message.tool_call_id + ':' + toolIdx))">
-                                    <div class="arg-row">
-                                        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
-                                             x-fade-text: streamed tool call args fade in per token -->
-                                        <span class="arg-name" x-fade-text="key"></span>
-                                        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
-                                             nested objects/arrays now render as a growing
-                                             json string instead of '[object object]' -->
-                                        <!-- x-auto-scroll: streamed values chase the bottom
-                                             inside their own 120px scroll container -->
-                                        <span class="arg-value" x-auto-scroll x-fade-text="(value !== null && typeof value === 'object') ? JSON.stringify(value, null, 2) : value"></span>
-                                    </div>
-                                </template>
-
-                                <template x-if="tool.response">
-                                    <div class="tool-response-section">
-                                        <div class="title">Response</div>
-                                        <div class="content">
-                                             <div x-data="{
-                                                     get isJson() {
-                                                        try {
-                                                            JSON.parse(this.tool.response);
-                                                            return true;
-                                                        } catch {
-                                                            return false;
-                                                        }
-                                                    }
-                                                }">
-                                                 <!-- if it's json, use our complex function to show the response in a fancy way -->
-                                                <template x-if="isJson">
-                                                    <div class="content" x-auto-scroll x-fade-html="toolResultsRenderer(JSON.parse(tool.response), 0)"></div>
-                                                </template>
-                                                <!-- if not, show it as a raw string, formatted nicely -->
-                                                <template x-if="!isJson">
-                                                    <p x-auto-scroll x-fade-text="tool.response" class="raw-response"></p>
-                                                </template>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </template>
+                        <template x-for="(value, key) in partialJsonParse(tool.function?.arguments ?? '{}', tool.id ?? (message.tool_call_id + ':' + toolIdx))">
+                            <div class="arg-row">
+                                <span class="arg-name" x-fade-text="key"></span>
+                                <span class="arg-value" x-box x-auto-scroll x-fade-text="(value !== null && typeof value === 'object') ? JSON.stringify(value, null, 2) : value"></span>
                             </div>
-                        </div>
+                        </template>
+
+                        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+                             response has no key label: json responses render their
+                             key/value rows directly, anything else as raw text. -->
+                        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+                             response renders directly in the flow: no scroll
+                             container, no wrapper. json -> key/value rows,
+                             anything else -> raw text. -->
+                        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+                             object responses render as key/value rows in the exact
+                             same style as the arg rows (individual long values get
+                             boxed the same way). non-object responses render raw. -->
+                        <template x-if="tool.response">
+                            <div class="response-row" x-data="{
+                                     get parsed() {
+                                        try {
+                                            const p = JSON.parse(this.tool.response);
+                                            return (p !== null && typeof p === 'object') ? p : null;
+                                        } catch {
+                                            return null;
+                                        }
+                                     }
+                                 }">
+                            <template x-if="parsed !== null">
+                                <template x-for="(value, key) in parsed">
+                                    <div class="arg-row">
+                                        <span class="arg-name" x-text="key"></span>
+                                        <span class="arg-value" x-box x-fade-text="(value !== null && typeof value === 'object') ? JSON.stringify(value, null, 2) : value"></span>
+                                    </div>
+                                </template>
+                            </template>
+                            <template x-if="parsed === null">
+                                <p x-fade-text="tool.response" class="raw-response"></p>
+                            </template>
+                            </div>
+                        </template>
                     </div>
                     </template>
                 </div>
