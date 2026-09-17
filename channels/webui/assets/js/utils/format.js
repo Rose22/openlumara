@@ -49,6 +49,8 @@ function formatDate(dateString) {
 const _dayWeekdayFmt = new Intl.DateTimeFormat('en', { weekday: 'long' });
 const _dayMonthDayFmt = new Intl.DateTimeFormat('en', { month: 'long', day: 'numeric' });
 const _dayFullFmt = new Intl.DateTimeFormat('en', { month: 'long', day: 'numeric', year: 'numeric' });
+const _monthFmt = new Intl.DateTimeFormat('en', { month: 'long' });
+const _monthYearFmt = new Intl.DateTimeFormat('en', { month: 'long', year: 'numeric' });
 
 function parseChatDate(dateString) {
     if (!dateString) { return null; }
@@ -85,8 +87,17 @@ function dayLabelFromKey(key) {
     // parsed as LOCAL midnight (component ctor), unlike new Date('YYYY-MM-DD')
     // which would parse as UTC and shift the day
     const parts = key.split('-').map(Number);
-    const date = new Date(parts[0], parts[1] - 1, parts[2]);
+    const date = new Date(parts[0], parts[1] - 1, parts[2] ?? 1);
     if (isNaN(date.getTime())) { return 'Undated'; }
+
+    // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+    // month group keys are 'YYYY-MM' (everything older than the past
+    // week, mirroring the backend's grouping cutoff)
+    if (parts.length === 2) {
+        const monthFmt = date.getFullYear() === new Date().getFullYear()
+            ? _monthFmt : _monthYearFmt;
+        return monthFmt.format(date);
+    }
 
     const diffDays = Math.round((startOfDayMs(new Date()) - startOfDayMs(date)) / 86400000);
 
@@ -96,6 +107,21 @@ function dayLabelFromKey(key) {
     if (date.getFullYear() === new Date().getFullYear()) { return _dayMonthDayFmt.format(date); }
 
     return _dayFullFmt.format(date);
+}
+
+// -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+// client-side mirror of the backend's grouping cutoff: the past week
+// (incl. today) groups by day ('YYYY-MM-DD'), older chats by month
+// ('YYYY-MM'). used for search results, which are grouped in the
+// browser; the backend applies the same rule for the day list.
+function groupKeyOf(dateString) {
+    const date = parseChatDate(dateString);
+    if (!date) { return ''; }
+
+    const diffDays = Math.round((startOfDayMs(new Date()) - startOfDayMs(date)) / 86400000);
+    if (diffDays < 7) { return localDayKey(date); }
+
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 }
 
 function dayLabelOf(dateString) {

@@ -253,12 +253,13 @@ CHAT_STORE = {
         if (!this.searching) { return this.dayGroups; }
 
         // search results arrive newest-first, so first-seen order is
-        // the correct (descending) day order
+        // the correct (descending) day order. groupKeyOf mirrors the
+        // backend: past week by day, older by month.
         const groups = [];
         const byKey = {};
 
         for (const chat of this.searchResults) {
-            const key = dayKeyOf(chat.updated) || 'undated';
+            const key = groupKeyOf(chat.updated) || 'undated';
             if (!(key in byKey)) {
                 byKey[key] = { key: key, label: dayLabelFromKey(key), chats: [] };
                 groups.push(byKey[key]);
@@ -277,18 +278,18 @@ CHAT_STORE = {
     async reloadDayGroups() {
         const gen = ++this.dayFetchGen;
 
-        const days = await simpleApiFetch(`/api/chats/days?tz_offset=${this.tzOffset()}${this.catParam()}`);
+        const groupList = await simpleApiFetch(`/api/chats/days?tz_offset=${this.tzOffset()}${this.catParam()}`);
 
         // stale: a newer reload superseded this one
         if (gen !== this.dayFetchGen) { return; }
 
-        this.dayGroups = (days ?? []).map(d => ({
-            key: d.day,
-            label: dayLabelFromKey(d.day),
-            count: d.count,
+        this.dayGroups = (groupList ?? []).map(g => ({
+            key: g.key,
+            label: dayLabelFromKey(g.key),
+            count: g.count,
             chats: [],
             offset: 0,
-            hasMore: d.count > 0,
+            hasMore: g.count > 0,
             loading: false,
             loaded: false
         }));
