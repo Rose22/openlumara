@@ -808,6 +808,8 @@ CHAT_STORE = {
         const elapsed = progressData.time_ms / 1000;
         const remaining = (total - processed) > 0 ? (elapsed / processed) * (total - processed) : 0;
 
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+        // expose show_eta so the indicator hides ETA until it can actually be estimated
         return {
             cache,
             processed,
@@ -816,7 +818,10 @@ CHAT_STORE = {
             percent_str: `${percent}%`,
             elapsed: elapsed.toFixed(1),
             remaining,
-            remaining_str: `(ETA: ${Math.ceil(remaining)}s)`
+            show_eta: processed > 0 && remaining > 0,
+            // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+            // placeholder instead of hiding ETA so pill width stays stable
+            remaining_str: (processed > 0 && remaining > 0) ? `(ETA: ${Math.ceil(remaining)}s)` : `(ETA: ...)`
         };
     }
 }

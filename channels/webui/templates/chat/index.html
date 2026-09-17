@@ -148,6 +148,7 @@
                                     {% include 'chat/turns/assistant_stream.html' %}
                                 </template>
                                 <template x-if="$store.stream.state === 'processing_tools'">
+                                    {% set pp_variant = 'tool' %}
                                     {% include 'chat/prompt_processing.html' %}
                                 </template>
                             </div>
@@ -174,6 +175,7 @@
     <!-- prompt processing indicator (works with llama.cpp and derivatives) -->
     <template x-if="$store.stream.state === 'processing'">
         <div class="message-wrapper">
+            {% set pp_variant = 'prompt' %}
             {% include 'chat/prompt_processing.html' %}
         </div>
     </template>

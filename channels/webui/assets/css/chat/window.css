@@ -30,6 +30,7 @@
         flex-direction: column;
         gap: 4px;
         margin: 0 auto;
+        margin-bottom: 7px;
         min-height: 0;
 
         .message-wrapper {
