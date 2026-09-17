@@ -34,11 +34,11 @@
          text is now fully unmounted instead of sitting in the dom for the
          lifetime of the tab. reasoning blocks are often the largest text in
          tool-heavy chats. -->
-    <template x-if="!collapsed">
+    <div x-show="!collapsed" x-collapse.duration.250>
         <div class="block">
             <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
                  x-fade-text: streamed reasoning fades in per token, like content -->
             <div class="content" x-fade-text="message.reasoning_content" x-auto-scroll></div>
         </div>
-    </template>
+    </div>
 </div>

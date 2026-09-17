@@ -50,7 +50,7 @@
                          registered display returns html (from args, response,
                          or both - possibly partial mid-stream), it replaces
                          the default args+response rows entirely. -->
-                    <template x-if="!collapsed">
+                    <div x-show="!collapsed" x-collapse.duration.250>
                     <div class="body" x-data="{ get displayBody() { return toolDisplayBody(tool, tool.id ?? (message.tool_call_id + ':' + toolIdx)) } }">
                         <template x-if="hasToolDisplay(tool)">
                             <!-- registry html is raw (Alpine doesn't compile
@@ -92,7 +92,7 @@
                         </div>
                         </template>
                     </div>
-                    </template>
+                    </div>
                 </div>
             </div>
         </div>
