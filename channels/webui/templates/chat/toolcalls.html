@@ -47,21 +47,17 @@
                          a soft scroll box (via x-box) only when they overflow. -->
                     <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
                          the display registry can CLAIM a call's body: when a
-                         registered display returns html (from args, response,
-                         or both - possibly partial mid-stream), it replaces
-                         the default args+response rows entirely. -->
+                         tool matches a registered display, an inline markup
+                         view (tool_displays.html) replaces the default
+                         args+response rows entirely. -->
                     <div x-show="!collapsed" x-collapse.duration.250>
-                    <div class="body" x-data="{ get displayBody() { return toolDisplayBody(tool, tool.id ?? (message.tool_call_id + ':' + toolIdx)) } }">
-                        <template x-if="hasToolDisplay(tool)">
-                            <!-- registry html is raw (Alpine doesn't compile
-                                 directives inside x-html), so the auto-scroll
-                                 convention for .tool-display boxes is wired
-                                 here via a helper, after x-html repaints -->
-                            <div class="content"
-                                 x-html="displayBody"
-                                 x-effect="autoScrollToolDisplay($el, displayBody)"></div>
-                        </template>
-                        <template x-if="!hasToolDisplay(tool)">
+                    <div class="body" x-data="{ cacheKey: tool.id ?? (message.tool_call_id + ':' + toolIdx) }">
+                        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+                             claimed tool calls render from inline markup views
+                             (tool_displays.html) instead of the default arg
+                             rows - no html strings involved -->
+                        {% include 'chat/tool_displays.html' %}
+                        <template x-if="!toolDisplayView(tool)">
                         <div class="default-display">
                             <template x-for="(value, key) in partialJsonParse(tool.function?.arguments ?? '{}', tool.id ?? (message.tool_call_id + ':' + toolIdx))">
                                 <div class="arg-row">

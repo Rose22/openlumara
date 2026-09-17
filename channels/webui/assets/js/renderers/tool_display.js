@@ -1,18 +1,16 @@
 // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
-// tool display registry: custom renderers for specific tool calls.
-// this is the seam webui plugins will later hook into via
-// registerToolDisplay(); entries are checked top-down, first match wins.
+// tool display registry: claims specific tool calls so their body renders
+// from an inline markup template (templates/chat/tool_displays.html)
+// instead of the default arg rows. NO html strings - the registry only
+// matches and names views; all markup lives in the template file.
+// webui plugins will later hook in via registerToolDisplay() plus their
+// own template branch.
 //
 // entry shape:
 //   match:   RegExp tested against the tool function name
-//   live:    (optional) render the body even before a response exists,
-//            ie. stream live from the arguments
-//   body:    (response, args) => html. response/args may be PARTIAL while
-//            streaming; both are null until they parse to something.
+//   view:    name of the template branch in tool_displays.html to render
 //   summary: (optional) (response) => short one-liner for the collapsed
 //            header. default (no summary fn, or empty return) = show nothing.
-// body() owns the ENTIRE custom area - it returns raw html and is free to
-// include any structure (boxes, footers, whatever) with .display-* classes.
 
 const TOOL_DISPLAYS = [];
 
@@ -23,6 +21,11 @@ function registerToolDisplay(entry) {
 function toolDisplayFor(name) {
     if (!name) return null;
     return TOOL_DISPLAYS.find(d => d.match.test(name)) ?? null;
+}
+
+// which template branch (if any) renders this call's body; null = default
+function toolDisplayView(tool) {
+    return toolDisplayFor(tool?.function?.name)?.view ?? null;
 }
 
 // one-line result hint for the completed tool call header; by default
@@ -90,22 +93,26 @@ function collapseContext(rows, keep) {
     return out;
 }
 
-function codeDiffHtml(original, replacement) {
-    if (!original && !replacement) return '';
-    const line = (sign, cls, text) =>
-        `<div class="diff-line ${cls}"><span class="diff-gutter">${sign}</span><span class="diff-text">${escapeHtml(text)}</span></div>`;
-    // while only one side has streamed in, show it as context/plain
+// diff rows for the view template: [{ gutter, cls, text }] - no html,
+// the template renders these with x-for + x-text. works on partial
+// (streaming) inputs too - it just re-diffs as the args grow.
+function diffRows(original, replacement) {
+    const clsFor = sign =>
+        sign === '..' ? 'diff-gap' : sign === '-' ? 'diff-del' : sign === '+' ? 'diff-add' : 'diff-ctx';
+    let rows;
+    if (!original && !replacement) return [];
     if (!original || !replacement) {
-        const solo = (original || replacement).replace(/\n$/, '').split('\n');
-        return solo.map(t => line(' ', 'diff-ctx', t)).join('');
+        // while only one side has streamed in, show it as context/plain
+        const solo = (original || replacement || '').replace(/\n$/, '').split('\n');
+        rows = solo.map(t => [' ', t]);
+    } else {
+        rows = collapseContext(diffLines(original, replacement), 2);
     }
-    return collapseContext(diffLines(original, replacement), 2)
-        .map(([sign, text]) =>
-            sign === '..'
-                ? `<div class="diff-line diff-gap"><span class="diff-gutter">..</span><span class="diff-text">${escapeHtml(text)}</span></div>`
-                : line(sign, sign === '-' ? 'diff-del' : sign === '+' ? 'diff-add' : 'diff-ctx', text)
-        )
-        .join('');
+    return rows.map(([sign, text]) => ({
+        gutter: sign === '..' ? '..' : sign,
+        cls: clsFor(sign),
+        text,
+    }));
 }
 
 // -- registry entries -----------------------------------------------------
@@ -113,56 +120,19 @@ function codeDiffHtml(original, replacement) {
 // coder file edits: show the change as a diff, live while the args stream
 registerToolDisplay({
     match: /^coder_file_edit$/,
-    body: (response, args) => {
-        const diff = codeDiffHtml(args?.original_code, args?.replacement_code);
-        if (!diff) return '';
-        const footer = args?.path
-            ? `<div class="display-footer">file: ${escapeHtml(args.path)}</div>`
-            : '';
-        return `<div class="tool-display" x-auto-scroll>${diff}</div>${footer}`;
-    }
+    view: 'coder-file-edit'
 });
 
 // -- template helpers ------------------------------------------------------
 
-// does this tool have a custom display? if so, it owns the body from the
-// very first token - the default arg rows NEVER show for claimed tools.
-function hasToolDisplay(tool) {
-    return !!toolDisplayFor(tool?.function?.name);
-}
-
-// auto-scroll convention for .tool-display boxes inside registry html:
-// x-html replaces the box on every chunk, so re-find it each repaint and
-// keep it pinned to the bottom - unless the user scrolled up to read
-function autoScrollToolDisplay(el, body) {
-    const box = el.querySelector('.tool-display');
-    if (!box) return;
-    if (box._stick === undefined) {
-        box._stick = true;
-        box.addEventListener('scroll', () => {
-            box._stick = box.scrollHeight - box.scrollTop - box.clientHeight < 24;
-        });
-    }
-    if (box._stick) requestAnimationFrame(() => { box.scrollTop = box.scrollHeight; });
-}
-
-// render a claimed tool call's body; response and args may be partial
-// (mid-stream) or null (not parseable yet). empty string = nothing to
-// show yet (empty box is hidden by css).
-function toolDisplayBody(tool, cacheKey) {
-    const d = toolDisplayFor(tool.function?.name);
-    if (!d) return null;
-    let response = null;
+// parsed (possibly PARTIAL, mid-stream) arguments for a claimed tool
+// call, for use inside the view templates. {} until anything parses.
+function toolArgs(tool, cacheKey) {
     try {
-        const p = JSON.parse(tool.response);
-        if (p !== null && typeof p === 'object') response = p;
-    } catch { /* response not (fully) here yet */ }
-    let args = null;
-    try {
-        const a = partialJsonParse(tool.function?.arguments ?? '{}', cacheKey + ':display');
-        if (a !== null && typeof a === 'object') args = a;
+        const a = partialJsonParse(tool.function?.arguments ?? '{}', cacheKey + ':args');
+        if (a !== null && typeof a === 'object') return a;
     } catch { /* no parsable args yet */ }
-    return d.body(response, args) || null;
+    return {};
 }
 
 

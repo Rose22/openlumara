@@ -1,0 +1,22 @@
+<!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+     custom body views for claimed tool calls (see js/renderers/tool_display.js).
+     one branch per view name; toolDisplayView(tool) picks it. plugins will
+     later contribute their own branches the same way. no html string
+     generation anywhere - everything here is plain alpine markup.
+     `tool` and `cacheKey` come from the including template's scope. -->
+
+<template x-if="toolDisplayView(tool) === 'coder-file-edit'"
+          x-data="{ get args() { return toolArgs(tool, cacheKey) },
+                    get rows() { return diffRows(this.args.original_code, this.args.replacement_code) } }">
+    <div>
+        <div class="tool-display" x-show="rows.length" x-auto-scroll>
+            <template x-for="row in rows">
+                <div class="diff-line" :class="row.cls">
+                    <span class="diff-gutter" x-text="row.gutter"></span>
+                    <span class="diff-text" x-text="row.text"></span>
+                </div>
+            </template>
+        </div>
+        <div class="display-footer" x-show="args.path" x-text="'file: ' + (args.path ?? '')"></div>
+    </div>
+</template>
