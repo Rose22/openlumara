@@ -7,6 +7,14 @@
  */
 const _turnHeights = new WeakMap();
 
+/*
+ * -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17) (02:45)
+ * per-element lerp-chase state (active rAF id) and a marker for elements
+ * whose user-input interrupt listeners are already wired up
+ */
+const _chases = new WeakMap();
+const _interruptBound = new WeakSet();
+
 UI_STORE = {
     scrollThreshold: 50,
     errors: [],
@@ -17,45 +25,73 @@ UI_STORE = {
     scrollToTurnIndex: null,
 
     /*
-     * -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17) (02:25)
-     * bottom-detection suppression for smooth streaming autoscroll: while
-     * our own smooth animation is in flight, the intermediate positions
-     * would otherwise flip shouldScroll off and stall the follow. when the
-     * animation settles (including when the user hijacks it mid-flight -
-     * scrollend fires wherever they land) the resting position is
-     * re-evaluated. falls back to instant for reduced motion.
+     * -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17) (02:45)
+     * lerp-chase streaming autoscroll: instead of native smooth scroll (no
+     * speed control), each animation frame moves scrollTop a fraction of the
+     * remaining distance toward the bottom. the target is re-read every
+     * frame, so tokens arriving mid-chase are folded into the same glide.
+     * scrollFollowSpeed is the knob: 0.2 = glidey, 0.5 = snappy, 1 = instant.
+     * while a chase is in flight its intermediate positions are suppressed
+     * from bottom-detection (they would flip shouldScroll off and stall the
+     * follow); a real wheel/touch cancels the chase and resumes tracking.
      */
+    scrollFollowSpeed: 0.2,
     _suppressScroll: false,
-    _suppressTimer: null,
 
     _updateShouldScroll(el) {
         const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
         this.shouldScroll = distFromBottom < this.scrollThreshold;
     },
 
-    _smoothScrollToBottom(el) {
+    _stopChase(el) {
+        const chase = _chases.get(el);
+        if (!chase) return;
+        if (chase.raf) cancelAnimationFrame(chase.raf);
+        _chases.delete(el);
+        this._suppressScroll = false;
+    },
+
+    _chaseScrollToBottom(el) {
         if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            this._stopChase(el);
             el.scrollTop = el.scrollHeight;
             return;
         }
 
-        this._suppressScroll = true;
-        el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+        let chase = _chases.get(el);
+        if (!chase) {
+            chase = { raf: null };
+            _chases.set(el, chase);
+            this._suppressScroll = true;
 
-        const settle = () => {
-            this._suppressScroll = false;
-            el.removeEventListener('scrollend', settle);
-            // evaluate the resting position: covers both a natural finish at
-            // the bottom AND a user interrupting the animation with their
-            // wheel/touch (scrollend fires wherever they stopped)
-            this._updateShouldScroll(el);
+            // user input wins: give up the chase and let onScroll track
+            // their real position again. bound once per element.
+            if (!_interruptBound.has(el)) {
+                _interruptBound.add(el);
+                const stop = () => {
+                    this._stopChase(el);
+                    this._updateShouldScroll(el);
+                };
+                el.addEventListener('wheel', stop, { passive: true });
+                el.addEventListener('touchstart', stop, { passive: true });
+            }
+        }
+
+        if (chase.raf) return; // already chasing; the step re-reads the target
+
+        const step = () => {
+            const target = el.scrollHeight - el.clientHeight;
+            const remaining = target - el.scrollTop;
+            if (Math.abs(remaining) < 1) {
+                el.scrollTop = target;
+                this._stopChase(el);
+                this._updateShouldScroll(el);
+                return;
+            }
+            el.scrollTop += remaining * this.scrollFollowSpeed;
+            chase.raf = requestAnimationFrame(step);
         };
-
-        el.addEventListener('scrollend', settle);
-
-        // scrollend isn't universally supported; timeout as a safety net
-        clearTimeout(this._suppressTimer);
-        this._suppressTimer = setTimeout(settle, 500);
+        chase.raf = requestAnimationFrame(step);
     },
 
     /*
@@ -171,18 +207,21 @@ UI_STORE = {
         const el = document.getElementById(containerId);
         if (!el) return;
 
-        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17) (02:25)
-        // smooth glide for the streaming follow; each incoming token
-        // retargets the in-flight animation, so it reads as one continuous
-        // drift instead of a jump per token
+        // lerp chase for the streaming follow; tokens arriving mid-chase
+        // just extend the glide since the target is re-read every frame
         Alpine.nextTick(() => {
-            this._smoothScrollToBottom(el);
+            this._chaseScrollToBottom(el);
         });
     },
 
     async forceScrollToBottom(containerId = 'messages') {
         const el = document.getElementById(containerId);
         if (!el) return;
+
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17) (02:45)
+        // cancel an in-flight chase so its per-frame writes don't fight
+        // the instant jumps below
+        this._stopChase(el);
 
         this.shouldScroll = true;
 
@@ -225,6 +264,10 @@ UI_STORE = {
          */
         const container = document.getElementById('messages');
         if (!container) return;
+
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17) (02:45)
+        // a running chase would fight the re-centering loop below
+        this._stopChase(container);
 
         let lastTop = -1;
         for (let i = 0; i < 24; i++) {
