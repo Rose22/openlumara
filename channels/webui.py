@@ -352,7 +352,8 @@ async def create_fastapi(channel):
             "alpine_stores": alpine_stores,
             "js_utils": js_utils,
             "js_files": js_files,
-            "login_enabled": channel.config.get("require_login")
+            "login_enabled": channel.config.get("require_login"),
+            "core_config": core.config
         })
 
     # ---- login
@@ -699,6 +700,19 @@ async def create_fastapi(channel):
         }
 
         return api_result(data)
+
+    # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+    # serves the context breakdown (from channel.context.get_size()) for the webui context ring popup.
+    @app.get("/api/system/context_size")
+    async def get_context_size():
+        """returns a detailed breakdown of the current context window usage"""
+        try:
+            size = await channel.context.get_size()
+        except Exception as e:
+            return api_result(core.detail_error(e), success=False)
+
+        return api_result(size)
+
     @app.get("/api/system/logs")
     async def get_logs():
         return api_result(channel.logs)

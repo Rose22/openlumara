@@ -30,13 +30,16 @@ header {
     }
 
     h1 {
-        font-size: 1.35rem;
+        font-size: 1.1rem;
         font-weight: 700;
         letter-spacing: -0.02em;
+        color: var(--text-secondary);
+        /*
         background: linear-gradient(135deg, var(--accent) 0%, var(--text-primary) 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
+        */
     }
 
     .btn {
@@ -86,27 +89,6 @@ header {
         svg {
             width: 20px;
             height: 20px;
-        }
-    }
-
-    .status-dot {
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-        transition: all 0.3s ease;
-
-        &.connected {
-            background: #4ade80;
-            box-shadow: 0 0 8px rgba(74, 222, 128, 0.6);
-        }
-        &.disconnected {
-            background: #f87171;
-            box-shadow: 0 0 8px rgba(248, 113, 113, 0.6);
-        }
-        &.connecting {
-            background: #fbbf24;
-            box-shadow: 0 0 8px rgba(251, 191, 36, 0.6);
-            animation: pulse 1s infinite;
         }
     }
 }

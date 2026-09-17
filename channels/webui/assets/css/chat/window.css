@@ -58,6 +58,82 @@
         color: var(--important);
         border: 1px dashed var(--important);
     }
+
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+       friendly welcome panel shown in the center of the chat window
+       when the selected chat has no messages yet */
+    .welcome-panel {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        text-align: center;
+        padding: 40px 20px;
+        user-select: none;
+        animation: welcome-fade-in 0.6s ease both;
+
+        /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+           sparkle icon (svg/sparkle.svg) shown above the welcome text */
+        .welcome-icon {
+            width: 44px;
+            height: 44px;
+            color: var(--accent, #f06595);
+        }
+
+        .welcome-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .welcome-subtitle {
+            font-size: 1.05rem;
+            color: var(--text-secondary, #a0a0a0);
+        }
+
+        .welcome-hint {
+            font-size: 0.9rem;
+            color: var(--text-secondary, #888);
+            max-width: 420px;
+        }
+
+        /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+           pill badge showing the currently used model name */
+        .welcome-model-badge {
+            margin-top: 6px;
+            padding: 4px 14px;
+            border-radius: var(--radius-sm);
+            font-size: 0.8rem;
+            font-family: monospace;
+            color: var(--text-primary, #f06595);
+            background: none;
+            border: 1px solid color-mix(in srgb, var(--accent, #f06595) 35%, transparent);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+
+            .welcome-model-icon {
+                width: 14px;
+                height: 14px;
+                flex-shrink: 0;
+            }
+        }
+    }
 }
+
+@keyframes welcome-fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+
 
 

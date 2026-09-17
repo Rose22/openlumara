@@ -1,0 +1,17 @@
+<!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+     friendly welcome panel shown when the selected chat has no
+     messages yet. gated on chat.id so it doesn't flash during
+     initial load before the current chat has been fetched. -->
+<template x-if="$store.chat.chat.id && $store.chat.turnHistory.length === 0 && !$store.stream.turn.messages">
+    <div class="welcome-panel">
+        {% include 'svg/sparkle.svg' %}
+        <h2 class="welcome-title">Hello there!</h2>
+        <p class="welcome-hint">Say hi, ask me anything, or let's plan something together.</p>
+        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
+             badge showing the model this chat is currently powered by -->
+        <div class="welcome-model-badge">
+            {% include 'svg/cube.svg' %}
+            <span>{{ core_config.get("model", "name") }}</span>
+        </div>
+    </div>
+</template>
