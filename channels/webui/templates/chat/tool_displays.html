@@ -109,18 +109,12 @@
 
 <template x-if="toolDisplayView(tool) === 'coder-file-edit'"
           x-data="{ get args() { return toolArgs(tool, cacheKey) },
-                    get rows() { return diffRows(this.args.original_code, this.args.replacement_code, langForPath(this.args.path)) } }">
+                    get html() { return diffHtml(this.args.original_code, this.args.replacement_code, langForPath(this.args.path)) } }">
     <div>
-        <div class="tool-display hljs" x-show="rows.length" x-auto-scroll>
-            <template x-for="row in rows">
-                <div class="diff-line" :class="row.cls">
-                    <span class="diff-gutter" x-text="row.gutter"></span>
-                    <!-- per-line hljs markup (escaped plain text when the
-                         language is unknown) -->
-                    <span class="diff-text" x-html="row.html"></span>
-                </div>
-            </template>
-        </div>
+        <!-- the ONE html-string view: token fade needs whole-content
+             repaints (x-fade-html), which x-for rows can't survive. see
+             diffHtml() in custom_tool_views.js -->
+        <div class="tool-display hljs" x-show="html" x-auto-scroll x-fade-html="html"></div>
         <div class="display-footer" x-show="args.path" x-text="'file: ' + (args.path ?? '')"></div>
     </div>
 </template>

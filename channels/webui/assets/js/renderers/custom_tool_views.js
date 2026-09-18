@@ -68,14 +68,16 @@ function collapseContext(rows, keep) {
     return out;
 }
 
-// diff rows for the view template: [{ gutter, cls, html }]. text is always
-// plain; html is the per-line highlighted markup (hljs escape hatch, same
-// as the read/create views) or escaped plain text without a known lang.
-function diffRows(original, replacement, lang) {
+// full diff markup for the view box. THE ONE html-string view: the box is
+// painted via x-fade-html, and token fade requires whole-content repaints
+// (x-for rows can't survive that), so this view generates its row markup
+// here instead of in the template. all text goes through escapeHtml or
+// hljs (whose output is escaped), so it's safe markup.
+function diffHtml(original, replacement, lang) {
     const clsFor = sign =>
         sign === '..' ? 'diff-gap' : sign === '-' ? 'diff-del' : sign === '+' ? 'diff-add' : 'diff-ctx';
     let rows;
-    if (!original && !replacement) return [];
+    if (!original && !replacement) return '';
     if (!original || !replacement) {
         // while only one side has streamed in, show it as context/plain
         const solo = (original || replacement || '').replace(/\n$/, '').split('\n');
@@ -83,11 +85,13 @@ function diffRows(original, replacement, lang) {
     } else {
         rows = collapseContext(diffLines(original, replacement), 2);
     }
-    return rows.map(([sign, text]) => ({
-        gutter: sign === '..' ? '..' : sign,
-        cls: clsFor(sign),
-        html: sign === '..' ? escapeHtml(text) : highlightDiffLine(text, lang),
-    }));
+    return rows.map(([sign, text]) => {
+        const gutter = sign === '..' ? '..' : sign;
+        const body = sign === '..' ? escapeHtml(text) : highlightDiffLine(text, lang);
+        return `<div class="diff-line ${clsFor(sign)}">` +
+            `<span class="diff-gutter">${gutter}</span>` +
+            `<span class="diff-text">${body}</span></div>`;
+    }).join('');
 }
 
 // -- web_search_*: result cards ---------------------------------------------
