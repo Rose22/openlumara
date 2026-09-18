@@ -40,7 +40,7 @@
           x-data="{ get args() { return toolArgs(tool, cacheKey) },
                     get response() { return toolResponse(tool) },
                     get isError() { return !!this.response && this.response.status === 'error' },
-                    get html() { return highlightedCode(this.response?.content, langForPath(this.args.path)) } }">
+                    get html() { return codeLinesHtml(this.response?.content, langForPath(this.args.path), this.args.line_start) } }">
     <div>
         <!-- failed read: plain error text -->
         <div class="search-snippet" x-show="isError" x-text="response?.content ?? ''"></div>
@@ -56,7 +56,7 @@
           x-data="{ get args() { return toolArgs(tool, cacheKey) },
                     get response() { return toolResponse(tool) },
                     get isError() { return !!this.response && this.response.status === 'error' },
-                    get html() { return highlightedCode(this.args.content, langForPath(this.args.path)) } }">
+                    get html() { return codeLinesHtml(this.args.content, langForPath(this.args.path)) } }">
     <div>
         <!-- failed create: plain error text -->
         <div class="search-snippet" x-show="isError" x-text="typeof response?.content === 'string' ? response.content : ''"></div>
@@ -109,13 +109,15 @@
 
 <template x-if="toolDisplayView(tool) === 'coder-file-edit'"
           x-data="{ get args() { return toolArgs(tool, cacheKey) },
-                    get rows() { return diffRows(this.args.original_code, this.args.replacement_code) } }">
+                    get rows() { return diffRows(this.args.original_code, this.args.replacement_code, langForPath(this.args.path)) } }">
     <div>
-        <div class="tool-display" x-show="rows.length" x-auto-scroll>
+        <div class="tool-display hljs" x-show="rows.length" x-auto-scroll>
             <template x-for="row in rows">
                 <div class="diff-line" :class="row.cls">
                     <span class="diff-gutter" x-text="row.gutter"></span>
-                    <span class="diff-text" x-text="row.text"></span>
+                    <!-- per-line hljs markup (escaped plain text when the
+                         language is unknown) -->
+                    <span class="diff-text" x-html="row.html"></span>
                 </div>
             </template>
         </div>

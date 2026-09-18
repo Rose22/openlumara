@@ -32,6 +32,9 @@
         border: 1px solid var(--border-color);
         border-radius: 8px;
         padding: 8px 10px;
+        /* kill the code theme's opaque .hljs background, like the other
+           code boxes - card background stays */
+        background: transparent;
 
         .diff-line {
             display: flex;
@@ -147,6 +150,28 @@
            but themes also set an opaque .hljs background - kill it, the
            box keeps the card's own background */
         background: transparent;
+    }
+
+    /* line rows inside read/create boxes: number gutter + wrapped code.
+       generated markup has no whitespace between lines, so the container's
+       pre-wrap never paints stray blanks */
+    .code-line {
+        display: flex;
+        gap: 10px;
+
+        .code-num {
+            flex-shrink: 0;
+            min-width: 2.5em;
+            text-align: right;
+            user-select: none;
+            opacity: 0.45;
+        }
+
+        .code-text {
+            min-width: 0;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
     }
 
     /* grep variant of the box: NO pre-wrap on the container itself - the

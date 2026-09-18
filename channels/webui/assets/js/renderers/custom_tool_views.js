@@ -68,9 +68,10 @@ function collapseContext(rows, keep) {
     return out;
 }
 
-// diff rows for the view template: [{ gutter, cls, text }] - no html,
-// the template renders these with x-for + x-text.
-function diffRows(original, replacement) {
+// diff rows for the view template: [{ gutter, cls, html }]. text is always
+// plain; html is the per-line highlighted markup (hljs escape hatch, same
+// as the read/create views) or escaped plain text without a known lang.
+function diffRows(original, replacement, lang) {
     const clsFor = sign =>
         sign === '..' ? 'diff-gap' : sign === '-' ? 'diff-del' : sign === '+' ? 'diff-add' : 'diff-ctx';
     let rows;
@@ -85,7 +86,7 @@ function diffRows(original, replacement) {
     return rows.map(([sign, text]) => ({
         gutter: sign === '..' ? '..' : sign,
         cls: clsFor(sign),
-        text,
+        html: sign === '..' ? escapeHtml(text) : highlightDiffLine(text, lang),
     }));
 }
 
@@ -141,6 +142,30 @@ function highlightedCode(code, lang) {
     }
 }
 
+// per-line highlighting for diff rows. lines are highlighted in ISOLATION
+// (the diff only shows excerpts, so whole-file highlighting is impossible):
+// known languages only - per-line auto-detect would guess wildly. tiny
+// cache: diffs re-run on every streamed chunk, and context lines mostly
+// repeat between runs.
+const _diffLineCache = new Map();
+function highlightDiffLine(text, lang) {
+    if (!text) return '';
+    if (!lang || typeof hljs === 'undefined' || !hljs.getLanguage(lang))
+        return escapeHtml(text);
+    const key = lang + '\u0000' + text;
+    let html = _diffLineCache.get(key);
+    if (html === undefined) {
+        try {
+            html = hljs.highlight(text, { language: lang, ignoreIllegals: true }).value;
+        } catch {
+            html = escapeHtml(text);
+        }
+        if (_diffLineCache.size > 2000) _diffLineCache.clear();
+        _diffLineCache.set(key, html);
+    }
+    return html;
+}
+
 // -- coder_folder_grep / coder_file_grep: match lists --------------------------
 
 // normalize the grep response into [{ file, matches }]. content is a flat
@@ -174,6 +199,47 @@ function grepRows(matches) {
             rows.push({ num: '', text: line, kind: 'ctx' });
     }
     return rows;
+}
+
+// -- shared: line-numbered highlighted code blocks ----------------------------
+
+// split highlighted html into per-line divs with a number gutter.
+// operates on hljs OUTPUT (same sanctioned escape hatch as the x-html
+// these views use): tracks which token spans are open so multi-line
+// tokens (python docstrings, block comments) stay colored on every line
+// they span - each line closes and re-opens the spans around it.
+function splitHighlightedLines(html, startLine) {
+    const tokenRe = /<[^>]+>|[^<]+/g;
+    const open = [];
+    const lines = [];
+    let cur = '';
+    for (const tok of html.match(tokenRe) ?? []) {
+        if (tok[0] === '<') {
+            if (tok.startsWith('</')) open.pop();
+            else if (!tok.endsWith('/>')) open.push(tok);
+            cur += tok;
+        } else {
+            tok.split('\n').forEach((part, i) => {
+                if (i > 0) {
+                    lines.push(cur + '</span>'.repeat(open.length));
+                    cur = open.join('');
+                }
+                cur += part;
+            });
+        }
+    }
+    lines.push(cur + '</span>'.repeat(open.length));
+    return lines.map((l, i) =>
+        `<div class="code-line"><span class="code-num">${startLine + i}</span>` +
+        `<span class="code-text">${l || '\u200b'}</span></div>`
+    ).join('');
+}
+
+// full code block for the read/create views: highlighted + line numbers.
+// startLine offsets the gutter for chunked reads (line_start arg).
+function codeLinesHtml(code, lang, startLine) {
+    if (!code) return '';
+    return splitHighlightedLines(highlightedCode(code, lang), startLine ?? 1);
 }
 
 // -- registrations ------------------------------------------------------------
