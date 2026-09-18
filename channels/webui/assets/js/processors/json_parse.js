@@ -170,6 +170,16 @@ function _entryCount(parsed) {
 function partialJsonParse(str, cacheKey) {
     if (!str || !str.trim()) return {};
 
+    // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-18)
+    // fast path: several view getters (args, html, footer) request the SAME
+    // args string per reactive flush; serve an identical raw string straight
+    // from the last-good cache instead of re-parsing the whole growing blob
+    // once per getter on every streamed chunk.
+    if (cacheKey) {
+        const cached = _PARSE_CACHE.get(cacheKey);
+        if (cached && cached.raw === str) return cached.parsed;
+    }
+
     try {
         const full = JSON.parse(str);
         if (cacheKey) _PARSE_CACHE.set(cacheKey, { raw: str, parsed: full });

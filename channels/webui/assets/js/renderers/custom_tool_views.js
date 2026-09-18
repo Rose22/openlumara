@@ -15,6 +15,68 @@
 // globbed script (incl. the tool_display.js registry) has loaded, and it
 // still runs well before any chat messages render.
 
+// -- streaming render memo ----------------------------------------------------
+
+// the backend re-broadcasts the FULL accumulated segment while a tool call
+// streams, and alpine re-evaluates every view getter on each of those
+// messages (x-fade-html AND x-show read the same html getter). an O(n)
+// render (full parse + hljs + diff) over the growing args is therefore
+// O(n^2) for large files, with a fresh giant string + DOM subtree per pass -
+// the crawl and the RAM blowup. memo caches the last output per view
+// instance (keyed by the tool call's cacheKey) and throttles recomputes to
+// one per STREAM_MEMO_MIN_MS; a bump timer touches a tiny reactive counter
+// that every memo getter reads, so the final tail still lands once the
+// throttle window passes.
+const STREAM_MEMO_MIN_MS = 100;
+const STREAM_MEMO_MAX = 16;
+const _STREAM_MEMOS = new Map();
+let _RENDER_TICK = null;
+
+function _renderTick() {
+    if (_RENDER_TICK === null) _RENDER_TICK = Alpine.reactive({ v: 0 });
+    _RENDER_TICK.v; // tracked read: the bump timer re-fires this getter
+    return _RENDER_TICK;
+}
+
+// inputs is an array of the (primitive) render inputs; identity comparison
+// is enough - streamed strings grow per chunk, so lengths differ and the
+// compare short-circuits.
+function streamMemo(key, inputs, compute) {
+    let m = _STREAM_MEMOS.get(key);
+    if (m && m.inputs.length === inputs.length &&
+        m.inputs.every((v, i) => v === inputs[i])) return m.out;
+
+    if (!m) {
+        m = { inputs: [], out: null, at: 0, timer: null };
+        _STREAM_MEMOS.set(key, m);
+        while (_STREAM_MEMOS.size > STREAM_MEMO_MAX) {
+            const oldest = _STREAM_MEMOS.keys().next().value;
+            const evicted = _STREAM_MEMOS.get(oldest);
+            if (evicted.timer) clearTimeout(evicted.timer);
+            _STREAM_MEMOS.delete(oldest);
+        }
+    }
+
+    const tick = _renderTick();
+    const now = performance.now();
+    if (m.out !== null && now - m.at < STREAM_MEMO_MIN_MS) {
+        // within the throttle window: serve the stale render and wake the
+        // getter again when the window elapses so nothing is left behind
+        if (m.timer === null) {
+            m.timer = setTimeout(() => {
+                m.timer = null;
+                _RENDER_TICK.v++;
+            }, STREAM_MEMO_MIN_MS);
+        }
+        return m.out;
+    }
+
+    m.inputs = inputs;
+    m.out = compute();
+    m.at = now;
+    return m.out;
+}
+
 // -- coder_file_edit: diff view ---------------------------------------------
 
 // generic helper: true line diff (LCS) between two code strings.
@@ -73,7 +135,13 @@ function collapseContext(rows, keep) {
 // (x-for rows can't survive that), so this view generates its row markup
 // here instead of in the template. all text goes through escapeHtml or
 // hljs (whose output is escaped), so it's safe markup.
-function diffHtml(original, replacement, lang) {
+function diffHtml(original, replacement, lang, cacheKey) {
+    // memoized + throttled while the args stream in (see streamMemo)
+    return streamMemo('edit:' + cacheKey, [original, replacement, lang],
+        () => _diffHtmlNow(original, replacement, lang));
+}
+
+function _diffHtmlNow(original, replacement, lang) {
     const clsFor = sign =>
         sign === '..' ? 'diff-gap' : sign === '-' ? 'diff-del' : sign === '+' ? 'diff-add' : 'diff-ctx';
     let rows;
@@ -138,9 +206,13 @@ function highlightedCode(code, lang) {
     const esc = escapeHtml(code ?? '');
     if (!code || code.length > 200000 || typeof hljs === 'undefined') return esc;
     try {
-        return (lang && hljs.getLanguage(lang))
-            ? hljs.highlight(code, { language: lang }).value
-            : hljs.highlightAuto(code).value;
+        if (lang && hljs.getLanguage(lang))
+            return hljs.highlight(code, { language: lang }).value;
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-18)
+        // auto-detect runs EVERY grammar in hljs - catastrophic on big
+        // files with unknown extensions. only guess for small snippets.
+        if (code.length > 20000) return esc;
+        return hljs.highlightAuto(code).value;
     } catch {
         return esc;
     }
@@ -241,9 +313,38 @@ function splitHighlightedLines(html, startLine) {
 
 // full code block for the read/create views: highlighted + line numbers.
 // startLine offsets the gutter for chunked reads (line_start arg).
-function codeLinesHtml(code, lang, startLine) {
+// memoized + throttled per view instance (see streamMemo): without it the
+// full highlight + line split re-runs for every getter read on every
+// streamed chunk, which turns quadratic on large streamed files.
+function codeLinesHtml(code, lang, startLine, cacheKey) {
     if (!code) return '';
-    return splitHighlightedLines(highlightedCode(code, lang), startLine ?? 1);
+    return streamMemo('code:' + cacheKey, [code, lang, startLine ?? 1],
+        () => splitHighlightedLines(highlightedCode(code, lang), startLine ?? 1));
+}
+
+// -- scheduler_add_job: schedule card ------------------------------------------
+
+const WEEKDAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+// derive the display bits from a scheduler job's args. only fields the
+// model actually passed show up; everything optional stays hidden.
+function schedulerInfo(args) {
+    const when = args.relative_duration ?? args.target_time ?? '';
+    const tags = [];
+    if (args.recurring) tags.push('recurring');
+    if (args.weekdays_only) tags.push('weekdays');
+    if (Number.isInteger(args.target_weekday))
+        tags.push(WEEKDAY_NAMES[args.target_weekday] ?? `day ${args.target_weekday}`);
+    return { when, tags, action: args.action ?? '' };
+}
+
+// -- tools_load: module chips ---------------------------------------------------
+
+// meta tool that loads other tools; the args' module_names list is the
+// whole story, the response is boilerplate. error responses (unknown
+// module) are shown as plain text instead.
+function toolLoadModules(args) {
+    return Array.isArray(args.module_names) ? args.module_names : [];
 }
 
 // -- registrations ------------------------------------------------------------
@@ -252,30 +353,94 @@ document.addEventListener('alpine:init', () => {
     // coder file edits: show the change as a diff, live while the args stream
     registerToolDisplay({
         match: /^coder_file_edit$/,
-        view: 'coder-file-edit'
+        view: 'coder-file-edit',
+        summary: (res, tool, cacheKey) => {
+            if (res?.status !== 'success') return '';
+            const args = toolArgs(tool, cacheKey);
+            if (!args.original_code || !args.replacement_code) return '';
+            // full diff per reactive flush adds up (x-text evaluates even
+            // while collapsed) - memoize it like the view itself
+            return streamMemo('edit-sum:' + cacheKey,
+                [args.original_code, args.replacement_code], () => {
+                    let add = 0, del = 0;
+                    for (const [sign] of diffLines(args.original_code, args.replacement_code)) {
+                        if (sign === '+') add++;
+                        else if (sign === '-') del++;
+                    }
+                    return `+${add} −${del}`;
+                });
+        }
     });
 
     // web searches: render results as titled link cards
     registerToolDisplay({
         match: /^web_search_(text|images|news|videos|books)$/,
-        view: 'web-search'
+        view: 'web-search',
+        summary: res => {
+            const n = searchResults(res).length;
+            return n ? `${n} result${n === 1 ? '' : 's'}` : '';
+        }
     });
 
     // coder file reads: highlighted code block
     registerToolDisplay({
         match: /^coder_file_read$/,
-        view: 'file-read'
+        view: 'file-read',
+        summary: res => {
+            if (!res || res.status === 'error' || typeof res.content !== 'string') return '';
+            const n = res.content.split('\n').length;
+            return `${n} line${n === 1 ? '' : 's'}`;
+        }
     });
 
     // coder file creates: the new file's content, highlighted, streamed live
     registerToolDisplay({
         match: /^coder_file_create$/,
-        view: 'file-create'
+        view: 'file-create',
+        summary: (res, tool, cacheKey) => {
+            if (res?.status !== 'success') return '';
+            const content = toolArgs(tool, cacheKey).content;
+            if (!content) return '';
+            const n = content.replace(/\n$/, '').split('\n').length;
+            return `${n} line${n === 1 ? '' : 's'}`;
+        }
     });
 
     // grep calls: file-grouped match lists with line numbers + context
     registerToolDisplay({
         match: /^coder_(folder|file)_grep$/,
-        view: 'grep'
+        view: 'grep',
+        summary: (res, tool, cacheKey) => {
+            const groups = grepGroups(res, toolArgs(tool, cacheKey));
+            const n = groups.reduce((sum, g) => sum + g.matches.length, 0);
+            if (!n) return '';
+            return groups.length > 1 ? `${n} matches · ${groups.length} files` : `${n} match${n === 1 ? '' : 'es'}`;
+        }
+    });
+
+    // coder glob: file list + count
+    registerToolDisplay({
+        match: /^coder_glob$/,
+        summary: res => {
+            const n = Array.isArray(res?.content) ? res.content.length : 0;
+            return n ? `${n} file${n === 1 ? '' : 's'}` : '';
+        }
+    });
+
+    // scheduler jobs: card with clock, when + action
+    registerToolDisplay({
+        match: /^scheduler_add_job$/,
+        view: 'scheduler-job',
+        summary: (res, tool, cacheKey) => schedulerInfo(toolArgs(tool, cacheKey)).when
+    });
+
+    // tools_load: which modules' tools just got loaded
+    registerToolDisplay({
+        match: /^tools_load$/,
+        view: 'tools-load',
+        summary: (res, tool, cacheKey) => {
+            const mods = toolLoadModules(toolArgs(tool, cacheKey));
+            return mods.length ? mods.join(' + ') : '';
+        }
     });
 });

@@ -258,6 +258,75 @@
         }
     }
 
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-18)
+       tools_load: one soft chip per loaded module, box icon + name */
+    .module-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+
+        .module-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-full, 999px);
+            color: var(--text-muted);
+            font-size: 0.82rem;
+            font-weight: 500;
+
+            svg {
+                width: 0.95em;
+                height: 0.95em;
+                flex-shrink: 0;
+            }
+        }
+    }
+
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-18)
+       scheduler job card: clock + when + tags, action text below */
+    .job-card {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 10px 12px;
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+
+        .job-when {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            font-size: 0.88rem;
+
+            svg {
+                width: 1.05em;
+                height: 1.05em;
+                flex-shrink: 0;
+                color: var(--accent);
+            }
+        }
+
+        .job-tag {
+            font-size: 0.68rem;
+            font-weight: 500;
+            padding: 1px 7px;
+            border-radius: var(--radius-full, 999px);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            text-transform: lowercase;
+        }
+
+        .job-action {
+            font-size: 0.82rem;
+            line-height: 1.5;
+            color: var(--text-primary);
+            opacity: 0.85;
+        }
+    }
+
     /* truncation/cap notes under a view box */
     .grep-note {
         margin-top: 6px;

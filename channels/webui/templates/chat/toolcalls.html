@@ -6,7 +6,7 @@
                  during streaming. autoCollapsed guards against re-collapsing
                  if the user manually expands it again mid-stream. -->
             <div class="tool-calls-container"
-                 x-data="{ collapsed: $store.stream.state === 'idle' || !!tool.response || localStorage.getItem('collapseToolcallsDefault') === 'true', autoCollapsed: false }"
+                 x-data="{ collapsed: $store.stream.state === 'idle' || !!tool.response || localStorage.getItem('collapseToolcallsDefault') === 'true', autoCollapsed: false, cacheKey: tool.id ?? (message.tool_call_id + ':' + toolIdx) }"
                  x-effect="if (tool.response && !autoCollapsed) { autoCollapsed = true; collapsed = true }">
             <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
                  tool-pending marks in-flight calls (no response yet) so the
@@ -38,7 +38,7 @@
                         <!-- result hint from the display registry (default:
                              displays define no summary, so this stays empty) -->
                         <span class="call-result" x-show="tool.response"
-                              x-text="toolCallResultSummary(tool)"></span>
+                              x-text="toolCallResultSummary(tool, cacheKey)"></span>
                     </div>
 
                     <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)

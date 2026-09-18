@@ -33,8 +33,10 @@ function toolDisplayView(tool) {
 }
 
 // one-line result hint for the completed tool call header; by default
-// nothing is shown (Rosie's call) - displays can opt in via summary()
-function toolCallResultSummary(tool) {
+// nothing is shown (Rosie's call) - displays can opt in via summary().
+// summaries get (parsedResponse, tool) - many stats (diff sizes, glob
+// counts) live in the ARGS, so they need the tool itself as well.
+function toolCallResultSummary(tool, cacheKey) {
     const display = toolDisplayFor(tool.function?.name);
     if (!display || typeof display.summary !== 'function') return '';
     let parsed = null;
@@ -43,7 +45,7 @@ function toolCallResultSummary(tool) {
     } catch {
         return '';
     }
-    return display.summary(parsed) ?? '';
+    return display.summary(parsed, tool, cacheKey) ?? '';
 }
 
 // -- generic template helpers ----------------------------------------------
