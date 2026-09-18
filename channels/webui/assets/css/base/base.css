@@ -7,6 +7,13 @@
     padding: 0;
 }
 
+/* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-18)
+   safety-net default; base.json defines the real one. kept so standalone
+   css still renders code in mono even if the theme fetch failed */
+:root {
+    --code-font: ui-monospace, 'Cascadia Code', 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+}
+
 /* Utility classes */
 .nopadding {
     padding: 0 !important;

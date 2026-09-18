@@ -137,10 +137,14 @@ THEME_STORE = {
         const root = document.documentElement;
         localStorage.setItem('fontFamily', font);
 
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-18)
+        // the settings font is for PROSE only. it used to clobber
+        // --code-font too (inline on the root, so it beat every theme
+        // value), making all code views render in the sans UI font.
+        // --code-font now belongs to base.json / the css fallback only.
         if (font && font !== 'default') {
             this.loadGoogleFont(font);
             root.style.setProperty('--font-primary', `'${font}', sans-serif`);
-            root.style.setProperty('--code-font', `'${font}', monospace`);
         } else {
             root.style.setProperty('--font-primary', "Arial, sans-serif");
         }
