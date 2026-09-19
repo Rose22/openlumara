@@ -75,6 +75,8 @@ class TurnCollector:
                         if tool.get("id") in response_map:
                             tool["response"] = response_map[tool["id"]]
 
+        return turns
+
     async def group_stream(self, stream_generator):
         """
         this takes the raw stream generator and yields 'streaming turn' objects
