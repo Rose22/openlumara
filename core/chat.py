@@ -237,15 +237,13 @@ class Chat:
         if self.current is None:
             raise Exception("No chat is currently loaded!")
 
-        # Reset active tools on clear, and wipe the persisted module list so
-        # this chat starts fresh the next time it's loaded
+        # reset active tools on clear
         self.channel.tool_loader.reset_for_new_chat()
         self.set_loaded_modules([])
 
         await self.messages.clear()
         
-        # Reset token_usage since we're clearing the chat
-        # API token usage is only valid for the exact context that was sent
+        # reset stored token usage data
         await self.set("token_usage", 0)
         
         await self.save()
@@ -424,8 +422,6 @@ class Chat:
             if query_lower in chat_meta.get("title").lower():
                 found["title_match"] = True
 
-            # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16) (rosie-approved task: sidebar search)
-            # title-only mode: skip loading history files entirely
             if not search_in_content:
                 if found.get("title_match"):
                     found_chats.append(found)
@@ -488,21 +484,14 @@ class Chat:
                     "message_snippets": found_messages
                 })
                 found_chats.append(found)
-
-            # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16) (rosie-approved task: sidebar search)
-            # bugfix: a title match with a readable history but no content
-            # match was never appended (it only got appended in the
-            # no-history / unreadable-history branches), so chats whose
-            # title matched but whose messages didn't were silently lost.
             elif found.get("title_match"):
                 found_chats.append(found)
 
             if len(found_chats) >= max_results:
                 return found_chats
 
-        # Sort with priority: title matches first, then content-only matches
-        # Within each group, sort by updated date descending
-        # Use stable sort: first by date descending, then by title_match (True first)
+        # sort with them by date last modified, then by title
+        # (so that the newest chats show up first)
         found_chats.sort(key=lambda x: x["updated"] or "", reverse=True)
         found_chats.sort(key=lambda x: not x.get("title_match"))  # not True=False=0 sorts before not False=True=1
         

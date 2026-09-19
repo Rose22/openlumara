@@ -75,20 +75,6 @@ class TurnCollector:
                         if tool.get("id") in response_map:
                             tool["response"] = response_map[tool["id"]]
 
-        # flag the final content turn
-        for turn in reversed(turns):
-            if turn["role"] != "assistant":
-                continue
-            has_content = any(
-                m.get("role") == "assistant" and m.get("content") and not m.get("tool_calls")
-                for m in turn["messages"]
-            )
-            if has_content:
-                turn["final"] = True
-            break
-                            
-        return turns
-
     async def group_stream(self, stream_generator):
         """
         this takes the raw stream generator and yields 'streaming turn' objects
@@ -186,8 +172,7 @@ class TurnCollector:
                 elif segment_type == 'content':
                     current_segment.setdefault("content", token.get("content", ''))
                 elif segment_type == 'tool_calls':
-                    # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
-                    # copy the list since we now mutate it in place during merges
+                    # copy the list since we mutate it in place during merges
                     current_segment.setdefault("tool_calls", list(token.get("tool_calls", [])))
                     last_tool_calls_segment = current_segment  # remember this for later merging
                 elif segment_type == 'tool':
@@ -203,12 +188,10 @@ class TurnCollector:
                 # so here's where we do the streaming magic
                 # that merges new tokens into the existing segment
                 if segment_type == 'tool_calls':
-                    # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
-                    # merge streamed tool calls by id instead of replacing the whole
-                    # array: each delta only carries the single buffered call for its
-                    # index, so a blunt replace wiped out all previously streamed calls.
                     if token.get("tool_calls"):
                         existing_calls = current_segment.setdefault("tool_calls", [])
+                        # merge the tool calls using their id
+                        # so that batched tool calls properly show up
                         for incoming_call in token["tool_calls"]:
                             call_id = incoming_call.get("id")
                             if call_id:
