@@ -388,16 +388,22 @@ class Commands:
         context = await self.channel.context.get()
 
         # use API.send() to skip all the usual convenience logic
-        response = await self.channel.manager.API.send(context+[{"role": "user", "content": "Please summarize our conversation so far up to this point. The purpose is to compress current context into a summary that will be used to continue the chat."}], use_tools=False, use_thinking=False)
+        response = await self.channel.render_stream(
+            self.channel.manager.API.send_stream(
+                context+[{"role": "user", "content": "Please summarize our conversation so far up to this point. The purpose is to compress current context into a summary that will be used to continue the chat."}],
+                use_tools=False,
+                use_thinking=False
+            )
+        )
 
         if not response:
-            return None
+            return "ai returned a blank response!"
 
         # add special cutoff message that gets handled by the context manager
         await self.channel.context.chat.messages.add(self.channel.context.SUMMARIZATION_CUTOFF)
 
         # add AI's summarization
-        await self.channel.context.chat.messages.add({"role": "assistant", "content": response.get("content")})
+        await self.channel.context.chat.messages.add(response)
 
         return "chat compressed"
 

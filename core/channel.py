@@ -532,7 +532,7 @@ class Channel:
         # and pass it on to yield
         return {"type": "error", "content": error}
 
-    async def send(self, message: str, files: list = None, commands_authorized=False):
+    async def send(self, message: str, files: list = None, commands_authorized=False, **kwargs):
         """sends a message to the AI from within the current channel"""
 
         # preprocessing (API connection logic, command processing, user message module hooks, etc)
@@ -548,7 +548,7 @@ class Channel:
                 return {"role": "assistant", "content": processed["content"]}
 
         # request the AI response and add it to context
-        response = await self.manager.API.send(processed["context"])
+        response = await self.manager.API.send(processed["context"], **kwargs)
 
         # handle any errors
         if isinstance(response, core.api.APIError):
@@ -579,7 +579,7 @@ class Channel:
         await self._send_postprocess(assistant_message)
         return self.format_message(assistant_message)
 
-    async def send_stream(self, message: str, files: list = None, commands_authorized=False):
+    async def send_stream(self, message: str, files: list = None, commands_authorized=False, **kwargs):
         """sends a message to the AI from within the current channel, streaming version"""
 
         # preprocessing (API connection logic, command processing, user message module hooks, etc)
@@ -630,7 +630,7 @@ class Channel:
 
         # and stream the response to the caller of this method
         try:
-            stream = self.manager.API.send_stream(processed.get("context"))
+            stream = self.manager.API.send_stream(processed.get("context"), **kwargs)
         except Exception as e:
             yield await self.throw_stream_error(f"Error while starting stream: {core.detail_error(e)}")
             return

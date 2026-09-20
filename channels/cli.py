@@ -185,6 +185,115 @@ class Cli(core.channel.Channel):
         total_bar_str = " | ".join(total_bar)
         return prompt_toolkit.formatted_text.HTML(total_bar_str)
 
+    async def render_stream(self, stream):
+        accent_color = self._get_accent_color()
+
+        processing_prompt = False
+        first_processing_prompt = True
+        progress = rich.progress.Progress(expand=False, transient=False)
+        progress_task = None
+
+        # sending_prompt = True
+        # sending = rich.status.Status("Sending", console=self.console)
+        # sending.start()
+
+        show_reasoning = self.config.get("show_reasoning")
+
+        strings = {
+            "thinking_header": "Thinking:",
+            "thinking_newline": "\n-> ",
+            "conclusion_header": "",
+            "separator": "-"*8 if show_reasoning else "",
+            "tool_call_header": "🔧 calling tool {tool_name}"
+        }
+
+        if not show_reasoning:
+            reasoning_indicator = rich.status.Status("Thinking..", console=self.console)
+        reasoning_indicator_started = False
+
+        final_reasoning = []
+        final_content = []
+
+        try:
+            async for token in self.format_stream_for_text(
+                stream,
+                use_markdown=False,
+                strings=strings,
+                show_indicators=False
+            ):
+                token_type = token.get("type")
+                token_content = token.get("content")
+
+                if token_type == "error":
+                    self.console.print(f"[red][bold]ERROR:[/bold] {token_content}[/red]")
+                    continue
+                elif token_type in ("user_message", "token_usage"):
+                    continue
+
+                # if sending_prompt:
+                #     sending.stop()
+                #     sending_prompt = False
+
+                if token_type == "prompt_progress":
+                    if not processing_prompt:
+                        if first_processing_prompt:
+                            first_processing_prompt = False
+                        else:
+                            # create a newline so that the progress bar doesnt replace the content
+                            self.console.print()
+
+                        # display a progress bar
+                        progress.start()
+                        progress_task = progress.add_task(f"[{accent_color}]Processing..", total=1)
+                        processing_prompt = True
+
+                    progress.update(progress_task, completed=(token_content.get("processed") / token_content.get("total")), refresh=True)
+                elif processing_prompt:
+                    # remove the progress bar upon receival of the first non-progress token
+                    progress.remove_task(progress_task)
+                    progress.stop()
+                    processing_prompt = False
+
+                if token_type == "reasoning":
+                    final_reasoning.append(token_content)
+                elif token_type == "content":
+                    final_content.append(token_content)
+
+                if token_type == "reasoning" and not show_reasoning:
+                    if not reasoning_indicator_started:
+                        reasoning_indicator.start()
+                        reasoning_indicator_started = True
+                elif token_type == "formatted":
+                    if reasoning_indicator_started:
+                        reasoning_indicator.stop()
+                        reasoning_indicator_started = False
+
+                    self.console.print(token_content, end="")
+        except asyncio.CancelledError:
+            self.console.print(f"\n[{accent_color}]cancelled.[/]")
+            return
+        except KeyboardInterrupt:
+            self.console.print(f"\n[{accent_color}]cancelled.[/]")
+            return
+        finally:
+            progress.stop()
+            # sending.stop()
+
+            if not show_reasoning:
+                reasoning_indicator.stop()
+
+            self._token_usage = await self.context.get_total_tokens()
+
+        self.console.print()
+
+        msg = {"role": "assistant"}
+        if final_reasoning:
+            msg["reasoning_content"] = "".join(final_reasoning)
+        if final_content:
+            msg["content"] = "".join(final_content)
+
+        return msg
+
     async def run(self):
         # auto disable when not run from a terminal
         if not sys.stdout.isatty():
@@ -232,94 +341,9 @@ class Cli(core.channel.Channel):
                 await self.manager.shutdown()
                 break
 
-            processing_prompt = False
-            first_processing_prompt = True
-            progress = rich.progress.Progress(expand=False, transient=False)
-            progress_task = None
-
-            sending_prompt = True
-            sending = rich.status.Status("Sending", console=self.console)
-            sending.start()
-
-            show_reasoning = self.config.get("show_reasoning")
-
-            strings = {
-                "thinking_header": "Thinking:",
-                "thinking_newline": "\n-> ",
-                "conclusion_header": "",
-                "separator": "-"*8 if show_reasoning else "",
-                "tool_call_header": "🔧 calling tool {tool_name}"
-            }
-
-            if not show_reasoning:
-                reasoning_indicator = rich.status.Status("Thinking..", console=self.console)
-            reasoning_indicator_started = False
-
-            try:
-                async for token in self.format_stream_for_text(
-                    self.send_stream(user_input, commands_authorized=True),
-                    use_markdown=False,
-                    strings=strings,
-                    show_indicators=False
-                ):
-                    token_type = token.get("type")
-                    token_content = token.get("content")
-
-                    if token_type == "error":
-                        self.console.print(f"[red][bold]ERROR:[/bold] {token_content}[/red]")
-                        continue
-                    elif token_type in ("user_message", "token_usage"):
-                        continue
-
-                    if sending_prompt:
-                        sending.stop()
-                        sending_prompt = False
-
-                    if token_type == "prompt_progress":
-                        if not processing_prompt:
-                            if first_processing_prompt:
-                                first_processing_prompt = False
-                            else:
-                                # create a newline so that the progress bar doesnt replace the content
-                                self.console.print()
-
-                            # display a progress bar
-                            progress.start()
-                            progress_task = progress.add_task(f"[{accent_color}]Processing..", total=1)
-                            processing_prompt = True
-
-                        progress.update(progress_task, completed=(token_content.get("processed") / token_content.get("total")), refresh=True)
-                    elif processing_prompt:
-                        # remove the progress bar upon receival of the first non-progress token
-                        progress.remove_task(progress_task)
-                        progress.stop()
-                        processing_prompt = False
-
-                    if token_type == "reasoning" and not show_reasoning:
-                        if not reasoning_indicator_started:
-                            reasoning_indicator.start()
-                            reasoning_indicator_started = True
-                    elif token_type == "formatted":
-                        if reasoning_indicator_started:
-                            reasoning_indicator.stop()
-                            reasoning_indicator_started = False
-
-                        self.console.print(token_content, end="")
-            except asyncio.CancelledError:
-                self.console.print(f"\n[{accent_color}]cancelled.[/]")
-                break
-            except KeyboardInterrupt:
-                self.console.print(f"\n[{accent_color}]cancelled.[/]")
-            finally:
-                progress.stop()
-                sending.stop()
-
-                if not show_reasoning:
-                    reasoning_indicator.stop()
-
-                self._token_usage = await self.context.get_total_tokens()
-
-            self.console.print()
+            await self.render_stream(
+                self.send_stream(user_input, commands_authorized=True)
+            )
 
     async def on_shutdown(self):
         # stop the input loop so that run() exits cleanly
