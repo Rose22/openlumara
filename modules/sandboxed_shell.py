@@ -8,6 +8,23 @@ import sys
 
 import core
 
+# thanks to qrkadem for coming up with this solution! i was overthinking this all along.
+# i thought i needed to create a second container next to the one openlumara runs in,
+# because docker-in-docker is insecure.
+# but if we're already running in docker anyway, we can just run on the "host"! (which is a container)
+def _is_running_in_container():
+    if os.path.exists('/.dockerenv'):
+        return True
+    if os.environ.get('container') in ('docker', 'podman'):
+        return True
+    try:
+        with open('/proc/1/cgroup', 'r') as f:
+            cgroup = f.read()
+            if 'docker' in cgroup or 'podman' in cgroup or 'libpod' in cgroup:
+                return True
+    except (FileNotFoundError, PermissionError):
+        pass
+    return False
 
 class SandboxedShell(core.module.Module):
     """
@@ -160,6 +177,27 @@ class SandboxedShell(core.module.Module):
     async def on_system_prompt(self):
         return "".join(self._get_setup())
 
+    def _resolve_dockerfile_path(self, dockerfile_path):
+        if not dockerfile_path:
+            return None
+
+        expanded = os.path.expanduser(dockerfile_path)
+
+        if os.path.isabs(expanded):
+            return expanded
+
+        module_dir = os.path.dirname(os.path.abspath(__file__))
+        candidates = [
+            os.path.abspath(expanded),
+            os.path.abspath(core.get_path(expanded)),
+            os.path.abspath(os.path.join(module_dir, '..', expanded)),
+        ]
+        for candidate in candidates:
+            if os.path.isfile(candidate):
+                return candidate
+
+        return os.path.abspath(expanded)
+
     async def _build_image(self, force=False):
         """Builds a Docker image from the configured Dockerfile.
         
@@ -179,16 +217,7 @@ class SandboxedShell(core.module.Module):
         img_tag = "latest"
         full_image = f"{img_name}:{img_tag}"
 
-        # expand user home dir if present
-        dockerfile_path = os.path.expanduser(dockerfile_path)
-
-        # if path is relative to openlumara root, find the root
-        if not os.path.isabs(dockerfile_path):
-            # try to find openlumara root by checking if it's relative to this module
-            module_dir = os.path.dirname(os.path.abspath(__file__))
-            candidate = os.path.join(module_dir, '..', '..', dockerfile_path)
-            if os.path.isfile(candidate):
-                dockerfile_path = os.path.abspath(candidate)
+        dockerfile_path = self._resolve_dockerfile_path(dockerfile_path)
 
         if not os.path.isfile(dockerfile_path):
             self.log("sandbox_shell", f"Dockerfile not found at {dockerfile_path}, skipping build.")
@@ -327,10 +356,6 @@ class SandboxedShell(core.module.Module):
         uid = self.config.get("run_as_user") or self.host_user_uid
         gid = self.config.get("run_as_user") or self.host_user_gid
 
-        # --rm: if the container ever dies (e.g. OOM from a resource exhaustion attack),
-        # docker removes it automatically so we can cleanly start a fresh one.
-        # Persistence is unaffected: installed packages live in the image, and files
-        # live in the sandbox folder mount.
         cmd = [self.runtime, 'run', '-d', '--rm', '--init', '--name', self.container_name]
 
         if self.use_gvisor:
@@ -363,10 +388,7 @@ class SandboxedShell(core.module.Module):
 
         # mount dockerfile read-only if using dockerfile method
         if method == "dockerfile" and dockerfile_path:
-            expanded_path = os.path.expanduser(dockerfile_path)
-            if not os.path.isabs(expanded_path):
-                module_dir = os.path.dirname(os.path.abspath(__file__))
-                expanded_path = os.path.abspath(os.path.join(module_dir, '..', '..', expanded_path))
+            expanded_path = self._resolve_dockerfile_path(dockerfile_path)
             if os.path.isfile(expanded_path):
                 cmd.extend(['-v', f"{expanded_path}:{dockerfile_mount}:ro"])
                 self.log("sandbox_shell", f"Mounted Dockerfile read-only at {dockerfile_mount}")
@@ -462,9 +484,12 @@ class SandboxedShell(core.module.Module):
 
     async def on_ready(self):
         """Starts the persistent container when the module is ready."""
+        self.passthrough = _is_running_in_container()
+        if self.passthrough:
+            self.log("sandbox_shell", "Detected we are already running inside a container. Running commands directly on the host!")
+            return
+
         self.runtime = None
-        self.container_name = None
-        self.use_gvisor = False
         self.container_name = "openlumara_shell"
 
         # hash tracking file location
@@ -488,6 +513,7 @@ class SandboxedShell(core.module.Module):
         self.host_user_uid = os.getuid()
         self.host_user_gid = os.getgid()
 
+        self.use_gvisor = False
         if shutil.which("runsc"):
             self.use_gvisor = True
             self.log("sandbox_shell", "gVisor (runsc) detected. Sandbox will use gVisor for enhanced security.")
@@ -498,6 +524,9 @@ class SandboxedShell(core.module.Module):
 
     async def on_shutdown(self):
         """Stops and removes the container when the application shuts down."""
+        if self.passthrough:
+            return
+
         if self.container_name and self.runtime:
             self.log("sandbox_shell", f"Shutting down container {self.container_name}...")
             try:
@@ -509,8 +538,47 @@ class SandboxedShell(core.module.Module):
             finally:
                 self.container_name = None
 
+    async def _run_passthrough(self, command):
+        # Runs the command directly on the host since we're already inside a container; keeps timeout and output limits.
+        timeout_val = self.config.get("execution_timeout", default=10)
+        output_limit = self.config.get("output_limit", default=2000)
+        safety_timeout = timeout_val + 5
+
+        try:
+            stdout, stderr, exit_code, timed_out = await self._run_async_cmd(['sh', '-c', command], timeout=safety_timeout, limit=output_limit)
+
+            success = True
+            stdout_text = stdout.decode('utf-8', errors='replace').strip()
+            stderr_text = stderr.decode('utf-8', errors='replace').strip()
+            truncated = len(stdout) >= output_limit or len(stderr) >= output_limit
+
+            errors = []
+            if timed_out:
+                errors.append(f"Command execution timed out after {timeout_val}s")
+            if truncated:
+                errors.append(f"Output truncated - limit: {output_limit} chars")
+            if exit_code == 137:
+                errors.append("Process forcibly killed")
+
+            results = {
+                "stdout": stdout_text,
+                "stderr": stderr_text,
+                "exit_code": exit_code
+            }
+            if errors:
+                success = False
+                results["errors"] = errors
+
+            return self.result(results, success)
+
+        except Exception as e:
+            return self.result(f"Error while running passthrough shell command: {e}", False)
+
     async def run(self, command):
         """Executes a command inside the existing persistent container."""
+        if self.passthrough:
+            return await self._run_passthrough(command)
+
         if not self.runtime:
             return self.result("Docker or podman not available.", False)
 
@@ -606,6 +674,9 @@ class SandboxedShell(core.module.Module):
         return str(result)
 
     def _get_setup(self):
+        if self.passthrough:
+            return "You're running openlumara in a container, so all commands are running directly in your container!"
+
         gid = self.config.get('run_as_user') or self.host_user_gid
         method = self.config.get('method', default='dockerfile')
         lines = [
@@ -619,10 +690,7 @@ class SandboxedShell(core.module.Module):
         if method == "dockerfile":
             dockerfile_path = self.config.get('dockerfile_path')
             if dockerfile_path:
-                expanded = os.path.expanduser(dockerfile_path)
-                if not os.path.isabs(expanded):
-                    module_dir = os.path.dirname(os.path.abspath(__file__))
-                    expanded = os.path.abspath(os.path.join(module_dir, '..', '..', expanded))
+                expanded = self._resolve_dockerfile_path(dockerfile_path)
                 exists = "exists" if os.path.isfile(expanded) else "NOT FOUND"
                 lines.append(f"Dockerfile: {dockerfile_path} ({exists})")
             else:
