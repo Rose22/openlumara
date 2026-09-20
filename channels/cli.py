@@ -185,7 +185,7 @@ class Cli(core.channel.Channel):
         total_bar_str = " | ".join(total_bar)
         return prompt_toolkit.formatted_text.HTML(total_bar_str)
 
-    async def render_stream(self, stream):
+    async def on_stream(self, stream):
         accent_color = self._get_accent_color()
 
         processing_prompt = False
@@ -341,7 +341,7 @@ class Cli(core.channel.Channel):
                 await self.manager.shutdown()
                 break
 
-            await self.render_stream(
+            await self.push_stream(
                 self.send_stream(user_input, commands_authorized=True)
             )
 

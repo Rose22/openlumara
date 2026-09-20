@@ -388,7 +388,7 @@ class Commands:
         context = await self.channel.context.get()
 
         # use API.send() to skip all the usual convenience logic
-        response = await self.channel.render_stream(
+        response = await self.channel.push_stream(
             self.channel.manager.API.send_stream(
                 context+[{"role": "user", "content": "Please summarize our conversation so far up to this point. The purpose is to compress current context into a summary that will be used to continue the chat."}],
                 use_tools=False,

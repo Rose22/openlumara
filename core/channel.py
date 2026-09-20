@@ -174,6 +174,53 @@ class Channel:
         """Overridable method that triggers when the auto-installer uninstalls the dependencies for a channel"""
         pass
 
+    async def accumulate_stream(self, stream, content, reasoning):
+        """this is used to collect the tokens from a stream so they can be returned as a final message object"""
+        async for token in stream:
+            token_type = token.get("type")
+            if token_type == "content":
+                content.append(token.get("content"))
+            elif token_type == "reasoning":
+                reasoning.append(token.get("content"))
+            yield token
+
+    async def push_stream(self, stream):
+        """
+        call this from any channel in order to send a stream into the channel without needing the user's input
+        for example: self.push_stream(self.send_stream('blah'))
+
+        the channel's overridable on_stream() method will then take the pushed stream and loop through its tokens
+        (if it is defined)
+
+        returns the final message as a chat completions message object that
+        can be used however you wish
+        """
+        content = []
+        reasoning = []
+
+        # this is just a wrapper that accumulates the tokens,
+        # so call the real event callback
+        await self.on_stream(self.accumulate_stream(stream, content, reasoning))
+
+        msg = {"role": "assistant"}
+        if reasoning:
+            msg["reasoning_content"] = "".join(reasoning)
+        if content:
+            msg["content"] = "".join(content)
+
+        return msg
+
+    async def on_stream(self, stream):
+        """
+        overridable method that takes a stream object and lets you loop through the tokens in it in order to render them
+
+        this is a way to decouple user input from stream receiving so that
+        things like context compression and modules can send streamed requests
+        that display the streamed tokens directly to the user,
+        so that the user doesn't have to wait for a request to finish
+        """
+        pass
+
     async def push(self, message):
         """
         push a message to the push queue, which will instantly display it in all channels
