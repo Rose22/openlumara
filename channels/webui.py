@@ -195,6 +195,57 @@ class Webui(core.channel.Channel):
             "content": message
         })
 
+    async def on_stream(self, stream):
+        user_message_confirmed = False
+        index = getattr(self, "_ws_stream_index", -1)
+
+        async for partial in self.turncollector.group_stream(stream):
+            payload = serialize_for_json(partial)
+
+            if partial.get("type") == "token":
+                token = partial.get("content")
+                token_type = token.get("type")
+                match token_type:
+                    case "user_message":
+                        try:
+                            user_msg_payload = token.copy()
+                            user_msg_payload['index'] = index
+                            await self.websocket_manager.broadcast({
+                                "type": "user_message_added",
+                                "message": user_msg_payload,
+                            })
+                        except Exception as e:
+                            self.log(self.name, f"error sending user message: {core.detail_error(e)}")
+                            return
+                    case "error":
+                        # for an error, just force a chat reload so that it shows up (core/channel takes care of adding it to context)
+                        await self.websocket_manager.broadcast({
+                            "type": "user_message_confirmed",
+                            "index": index
+                        })
+                        await self.websocket_manager.broadcast({
+                            "type": "sync"
+                        })
+                        return
+                    case _:
+                        if not user_message_confirmed:
+                            user_message_confirmed = True
+                            await self.websocket_manager.broadcast({
+                                "type": "user_message_confirmed",
+                                "index": index
+                            })
+
+                        await self.websocket_manager.broadcast({
+                            "type": "token",
+                            "content": token
+                        })
+
+            elif partial.get("type") == "turn":
+                await self.websocket_manager.broadcast({
+                    "type": "turn_stream",
+                    "turn": payload.get("content")
+                })
+
     def on_log(self, category, message):
         if not hasattr(self, 'websocket_manager'):
             # not initialized yet
@@ -1162,61 +1213,16 @@ class WebSocketManager:
             self.disconnect(conn)
 
     async def _stream_task(self, message: str, index, files: list = None):
-        user_message_confirmed = False
+        self.channel._ws_stream_index = index
 
         try:
-            async for partial in self.channel.turncollector.group_stream(
-                    self.channel.send_stream(
-                        message=message,
-                        files=files,
-                        commands_authorized=self.channel.config.get("allow_admin_commands")
-                    )
-                ):
-                payload = serialize_for_json(partial)
-
-                if partial.get("type") == "token":
-                    token = partial.get("content")
-                    token_type = token.get("type")
-                    match token_type:
-                        case "user_message":
-                            try:
-                                user_msg_payload = token.copy()
-                                user_msg_payload['index'] = index
-                                await self.broadcast({
-                                    "type": "user_message_added",
-                                    "message": user_msg_payload,
-                                })
-                            except Exception as e:
-                                self.channel.log(self.channel.name, f"error sending user message: {core.detail_error(e)}")
-                                return
-                        case "error":
-                            # for an error, just force a chat reload so that it shows up (core/channel takes care of adding it to context)
-                            await self.broadcast({
-                                "type": "user_message_confirmed",
-                                "index": index
-                            })
-                            await self.broadcast({
-                                "type": "sync"
-                            })
-                            return
-                        case _:
-                            if not user_message_confirmed:
-                                user_message_confirmed = True
-                                await self.broadcast({
-                                    "type": "user_message_confirmed",
-                                    "index": index
-                                })
-
-                            await self.broadcast({
-                                "type": "token",
-                                "content": token
-                            })
-
-                elif partial.get("type") == "turn":
-                    await self.broadcast({
-                        "type": "turn_stream",
-                        "turn": payload.get("content")
-                    })
+            await self.channel.push_stream(
+                self.channel.send_stream(
+                    message=message,
+                    files=files,
+                    commands_authorized=self.channel.config.get("allow_admin_commands")
+                )
+            )
         finally:
             # always finalize the stream, no matter what
             await self.broadcast({
