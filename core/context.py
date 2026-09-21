@@ -11,6 +11,7 @@ class Context:
         self.model_name = None
         self.using_api_token_data = False
         self.token_encoding = None
+        self.compressing = False
 
         # UI-agnostic chat history system - save/load context windows from save file!
         self.chat = core.chat.Chat(self.channel)
@@ -251,13 +252,9 @@ class Context:
         return used_ratio >= threshold
 
     async def _request_compress_stream(self):
-        """so that we can wrap it in push_stream()"""
+        """so that we can wrap it in push_stream(), and support recursive toolcalls"""
 
-        content = []
-        reasoning = []
-        async for token in self.channel.manager.API.send_stream(
-            await self.channel.context.get()
-            + [{"role": "user", "content": """
+        compress_prompt = """
 [SYSTEM INSTRUCTION]
 Compress the conversation so far into a handoff summary for a brand-new session with zero other context. A fresh instance reading ONLY this summary must continue seamlessly.
 
@@ -276,7 +273,27 @@ Hard rules:
 - NEVER restate identity, memories, tools, scheduler, or anything from the system prompt.
 - Never invent or guess details not present in the history.
 - No meta-commentary about summarizing. Output the summary only.
-""".strip()}]
+""".strip()
+
+        # get the user's latest request and pin it in the compaction request
+        active_request = None
+        for msg in reversed(await self.chat.messages.get()):
+            meta = msg.get("_metadata", {})
+            if msg.get("role") == "user" and not meta.get("is_cmd") and not meta.get("signal") and not meta.get("ghost"):
+                active_request = self.channel._extract_content(msg)
+                break
+
+        if active_request:
+            compress_prompt += f'\n\nThe user\'s active request is the message below. Before the numbered sections, output a line "ACTIVE USER REQUEST:" followed by this message quoted verbatim. Do NOT paraphrase it.\n"""\n{active_request}\n"""'
+
+        content = []
+        reasoning = []
+
+        # calling tools based on the summary is *essential* to having an
+        # endless agentic toolcall loop
+        async for token in self.channel.manager.API.send_stream(
+            await self.channel.context.get()
+            + [{"role": "user", "content": compress_prompt}]
         ):
             if token.get("type") == "tool_calls":
                 req = await self.channel.tc_manager._build_recursive_request(token, content, reasoning)
@@ -289,10 +306,13 @@ Hard rules:
     async def compress(self):
         """compress context using the special summarization cutoff signal (reversible non-destructive compression)"""
 
-        if getattr(self, "_compressing", False):
+        # chat.add() and toolcall_manager.process() both call this function,
+        # so this is a guard that prevents compress() from being called recursively
+        # where it shouldn't
+        if self.compressing:
             return False
 
-        self._compressing = True
+        self.compressing = True
         try:
             response = await self.channel.push_stream(self._request_compress_stream())
 
@@ -307,7 +327,7 @@ Hard rules:
 
             return response
         finally:
-            self._compressing = False
+            self.compressing = False
 
     async def get_size(self):
         """basically just a fancy display of current token use, used by the `/status` command, and can optionally be used by other parts of the framework"""
