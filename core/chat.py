@@ -162,6 +162,7 @@ class Chat:
                 "category": old_chat.get("category", "general"),
                 "tags": old_chat.get("tags", []),
                 "token_usage": old_chat.get("token_usage", 0),
+                "token_usage_mark": old_chat.get("token_usage_mark", 0),
                 "metadata": old_chat.get("custom_data", {}),
                 "created": old_chat.get("created", ""),
                 "updated": old_chat.get("updated", ""),
@@ -215,6 +216,7 @@ class Chat:
             "category": category,
             "tags": [],
             "token_usage": 0,
+            "token_usage_mark": 0,
             "metadata": metadata,
             "created": now,
             "updated": now
@@ -245,7 +247,9 @@ class Chat:
         
         # reset stored token usage data
         await self.set("token_usage", 0)
-        
+        if self.current is not None:
+            self.data[self.current]["token_usage_mark"] = 0
+
         await self.save()
 
         # start a system prompt warmup so that the response is instant (if the user types slowly... lol)

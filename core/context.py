@@ -248,13 +248,9 @@ class Context:
 
         threshold = core.config.get("model", "context_compression_threshold")
 
-        context = await self.get(trim=False)
-        if not context:
+        used_tokens = await self.get_total_tokens()
+        if not used_tokens:
             return False
-
-        used_tokens = await self.count_tokens(context)
-        if self.channel.manager.tools:
-            used_tokens += await self.count_tokens(self.channel.manager.tools)
 
         used_ratio = used_tokens / max_tokens
 
@@ -334,6 +330,13 @@ Hard rules:
             # add AI's summarization
             await self.channel.context.chat.messages.add(response)
 
+            # the cached API measurement no longer reflects reality after
+            # compression (context shrank), so invalidate it until the next one lands
+            if self.chat.current is not None:
+                self.chat.data[self.chat.current]["token_usage"] = 0
+                self.chat.data[self.chat.current]["token_usage_mark"] = 0
+                self.using_api_token_data = False
+
             return response
         finally:
             self.compressing = False
@@ -364,7 +367,6 @@ Hard rules:
         sysprompt_size_tokens = await self.count_tokens(sys_msgs)
         sysprompt_size_words = len(str(sys_msgs).split())
 
-        message_hist_size_tokens = await self.count_tokens(hist_msgs)
         message_hist_size_words = len(str(hist_msgs).split())
 
         histend_size_tokens = await self.count_tokens(end_msgs)
@@ -380,6 +382,8 @@ Hard rules:
 
         token_usage = await self.get_total_tokens()
         pct_full = round((token_usage / max_context) * 100)
+
+        message_hist_size_tokens = max(token_usage - sysprompt_size_tokens - histend_size_tokens - tool_array_size_tokens, 0)
 
         return {
             "max_context": max_context,
@@ -401,23 +405,45 @@ Hard rules:
         # 1 token is roughly 4 characters for most English text
         return len(text) // 4
 
-    async def get_total_tokens(self):
-        """returns the total amount of tokens taken up by the prompt + the tools array"""
+    async def record_api_usage(self, num_tokens):
+        """caches the API's real prompt token count as the single source of truth,
+        along with a mark of how many messages were included in that measurement"""
+        if self.chat.current is None or num_tokens <= 0:
+            return
 
+        chat_data = self.chat.data[self.chat.current]
+        chat_data["token_usage"] = num_tokens
         try:
-            if self.chat.current is not None:
-                chat_data = self.chat.data[self.chat.current]
-                api_base = chat_data.get("token_usage")
-                mark = chat_data.get("token_usage_mark")
-                messages = await self.chat.messages.get()
-
-                if isinstance(api_base, int) and api_base > 0 and isinstance(mark, int) and 0 <= mark <= len(messages):
-                    # strip _metadata since it's never sent to the API and would inflate the estimate
-                    delta = await self.count_tokens([{k: v for k, v in m.items() if k != "_metadata"} for m in messages[mark:]])
-                    return api_base + delta
+            chat_data["token_usage_mark"] = len(await self.chat.messages.get())
         except Exception:
-            pass
+            chat_data["token_usage_mark"] = 0
 
+        self.using_api_token_data = True
+
+        await self.chat.save()
+
+    async def get_total_tokens(self):
+        """returns the total amount of tokens taken up by the prompt + the tools array.
+        the API's reported count is the single source of truth; estimation is only
+        used when no API figure exists, or for messages added after it was measured."""
+        if self.chat.current is not None:
+            chat_data = self.chat.data[self.chat.current]
+            api_base = int(chat_data.get("token_usage", 0))
+            mark = int(chat_data.get("token_usage_mark", 0))
+
+            # mark > 0 gate: only a real API measurement sets it (new() stores
+            # a raw estimate with mark 0, which must not be treated as a base)
+            if api_base > 0 and mark > 0:
+                messages = await self.chat.messages.get()
+                if mark <= len(messages):
+                    # estimate only what landed after the API measured, on top of the real number
+                    delta = 0
+                    if len(messages) > mark:
+                        # strip _metadata since it's never sent to the API and would inflate the estimate
+                        delta = await self.count_tokens([{k: v for k, v in m.items() if k != "_metadata"} for m in messages[mark:]])
+                    return api_base + delta
+
+        # no API data available (fresh chat, or an API that doesn't report usage): estimate
         context = await self.get()
         if not context:
             return 0

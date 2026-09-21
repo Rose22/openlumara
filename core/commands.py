@@ -412,9 +412,6 @@ class Commands:
         return "Disconnected from API"
     
     def _format_context_size(self, size: dict) -> str:
-        # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-21)
-        # get_size() now returns raw numbers, so presentation lives here
-        # (and in the channels/UIs) rather than in the context class.
         parts = [
             f"Total: {size['total_tokens']:,} / {size['max_context']:,} tokens ({size['percent_full']}% full)",
             f"System prompt: {size['system_prompt']['tokens']:,} tokens | {size['system_prompt']['words']:,} words",

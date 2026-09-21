@@ -729,23 +729,9 @@ class Channel:
                     token_usage = token.get("content")
                     if isinstance(token_usage, int):
                         if token_usage > 0:
-                            # set the flag so that token counting is always using API data
-                            self.context.using_api_token_data = True
-
-                            # cache this in the chat's metadata
-                            await self.context.chat.set("token_usage", token_usage)
-
-                            # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-21)
-                            # remember how many messages existed when the API
-                            # measured, so anything added afterwards (this
-                            # response, tool results, the next user message)
-                            # can be estimated ON TOP of the real number
-                            # instead of being ignored or re-estimated whole.
-                            try:
-                                mark = len(await self.context.chat.messages.get())
-                                await self.context.chat.set("token_usage_mark", mark)
-                            except Exception:
-                                pass
+                            # cache the API's reported token usage
+                            # all context measurement methods will then use it from this point on
+                            await self.context.record_api_usage(token_usage)
 
                             fetched_token_usage = True
         except asyncio.CancelledError:
@@ -762,10 +748,6 @@ class Channel:
         except Exception as e:
             yield await self.throw_stream_error(str(e))
 
-        # -- AI GENERATED CODE (qwen3.8-flash-next-q4) :: 2026-09-22 00:30
-        # publish the authoritative count only AFTER the finished assistant
-        # message has landed in context, so clients never show a number that
-        # is missing the reply that just arrived.
         if tool_calls_occurred:
             # if tool calls occurred, tc_manager has already added the final
             # message to context, so we can publish and abort early here
