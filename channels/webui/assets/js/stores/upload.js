@@ -1,5 +1,33 @@
 const UPLOAD_STORE = {
     files: [],
+    dragCount: 0,
+
+    get isDragging() {
+        return this.dragCount > 0;
+    },
+
+    dragEnter() {
+        this.dragCount++;
+    },
+
+    dragLeave(event, el) {
+        if (event.relatedTarget && el.contains(event.relatedTarget)) return;
+        this.dragCount = Math.max(0, this.dragCount - 1);
+    },
+
+    dragOver(event) {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'copy';
+    },
+
+    handleDrop(event) {
+        event.preventDefault();
+        const droppedFiles = event.dataTransfer.files;
+        if (droppedFiles && droppedFiles.length > 0) {
+            this.files.push(...droppedFiles);
+        }
+        this.dragCount = 0;
+    },
 
     addFile(event) {
         this.files.push(...event.target.files);
