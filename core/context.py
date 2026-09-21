@@ -16,7 +16,7 @@ class Context:
         # UI-agnostic chat history system - save/load context windows from save file!
         self.chat = core.chat.Chat(self.channel)
 
-    async def get(self, system_prompt=True, end_prompt=True, history=True, prevent_recursion=False):
+    async def get(self, system_prompt=True, end_prompt=True, history=True, prevent_recursion=False, trim=True):
         """
         builds the full context window using system prompt + message history + end prompt
         to the API, we send this full context.
@@ -49,6 +49,8 @@ class Context:
                 system_msg = [{"role": system_role, "content": content}]
 
         messages = []
+        # set when a summarization cutoff exists so trimming can pin the summary
+        summary_ref = None
         if history:
             # Get history from the chat (the full, untrimmed version)
             # create a shallow copy of it by doing a list comprehension
@@ -61,9 +63,11 @@ class Context:
             # from which to actually return the chat history
 
             # find the last occurence of it and return only the messages from that point onward
+            # keep a reference to the summary message so trimming can never cut past it.
             for i in range(len(messages) - 1, -1, -1):
                 if messages[i].get("_metadata", {}).get("signal") == "SUMMARIZATION_CUTOFF":
-                    messages = [{"role": "user", "content": messages[i+1].get("content")}] + messages[i + 2:]
+                    summary_ref = {"role": "user", "content": messages[i+1].get("content")}
+                    messages = [summary_ref] + messages[i + 2:]
                     break
 
             # Remove ghost messages and signal messages from history
@@ -195,23 +199,25 @@ class Context:
         # If we are over the limit, trim the history (the middle part).
         # We don't trim the system prompt or the end prompt as they are essential.
         # Use binary search to find the optimal trim point efficiently.
-        if current_tokens > effective_max_tokens and messages:
+
+        # trimming is skipped entirely when trim=False so is_over_threshold() can measure raw fullness.
+        if current_tokens > effective_max_tokens and messages and trim:
             # Reserve tokens for the last user message so it always fits
             reserved_tokens = 0
             if messages and messages[-1].get("role") == "user":
                 reserved_tokens = await self.count_tokens([messages[-1]])
-            
-            # Reduce the effective max by the reserved amount
-            effective_max_with_reserve = effective_max_tokens - reserved_tokens
-            
-            # Binary search: find the minimum number of messages to remove from the front
-            lo, hi = 0, len(messages)
-            best_trim = len(messages)  # worst case: remove everything
+
+            # never trim past the summarization cutoff
+            keep = [summary_ref] if summary_ref else []
+            rest = messages[1:] if summary_ref else messages
+
+            # Binary search: find the minimum number of messages to remove from the front of rest
+            lo, hi = 0, len(rest)
+            best_trim = len(rest)  # worst case: remove everything after the summary
 
             while lo <= hi:
                 mid = (lo + hi) // 2
-                trimmed = messages[mid:]
-                candidate_context = system_msg + trimmed + end_msg
+                candidate_context = system_msg + keep + rest[mid:] + end_msg
                 tokens = tool_tokens + await self.count_tokens(candidate_context) + reserved_tokens
 
                 if tokens <= effective_max_tokens:
@@ -220,13 +226,13 @@ class Context:
                 else:
                     lo = mid + 1
 
-            messages = messages[best_trim:]
+            messages = keep + rest[best_trim:]
             full_context = system_msg + messages + end_msg
             current_tokens = tool_tokens + await self.count_tokens(full_context) + reserved_tokens
 
         # If we are STILL over the limit even with empty history,
         # the system prompt + end prompt alone exceed the limit, or a single message is too large.
-        if current_tokens > max_tokens:
+        if trim and current_tokens > max_tokens:
             await self.channel.push(
                 f"Your system prompt of {current_tokens} tokens somehow exceeds the maximum context size of {max_tokens}! Please set a larger context size. Or disable some modules, disable system prompt insertion across modules, do whatever you can to reduce token size."
             )
@@ -247,7 +253,12 @@ class Context:
             return False
 
         threshold = core.config.get("model", "context_compression_threshold")
-        used_ratio = (await self.get_total_tokens()) / max_tokens
+
+        context = await self.get(trim=False)
+        if not context:
+            return False
+
+        used_ratio = (await self.count_tokens(context)) / max_tokens
 
         return used_ratio >= threshold
 
