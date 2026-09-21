@@ -325,6 +325,8 @@ Hard rules:
 
         self.compressing = True
         try:
+            self.using_api_token_data = False
+
             response = await self.channel.push_stream(self._request_compress_stream())
 
             if not response:
@@ -370,12 +372,19 @@ Hard rules:
 
         token_usage = await self.get_total_tokens()
 
+        max_context = int(core.config.get("api", "max_context"))
+
+        pct_full = round((token_usage / max_context) * 100)
+        usage_line = f"{token_usage} tokens out of {max_context}"
+        pct_line = f"{pct_full}% full"
+
         return {
             "system prompt size": f"{sysprompt_size_tokens} tokens | {sysprompt_size_words} words",
             "tools": f"{tools_amount} tools active | {tool_array_size_tokens} tokens | {tool_array_size_words} words",
             "message history size": f"{message_hist_size_tokens} tokens | {message_hist_size_words} words",
             "end prompt size": f"{histend_size_tokens} tokens | {histend_size_words} words",
-            "total size": f"{token_usage} tokens | {combined_size_words} words",
+            "total size": usage_line,
+            "context full": pct_line
         }
 
     def _count_text_tokens(self, text: str) -> int:
@@ -387,10 +396,34 @@ Hard rules:
         # 1 token is roughly 4 characters for most English text
         return len(text) // 4
 
-    async def get_total_tokens(self):
+    async def get_total_tokens(self, trim=True):
         """returns the total amount of tokens taken up by the prompt + the tools array"""
 
-        context = await self.get()
+        # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-21)
+        # the API's own prompt-token count is the only trustworthy figure (the
+        # estimate below is chars // 4, which badly over-counts JSON-heavy tool
+        # payloads), so it is the primary source and the estimate is a fallback
+        # for APIs that don't report usage at all.
+        if self.using_api_token_data:
+            try:
+                baseline = self.chat.get("token_usage", 0) or 0
+                mark = self.chat.get("token_usage_mark", 0) or 0
+                messages = await self.chat.messages.get()
+            except Exception:
+                baseline, mark, messages = 0, 0, []
+
+            if baseline > 0 and mark <= len(messages):
+                # the baseline already covers the system prompt, the tools
+                # array and all history that was sent with that request, so
+                # only what landed since then still needs estimating
+                pending = messages[mark:]
+                pending_tokens = await self.count_tokens(pending) if pending else 0
+                return baseline + pending_tokens
+
+            # history shrank (clear or compression), so the baseline is stale
+            self.using_api_token_data = False
+
+        context = await self.get(trim=trim)
         if not context:
             return 0
 

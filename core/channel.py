@@ -728,14 +728,26 @@ class Channel:
                     # this is the final token usage count, usually emitted at the end of the stream
                     token_usage = token.get("content")
                     if isinstance(token_usage, int):
-                        # set the flag so that token counting is always using API data
-                        if not self.context.using_api_token_data:
+                        if token_usage > 0:
+                            # set the flag so that token counting is always using API data
                             self.context.using_api_token_data = True
 
-                        # cache this in the chat's metadata
-                        await self.context.chat.set("token_usage", token_usage)
+                            # cache this in the chat's metadata
+                            await self.context.chat.set("token_usage", token_usage)
 
-                        fetched_token_usage = True
+                            # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-21)
+                            # remember how many messages existed when the API
+                            # measured, so anything added afterwards (this
+                            # response, tool results, the next user message)
+                            # can be estimated ON TOP of the real number
+                            # instead of being ignored or re-estimated whole.
+                            try:
+                                mark = len(await self.context.chat.messages.get())
+                                await self.context.chat.set("token_usage_mark", mark)
+                            except Exception:
+                                pass
+
+                            fetched_token_usage = True
         except asyncio.CancelledError:
             # if the stream is cancelled at this level, we need to handle the accumulated content in a special way
 
@@ -750,9 +762,16 @@ class Channel:
         except Exception as e:
             yield await self.throw_stream_error(str(e))
 
-        if not fetched_token_usage:
-            # yield an estimated token usage if the API didn't provide one
-            yield {"type": "token_usage", "content": await self.context.get_total_tokens(), "source": "estimation"}
+        # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-21)
+        # always publish the authoritative count once the stream is done, even
+        # when the API already reported one: that raw figure was measured
+        # before this response landed in context, so pushing it would leave
+        # every client showing a stale number.
+        yield {
+            "type": "token_usage",
+            "content": await self.context.get_total_tokens(),
+            "source": "API" if fetched_token_usage else "estimation",
+        }
 
         # and finally, once the stream has completed, add the finished assistant message to context
         if tool_calls_occurred:

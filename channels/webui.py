@@ -484,6 +484,7 @@ async def create_fastapi(channel):
             # that likely means this is already the loaded chat
             chat = dict(channel.context.chat.get())
             chat["turn_history"] = await channel.group_history()
+            chat["token_usage"] = await channel.context.get_total_tokens()
             return api_result(chat, success=True)
 
         # broadcast the switch to any connected clients
@@ -491,6 +492,7 @@ async def create_fastapi(channel):
 
         chat = dict(channel.context.chat.get())
         chat["turn_history"] = await channel.group_history()
+        chat["token_usage"] = await channel.context.get_total_tokens()
         return api_result(chat, success=True)
 
     @app.get("/api/chat/current")
@@ -499,6 +501,10 @@ async def create_fastapi(channel):
 
         chat = dict(channel.context.chat.get())
         chat["turn_history"] = await channel.group_history()
+        # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-21)
+        # report the live, authoritative count instead of the raw metadata
+        # field, so the context pill can never disagree with the popup
+        chat["token_usage"] = await channel.context.get_total_tokens()
         return api_result(chat)
 
     @app.get("/api/chat/export")

@@ -685,13 +685,16 @@ class APIClient():
                         total_prompt_tokens = chunk.usage.prompt_tokens
                     if hasattr(chunk.usage, 'completion_tokens'):
                         total_completion_tokens = chunk.usage.completion_tokens
-                    if hasattr(chunk.usage, 'total_tokens'):
-                        token_usage = chunk.usage.total_tokens
-                    elif total_prompt_tokens > 0 or total_completion_tokens > 0:
-                        # Calculate total if not provided
-                        token_usage = total_prompt_tokens + total_completion_tokens
 
-                    yield {"type": "token_usage", "content": token_usage, "source": "API"}
+                    token_usage = 0
+                    if total_prompt_tokens > 0:
+                        token_usage = total_prompt_tokens
+                    elif total_completion_tokens > 0:
+                        # API gave us no prompt count, fall back to what we have
+                        token_usage = total_completion_tokens
+
+                    if token_usage > 0:
+                        yield {"type": "token_usage", "content": token_usage, "source": "API"}
 
                 if hasattr(chunk, 'timings'):
                     yield {"type": "timings", "content": chunk.timings}

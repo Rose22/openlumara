@@ -292,6 +292,12 @@ class ToolcallManager:
                     yield token
                 elif token_type in ["tool_call_delta", "tool", "tool_calls", "prompt_progress", "timings"]:
                     yield token
+                # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-21)
+                # forward the API's real token count from every recursive call
+                # too. it used to be silently dropped here, which left the
+                # estimate as the only figure available during toolcall chains.
+                elif token_type == "token_usage":
+                    yield token
 
                 if token_type == "tool_calls":
                     # re-calculate current token use and yield it

@@ -6,6 +6,7 @@
     display: flex;
     align-items: center;
     flex-shrink: 0;
+    margin-left: 14px;
     z-index: 30;
 
     .pill-button {
