@@ -325,8 +325,6 @@ Hard rules:
 
         self.compressing = True
         try:
-            self.using_api_token_data = False
-
             response = await self.channel.push_stream(self._request_compress_stream())
 
             if not response:
@@ -343,37 +341,29 @@ Hard rules:
             self.compressing = False
 
     async def get_size(self):
-        """raw data about current token use, for the /status command and any other
-        part of the framework. returns numbers only, no formatting: consumers are
-        responsible for turning this into whatever presentation they need."""
+        """basically just a fancy display of current token use, used by the `/status` command, and can optionally be used by other parts of the framework"""
 
         # we're using self.get() here because it dynamically trims message history,
         # and chat.messages.get() would instead return the ENTIRE history without trimming,
         # which would be an inaccurate count
+        max_context = core.config.get("api", "max_context")
+
         message_history = await self.get(system_prompt=False, end_prompt=False, history=True)
         sysprompt = await self.get(system_prompt=True, end_prompt=False, history=False)
         histend = await self.get(system_prompt=False, end_prompt=True, history=False)
         
-        # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-21)
-        # words are counted the same way for every part, and an empty part is
-        # 0 words (str(None) would otherwise count as one word)
-        def word_count(data):
-            if not data:
-                return 0
-            return len(str(data).split())
-
         # now we count the tokens for each part of the context
         sysprompt_size_tokens = await self.count_tokens(sysprompt)
-        sysprompt_size_words = word_count(sysprompt)
-
+        sysprompt_size_words = len(str(sysprompt).split())
+        
         message_hist_size_tokens = await self.count_tokens(message_history)
-        message_hist_size_words = word_count(message_history)
-
+        message_hist_size_words = len(str(message_history).split())
+        
         histend_size_tokens = await self.count_tokens(histend)
-        histend_size_words = word_count(histend)
+        histend_size_words = len(str(histend).split()) if histend else 0
 
         tool_array_size_tokens = await self.count_tokens(self.channel.manager.tools)
-        tool_array_size_words = word_count(self.channel.manager.tools)
+        tool_array_size_words = len(str(self.channel.manager.tools).split())
 
         # get amount of tools active
         tools_amount = len(self.channel.manager.tools)
@@ -381,9 +371,6 @@ Hard rules:
         combined_size_words = tool_array_size_words + sysprompt_size_words + message_hist_size_words + histend_size_words
 
         token_usage = await self.get_total_tokens()
-
-        max_context = int(core.config.get("api", "max_context"))
-
         pct_full = round((token_usage / max_context) * 100)
 
         return {
@@ -394,7 +381,7 @@ Hard rules:
             "system_prompt": {"tokens": sysprompt_size_tokens, "words": sysprompt_size_words},
             "tools": {"active": tools_amount, "tokens": tool_array_size_tokens, "words": tool_array_size_words},
             "message_history": {"tokens": message_hist_size_tokens, "words": message_hist_size_words},
-            "end_prompt": {"tokens": histend_size_tokens, "words": histend_size_words},
+            "end_prompt": {"tokens": histend_size_tokens, "words": histend_size_words}
         }
 
     def _count_text_tokens(self, text: str) -> int:
@@ -406,34 +393,10 @@ Hard rules:
         # 1 token is roughly 4 characters for most English text
         return len(text) // 4
 
-    async def get_total_tokens(self, trim=True):
+    async def get_total_tokens(self):
         """returns the total amount of tokens taken up by the prompt + the tools array"""
 
-        # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-21)
-        # the API's own prompt-token count is the only trustworthy figure (the
-        # estimate below is chars // 4, which badly over-counts JSON-heavy tool
-        # payloads), so it is the primary source and the estimate is a fallback
-        # for APIs that don't report usage at all.
-        if self.using_api_token_data:
-            try:
-                baseline = self.chat.get("token_usage", 0) or 0
-                mark = self.chat.get("token_usage_mark", 0) or 0
-                messages = await self.chat.messages.get()
-            except Exception:
-                baseline, mark, messages = 0, 0, []
-
-            if baseline > 0 and mark <= len(messages):
-                # the baseline already covers the system prompt, the tools
-                # array and all history that was sent with that request, so
-                # only what landed since then still needs estimating
-                pending = messages[mark:]
-                pending_tokens = await self.count_tokens(pending) if pending else 0
-                return baseline + pending_tokens
-
-            # history shrank (clear or compression), so the baseline is stale
-            self.using_api_token_data = False
-
-        context = await self.get(trim=trim)
+        context = await self.get()
         if not context:
             return 0
 
