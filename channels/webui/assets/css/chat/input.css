@@ -15,6 +15,11 @@
 
         .input-wrapper {
             display: flex;
+            /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-21)
+               stretch so the buttons fill the row's full height (and their
+               hover background reaches top to bottom) even while the
+               textarea autosizes taller */
+            align-items: stretch;
             width: 100%;
             border: 1px solid var(--border-color);
             border-radius: var(--radius-sm);
@@ -24,7 +29,11 @@
         #upload {
             padding: 0;
             width: 48px;
-            height: 48px;
+            /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-21)
+               stretches to the row's height; radius matches the wrapper's
+               left corners so its hover fill doesn't poke out of them */
+            height: auto;
+            border-radius: var(--radius-sm) 0 0 var(--radius-sm);
             background: none;
             border: none;
             color: var(--text-primary);
@@ -105,7 +114,10 @@
 
         #send, #stop {
             padding: 0 24px;
-            height: 48px;
+            /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-21)
+               stretch to full row height, with the wrapper's right corners */
+            height: auto;
+            border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
             border: none;
             font-size: 0.95rem;
             font-weight: 600;
