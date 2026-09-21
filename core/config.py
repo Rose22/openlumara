@@ -90,6 +90,16 @@ core_settings_schema = {
             "type": "list",
             "depends": "use_tools"
         },
+        "automatically_compress_context": {
+            "default": True,
+            "description": """When enabled, context will automatically be compressed when the threshold (defined below) is hit. This will make the AI summarize the current state of your conversation, so that it can continue where it left off without having to reprocess the entire context with every request. This will let you have an 'infinite context window' of sorts where the AI can keep working on your request forever.
+
+            When disabled, it will instead remove your old messages from context to make space for new ones - which is fine at small context sizes, but can be really slow at large context sizes. You will still have infinite context, but as soon as you hit the context window's size limit, requests will slow down massively."""
+        },
+        "context_compression_threshold": {
+            "default": 0.7,
+            "description": "Percentage of the context that must be full in order for the automatic compression to trigger."
+        },
         "enable_thinking": {
             "default": True,
             "description": "Enable reasoning (thinking) for the model."
