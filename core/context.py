@@ -378,7 +378,7 @@ Hard rules:
 
         combined_size_words = tool_array_size_words + sysprompt_size_words + message_hist_size_words + histend_size_words
 
-        token_usage = await self.count_tokens(full) + tool_array_size_tokens
+        token_usage = await self.get_total_tokens()
         pct_full = round((token_usage / max_context) * 100)
 
         return {
@@ -403,6 +403,20 @@ Hard rules:
 
     async def get_total_tokens(self):
         """returns the total amount of tokens taken up by the prompt + the tools array"""
+
+        try:
+            if self.chat.current is not None:
+                chat_data = self.chat.data[self.chat.current]
+                api_base = chat_data.get("token_usage")
+                mark = chat_data.get("token_usage_mark")
+                messages = await self.chat.messages.get()
+
+                if isinstance(api_base, int) and api_base > 0 and isinstance(mark, int) and 0 <= mark <= len(messages):
+                    # strip _metadata since it's never sent to the API and would inflate the estimate
+                    delta = await self.count_tokens([{k: v for k, v in m.items() if k != "_metadata"} for m in messages[mark:]])
+                    return api_base + delta
+        except Exception:
+            pass
 
         context = await self.get()
         if not context:

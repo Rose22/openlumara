@@ -7,6 +7,31 @@
         open: false,
         details: null,
         loading: false,
+        poll_interval: null,
+
+        // -- AI GENERATED CODE (qwen3.8-flash-next-q4) :: 2026-09-22 00:34
+        // while the popup is open, keep it live: poll the breakdown every few
+        // seconds, and also re-fetch whenever the pill's token usage updates
+        // (a stream just finished). closing the popup stops the polling.
+        init() {
+            this.$watch('open', (open) => {
+                if (open) {
+                    this.refresh();
+                    this.poll_interval = setInterval(() => this.refresh(), 5000);
+                } else if (this.poll_interval) {
+                    clearInterval(this.poll_interval);
+                    this.poll_interval = null;
+                }
+            });
+
+            this.$watch('$store.chat.currentTokenUsage', () => {
+                if (this.open) this.refresh();
+            });
+        },
+
+        destroy() {
+            if (this.poll_interval) clearInterval(this.poll_interval);
+        },
 
         get percentage() {
             const max = $store.system.data?.max_context;
@@ -33,12 +58,16 @@
                 ...p,
                 pct: Math.min((p.tokens / d.max_context) * 100, 100),
             }));
-            const used = segs.reduce((sum, s) => sum + s.pct, 0);
+            // -- AI GENERATED CODE (qwen3.8-flash-next-q4) :: 2026-09-22 00:30
+            // leftover room is derived from the authoritative total_tokens
+            // (which may be API-based) rather than the sum of the estimated
+            // segments, so the bar always agrees with the hero percentage.
+            const usedPct = Math.min((d.total_tokens / d.max_context) * 100, 100);
             segs.push({
                 key: 'free',
                 label: 'free',
-                tokens: Math.max(d.max_context - Math.round((used / 100) * d.max_context), 0),
-                pct: Math.max(100 - used, 0),
+                tokens: Math.max(d.max_context - (d.total_tokens || 0), 0),
+                pct: Math.max(100 - usedPct, 0),
             });
             return segs;
         },
@@ -48,15 +77,23 @@
             return this.segments.filter(s => s.key !== 'free');
         },
 
-        async toggle() {
+        // -- AI GENERATED CODE (qwen3.8-flash-next-q4) :: 2026-09-22 00:34
+        // toggle no longer refreshes directly, the 'open' watcher does it.
+        toggle() {
             this.open = !this.open;
-            if (this.open) await this.refresh();
         },
 
         async refresh() {
+            // guard against overlapping fetches from polling + watchers
+            if (this.loading) return;
             this.loading = true;
             try {
                 this.details = await simpleApiFetch('/api/system/context_size');
+                // -- AI GENERATED CODE (qwen3.8-flash-next-q4) :: 2026-09-22 00:30
+                // keep the pill in sync with the popup's authoritative total
+                if (this.details && typeof this.details.total_tokens === 'number') {
+                    $store.chat.currentTokenUsage = this.details.total_tokens;
+                }
             } catch (e) {
                 this.details = { 'error': String(e) };
             } finally {
@@ -85,9 +122,10 @@
 
     <template x-if="open">
         <div class="context-popup">
+            <!-- -- AI GENERATED CODE (qwen3.8-flash-next-q4) :: 2026-09-22 00:34
+                 refresh button removed: the popup polls while it's open now -->
             <div class="popup-header">
                 <span class="popup-title">Context</span>
-                <button class="popup-refresh" @click="refresh()" :disabled="loading" title="Refresh">&#x21bb;</button>
             </div>
             <template x-if="loading && !details">
                 <div class="popup-loading">Loading..</div>

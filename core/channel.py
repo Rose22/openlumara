@@ -762,26 +762,28 @@ class Channel:
         except Exception as e:
             yield await self.throw_stream_error(str(e))
 
-        # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-21)
-        # always publish the authoritative count once the stream is done, even
-        # when the API already reported one: that raw figure was measured
-        # before this response landed in context, so pushing it would leave
-        # every client showing a stale number.
+        # -- AI GENERATED CODE (qwen3.8-flash-next-q4) :: 2026-09-22 00:30
+        # publish the authoritative count only AFTER the finished assistant
+        # message has landed in context, so clients never show a number that
+        # is missing the reply that just arrived.
+        if tool_calls_occurred:
+            # if tool calls occurred, tc_manager has already added the final
+            # message to context, so we can publish and abort early here
+            yield {
+                "type": "token_usage",
+                "content": await self.context.get_total_tokens(),
+                "source": "API" if fetched_token_usage else "estimation",
+            }
+            return
+
+        assistant_message = self._build_final_assistant_message(final_content, final_reasoning)
+        await self._send_postprocess(assistant_message, add_to_context=add_to_context)
+
         yield {
             "type": "token_usage",
             "content": await self.context.get_total_tokens(),
             "source": "API" if fetched_token_usage else "estimation",
         }
-
-        # and finally, once the stream has completed, add the finished assistant message to context
-        if tool_calls_occurred:
-            # if tool calls occurred, we don't want the reasoning from the first message to be added to context
-            # (that would cause a duplicate)
-            # so we abort early
-            return
-
-        assistant_message = self._build_final_assistant_message(final_content, final_reasoning)
-        await self._send_postprocess(assistant_message, add_to_context=add_to_context)
 
     async def format_stream_for_text(self, stream, chunk_size=None, use_markdown=True, strings: dict = None, show_indicators=True):
         """
