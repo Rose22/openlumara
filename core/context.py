@@ -202,12 +202,6 @@ class Context:
 
         # trimming is skipped entirely when trim=False so is_over_threshold() can measure raw fullness.
         if current_tokens > effective_max_tokens and messages and trim:
-            # Reserve tokens for the last user message so it always fits
-            reserved_tokens = 0
-            if messages and messages[-1].get("role") == "user":
-                reserved_tokens = await self.count_tokens([messages[-1]])
-
-            # never trim past the summarization cutoff
             keep = [summary_ref] if summary_ref else []
             rest = messages[1:] if summary_ref else messages
 
@@ -218,7 +212,7 @@ class Context:
             while lo <= hi:
                 mid = (lo + hi) // 2
                 candidate_context = system_msg + keep + rest[mid:] + end_msg
-                tokens = tool_tokens + await self.count_tokens(candidate_context) + reserved_tokens
+                tokens = tool_tokens + await self.count_tokens(candidate_context)
 
                 if tokens <= effective_max_tokens:
                     best_trim = mid
@@ -228,7 +222,7 @@ class Context:
 
             messages = keep + rest[best_trim:]
             full_context = system_msg + messages + end_msg
-            current_tokens = tool_tokens + await self.count_tokens(full_context) + reserved_tokens
+            current_tokens = tool_tokens + await self.count_tokens(full_context)
 
         # If we are STILL over the limit even with empty history,
         # the system prompt + end prompt alone exceed the limit, or a single message is too large.
@@ -258,7 +252,11 @@ class Context:
         if not context:
             return False
 
-        used_ratio = (await self.count_tokens(context)) / max_tokens
+        used_tokens = await self.count_tokens(context)
+        if self.channel.manager.tools:
+            used_tokens += await self.count_tokens(self.channel.manager.tools)
+
+        used_ratio = used_tokens / max_tokens
 
         return used_ratio >= threshold
 
@@ -343,24 +341,34 @@ Hard rules:
     async def get_size(self):
         """basically just a fancy display of current token use, used by the `/status` command, and can optionally be used by other parts of the framework"""
 
-        # we're using self.get() here because it dynamically trims message history,
-        # and chat.messages.get() would instead return the ENTIRE history without trimming,
-        # which would be an inaccurate count
-        max_context = core.config.get("api", "max_context")
+        # measure all parts from a single trimmed context build so the breakdown sums to what is actually sent to the API.
+        max_context = int(core.config.get("api", "max_context"))
 
-        message_history = await self.get(system_prompt=False, end_prompt=False, history=True)
-        sysprompt = await self.get(system_prompt=True, end_prompt=False, history=False)
-        histend = await self.get(system_prompt=False, end_prompt=True, history=False)
-        
+        full = await self.get()
+        if not full:
+            full = []
+
+        # determine whether the system prompt and end prompt parts exist within the built context,
+        # so we can slice the full context into system + history + end parts
+        try:
+            system_present = bool(await self.channel.manager.get_system_prompt())
+        except Exception:
+            system_present = False
+        histend = await self.channel.manager.get_end_prompt(prevent_recursion=True)
+
+        sys_msgs = full[:1] if (system_present and full) else []
+        end_msgs = full[-1:] if (histend and len(full) > len(sys_msgs)) else []
+        hist_msgs = full[len(sys_msgs): len(full) - len(end_msgs)]
+
         # now we count the tokens for each part of the context
-        sysprompt_size_tokens = await self.count_tokens(sysprompt)
-        sysprompt_size_words = len(str(sysprompt).split())
-        
-        message_hist_size_tokens = await self.count_tokens(message_history)
-        message_hist_size_words = len(str(message_history).split())
-        
-        histend_size_tokens = await self.count_tokens(histend)
-        histend_size_words = len(str(histend).split()) if histend else 0
+        sysprompt_size_tokens = await self.count_tokens(sys_msgs)
+        sysprompt_size_words = len(str(sys_msgs).split())
+
+        message_hist_size_tokens = await self.count_tokens(hist_msgs)
+        message_hist_size_words = len(str(hist_msgs).split())
+
+        histend_size_tokens = await self.count_tokens(end_msgs)
+        histend_size_words = len(str(end_msgs).split()) if end_msgs else 0
 
         tool_array_size_tokens = await self.count_tokens(self.channel.manager.tools)
         tool_array_size_words = len(str(self.channel.manager.tools).split())
@@ -370,7 +378,7 @@ Hard rules:
 
         combined_size_words = tool_array_size_words + sysprompt_size_words + message_hist_size_words + histend_size_words
 
-        token_usage = await self.get_total_tokens()
+        token_usage = await self.count_tokens(full) + tool_array_size_tokens
         pct_full = round((token_usage / max_context) * 100)
 
         return {
