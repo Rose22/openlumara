@@ -16,6 +16,38 @@
 
         fmt: (n) => (n ?? 0).toLocaleString(),
 
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-21)
+        // the stacked bar: one segment per part of the context window, plus
+        // whatever room is left over. widths are relative to max_context so
+        // the bar is a literal picture of how full the window is.
+        get segments() {
+            const d = this.details;
+            if (!d || !d.max_context) return [];
+            const parts = [
+                { key: 'sys', label: 'system prompt', tokens: d.system_prompt?.tokens || 0 },
+                { key: 'tools', label: 'tools', tokens: d.tools?.tokens || 0 },
+                { key: 'history', label: 'message history', tokens: d.message_history?.tokens || 0 },
+                { key: 'end', label: 'end prompt', tokens: d.end_prompt?.tokens || 0 },
+            ];
+            const segs = parts.map(p => ({
+                ...p,
+                pct: Math.min((p.tokens / d.max_context) * 100, 100),
+            }));
+            const used = segs.reduce((sum, s) => sum + s.pct, 0);
+            segs.push({
+                key: 'free',
+                label: 'free',
+                tokens: Math.max(d.max_context - Math.round((used / 100) * d.max_context), 0),
+                pct: Math.max(100 - used, 0),
+            });
+            return segs;
+        },
+
+        // the legend skips the leftover room, it's only there to fill the bar
+        get legend_segments() {
+            return this.segments.filter(s => s.key !== 'free');
+        },
+
         async toggle() {
             this.open = !this.open;
             if (this.open) await this.refresh();
@@ -64,31 +96,61 @@
                  /api/system/context_size now returns raw numbers, so the
                  markup here owns the presentation -->
             <template x-if="details">
-                <div class="popup-rows">
-                    <div class="popup-row">
-                        <span class="popup-key">total</span>
-                        <span class="popup-value"
-                              x-text="`${fmt(details.total_tokens)} / ${fmt(details.max_context)} (${details.percent_full}%)`"></span>
+                <div class="popup-body">
+                    <!-- hero: how full the window is -->
+                    <div class="popup-hero">
+                        <span class="hero-pct"
+                              :class="{ 'danger': details.percent_full >= 75 }"
+                              x-text="Math.round(details.percent_full) + '%'"></span>
+                        <span class="hero-sub">
+                            <span x-text="fmt(details.total_tokens)"></span>
+                            /
+                            <span x-text="fmt(details.max_context)"></span>
+                            tokens
+                        </span>
                     </div>
-                    <div class="popup-row">
-                        <span class="popup-key">system prompt</span>
-                        <span class="popup-value"
-                              x-text="`${fmt(details.system_prompt.tokens)} tokens | ${fmt(details.system_prompt.words)} words`"></span>
+
+                    <!-- stacked bar: one segment per part of the window -->
+                    <div class="ctx-bar" role="img"
+                         :aria-label="`Context: ${Math.round(details.percent_full)} percent full`">
+                        <template x-for="s in segments" :key="s.key">
+                            <div class="bar-seg"
+                                 :class="'seg-' + s.key"
+                                 :style="`width: ${s.pct}%`"
+                                 :title="`${s.label}: ${fmt(s.tokens)} tokens (${s.pct.toFixed(1)}%)`"></div>
+                        </template>
                     </div>
-                    <div class="popup-row">
-                        <span class="popup-key">tools</span>
-                        <span class="popup-value"
-                              x-text="`${details.tools.active} active | ${fmt(details.tools.tokens)} tokens | ${fmt(details.tools.words)} words`"></span>
+
+                    <!-- legend -->
+                    <div class="ctx-legend">
+                        <template x-for="s in legend_segments" :key="'leg-' + s.key">
+                            <div class="legend-item" :class="'seg-' + s.key">
+                                <span class="legend-dot"></span>
+                                <span class="legend-label" x-text="s.label"></span>
+                                <span class="legend-pct" x-text="s.pct >= 1 ? Math.round(s.pct) + '%' : (s.pct > 0 ? '<1%' : '0%')"></span>
+                            </div>
+                        </template>
                     </div>
-                    <div class="popup-row">
-                        <span class="popup-key">message history</span>
-                        <span class="popup-value"
-                              x-text="`${fmt(details.message_history.tokens)} tokens | ${fmt(details.message_history.words)} words`"></span>
-                    </div>
-                    <div class="popup-row">
-                        <span class="popup-key">end prompt</span>
-                        <span class="popup-value"
-                              x-text="`${fmt(details.end_prompt.tokens)} tokens | ${fmt(details.end_prompt.words)} words`"></span>
+
+                    <!-- raw numbers, no word counts -->
+                    <div class="popup-rows">
+                        <div class="popup-row">
+                            <span class="popup-key">system prompt</span>
+                            <span class="popup-value" x-text="fmt(details.system_prompt.tokens) + ' tokens'"></span>
+                        </div>
+                        <div class="popup-row">
+                            <span class="popup-key">tools</span>
+                            <span class="popup-value"
+                                  x-text="`${details.tools.active} active | ${fmt(details.tools.tokens)} tokens`"></span>
+                        </div>
+                        <div class="popup-row">
+                            <span class="popup-key">message history</span>
+                            <span class="popup-value" x-text="fmt(details.message_history.tokens) + ' tokens'"></span>
+                        </div>
+                        <div class="popup-row">
+                            <span class="popup-key">end prompt</span>
+                            <span class="popup-value" x-text="fmt(details.end_prompt.tokens) + ' tokens'"></span>
+                        </div>
                     </div>
                 </div>
             </template>

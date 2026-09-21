@@ -92,15 +92,127 @@
         position: absolute;
         bottom: calc(100% + 8px);
         right: 0;
-        min-width: 360px;
-        max-width: 450px;
+        min-width: 300px;
+        max-width: 360px;
         background: var(--bg-secondary);
         border: 1px solid var(--border-color);
         border-radius: var(--radius-sm);
         box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
-        padding: 10px 12px;
+        padding: 12px 14px;
         font-size: 0.75rem;
         color: var(--text-primary);
+
+        /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-21)
+           segment palette: everything is mixed off --accent so the chart
+           stays on-theme no matter which theme is active */
+        --seg-sys: var(--accent);
+        --seg-tools: color-mix(in srgb, var(--accent) 50%, #b57bff);
+        --seg-history: color-mix(in srgb, var(--accent) 45%, #6fd3e8);
+        --seg-end: color-mix(in srgb, var(--accent) 50%, #ffb86b);
+        --seg-free: var(--bg-tertiary);
+
+        .seg-sys { --seg-color: var(--seg-sys); }
+        .seg-tools { --seg-color: var(--seg-tools); }
+        .seg-history { --seg-color: var(--seg-history); }
+        .seg-end { --seg-color: var(--seg-end); }
+        .seg-free { --seg-color: var(--seg-free); }
+
+        .popup-body {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        /* hero: the headline number */
+        .popup-hero {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+
+            .hero-pct {
+                font-size: 1.9rem;
+                font-weight: 700;
+                line-height: 1;
+                letter-spacing: -0.02em;
+                color: var(--accent);
+            }
+
+            .hero-pct.danger {
+                color: var(--error);
+            }
+
+            .hero-sub {
+                color: var(--text-muted);
+                font-size: 0.72rem;
+            }
+        }
+
+        /* stacked bar */
+        .ctx-bar {
+            display: flex;
+            width: 100%;
+            height: 12px;
+            border-radius: var(--radius-full);
+            overflow: hidden;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+
+            .bar-seg {
+                height: 100%;
+                background: var(--seg-color);
+                min-width: 0;
+                transition: width 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.15s ease;
+
+                &.seg-free {
+                    background: repeating-linear-gradient(
+                        45deg,
+                        transparent,
+                        transparent 3px,
+                        var(--seg-color) 3px,
+                        var(--seg-color) 6px
+                    );
+                }
+
+                &:hover {
+                    filter: brightness(1.2);
+                }
+            }
+        }
+
+        /* legend */
+        .ctx-legend {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px 14px;
+
+            .legend-item {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                font-size: 0.7rem;
+                color: var(--text-secondary);
+
+                .legend-dot {
+                    width: 8px;
+                    height: 8px;
+                    border-radius: 2px;
+                    flex-shrink: 0;
+                    background: var(--seg-color);
+                }
+
+                .legend-label {
+                    flex: 1;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+
+                .legend-pct {
+                    color: var(--text-muted);
+                    font-variant-numeric: tabular-nums;
+                }
+            }
+        }
 
         .popup-header {
             display: flex;
@@ -147,6 +259,9 @@
             display: flex;
             flex-direction: column;
             gap: 5px;
+            /* separated from the chart above with a hairline */
+            padding-top: 10px;
+            border-top: 1px solid var(--border-color);
 
             .popup-row {
                 display: flex;
