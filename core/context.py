@@ -19,10 +19,8 @@ class Context:
         """
         builds the full context window using system prompt + message history + end prompt
         to the API, we send this full context.
-
         to frontend channels, we send only the message history part of the context (context.chat.messages.get()),
         without the system prompt and without the modifications we do to it such as the endprompt.
-
         context must ALWAYS follow this strict turn order: system->user->assistant->user->assistant->user->...
         """
         if not self.channel.manager.API.connected:
@@ -239,6 +237,57 @@ class Context:
 
         return full_context
 
+    # -- AI GENERATED CODE (qwen/Qwen3.8-Flash-Next-Q4) :: (2026-09-21) (00:20)
+    # shared auto-compression threshold check so the math lives in exactly one place
+    async def is_over_threshold(self):
+        """returns True if automatic context compression should kick in"""
+
+        if not core.config.get("model", "automatically_compress_context"):
+            return False
+
+        max_tokens = core.config.get("api", "max_context")
+        if not max_tokens:
+            return False
+
+        threshold = core.config.get("model", "context_compression_threshold")
+        used_ratio = (await self.get_total_tokens()) / max_tokens
+
+        return used_ratio >= threshold
+
+    async def compress(self):
+        """compress context using the special summarization cutoff signal (reversible non-destructive compression)"""
+
+        # -- AI GENERATED CODE (qwen/Qwen3.8-Flash-Next-Q4) :: (2026-09-21) (00:20)
+        # re-entrancy guard: compress() calls messages.add() twice, and compress can now
+        # be triggered from both messages.add() and the toolcall manager. without this,
+        # those adds retrigger compression forever
+        if getattr(self, "_compressing", False):
+            return False
+
+        self._compressing = True
+        try:
+            context = await self.channel.context.get()
+
+            # use API.send() to skip all the usual convenience logic
+            response = await self.channel.push_stream(
+                self.channel.manager.API.send_stream(
+                    context+[{"role": "user", "content": "Please summarize our conversation so far up to this point. The purpose is to compress current context into a summary that will be used to continue the chat. If there were any tool results, determine if further toolcalls are needed, and if so, call them."}]
+                )
+            )
+
+            if not response:
+                return False
+
+            # add special cutoff message that gets handled by the context manager
+            await self.channel.context.chat.messages.add(self.channel.context.SUMMARIZATION_CUTOFF)
+
+            # add AI's summarization
+            await self.channel.context.chat.messages.add(response)
+
+            return response
+        finally:
+            self._compressing = False
+
     async def get_size(self):
         """basically just a fancy display of current token use, used by the `/status` command, and can optionally be used by other parts of the framework"""
 
@@ -337,3 +386,4 @@ class Context:
 
         num_tokens = self._count_text_tokens(data_str)
         return num_tokens
+

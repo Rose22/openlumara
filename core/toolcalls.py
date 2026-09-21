@@ -273,6 +273,12 @@ class ToolcallManager:
 
         reasoning_push_buffer = ""
 
+        # -- AI GENERATED CODE (qwen/Qwen3.8-Flash-Next-Q4) :: (2026-09-21) (00:20)
+        # safe compaction point: the current tool round is fully closed here, so a
+        # cutoff appended now can't orphan tool messages. the chain resumes from the summary
+        if await self.channel.context.is_over_threshold():
+            await self.channel.context.compress()
+
         try:
             async for token in self.channel.manager.API.send_stream(
                 await self.channel.context.get(system_prompt=True, end_prompt=False),

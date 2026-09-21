@@ -87,6 +87,14 @@ class Messages:
             if injections:
                 new_message["_metadata"]["injection"] = "\n\n".join(injections)
 
+        # -- AI GENERATED CODE (qwen/Qwen3.8-Flash-Next-Q4) :: (2026-09-21) (00:20)
+        # auto-compress only at turn boundaries (user messages): cutting mid-chain
+        # would orphan tool messages. mid-chain compression happens at a safe point
+        # in the toolcall manager instead
+        if message.get("role") == "user" and not cmd:
+            if await self.channel.context.is_over_threshold():
+                await self.channel.context.compress()
+
         self.data.append(new_message)
 
         index = len(self.data) - 1
