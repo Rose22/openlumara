@@ -343,7 +343,9 @@ Hard rules:
             self.compressing = False
 
     async def get_size(self):
-        """basically just a fancy display of current token use, used by the `/status` command, and can optionally be used by other parts of the framework"""
+        """raw data about current token use, for the /status command and any other
+        part of the framework. returns numbers only, no formatting: consumers are
+        responsible for turning this into whatever presentation they need."""
 
         # we're using self.get() here because it dynamically trims message history,
         # and chat.messages.get() would instead return the ENTIRE history without trimming,
@@ -352,18 +354,26 @@ Hard rules:
         sysprompt = await self.get(system_prompt=True, end_prompt=False, history=False)
         histend = await self.get(system_prompt=False, end_prompt=True, history=False)
         
+        # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-21)
+        # words are counted the same way for every part, and an empty part is
+        # 0 words (str(None) would otherwise count as one word)
+        def word_count(data):
+            if not data:
+                return 0
+            return len(str(data).split())
+
         # now we count the tokens for each part of the context
         sysprompt_size_tokens = await self.count_tokens(sysprompt)
-        sysprompt_size_words = len(str(sysprompt).split())
-        
+        sysprompt_size_words = word_count(sysprompt)
+
         message_hist_size_tokens = await self.count_tokens(message_history)
-        message_hist_size_words = len(str(message_history).split())
-        
+        message_hist_size_words = word_count(message_history)
+
         histend_size_tokens = await self.count_tokens(histend)
-        histend_size_words = len(str(histend).split()) if histend else 0
+        histend_size_words = word_count(histend)
 
         tool_array_size_tokens = await self.count_tokens(self.channel.manager.tools)
-        tool_array_size_words = len(str(self.channel.manager.tools).split())
+        tool_array_size_words = word_count(self.channel.manager.tools)
 
         # get amount of tools active
         tools_amount = len(self.channel.manager.tools)
@@ -375,16 +385,16 @@ Hard rules:
         max_context = int(core.config.get("api", "max_context"))
 
         pct_full = round((token_usage / max_context) * 100)
-        usage_line = f"{token_usage} tokens out of {max_context}"
-        pct_line = f"{pct_full}% full"
 
         return {
-            "system prompt size": f"{sysprompt_size_tokens} tokens | {sysprompt_size_words} words",
-            "tools": f"{tools_amount} tools active | {tool_array_size_tokens} tokens | {tool_array_size_words} words",
-            "message history size": f"{message_hist_size_tokens} tokens | {message_hist_size_words} words",
-            "end prompt size": f"{histend_size_tokens} tokens | {histend_size_words} words",
-            "total size": usage_line,
-            "context full": pct_line
+            "max_context": max_context,
+            "total_tokens": token_usage,
+            "percent_full": pct_full,
+            "total_words": combined_size_words,
+            "system_prompt": {"tokens": sysprompt_size_tokens, "words": sysprompt_size_words},
+            "tools": {"active": tools_amount, "tokens": tool_array_size_tokens, "words": tool_array_size_words},
+            "message_history": {"tokens": message_hist_size_tokens, "words": message_hist_size_words},
+            "end_prompt": {"tokens": histend_size_tokens, "words": histend_size_words},
         }
 
     def _count_text_tokens(self, text: str) -> int:

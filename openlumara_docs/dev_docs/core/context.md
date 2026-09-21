@@ -109,21 +109,29 @@ Builds and returns the full list of message dictionaries to be sent to the API.
 
 #### `async get_size()`
 
-Returns a detailed breakdown of the current context size.
+Returns a detailed breakdown of the current context size, as raw data only.
+Formatting (units, separators, layout) is the responsibility of the consumer
+(`/status`, the webUI context popup, etc).
 
 **Returns:**
-- Dict with size information:
-  - `system prompt size`: tokens and words
-  - `tools`: number of tools, tokens, and words
-  - `message history size`: tokens and words
-  - `end prompt size`: tokens and words
-  - `total size`: total tokens and words
+- Dict of raw numbers:
+  - `max_context`: configured context window size
+  - `total_tokens`: tokens currently in the window
+  - `percent_full`: `total_tokens` as a percentage of `max_context`
+  - `total_words`: word count across all parts
+  - `system_prompt`: `{tokens, words}`
+  - `tools`: `{active, tokens, words}`
+  - `message_history`: `{tokens, words}`
+  - `end_prompt`: `{tokens, words}`
 
 **Note:** Uses `self.get()` for dynamic trimming, not raw message history.
 
-#### `async get_total_tokens()`
+#### `async get_total_tokens(trim=True)`
 
-Returns the total token count of the context plus tools array.
+Returns the total token count of the context plus tools array. Prefers the
+API's own reported `prompt_tokens` (cached in the chat's metadata, plus a
+character-based estimate for any messages added since that measurement), and
+falls back to the estimate alone for APIs that don't report usage.
 
 **Returns:**
 - Integer token count, or 0 if context is empty

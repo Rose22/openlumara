@@ -411,6 +411,19 @@ class Commands:
         await self.channel.manager.API.disconnect()
         return "Disconnected from API"
     
+    def _format_context_size(self, size: dict) -> str:
+        # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-21)
+        # get_size() now returns raw numbers, so presentation lives here
+        # (and in the channels/UIs) rather than in the context class.
+        parts = [
+            f"Total: {size['total_tokens']:,} / {size['max_context']:,} tokens ({size['percent_full']}% full)",
+            f"System prompt: {size['system_prompt']['tokens']:,} tokens | {size['system_prompt']['words']:,} words",
+            f"Tools: {size['tools']['active']} active | {size['tools']['tokens']:,} tokens | {size['tools']['words']:,} words",
+            f"Message history: {size['message_history']['tokens']:,} tokens | {size['message_history']['words']:,} words",
+            f"End prompt: {size['end_prompt']['tokens']:,} tokens | {size['end_prompt']['words']:,} words",
+        ]
+        return "\n".join(parts)
+
     async def cmd_status(self, args: list):
         status = self.channel.manager.API.get_status()
         lines = ["== API Status =="]
@@ -422,10 +435,7 @@ class Commands:
             lines.append("")
             lines.append("== Context Size ==")
             context_size = await self.channel.context.get_size()
-            ctx_string = ""
-            for key, value in context_size.items():
-                ctx_string += f"{key}: {value}\n"
-            lines.append(ctx_string)
+            lines.append(self._format_context_size(context_size))
         
         return "\n".join(lines)
     
@@ -711,11 +721,8 @@ class Commands:
             disabled_prompts_str = "\n".join([mod_name for mod_name in disabled_prompts])
             context_display.append(f"== disabled prompts ==\n{disabled_prompts_str}")
         
-        ctx_string = ""
         context_size = await self.channel.context.get_size()
-        for key, value in context_size.items():
-            ctx_string += f"{key}: {value}\n"
-        context_display.append(f"== context size ==\n{ctx_string}")
+        context_display.append(f"== context size ==\n{self._format_context_size(context_size)}")
         
         return "\n\n".join(context_display)
     

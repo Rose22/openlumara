@@ -14,6 +14,8 @@
             return Math.min(($store.chat.currentTokenUsage / max) * 100, 100);
         },
 
+        fmt: (n) => (n ?? 0).toLocaleString(),
+
         async toggle() {
             this.open = !this.open;
             if (this.open) await this.refresh();
@@ -58,14 +60,36 @@
             <template x-if="loading && !details">
                 <div class="popup-loading">Loading..</div>
             </template>
+            <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-21)
+                 /api/system/context_size now returns raw numbers, so the
+                 markup here owns the presentation -->
             <template x-if="details">
                 <div class="popup-rows">
-                    <template x-for="(value, key) in details" :key="key">
-                        <div class="popup-row">
-                            <span class="popup-key" x-text="key"></span>
-                            <span class="popup-value" x-text="value"></span>
-                        </div>
-                    </template>
+                    <div class="popup-row">
+                        <span class="popup-key">total</span>
+                        <span class="popup-value"
+                              x-text="`${fmt(details.total_tokens)} / ${fmt(details.max_context)} (${details.percent_full}%)`"></span>
+                    </div>
+                    <div class="popup-row">
+                        <span class="popup-key">system prompt</span>
+                        <span class="popup-value"
+                              x-text="`${fmt(details.system_prompt.tokens)} tokens | ${fmt(details.system_prompt.words)} words`"></span>
+                    </div>
+                    <div class="popup-row">
+                        <span class="popup-key">tools</span>
+                        <span class="popup-value"
+                              x-text="`${details.tools.active} active | ${fmt(details.tools.tokens)} tokens | ${fmt(details.tools.words)} words`"></span>
+                    </div>
+                    <div class="popup-row">
+                        <span class="popup-key">message history</span>
+                        <span class="popup-value"
+                              x-text="`${fmt(details.message_history.tokens)} tokens | ${fmt(details.message_history.words)} words`"></span>
+                    </div>
+                    <div class="popup-row">
+                        <span class="popup-key">end prompt</span>
+                        <span class="popup-value"
+                              x-text="`${fmt(details.end_prompt.tokens)} tokens | ${fmt(details.end_prompt.words)} words`"></span>
+                    </div>
                 </div>
             </template>
         </div>
