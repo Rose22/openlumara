@@ -62,7 +62,13 @@ class Context:
             # find the last occurence of it and return only the messages from that point onward
             for i in range(len(messages) - 1, -1, -1):
                 if messages[i].get("_metadata", {}).get("signal") == "SUMMARIZATION_CUTOFF":
-                    messages = [{"role": "user", "content": "Summarize our chat so far."}] + messages[i + 1:]
+                    after = messages[i + 1:]
+                    handoff_opener = {"role": "user", "content": "Summarize our conversation so far."}
+                    handoff_directive = {
+                        "role": "user",
+                        "content": "Context was compressed. The handoff summary above is your complete memory of the session so far. If it lists NEXT ACTIONS, execute those toolcalls first, then continue the session normally."
+                    }
+                    messages = [handoff_opener] + after[:1] + [handoff_directive] + after[1:]
                     break
 
             # Remove ghost messages and signal messages from history
@@ -237,11 +243,7 @@ class Context:
 
         return full_context
 
-    # -- AI GENERATED CODE (qwen/Qwen3.8-Flash-Next-Q4) :: (2026-09-21) (00:20)
-    # shared auto-compression threshold check so the math lives in exactly one place
     async def is_over_threshold(self):
-        """returns True if automatic context compression should kick in"""
-
         if not core.config.get("model", "automatically_compress_context"):
             return False
 
@@ -254,26 +256,49 @@ class Context:
 
         return used_ratio >= threshold
 
+    async def _request_compress_stream(self):
+        """so that we can wrap it in push_stream()"""
+
+        content = []
+        reasoning = []
+        async for token in self.channel.manager.API.send_stream(
+            await self.channel.context.get()
+            + [{"role": "user", "content": """
+[SYSTEM INSTRUCTION]
+Compress the conversation so far into a handoff summary. This summary will be pasted into a brand-new session with zero other context, so it must be self-contained: a fresh instance of you reading only this summary must be able to continue the session seamlessly.
+
+Structure the summary as:
+
+1. SESSION STATE - what was being worked on, current status, and any unfinished work or open questions.
+2. REQUESTS & OUTCOMES - each user request and what was done about it, condensed. Group similar exchanges; omit smalltalk and anything no longer relevant.
+3. KEY FACTS - decisions made, preferences learned, file paths, names, dates, IDs, error messages, and other specifics that must not be lost. Quote exact values (paths, names, commands) rather than paraphrasing them.
+4. TOOLCALLS - recent or consequential toolcalls with their results, condensed to what matters for continuing. Omit routine calls whose results are no longer relevant.
+5. PENDING ACTIONS - toolcalls still required to fulfill the user's last request, stated explicitly. If none are pending, write the summary directly.
+
+Rules:
+- The new session already has your full system prompt (identity, instructions, memories, tools, scheduler, etc). Do NOT repeat or restate anything that originates from the system prompt. Summarize ONLY the message history, including toolcalls and their results.
+- Never invent or guess details that aren't in the conversation.
+- Be dense and factual; no filler, no pleasantries, no meta-commentary about summarizing.
+- When in doubt about relevance, keep the fact but compress its wording.
+""".strip()}]
+        ):
+            if token.get("type") == "tool_calls":
+                req = await self.channel.tc_manager._build_recursive_request(token, content, reasoning)
+                async for sub in self.channel.tc_manager.process(req):
+                    yield sub
+                content, reasoning = [], []
+            else:
+                yield token
+
     async def compress(self):
         """compress context using the special summarization cutoff signal (reversible non-destructive compression)"""
 
-        # -- AI GENERATED CODE (qwen/Qwen3.8-Flash-Next-Q4) :: (2026-09-21) (00:20)
-        # re-entrancy guard: compress() calls messages.add() twice, and compress can now
-        # be triggered from both messages.add() and the toolcall manager. without this,
-        # those adds retrigger compression forever
         if getattr(self, "_compressing", False):
             return False
 
         self._compressing = True
         try:
-            context = await self.channel.context.get()
-
-            # use API.send() to skip all the usual convenience logic
-            response = await self.channel.push_stream(
-                self.channel.manager.API.send_stream(
-                    context+[{"role": "user", "content": "Please summarize our conversation so far up to this point. The purpose is to compress current context into a summary that will be used to continue the chat. If there were any tool results, determine if further toolcalls are needed, and if so, call them."}]
-                )
-            )
+            response = await self.channel.push_stream(self._request_compress_stream())
 
             if not response:
                 return False

@@ -273,9 +273,7 @@ class ToolcallManager:
 
         reasoning_push_buffer = ""
 
-        # -- AI GENERATED CODE (qwen/Qwen3.8-Flash-Next-Q4) :: (2026-09-21) (00:20)
-        # safe compaction point: the current tool round is fully closed here, so a
-        # cutoff appended now can't orphan tool messages. the chain resumes from the summary
+        # this is the point where it's safe to auto-compact
         if await self.channel.context.is_over_threshold():
             await self.channel.context.compress()
 

@@ -534,8 +534,9 @@ class Channel:
         # and return the results for use in send() and send_stream()
         return {"type": "ready", "user_message": user_message_processed.get("content"), "context": context}
 
-    async def _send_postprocess(self, assistant_message):
-        await self.context.chat.messages.add(assistant_message)
+    async def _send_postprocess(self, assistant_message, add_to_context=True):
+        if add_to_context:
+            await self.context.chat.messages.add(assistant_message)
 
         # run module event hooks
         for module_name, module in self.manager.modules.items():
@@ -579,7 +580,7 @@ class Channel:
         # and pass it on to yield
         return {"type": "error", "content": error}
 
-    async def send(self, message: str, files: list = None, commands_authorized=False, **kwargs):
+    async def send(self, message: str, files: list = None, commands_authorized=False, add_to_context=True, **kwargs):
         """sends a message to the AI from within the current channel"""
 
         # preprocessing (API connection logic, command processing, user message module hooks, etc)
@@ -623,10 +624,10 @@ class Channel:
             return None
 
         # postprocessing ( mainly assistant message module hooks, but this can be extended later :) )
-        await self._send_postprocess(assistant_message)
+        await self._send_postprocess(assistant_message, add_to_context=add_to_context)
         return self.format_message(assistant_message)
 
-    async def send_stream(self, message: str, files: list = None, commands_authorized=False, **kwargs):
+    async def send_stream(self, message: str, files: list = None, commands_authorized=False, add_to_context=True, **kwargs):
         """sends a message to the AI from within the current channel, streaming version"""
 
         # preprocessing (API connection logic, command processing, user message module hooks, etc)
@@ -761,7 +762,7 @@ class Channel:
             return
 
         assistant_message = self._build_final_assistant_message(final_content, final_reasoning)
-        await self._send_postprocess(assistant_message)
+        await self._send_postprocess(assistant_message, add_to_context=add_to_context)
 
     async def format_stream_for_text(self, stream, chunk_size=None, use_markdown=True, strings: dict = None, show_indicators=True):
         """
