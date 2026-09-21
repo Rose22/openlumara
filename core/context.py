@@ -62,13 +62,7 @@ class Context:
             # find the last occurence of it and return only the messages from that point onward
             for i in range(len(messages) - 1, -1, -1):
                 if messages[i].get("_metadata", {}).get("signal") == "SUMMARIZATION_CUTOFF":
-                    after = messages[i + 1:]
-                    handoff_opener = {"role": "user", "content": "Summarize our conversation so far."}
-                    handoff_directive = {
-                        "role": "user",
-                        "content": "Context was compressed. The handoff summary above is your complete memory of the session so far. If it lists NEXT ACTIONS, execute those toolcalls first, then continue the session normally."
-                    }
-                    messages = [handoff_opener] + after[:1] + [handoff_directive] + after[1:]
+                    messages = [{"role": "user", "content": messages[i+1].get("content")}] + messages[i + 2:]
                     break
 
             # Remove ghost messages and signal messages from history
@@ -265,21 +259,23 @@ class Context:
             await self.channel.context.get()
             + [{"role": "user", "content": """
 [SYSTEM INSTRUCTION]
-Compress the conversation so far into a handoff summary. This summary will be pasted into a brand-new session with zero other context, so it must be self-contained: a fresh instance of you reading only this summary must be able to continue the session seamlessly.
+Compress the conversation so far into a handoff summary for a brand-new session with zero other context. A fresh instance reading ONLY this summary must continue seamlessly.
 
-Structure the summary as:
+Format (markdown, no preamble, no closing remarks):
 
-1. SESSION STATE - what was being worked on, current status, and any unfinished work or open questions.
-2. REQUESTS & OUTCOMES - each user request and what was done about it, condensed. Group similar exchanges; omit smalltalk and anything no longer relevant.
-3. KEY FACTS - decisions made, preferences learned, file paths, names, dates, IDs, error messages, and other specifics that must not be lost. Quote exact values (paths, names, commands) rather than paraphrasing them.
-4. TOOLCALLS - recent or consequential toolcalls with their results, condensed to what matters for continuing. Omit routine calls whose results are no longer relevant.
-5. PENDING ACTIONS - toolcalls still required to fulfill the user's last request, stated explicitly. If none are pending, write the summary directly.
+1. STATE - 1-3 sentences: what's in flight right now, status, open questions.
+2. REQUESTS → OUTCOMES - one bullet per user request: "request: outcome". Merge similar exchanges into one bullet. Telegraphic style (no full sentences, no articles where droppable).
+3. FACTS - only specifics needed to continue: exact quoted values (paths, names, IDs, commands, dates, error strings), decisions, preferences learned THIS session. Omit anything already inferable from the system prompt.
+4. TOOLS - only calls whose results still matter for continuing: "tool(args-key): result". Omit routine/obsolete calls entirely.
+5. NEXT - explicit remaining actions as imperative bullets. Write "none" if done.
 
-Rules:
-- The new session already has your full system prompt (identity, instructions, memories, tools, scheduler, etc). Do NOT repeat or restate anything that originates from the system prompt. Summarize ONLY the message history, including toolcalls and their results.
-- Never invent or guess details that aren't in the conversation.
-- Be dense and factual; no filler, no pleasantries, no meta-commentary about summarizing.
-- When in doubt about relevance, keep the fact but compress its wording.
+Hard rules:
+- Brevity beats completeness EXCEPT for exact values (paths, IDs, names, quotes) - those must be verbatim.
+- Target: smallest summary that loses no actionable information. If a detail wouldn't change what you do next, cut it.
+- No filler ("the user asked whether...", "it was decided that..."). Use fragments.
+- NEVER restate identity, memories, tools, scheduler, or anything from the system prompt.
+- Never invent or guess details not present in the history.
+- No meta-commentary about summarizing. Output the summary only.
 """.strip()}]
         ):
             if token.get("type") == "tool_calls":
