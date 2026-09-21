@@ -1,9 +1,9 @@
-<!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
-     replaced the token bar with a circular ring that fills up as the context
-     window gets fuller. clicking it opens a popup with a detailed context
-     breakdown, fetched from the backend via /api/system/context_size
-     (channel.context.get_size()). -->
-<div id="context-ring" x-cloak x-data="{
+<!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-21)
+     context pill replacing the circular ring: a rounded chip whose own
+     border fills clockwise (from top center) via an svg path as context
+     fills up. clicking it opens the detailed breakdown popup, fetched
+     from the backend via /api/system/context_size (channel.context.get_size()). -->
+<div id="context-pill" x-cloak x-data="{
         open: false,
         details: null,
         loading: false,
@@ -12,12 +12,6 @@
             const max = $store.system.data?.max_context;
             if (!max) return 0;
             return Math.min(($store.chat.currentTokenUsage / max) * 100, 100);
-        },
-
-        get dash_offset() {
-            // circumference of the r=18 svg circle
-            const circ = 2 * Math.PI * 18;
-            return circ * (1 - this.percentage / 100);
         },
 
         async toggle() {
@@ -38,20 +32,21 @@
      }"
      @click.outside="open = false">
 
-    <button class="ring-button"
+    <button class="pill-button"
             :class="{ 'active': percentage >= 70, 'warning': percentage >= 75 }"
             @click="toggle()"
             :title="`${$store.chat.currentTokenUsage.toLocaleString()} / ${( $store.system.data.max_context || 0 ).toLocaleString()} tokens`"
             :aria-label="'Context usage: ' + Math.round(percentage) + '%'">
-        <svg viewBox="0 0 42 42">
-            <circle class="ring-bg" cx="21" cy="21" r="18" fill="none" stroke-width="4"></circle>
-            <circle class="ring-fill" cx="21" cy="21" r="18" fill="none" stroke-width="4"
-                    stroke-dasharray="113.1"
-                    :stroke-dashoffset="dash_offset"
-                    stroke-linecap="round"
-                    transform="rotate(-90 21 21)"></circle>
+        <!-- stadium outline drawn as one path starting at top center, so the
+             fill stroke progresses clockwise from 12 o'clock -->
+        <svg class="pill-outline" viewBox="0 0 76 30" preserveAspectRatio="none" aria-hidden="true">
+            <path class="pill-track"
+                  d="M38 1 H61 A14 14 0 0 1 75 15 A14 14 0 0 1 61 29 H14 A14 14 0 0 1 1 15 A14 14 0 0 1 14 1 Z"></path>
+            <path class="pill-fill" pathLength="100"
+                  :stroke-dasharray="percentage + ' ' + (100 - percentage)"
+                  d="M38 1 H61 A14 14 0 0 1 75 15 A14 14 0 0 1 61 29 H14 A14 14 0 0 1 1 15 A14 14 0 0 1 14 1 Z"></path>
         </svg>
-        <span class="ring-pct" x-text="Math.round(percentage) + '%'"></span>
+        <span class="pill-pct" x-text="Math.round(percentage) + '%'"></span>
     </button>
 
     <template x-if="open">

@@ -1,67 +1,87 @@
-/* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
-   styles for the context ring that replaced the old token usage bar. */
-#context-ring {
-    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
-       sits inline in the input row, left of the send button */
+/* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-21)
+   styles for the context pill that replaced the circular context ring.
+   the pill's own border doubles as the progress indicator. */
+#context-pill {
     position: relative;
     display: flex;
     align-items: center;
     flex-shrink: 0;
     z-index: 30;
 
-    .ring-button {
+    .pill-button {
         position: relative;
         right: 7px;
-        width: 34px;
-        height: 34px;
-        padding: 0;
+        /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-21)
+           pill hugs its label: no fixed width/height, all em padding, so
+           the chip is always snug around the text and scales with the
+           user's base font */
+        font-size: 0.85rem;
+        width: auto;
+        height: auto;
+        line-height: 1;
+        padding: 0.5em 0.95em;
         background: var(--bg-secondary);
-        border: 1px solid var(--border-color);
-        border-radius: 50%;
+        border: none;
+        border-radius: 999px;
         cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
-        transition: border-color 0.2s ease, transform 0.2s ease;
-
+        /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-21)
+           subtle hover cue: no movement, just the track brightening toward
+           the accent and the percentage picking up the accent color */
         &:hover {
-            border-color: var(--accent);
-            transform: scale(1.06);
+            .pill-track {
+                stroke: color-mix(in srgb, var(--accent) 45%, var(--border-color));
+            }
+
+            .pill-pct {
+                color: var(--accent);
+            }
         }
 
-        svg {
-            width: 100%;
-            height: 100%;
+        .pill-outline {
             position: absolute;
             inset: 0;
-        }
-
-        .ring-bg {
-            stroke: var(--border-color);
-        }
-
-        .ring-fill {
-            stroke: var(--accent);
-            transition: stroke-dashoffset 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), stroke 0.3s ease;
-        }
-
-        .ring-pct {
-            position: relative;
-            font-size: 0.5rem;
-            font-weight: 600;
-            color: var(--text-muted);
+            width: 100%;
+            height: 100%;
             pointer-events: none;
         }
 
-        &.active .ring-fill {
+        .pill-track {
+            stroke: var(--border-color);
+            transition: stroke 0.3s ease;
+        }
+
+        .pill-fill {
+            stroke: var(--accent);
+            stroke-linecap: round;
+            transition: stroke-dasharray 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), stroke 0.3s ease;
+        }
+
+        .pill-pct {
+            /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-21)
+               back in normal flow: the pill sizes itself around this text,
+               so centering is automatic rather than forced */
+            position: relative;
+            /* inherits the button's 0.85rem base, so it scales with root font */
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            pointer-events: none;
+            transition: color 0.3s ease;
+            min-width: 35px;
+        }
+
+        &.active .pill-fill {
             stroke: var(--accent);
         }
 
         &.warning {
-            .ring-fill {
+            .pill-fill {
                 stroke: var(--error);
             }
-            .ring-pct {
+            .pill-pct {
                 color: var(--error);
             }
         }
