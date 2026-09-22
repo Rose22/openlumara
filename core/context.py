@@ -256,8 +256,29 @@ class Context:
 
         return used_ratio >= threshold
 
-    async def _request_compress_stream(self):
-        """so that we can wrap it in push_stream(), and support recursive toolcalls"""
+    async def get_latest_summary(self):
+        """returns the newest handoff summary in this chat, or None if never compacted"""
+        messages = await self.chat.messages.get()
+        for i in range(len(messages) - 1, -1, -1):
+            if messages[i].get("_metadata", {}).get("signal") == "SUMMARIZATION_CUTOFF":
+                if i + 1 < len(messages):
+                    return messages[i + 1].get("content")
+                return None
+        return None
+
+    async def compress(self):
+        """compress context using the special summarization cutoff signal (reversible non-destructive compression)"""
+
+        # chat.add() and toolcall_manager.process() both call this function,
+        # so this is a guard that prevents compress() from being called recursively
+        # where it shouldn't
+        if self.compressing:
+            return False
+
+        self.compressing = True
+
+        # if this chat was compacted before, its summary is merged into rather than re-summarized
+        prev_summary = await self.get_latest_summary()
 
         compress_prompt = """
 [SYSTEM INSTRUCTION]
@@ -280,6 +301,22 @@ Hard rules:
 - No meta-commentary about summarizing. Output the summary only.
 """.strip()
 
+        # merge the previous summary with the new one
+        # by repeating the summary in the request,
+        # since some models won't be good at seeing the previous summary at
+        # the very start of context
+        if prev_summary:
+            compress_prompt += (
+                "\n\nPREVIOUS HANDOFF SUMMARY\n"
+                "This conversation was compacted before. Your previous handoff summary is quoted below. Merge it into your output:\n"
+                "- Move finished NEXT items into REQUESTS -> OUTCOMES.\n"
+                "- Replace STATE with the current status based on the newest messages.\n"
+                "- Carry over all FACTS and exact values (paths, IDs, names, quotes) unless a newer message contradicts them.\n"
+                "- Delete entries invalidated by newer messages.\n"
+                "Output ONE unified summary in the same format - never a diff, never mention this section.\n\n"
+                '"""\n' + prev_summary + '\n"""'
+            )
+
         # get the user's latest request and pin it in the compaction request
         active_request = None
         for msg in reversed(await self.chat.messages.get()):
@@ -291,35 +328,14 @@ Hard rules:
         if active_request:
             compress_prompt += f'\n\nThe user\'s active request is the message below. Before the numbered sections, output a line "ACTIVE USER REQUEST:" followed by this message quoted verbatim. Do NOT paraphrase it.\n"""\n{active_request}\n"""'
 
-        content = []
-        reasoning = []
-
-        # calling tools based on the summary is *essential* to having an
-        # endless agentic toolcall loop
-        async for token in self.channel.manager.API.send_stream(
-            await self.channel.context.get()
-            + [{"role": "user", "content": compress_prompt}]
-        ):
-            if token.get("type") == "tool_calls":
-                req = await self.channel.tc_manager._build_recursive_request(token, content, reasoning)
-                async for sub in self.channel.tc_manager.process(req):
-                    yield sub
-                content, reasoning = [], []
-            else:
-                yield token
-
-    async def compress(self):
-        """compress context using the special summarization cutoff signal (reversible non-destructive compression)"""
-
-        # chat.add() and toolcall_manager.process() both call this function,
-        # so this is a guard that prevents compress() from being called recursively
-        # where it shouldn't
-        if self.compressing:
-            return False
-
-        self.compressing = True
         try:
-            response = await self.channel.push_stream(self._request_compress_stream())
+            # request the stream
+            stream = self.channel.manager.API.send_stream(
+                await self.channel.context.get(end_prompt=False)
+                + [{"role": "user", "content": compress_prompt}]
+            )
+            # and push it to the channel so that the channel will consume the streamed tokens
+            response = await self.channel.push_stream(stream)
 
             if not response:
                 return False
