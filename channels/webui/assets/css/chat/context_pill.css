@@ -161,6 +161,7 @@
 
         /* stacked bar */
         .ctx-bar {
+            position: relative;
             display: flex;
             width: 100%;
             height: 12px;
@@ -168,6 +169,40 @@
             overflow: hidden;
             background: var(--bg-tertiary);
             border: 1px solid var(--border-color);
+
+            /* -- AI GENERATED CODE (qwen3.8-flash-next-q4) :: 2026-09-22 02:52
+               compression threshold marker: solid 1px vertical line at the
+               threshold percentage, plus a hatched overlay covering the zone
+               after it to show that region is 'beyond the limit' */
+            .bar-threshold {
+                position: absolute;
+                top: 0;
+                bottom: 0;
+                width: 1px;
+                background: var(--text-primary);
+                opacity: 0.8;
+                pointer-events: none;
+                z-index: 2;
+            }
+
+            .bar-threshold-zone {
+                position: absolute;
+                top: 0;
+                bottom: 0;
+                right: 0;
+                background:
+                    repeating-linear-gradient(
+                        -45deg,
+                        transparent,
+                        transparent 3px,
+                        rgba(0, 0, 0, 0.35) 3px,
+                        rgba(0, 0, 0, 0.35) 5px
+                    ),
+                    rgba(0, 0, 0, 0.25);
+                filter: saturate(0.6);
+                pointer-events: none;
+                z-index: 1;
+            }
 
             .bar-seg {
                 height: 100%;

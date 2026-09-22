@@ -168,6 +168,19 @@
                                  :style="`width: ${s.pct}%`"
                                  :title="`${s.label}: ${fmt(s.tokens)} tokens (${s.pct.toFixed(1)}%)`"></div>
                         </template>
+                        <!-- -- AI GENERATED CODE (qwen3.8-flash-next-q4) :: 2026-09-22 02:52
+                             compression threshold: solid line at the threshold
+                             percentage, plus a dark hatched zone covering the
+                             remainder past it -->
+                        <template x-if="details.auto_compress && details.compression_threshold > 0">
+                            <div class="bar-threshold-zone"
+                                 :style="`left: ${details.compression_threshold}%`"
+                                 :title="`compression threshold: ${details.compression_threshold}%`"></div>
+                        </template>
+                        <template x-if="details.auto_compress && details.compression_threshold > 0">
+                            <div class="bar-threshold"
+                                 :style="`left: ${details.compression_threshold}%`"></div>
+                        </template>
                     </div>
 
                     <!-- legend -->

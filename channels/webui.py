@@ -865,6 +865,13 @@ async def create_fastapi(channel):
         except Exception as e:
             return api_result(core.detail_error(e), success=False)
 
+        # -- AI GENERATED CODE (qwen3.8-flash-next-q4) :: 2026-09-22 02:50
+        # expose the compression threshold (stored as a 0-1 ratio) as a
+        # percentage so the popup can draw a marker line in the stacked bar
+        threshold = core.config.get("model", "context_compression_threshold") or 0
+        size["compression_threshold"] = round(float(threshold) * 100, 1)
+        size["auto_compress"] = bool(core.config.get("model", "automatically_compress_context"))
+
         return api_result(size)
 
     @app.get("/api/system/logs")
