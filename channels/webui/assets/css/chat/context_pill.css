@@ -147,6 +147,18 @@
             }
         }
 
+        /* -- AI GENERATED CODE (qwen3.8-flash-next-q4) :: 2026-09-22 01:47
+           compaction badge: plain muted text under the hero */
+        .ctx-compaction {
+            display: flex;
+            align-items: center;
+
+            .compaction-label {
+                color: var(--text-muted);
+                font-size: 0.68rem;
+            }
+        }
+
         /* stacked bar */
         .ctx-bar {
             display: flex;

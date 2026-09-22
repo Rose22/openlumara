@@ -383,12 +383,23 @@ Hard rules:
         token_usage = await self.get_total_tokens()
         pct_full = round((token_usage / max_context) * 100)
 
+        # count how often this chat has been compacted, based on the number of
+        # summarization cutoff markers
+        compaction_count = 0
+        try:
+            for msg in await self.chat.messages.get():
+                if msg.get("_metadata", {}).get("signal") == "SUMMARIZATION_CUTOFF":
+                    compaction_count += 1
+        except Exception:
+            pass
+
         message_hist_size_tokens = max(token_usage - sysprompt_size_tokens - histend_size_tokens - tool_array_size_tokens, 0)
 
         return {
             "max_context": max_context,
             "total_tokens": token_usage,
             "percent_full": pct_full,
+            "compaction_count": compaction_count,
             "total_words": combined_size_words,
             "system_prompt": {"tokens": sysprompt_size_tokens, "words": sysprompt_size_words},
             "tools": {"active": tools_amount, "tokens": tool_array_size_tokens, "words": tool_array_size_words},

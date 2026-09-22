@@ -148,6 +148,17 @@
                         </span>
                     </div>
 
+                    <!-- -- AI GENERATED CODE (qwen3.8-flash-next-q4) :: 2026-09-22 01:45
+                         compaction badge: simple text, only shown when at least
+                         one compaction happened -->
+                    <template x-if="details.compaction_count > 0">
+                        <div class="ctx-compaction"
+                             title="older context was summarized away">
+                            <span class="compaction-label"
+                                  x-text="`compacted ${details.compaction_count} time${details.compaction_count === 1 ? '' : 's'}`"></span>
+                        </div>
+                    </template>
+
                     <!-- stacked bar: one segment per part of the window -->
                     <div class="ctx-bar" role="img"
                          :aria-label="`Context: ${Math.round(details.percent_full)} percent full`">
