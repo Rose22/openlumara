@@ -272,14 +272,18 @@ class DiscordClient(discord.Client):
                 response = core.sanitize_leaked_tool_tags(response_content)
                 chunk_content = core.sanitize_leaked_tool_tags(chunk_content)
 
-                if should_stream_text:
-                    # do a final edit at the end. if sanitizing left this chunk empty
-                    # (it was nothing but leaked tags), keep the message non-empty so
-                    # discord doesn't reject the edit
-                    msg = await msg.edit(content=chunk_content or "...")
+                if should_stream_text and not chunk_content:
+                    # sanitizing left this chunk empty (it was nothing but leaked tags).
+                    # discord rejects empty edits, so drop the placeholder message instead
+                    await msg.delete()
+                elif should_stream_text:
+                    # do a final edit at the end
+                    msg = await msg.edit(content=chunk_content)
                 else:
                     # apply the same logic as non-streaming mode
-                    if len(response) < CHUNK_SIZE:
+                    if not response:
+                        await msg.delete()
+                    elif len(response) < CHUNK_SIZE:
                         msg = await msg.edit(content=response)
                     else:
                         offset = 0
