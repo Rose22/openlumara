@@ -298,7 +298,11 @@ class DiscordClient(discord.Client):
         else:
             async with self.target_channel.typing():
                 response_obj = await self._chan.send(content, commands_authorized=authorized, files=files)
-                response = response_obj.get("content")
+                response = (response_obj or {}).get("content")
+
+            # nothing to show (e.g. the reply was only leaked tool-call tags). discord rejects empty messages
+            if not response:
+                return
 
             if len(response) < CHUNK_SIZE:
                 await self.send_to_main(response, message=message)

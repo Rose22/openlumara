@@ -115,9 +115,13 @@ class ToolcallManager:
         # structured tool_calls. strip that leaked residue so we don't persist orphan
         # </tool_call> tags into history (where the model imitates them and it compounds)
         # or render them to the user.
-        assistant_message["content"] = core.sanitize_leaked_tool_tags(
-            assistant_message.get("content"), has_tool_calls=True
-        )
+        # if nothing real is left, drop the key like _build_recursive_request/_recv do for empty content
+        # (don't send content "" or null alongside tool_calls)
+        content = core.sanitize_leaked_tool_tags(assistant_message.get("content"), has_tool_calls=True)
+        if content:
+            assistant_message["content"] = content
+        else:
+            assistant_message.pop("content", None)
 
         # add it to context
         await self.channel.context.chat.messages.add(assistant_message)

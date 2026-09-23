@@ -578,6 +578,10 @@ class Channel:
                 return self.format_message(final_message)
             return None
 
+        # same leaked-tag cleanup the streaming path does in _build_final_assistant_message
+        if "content" in assistant_message:
+            assistant_message["content"] = core.sanitize_leaked_tool_tags(assistant_message["content"])
+
         # postprocessing ( mainly assistant message module hooks, but this can be extended later :) )
         await self._send_postprocess(assistant_message)
         return self.format_message(assistant_message)
