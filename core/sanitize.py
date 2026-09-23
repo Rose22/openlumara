@@ -35,8 +35,9 @@ _WRAPPER_RE = re.compile(r"-?(?:</?tool_call>|<function=[^<>\s]*>)>*")
 _FUNCTION_CLOSE_RE = re.compile(r"-?</function>>*")
 _FUNCTION_OPEN_RE = re.compile(r"<function[\s>]")
 
-# a line holding nothing but ">" (the lone ">" delta that leaks right before the closer)
-_TRAILING_GT_LINES_RE = re.compile(r"(?:\n[ \t]*>+[ \t]*)+$")
+# the leak itself only ever contains closers. a plain reply that has an opener
+# (<tool_call> or <function=...>) is the model writing out the format on purpose
+_OPENER_RE = re.compile(r"<tool_call>|<function=[^<>\s]*>")
 
 # Fenced code blocks first (so their inner backticks don't confuse the inline pass),
 # then inline code spans.
@@ -65,6 +66,15 @@ def _unmask_code(text, spans):
     return text
 
 
+def _strip_trailing_gt_lines(text):
+    """drop trailing lines holding nothing but ">" (the lone ">" delta that leaks before the closer)"""
+    # done line by line: a regex like (\n[ \t]*>+[ \t]*)+$ backtracks quadratically on long runs of ">" lines
+    lines = text.split("\n")
+    while len(lines) > 1 and set(lines[-1].strip(" \t\r")) == {">"}:
+        lines.pop()
+    return "\n".join(lines)
+
+
 def _is_only_residue(text):
     """True if what's left is nothing but whitespace and stray ">" leak residue."""
     stripped = text.strip()
@@ -79,6 +89,9 @@ def sanitize_leaked_tool_tags(content, has_tool_calls=False):
       `<function=...>`, plus "-...>>" residue) that appear as bare text outside
       of code spans. `</function>` is only removed when no `<function ...>`
       opener is present, so real xml keeps its closer.
+    - Without `has_tool_calls`, content containing an opener (`<tool_call>` or
+      `<function=...>`) is returned unchanged: leaks are closers only, so an
+      opener on a plain reply means the model is quoting the format.
     - If, after removal, nothing but whitespace / stray ">" residue remains, the
       content collapses to "".
     - When `has_tool_calls` is True, content that is *only* whitespace/">" residue
@@ -93,6 +106,12 @@ def sanitize_leaked_tool_tags(content, has_tool_calls=False):
         return content
 
     masked, spans = _mask_code(content)
+
+    # on a plain reply, an opener means the model is writing the tool-call format
+    # on purpose (e.g. the user asked what it looks like), so leave it alone
+    if not has_tool_calls and _OPENER_RE.search(masked):
+        return content
+
     stripped_masked = _WRAPPER_RE.sub("", masked)
     if not _FUNCTION_OPEN_RE.search(stripped_masked):
         stripped_masked = _FUNCTION_CLOSE_RE.sub("", stripped_masked)
@@ -111,5 +130,5 @@ def sanitize_leaked_tool_tags(content, has_tool_calls=False):
     # surrounding whitespace and any trailing ">"-only lines left behind.
     # a ">" that ends a line of real text (e.g. "x >") is kept.
     result = _unmask_code(stripped_masked, spans)
-    result = _TRAILING_GT_LINES_RE.sub("", result.strip())
+    result = _strip_trailing_gt_lines(result.strip())
     return result.strip()

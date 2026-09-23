@@ -137,13 +137,51 @@ class SanitizeLeakedToolTagsTest(unittest.TestCase):
         )
 
     def test_qwen_function_opener_stripped(self):
-        self.assertEqual(sanitize_leaked_tool_tags("hi\n<function=get_weather>"), "hi")
+        self.assertEqual(
+            sanitize_leaked_tool_tags("hi\n<function=get_weather>", has_tool_calls=True), "hi"
+        )
 
     def test_leaked_gt_line_before_closer_stripped(self):
         self.assertEqual(
             sanitize_leaked_tool_tags("Checking.\n>\n</tool_call>", has_tool_calls=True),
             "Checking.",
         )
+
+    # second review pass
+    def test_plain_reply_quoting_the_format_untouched(self):
+        # user asked what a qwen tool call looks like and the model answered without backticks
+        text = (
+            "Qwen format:\n<tool_call>\n<function=get_weather>\n<parameter=city>\n"
+            "Paris\n</parameter>\n</function>\n</tool_call>"
+        )
+        self.assertEqual(sanitize_leaked_tool_tags(text), text)
+        self.assertEqual(sanitize_leaked_tool_tags("<function=x>hi</function>"), "<function=x>hi</function>")
+
+    def test_near_miss_tags_untouched(self):
+        for text in ["hi </tool_call >", "hi </TOOL_CALL>", "<tool_calls>x", "<tool_call"]:
+            self.assertEqual(sanitize_leaked_tool_tags(text), text)
+            self.assertEqual(sanitize_leaked_tool_tags(text, has_tool_calls=True), text)
+
+    def test_crlf_leak(self):
+        self.assertEqual(sanitize_leaked_tool_tags("hi\r\n>\r\n</tool_call>", has_tool_calls=True), "hi")
+
+    def test_whitespace_only(self):
+        self.assertEqual(sanitize_leaked_tool_tags("   "), "   ")
+        self.assertEqual(sanitize_leaked_tool_tags("   ", has_tool_calls=True), "")
+
+    def test_none_and_list_content_untouched(self):
+        self.assertIsNone(sanitize_leaked_tool_tags(None, has_tool_calls=True))
+        parts = [{"type": "text", "text": "</tool_call>"}, {"type": "image_url", "image_url": {"url": "x"}}]
+        self.assertIs(sanitize_leaked_tool_tags(parts, has_tool_calls=True), parts)
+        self.assertEqual(parts[0]["text"], "</tool_call>")
+
+    def test_many_gt_lines_is_fast(self):
+        # the old trailing-">" regex backtracked quadratically here (~37s)
+        import time
+        text = "\n>" * 50000 + "a</tool_call>" + "\n >" * 50000 + "\nend"
+        start = time.time()
+        sanitize_leaked_tool_tags(text)
+        self.assertLess(time.time() - start, 1.0)
 
 
 if __name__ == "__main__":
