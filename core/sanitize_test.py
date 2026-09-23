@@ -117,5 +117,34 @@ class SanitizeLeakedToolTagsTest(unittest.TestCase):
         )
 
 
+    # false positives found in review: text that only looks like a wrapper tag
+    def test_prose_function_tag_untouched(self):
+        for text in [
+            "wrap it in a <function> element",
+            "use <function-list> here",
+            "a<function(b)>c",
+            "html <functional>",
+        ]:
+            self.assertEqual(sanitize_leaked_tool_tags(text), text)
+
+    def test_user_requested_xml_untouched(self):
+        text = 'Here is the XML:\n<function name="f">\n  <param/>\n</function>'
+        self.assertEqual(sanitize_leaked_tool_tags(text), text)
+
+    def test_legit_trailing_gt_kept(self):
+        self.assertEqual(
+            sanitize_leaked_tool_tags("ok </tool_call> then x >"), "ok  then x >"
+        )
+
+    def test_qwen_function_opener_stripped(self):
+        self.assertEqual(sanitize_leaked_tool_tags("hi\n<function=get_weather>"), "hi")
+
+    def test_leaked_gt_line_before_closer_stripped(self):
+        self.assertEqual(
+            sanitize_leaked_tool_tags("Checking.\n>\n</tool_call>", has_tool_calls=True),
+            "Checking.",
+        )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -23,10 +23,20 @@ as bare, un-fenced fragments, so this is a safe way to tell them apart.
 
 import re
 
-# A single complete tool-call wrapper token, with optional leading "-" residue
+# The exact wrapper tokens qwen3's tool-call format uses, with optional leading "-"
 # and one-or-more trailing ">" (handles the observed "-</tool_call>>" residue).
-# Matches: </tool_call>  <tool_call>  </function>  <function=name>  etc.
-_WRAPPER_RE = re.compile(r"-?</?(?:tool_call|function)\b[^>]*?>+")
+# Matches: <tool_call>  </tool_call>  <function=name>
+# Deliberately narrow so prose/html like <function>, <function-list> or
+# a<function(b)>c is left alone.
+_WRAPPER_RE = re.compile(r"-?(?:</?tool_call>|<function=[^<>\s]*>)>*")
+
+# </function> is also a real xml/html closer, so it's only stripped when the text
+# has no matching <function ...> opener (i.e. it's an orphan)
+_FUNCTION_CLOSE_RE = re.compile(r"-?</function>>*")
+_FUNCTION_OPEN_RE = re.compile(r"<function[\s>]")
+
+# a line holding nothing but ">" (the lone ">" delta that leaks right before the closer)
+_TRAILING_GT_LINES_RE = re.compile(r"(?:\n[ \t]*>+[ \t]*)+$")
 
 # Fenced code blocks first (so their inner backticks don't confuse the inline pass),
 # then inline code spans.
@@ -66,8 +76,9 @@ def sanitize_leaked_tool_tags(content, has_tool_calls=False):
     Strip leaked tool-call wrapper fragments from an assistant `content` string.
 
     - Removes complete orphan wrapper tokens (`</tool_call>`, `<tool_call>`,
-      `</function>`, `<function=...>`, plus "-...>>" residue) that appear as bare
-      text outside of code spans.
+      `<function=...>`, plus "-...>>" residue) that appear as bare text outside
+      of code spans. `</function>` is only removed when no `<function ...>`
+      opener is present, so real xml keeps its closer.
     - If, after removal, nothing but whitespace / stray ">" residue remains, the
       content collapses to "".
     - When `has_tool_calls` is True, content that is *only* whitespace/">" residue
@@ -83,6 +94,8 @@ def sanitize_leaked_tool_tags(content, has_tool_calls=False):
 
     masked, spans = _mask_code(content)
     stripped_masked = _WRAPPER_RE.sub("", masked)
+    if not _FUNCTION_OPEN_RE.search(stripped_masked):
+        stripped_masked = _FUNCTION_CLOSE_RE.sub("", stripped_masked)
     removed_any = stripped_masked != masked
     only_residue = _is_only_residue(stripped_masked)
 
@@ -95,8 +108,8 @@ def sanitize_leaked_tool_tags(content, has_tool_calls=False):
         return content
 
     # Real text survived alongside removed wrapper token(s): keep it, but trim
-    # surrounding whitespace and any trailing ">" leak residue left behind.
+    # surrounding whitespace and any trailing ">"-only lines left behind.
+    # a ">" that ends a line of real text (e.g. "x >") is kept.
     result = _unmask_code(stripped_masked, spans)
-    result = result.strip()
-    result = re.sub(r"[\s>]+$", "", result)
-    return result
+    result = _TRAILING_GT_LINES_RE.sub("", result.strip())
+    return result.strip()
