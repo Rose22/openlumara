@@ -3,6 +3,7 @@ import httpx
 import openai
 import asyncio
 import json
+import re
 import time
 import inspect
 
@@ -564,6 +565,7 @@ class APIClient():
         """Takes a response object and extracts the message from it, handling tool calls if needed. Streaming version."""
         final_tool_calls = []
         tool_call_buffer = {}
+        content_after_toolcall = ""
 
         token_usage = None
         total_prompt_tokens = 0
@@ -605,6 +607,12 @@ class APIClient():
                     streamed_token = chunk.choices[0].delta
 
                     content_yield = None
+
+                    # vllm's qwen3_coder parser sometimes leaks the end of the toolcall (">", "\n</tool_call>") as content
+                    # after it, split over several deltas. so hold that content back and clean it up once the stream is done
+                    if tool_call_buffer and streamed_token.content:
+                        content_after_toolcall += streamed_token.content
+                        streamed_token.content = None
 
                     # handle content token streaming
                     if streamed_token.content:
@@ -695,6 +703,12 @@ class APIClient():
 
                 if hasattr(chunk, 'timings'):
                     yield {"type": "timings", "content": chunk.timings}
+
+            # strip the leaked toolcall tags and pass on any real text that's left
+            # (the ">" is the tail of </function> that the parser didn't consume)
+            content_after_toolcall = re.sub(r">?\s*</tool_call>|</function>", "", content_after_toolcall)
+            if content_after_toolcall.strip():
+                yield {"type": "content", "content": content_after_toolcall}
 
             if use_tools:
                 for index in sorted(tool_call_buffer.keys()):
