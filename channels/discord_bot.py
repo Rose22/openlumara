@@ -259,7 +259,7 @@ class DiscordClient(discord.Client):
                                     msg = await msg.edit(content=toolcalls_str+reasoning_content)
                                 elif msg.content != toolcalls_str+"thinking..":
                                     msg = await msg.edit(content=toolcalls_str+"thinking..")
-                            else:
+                            elif chunk_content.strip():
                                 msg = await msg.edit(content=chunk_content)
 
                             timer = time.time()
@@ -271,10 +271,16 @@ class DiscordClient(discord.Client):
 
                 if should_stream_text:
                     # do a final edit at the end
-                    msg = await msg.edit(content=chunk_content)
+                    if chunk_content.strip():
+                        msg = await msg.edit(content=chunk_content)
+                    else:
+                        # discord won't let us edit a message to be empty, so remove the placeholder instead
+                        await msg.delete()
                 else:
                     # apply the same logic as non-streaming mode
-                    if len(response) < CHUNK_SIZE:
+                    if not response.strip():
+                        await msg.delete()
+                    elif len(response) < CHUNK_SIZE:
                         msg = await msg.edit(content=response)
                     else:
                         offset = 0
@@ -291,6 +297,8 @@ class DiscordClient(discord.Client):
                 response_obj = await self._chan.send(content, commands_authorized=authorized, files=files)
                 response = response_obj.get("content")
 
+            if not response.strip():
+                return
             if len(response) < CHUNK_SIZE:
                 await self.send_to_main(response, message=message)
             else:
