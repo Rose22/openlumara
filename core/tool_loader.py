@@ -96,7 +96,7 @@ class ToolLoader:
                     "required": required,
                     "additionalProperties": False,
                 },
-                "strict": True,
+                "strict": False,
             },
         }
         if docstring:
@@ -209,7 +209,7 @@ class ToolLoader:
                     "required": ["module_names"],
                     "additionalProperties": False,
                 },
-                "strict": True,
+                "strict": False,
             },
         }
 
