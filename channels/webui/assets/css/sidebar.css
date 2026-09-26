@@ -548,6 +548,82 @@
             }
         }
     }
+
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-26)
+       tag filter panel: collapsed by default, toggled by the tag button
+       in the search row. sits between search and the chat list, shows
+       the category's tags as toggleable chips. */
+    .tag-filter {
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 8px 10px;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-sm);
+        box-sizing: border-box;
+
+        .tag-filter-empty {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .tag-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            /* long tag lists scroll instead of eating the whole sidebar */
+            max-height: 132px;
+            overflow-y: auto;
+        }
+
+        .tag-chip {
+            padding: 3px 9px;
+            background: none;
+            border: 1px solid var(--border-color);
+            border-radius: 999px;
+            color: var(--text-secondary, #a0a0a0);
+            font-size: 0.72rem;
+            font-family: var(--font-primary);
+            cursor: pointer;
+            transition: all 0.15s ease;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+
+            &:hover {
+                color: var(--text-primary);
+                border-color: var(--accent);
+            }
+
+            &.selected {
+                color: var(--accent);
+                border-color: var(--accent);
+                background: rgba(var(--primary-rgb), 0.15);
+            }
+
+            &:disabled {
+                opacity: 0.5;
+                cursor: not-allowed;
+            }
+        }
+
+        .tag-filter-clear {
+            align-self: flex-start;
+            padding: 0;
+            background: none;
+            border: none;
+            color: var(--accent);
+            font-size: 0.72rem;
+            font-family: var(--font-primary);
+            cursor: pointer;
+
+            &:hover {
+                text-decoration: underline;
+            }
+        }
+    }
 }
 
 

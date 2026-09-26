@@ -8,7 +8,9 @@
      for the current category, no pagination. the paginated visibleChats
      list is untouched while searching (scroll loader hidden), so clearing
      the box is an instant switch back with no refetch. -->
-<div id="chat-list" x-ref="chat-list" x-cloak>
+<!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-26)
+     tagPanel: local state for the tag filter panel toggle below -->
+<div id="chat-list" x-ref="chat-list" x-cloak x-data="{ tagPanel: false }">
     <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
          category picker dropdown, replaces the old category sidebar -->
     <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
@@ -95,6 +97,48 @@
                 <line x1="4" y1="12" x2="20" y2="12"/>
                 <line x1="4" y1="18" x2="14" y2="18"/>
             </svg>
+        </button>
+
+        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-26)
+             opens/closes the tag filter panel (below). lit up whenever
+             one or more tags are filtering the list. -->
+        <button type="button" class="search-toggle"
+            :class="{ 'active': $store.chat.selectedTags.length > 0 || tagPanel }"
+            @click="tagPanel = !tagPanel"
+            :title="$store.chat.selectedTags.length > 0
+                ? `Filtering by: ${$store.chat.selectedTags.join(', ')} (click for tag filter)`
+                : 'Filter chats by tags'"
+            :aria-expanded="tagPanel"
+            :disabled="$store.stream.state !== 'idle'"
+        >
+            {% include 'svg/tag.svg' %}
+        </button>
+    </div>
+
+    <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-26)
+         tag filter panel: collapsed by default, toggled by the tag
+         button above. chips toggle tags (AND semantics, handled by the
+         store); 'clear filter' resets everything at once. -->
+    <div class="tag-filter" x-show="tagPanel" x-transition.opacity.duration.120ms>
+        <template x-if="$store.chat.availableTags.length === 0">
+            <div class="tag-filter-empty">no tags in this category yet</div>
+        </template>
+
+        <div class="tag-chips" x-show="$store.chat.availableTags.length > 0">
+            <template x-for="tag in $store.chat.availableTags" :key="tag">
+                <button type="button" class="tag-chip"
+                    :class="{ 'selected': $store.chat.selectedTags.includes(tag) }"
+                    :disabled="$store.stream.state !== 'idle'"
+                    @click="$store.chat.toggleTag(tag)"
+                    x-text="tag">
+                </button>
+            </template>
+        </div>
+
+        <button type="button" class="tag-filter-clear"
+            x-show="$store.chat.selectedTags.length > 0"
+            @click="$store.chat.clearTags()">
+            clear filter
         </button>
     </div>
 

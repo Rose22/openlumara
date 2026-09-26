@@ -534,10 +534,20 @@ async def create_fastapi(channel):
     # browser's local day: the frontend sends its tz offset (JS
     # getTimezoneOffset, minutes behind UTC) and the backend shifts
     # before bucketing so headers and client-side grouping agree.
-    def _chats_for_category(category):
+    # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-26)
+    # optional tag filter for the sidebar's tag panel: AND semantics, a
+    # chat must carry every selected tag to survive the filter.
+    def _chats_for_category(category, tags=None):
         all_chats = channel.context.chat.get_all()
         if category:
             all_chats = [c for c in all_chats if c.get("category") == category]
+
+        if tags:
+            all_chats = [
+                c for c in all_chats
+                if all(t in (c.get("tags") or []) for t in tags)
+            ]
+
         return all_chats
 
     def _local_day(updated_str, tz_offset_min):
@@ -586,13 +596,16 @@ async def create_fastapi(channel):
         """Returns the day/last-week/month groups that have chats, newest first, with counts"""
         category = request.query_params.get("category", None)
         tz_offset = int(request.query_params.get("tz_offset", 0))
+        # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-26)
+        # repeated 'tags' query params narrow the listing (AND semantics)
+        tags = request.query_params.getlist("tags")
 
         # max local day per group key: mixed-format keys ('YYYY-MM-DD',
         # 'last-week-...', 'YYYY-MM') can't be string-sorted against each
         # other, so groups are ordered by their newest member instead
         counts = {}
         newest = {}
-        for chat in _chats_for_category(category):
+        for chat in _chats_for_category(category, tags):
             updated = chat.get("updated", "")
             key = _group_key(updated, tz_offset)
             day = _local_day(updated, tz_offset)
@@ -613,9 +626,12 @@ async def create_fastapi(channel):
         limit = int(request.query_params.get("limit", 50))
         category = request.query_params.get("category", None)
         tz_offset = int(request.query_params.get("tz_offset", 0))
+        # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-26)
+        # repeated 'tags' query params narrow the listing (AND semantics)
+        tags = request.query_params.getlist("tags")
 
         day_chats = [
-            c for c in _chats_for_category(category)
+            c for c in _chats_for_category(category, tags)
             if _group_key(c.get("updated", ""), tz_offset) == day
         ]
 
@@ -628,6 +644,22 @@ async def create_fastapi(channel):
     async def get_chat_categories():
         """Returns a list of all existing chat categories"""
         return api_result(channel.context.chat.get_categories(), True)
+
+    # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-26)
+    # all tags in use, optionally scoped to a category (the sidebar's
+    # tag filter panel only offers tags relevant to the open category).
+    @app.get("/api/chats/tags")
+    async def get_chat_tags(request: fastapi.Request):
+        """Returns the sorted list of tags used by chats"""
+        category = request.query_params.get("category", None)
+
+        tags = set()
+        for chat in _chats_for_category(category):
+            for tag in (chat.get("tags") or []):
+                if tag:
+                    tags.add(tag)
+
+        return api_result(sorted(tags), success=True)
 
     # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
     # deleting a category = moving all of its chats to 'general'.
@@ -677,6 +709,12 @@ async def create_fastapi(channel):
             results = [r for r in results if r.get('category') == category]
         elif category == 'general':
             results = [r for r in results if not r.get('category') or r.get('category') == 'general']
+
+        # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-26)
+        # respect the sidebar's active tag filter (AND semantics)
+        tags = data.get("tags") or []
+        if tags:
+            results = [r for r in results if all(t in (r.get("tags") or []) for t in tags)]
 
         return api_result(results)
 
