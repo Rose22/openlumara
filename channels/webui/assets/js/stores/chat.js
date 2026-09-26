@@ -104,6 +104,47 @@ CHAT_STORE = {
     user_input: '',
     last_user_input: '',
 
+    // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-26)
+    // shell-style input history (global across chats), persisted to localStorage
+    inputHistory: JSON.parse(localStorage.getItem('input_history') || '[]'),
+    historyIndex: -1,
+    draftValue: '',
+
+    pushInputHistory(msg) {
+        msg = (msg || '').trim();
+        if (!msg) return;
+        if (this.inputHistory[this.inputHistory.length - 1] !== msg) {
+            this.inputHistory.push(msg);
+            if (this.inputHistory.length > 100) this.inputHistory.shift();
+            localStorage.setItem('input_history', JSON.stringify(this.inputHistory));
+        }
+        this.historyIndex = -1;
+        this.draftValue = '';
+    },
+
+    historyPrev() {
+        if (!this.inputHistory.length) return;
+        if (this.historyIndex === -1) {
+            this.draftValue = this.user_input;
+            this.historyIndex = this.inputHistory.length - 1;
+        } else if (this.historyIndex > 0) {
+            this.historyIndex--;
+        }
+        this.user_input = this.inputHistory[this.historyIndex];
+    },
+
+    historyNext() {
+        if (this.historyIndex === -1) return;
+        if (this.historyIndex < this.inputHistory.length - 1) {
+            this.historyIndex++;
+            this.user_input = this.inputHistory[this.historyIndex];
+        } else {
+            this.historyIndex = -1;
+            this.user_input = this.draftValue;
+            this.draftValue = '';
+        }
+    },
+
     currentTokenUsage: 0,
 
     async load() {
@@ -713,6 +754,10 @@ CHAT_STORE = {
             return;
         }
 
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-26)
+        // record the sent text in the input history before clearing the box
+        this.pushInputHistory(text);
+
         Alpine.store("stream").state = "message_sending";
         await this.clearInput();
 
@@ -743,6 +788,15 @@ CHAT_STORE = {
             content: text,
             files: files
         });
+
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-26)
+        // if the message never made it onto the socket, restore the draft
+        // (and keep any attached files) so the user can retry
+        if (success === false) {
+            this.user_input = text;
+            Alpine.store("stream").state = "idle";
+            return;
+        }
 
         uploadStore.clear();
     },

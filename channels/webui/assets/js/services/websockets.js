@@ -235,7 +235,10 @@ async function handleWebSocketMessage(data) {
             // process tokens based on their type
             switch (token_type) {
                 case "error":
-                    // force a refresh
+                    // restore the user's last input
+                    if (!chat.user_input && chat.last_user_input) {
+                        chat.user_input = chat.last_user_input;
+                    }
                     await chat.reloadChat();
                     break;
                 case "tool":

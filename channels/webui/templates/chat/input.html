@@ -19,6 +19,8 @@
     x-autosize
     aria-label="Message input"
     @paste="$store.upload.pasteImage($event)"
+    @keydown.ctrl.up.prevent="$store.chat.historyPrev(); $autosize($el)"
+    @keydown.ctrl.down.prevent="$store.chat.historyNext(); $autosize($el)"
     @keydown.enter="
         if (!$event.shiftKey && !$store.ui.isMobile) {
             $event.preventDefault();

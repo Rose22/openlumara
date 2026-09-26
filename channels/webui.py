@@ -218,11 +218,18 @@ class Webui(core.channel.Channel):
                             self.log(self.name, f"error sending user message: {core.detail_error(e)}")
                             return
                     case "error":
-                        # for an error, just force a chat reload so that it shows up (core/channel takes care of adding it to context)
                         await self.websocket_manager.broadcast({
                             "type": "user_message_confirmed",
                             "index": index
                         })
+
+                        # pass the raw token on so this case can be handled seperately
+                        await self.websocket_manager.broadcast({
+                            "type": "token",
+                            "content": token
+                        })
+
+                        # force a chat reload so that it shows up (core/channel takes care of adding it to context)
                         await self.websocket_manager.broadcast({
                             "type": "sync"
                         })
