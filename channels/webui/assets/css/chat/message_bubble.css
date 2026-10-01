@@ -20,6 +20,12 @@
         width: fit-content;
         backdrop-filter: blur(10px);
 
+        /* the edit textarea fills the relative width (100%) */
+        &:has(.editing) {
+            width: 100%;
+            max-width: 100%;
+        }
+
         .command {
             font-family: monospace;
             white-space: pre-wrap;
