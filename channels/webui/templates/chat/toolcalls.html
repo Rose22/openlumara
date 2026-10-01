@@ -78,9 +78,11 @@
                              failed calls with a custom view: the error text always
                              shows below the view markup, in the error color (the
                              default display renders its own raw response) -->
-                        <template x-if="toolDisplayView(tool)">
-                            <div class="display-error" x-show="toolDisplayError(tool)"
-                                 x-text="toolDisplayError(tool)"></div>
+                        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+                             single getter so the response is parsed once per
+                             reactive flush instead of once per binding -->
+                        <template x-if="toolDisplayView(tool)" x-data="{ get err() { return toolDisplayError(tool) } }">
+                            <div class="display-error" x-show="err" x-text="err"></div>
                         </template>
                         <template x-if="!toolDisplayView(tool)">
                         <div class="default-display">

@@ -250,21 +250,31 @@ function _diffSideHtmlNow(original, replacement, lang) {
 // -- web_search_*: result cards ---------------------------------------------
 
 // flatten a web_search response into display cards: [{ title, url, thumb,
-// snippet }]. response shape: { status, content: [ wrapped, instruction ] }
-// with the results living in wrapped.web_content. url key differs per kind
-// (href for text, url/image for the rest), snippet likewise
-// (body/description/info). only http(s) urls are passed through; anything
-// else renders as plain text.
+// snippet, note }]. response shape: { status, content: [ wrapped,
+// instruction ] } with the results living in wrapped.web_content. url key
+// differs per kind (href for text, url/image for the rest), snippet
+// likewise (body/description/info). only http(s) urls are passed through;
+// anything else renders as plain text.
+// -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+// results rejected by the module's url policy arrive as [REDACTED]
+// placeholders plus a note field; carry it through so the card can show
+// WHY it's empty instead of a bare untitled shell.
 function searchResults(response) {
     const wrapped = response?.content?.find?.(c => c && typeof c === 'object' && c.web_content);
     const items = Array.isArray(wrapped?.web_content) ? wrapped.web_content : [];
     const safeUrl = u => (typeof u === 'string' && /^https?:\/\//i.test(u)) ? u : '';
-    return items.map(res => ({
-        title: res.title || '(untitled)',
-        url: safeUrl(res.href || res.url || res.image),
-        thumb: safeUrl(res.thumbnail),
-        snippet: res.body || res.description || res.info || '',
-    }));
+    return items.map(res => {
+        const note = typeof res.note === 'string' ? res.note : '';
+        return {
+            title: res.title && res.title !== '[REDACTED]' ? res.title : (note ? '' : '(untitled)'),
+            url: safeUrl(res.href || res.url || res.image),
+            thumb: safeUrl(res.thumbnail),
+            snippet: res.body && res.body !== '[REDACTED]'
+                ? res.body
+                : (res.description || res.info || ''),
+            note,
+        };
+    });
 }
 
 // -- coder_file_read: highlighted code block ----------------------------------
@@ -437,10 +447,14 @@ function globFiles(response) {
 function coderRunningInfo(tool, cacheKey) {
     const args = toolArgs(tool, cacheKey);
     const path = args.path ?? args.orig_path ?? args.sub_path ?? '';
+    // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+    // moves stream a destination too: surface it so the running one-liner
+    // reads "moving · dev: a.py -> b.py" instead of hiding where it goes
     return {
         label: CODER_RUNNING_LABELS[tool?.function?.name] ?? 'in',
         sandbox: args.sandbox ?? '',
         path,
+        out: args.target_path ?? '',
     };
 }
 
@@ -477,13 +491,19 @@ function shellViewInfo(tool, cacheKey) {
     else if (c && typeof c === 'object') {
         if (c.stdout) parts.push(c.stdout);
         if (c.stderr) parts.push(c.stderr);
-        if (Array.isArray(c.errors)) parts.push(c.errors.join('\n'));
+        // errors (timeouts, kills) are NOT mixed into the terminal output:
+        // the shared .display-error row below the view shows them in the
+        // error color (see toolDisplayError). truncation is a separate,
+        // non-fatal note (see truncation_note below)
     }
     let output = parts.join('\n\n');
     // silent non-zero exits would leave an empty box - say something
     if (!output && typeof c === 'object' && c && c.exit_code)
         output = `(exit code ${c.exit_code})`;
-    return { command: args.command ?? '', output, done: true, multiline };
+    return {
+        command: args.command ?? '', output, done: true, multiline,
+        note: (typeof c === 'object' && c && c.truncation_note) || '',
+    };
 }
 
 // bash-highlighted command html, memoized + throttled per view instance
@@ -530,7 +550,14 @@ function toolDisplayError(tool) {
     const resp = toolResponse(tool);
     if (!resp || resp.status !== 'error') return '';
     const c = resp.content;
-    return typeof c === 'string' ? c : JSON.stringify(c);
+    if (typeof c === 'string') return c;
+    // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+    // structured error payloads (eg. sandboxed shell: timeouts, output
+    // truncation) fail the call while keeping stdout/stderr in content -
+    // show just the human-readable errors lines instead of dumping the
+    // whole raw JSON object
+    if (c && Array.isArray(c.errors) && c.errors.length) return c.errors.join('\n');
+    return JSON.stringify(c);
 }
 
 // -- registrations ------------------------------------------------------------
@@ -641,12 +668,11 @@ document.addEventListener('alpine:init', () => {
     });
 
     // tools_load: which modules' tools just got loaded
+    // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+    // summary dropped: the module chips in the view tell the whole story,
+    // repeating them in the collapsed header was redundant
     registerToolDisplay({
         match: /^tools_load$/,
-        view: 'tools-load',
-        summary: (res, tool, cacheKey) => {
-            const mods = toolLoadModules(toolArgs(tool, cacheKey));
-            return mods.length ? mods.join(' + ') : '';
-        }
+        view: 'tools-load'
     });
 });

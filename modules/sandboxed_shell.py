@@ -553,8 +553,12 @@ class SandboxedShell(core.module.Module):
             if timed_out:
                 errors.append(f"Command execution timed out after {timeout_val}s")
 
+            truncated_note = None
             if truncated:
-                errors.append(f"Output truncated - limit: {output_limit} chars")
+                # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+                # truncation is informational, not a failure: the command
+                # ran fine, we just capped how much output came back
+                truncated_note = f"Output truncated - limit: {output_limit} chars"
 
             if exit_code == 137:
                 errors.append(f"Process forcibly killed")
@@ -564,6 +568,9 @@ class SandboxedShell(core.module.Module):
                 "stderr": stderr_text,
                 "exit_code": exit_code
             }
+
+            if truncated_note:
+                results["truncation_note"] = truncated_note
 
             if errors:
                 success = False
@@ -592,12 +599,16 @@ class SandboxedShell(core.module.Module):
             stdout = content.get("stdout")
             stderr = content.get("stderr")
             errors = content.get("errors")
+            truncation_note = content.get("truncation_note")
 
             output = []
             if stdout:
                 output.append(stdout)
             if stderr:
                 output.append(stderr)
+
+            if truncation_note:
+                output.append(truncation_note)
 
             if errors:
                 output.append("errors:\n"+"\n".join(errors))

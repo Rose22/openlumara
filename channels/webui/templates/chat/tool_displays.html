@@ -22,11 +22,15 @@
                     <div class="search-title-row">
                         <a class="search-title" x-show="res.url" :href="res.url"
                            target="_blank" rel="noopener noreferrer" x-text="res.title"></a>
-                        <span class="search-title plain" x-show="!res.url" x-text="res.title"></span>
+                        <span class="search-title plain" x-show="!res.url && res.title" x-text="res.title"></span>
                         <img class="search-thumb" x-show="res.thumb" :src="res.thumb" loading="lazy" alt="">
                     </div>
                     <div class="search-url" x-show="res.url" x-text="res.url"></div>
                     <div class="search-snippet" x-show="res.snippet" x-text="res.snippet"></div>
+                    <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+                         policy-rejected results: show the module's note explaining
+                         why the card is empty -->
+                    <div class="grep-note" x-show="res.note" x-text="res.note"></div>
                 </div>
             </template>
         </div>
@@ -57,7 +61,14 @@
 <template x-if="toolDisplayView(tool) === 'file-create'"
           x-data="{ get args() { return toolArgs(tool, cacheKey) },
                     get response() { return toolResponse(tool) },
-                    get html() { return codeLinesHtml(this.args.content, langForPath(this.args.path), 1, cacheKey) } }">
+                    get html() {
+                        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+                        // a failed create must render no box (the file was
+                        // never written): bail like file-read does, the
+                        // shared .display-error row shows the reason
+                        if (this.response && this.response.status === 'error') return '';
+                        return codeLinesHtml(this.args.content, langForPath(this.args.path), 1, cacheKey);
+                    } }">
     <div>
         <!-- the new file's content, highlighted, streaming live from the
              args (no response needed - creation is the last step). a failed
@@ -130,6 +141,10 @@
                 </div>
             </template>
         </div>
+        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+             the module returns { matches, note } when the max_matches cap
+             hit - show the note so a truncated list is visible as such -->
+        <div class="grep-note" x-show="response?.content?.note" x-text="response?.content?.note ?? ''"></div>
     </div>
 </template>
 
@@ -148,6 +163,10 @@
             <span class="grep-running-label" x-text="info.label"></span>
             <span class="grep-running-pattern" x-show="info.sandbox || info.path"
                   x-text="(info.sandbox ? info.sandbox + ': ' : '') + info.path"></span>
+            <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+                 move destination, streams in right after the source path -->
+            <span class="grep-running-label" x-show="info.out">-></span>
+            <span class="grep-running-pattern" x-show="info.out" x-text="info.out"></span>
         </div>
         <!-- glob results: plain file list -->
         <div class="glob-files" x-show="files.length">
@@ -165,6 +184,7 @@
           x-data="{ get info() { return shellViewInfo(tool, cacheKey) },
                     get commandHtml() { return shellCommandHtml(this.info.command, cacheKey) } }">
     <!-- single root element: x-if only renders the template's FIRST child -->
+    <div>
     <div class="shell-box" x-auto-scroll>
         <!-- terminal look: prompt symbol + command streaming in via token
              fade, blinking cursor trails it until the output lands.
@@ -182,6 +202,11 @@
         <!-- output appears below the command once the call completes, as if
              printed by the shell itself; cursor is gone by then -->
         <div class="shell-output" x-show="info.output" x-fade-text="info.output"></div>
+    </div>
+    <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+         truncation is informational (the call succeeded): dim note under
+         the terminal box, same style as the other views' cap notes -->
+    <div class="grep-note" x-show="info.note" x-text="info.note"></div>
     </div>
 </template>
 
