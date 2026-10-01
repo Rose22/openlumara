@@ -135,10 +135,7 @@ function collapseContext(rows, keep) {
 // whole-content repaints (x-for rows can't survive that), so this view
 // generates its row markup here instead of in the template. all text goes
 // through escapeHtml or hljs (whose output is escaped), so it's safe markup.
-// returns '' on desktop, where the side-by-side view takes over - that
-// skips the render AND lets x-show collapse the box (see diffSideHtml).
 function diffHtml(original, replacement, lang, cacheKey) {
-    if (_DESKTOP_MQ.matches) return '';
     // memoized + throttled while the args stream in (see streamMemo)
     return streamMemo('edit:' + cacheKey, [original, replacement, lang],
         () => _diffHtmlNow(original, replacement, lang));
@@ -196,16 +193,14 @@ function sideBySideRows(rows) {
 // no line numbers - the cell tints convey which side is which. memoized
 // like diffHtml: each box keeps its own memo entry, so the hidden one
 // only recomputes on real arg changes.
-// desktop/mobile split: each view returns '' off-breakpoint so css hides it
-// (visibility collapse, see custom_tool_views.css) AND its render is
-// skipped - computing both diffs per streamed chunk would double the cost.
-// matchMedia is not reactive, so a window resize mid-stream only picks the
-// other view up on the next streamed chunk (getter re-evaluates, memo sees
-// the flip); a resize while idle self-heals on the next edit call.
-const _DESKTOP_MQ = window.matchMedia('(min-width: 1025px)');
-
+// side-by-side counterpart of diffHtml. which one VISIBLE is pure css:
+// .diff-container is a size container and a container query swaps the
+// layouts at a min card width (custom_tool_views.css) - so the switch
+// follows the chat/message width settings and resizes with zero JS.
+// both layouts render regardless; the per-line highlight cache is shared
+// between them, so the second render is mostly just the LCS + string work
+// (edit snippets are small, and streamMemo throttles either way).
 function diffSideHtml(original, replacement, lang, cacheKey) {
-    if (!_DESKTOP_MQ.matches) return '';
     return streamMemo('edit2:' + cacheKey, [original, replacement, lang],
         () => _diffSideHtmlNow(original, replacement, lang));
 }

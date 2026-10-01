@@ -192,10 +192,10 @@
     <div class="diff-container">
         <!-- both views render as html strings: token fade needs whole-content
              repaints (x-fade-html), which x-for rows can't survive. see
-             diffHtml()/diffSideHtml() in custom_tool_views.js. each helper
-             returns '' off-breakpoint, so only one box has content at a
-             time and x-show collapses the other: side-by-side on desktop,
-             unified on mobile -->
+             diffHtml()/diffSideHtml() in custom_tool_views.js. which one
+             shows is a css container query on this .diff-container's width
+             (custom_tool_views.css): side-by-side once the card is wide
+             enough, unified below - follows the chat width setting -->
         <div class="tool-display hljs diff-unified" x-show="html" x-auto-scroll x-fade-html="html"></div>
         <div class="diff-side hljs" x-show="sideHtml" x-auto-scroll x-fade-html="sideHtml"></div>
         <div class="display-footer" x-show="args.sandbox || args.path" x-text="coderFooterText(args)"></div>

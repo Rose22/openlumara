@@ -438,40 +438,42 @@
 }
 
 /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
-   coder file edit view: github-style two-column diff on desktop.
-   both layouts render inside .diff-container; this media query (same
-   desktop breakpoint as responsive.css) flips which one is visible.
-   display here beats the base rules' specificity tie because it comes
-   later in the file, and x-show's inline display:none still hides a
-   layout when its content is empty. no line numbers - the cell tints
-   convey old vs new. */
+   coder file edit view: github-style two-column diff.
+   both layouts render inside .diff-container, which is a size container
+   itself: the switch keys off the CARD's actual width, so it follows the
+   chat width / message width settings, the sidebar, and window resizes
+   automatically - pure css, always reactive. side-by-side once the box
+   is wide enough for two columns to read well, unified below that.
+   x-show's inline display:none still wins over these rules, so a layout
+   with no content stays hidden regardless. no line numbers - the cell
+   tints convey old vs new. */
 .diff-container {
+    container-type: inline-size;
+
     .diff-side {
         display: none;
     }
 }
 
-@media (min-width: 1025px) {
-    .tool-call-card .diff-container {
-        .diff-unified {
-            display: none;
-        }
+@container (min-width: 640px) {
+    .diff-container .diff-unified {
+        display: none;
+    }
 
-        .diff-side {
-            display: block;
-            font-family: var(--code-font);
-            font-size: 0.8rem;
-            line-height: 1.55;
-            max-height: 320px;
-            overflow-y: auto;
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 8px 10px;
-            /* the .hljs class pulls token colors from the active code
-               theme, but themes also set an opaque .hljs background -
-               kill it, the box keeps the card's own background */
-            background: transparent;
-        }
+    .diff-container .diff-side {
+        display: block;
+        font-family: var(--code-font);
+        font-size: 0.8rem;
+        line-height: 1.55;
+        max-height: 320px;
+        overflow-y: auto;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 8px 10px;
+        /* the .hljs class pulls token colors from the active code
+           theme, but themes also set an opaque .hljs background -
+           kill it, the box keeps the card's own background */
+        background: transparent;
     }
 }
 
