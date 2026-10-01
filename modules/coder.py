@@ -141,6 +141,8 @@ class Coder(core.module.Module):
 
         if self.config.get("read-only"):
             final_output.append("## IMPORTANT: Read-Only Mode\nYour coder module is in read-only mode and you cannot write to files. Provide output code to the user directly in your messages.")
+        else:
+            final_output.append("No need to check syntax. Coder has built-in syntax check.")
 
         if final_output:
             return "\n\n".join(final_output)
