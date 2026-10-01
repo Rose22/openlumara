@@ -97,14 +97,26 @@
                                  the body persists and x-show just hides it - so
                                  re-expanding is instant instead of rebuilding the
                                  whole chain (the jump). -->
-                            <div class="agent-chain" x-data="{ collapsed: true, mounted: false }">
+                            <div class="agent-chain" x-data="{ collapsed: true, mounted: false,
+                                     // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+                                     // tool-less chain (just reasoning/content):
+                                     // the header reads standalone Thoughts
+                                     get thoughtsOnly() { return turn.steps.every(s => s.status === 'thoughts') } }">
                                 <div class="agent-chain-header" @click="collapsed = !collapsed; if (!collapsed) mounted = true">
                                     <svg :class="{'toggle': true, 'toggle-expanded': !collapsed}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <polyline points="9 6 15 12 9 18"></polyline>
                                     </svg>
-                                    {% include 'svg/gear.svg' %}
-                                    <span class="label">Process</span>
-                                    <span class="activity" x-show="collapsed" x-text="'(' + turn.steps.length + (turn.steps.length === 1 ? ' step)' : ' steps)')"></span>
+                                    <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+                                         thoughts-only turns swap the gear + Process
+                                         label for a thought bubble + Thoughts -->
+                                    <template x-if="!thoughtsOnly">
+                                        {% include 'svg/gear.svg' %}
+                                    </template>
+                                    <template x-if="thoughtsOnly">
+                                        {% include 'svg/thought_bubble.svg' %}
+                                    </template>
+                                    <span class="label" x-text="thoughtsOnly ? 'Thoughts' : 'Process'"></span>
+                                    <span class="activity" x-show="collapsed && !thoughtsOnly" x-text="'(' + turn.steps.length + (turn.steps.length === 1 ? ' step)' : ' steps)')"></span>
                                 </div>
                                 <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
                                      timeline layout: each chain segment is a station
@@ -114,21 +126,46 @@
                                 <template x-if="mounted">
                                     <div class="agent-chain-body" x-show="!collapsed" x-collapse.duration.250>
                                         <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
-                                             every chain item is a backend step now; no more
-                                             combined-vs-regular runtime branch -->
-                                        <template x-for="(message, messageIndex) in turn.steps" :key="messageIndex">
-                                            <div class="chain-station">
-                                                <div class="chain-rail"><div class="chain-dot"></div></div>
-                                                <div class="chain-content">
-                                                    {% set combined_stream = False %}
-                                                    {% include 'chat/combined_block.html' %}
-                                                </div>
+                                             thoughts-only turn: the reasoning IS the whole
+                                             chain, so render it straight as a block - no
+                                             stations, step badges, spine or finish flag -->
+                                        <template x-if="thoughtsOnly">
+                                            <div>
+                                                <template x-for="(message, messageIndex) in turn.steps" :key="'th-'+messageIndex">
+                                                    <div class="combined-block expanded">
+                                                        <div class="block">
+                                                            <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+                                                                 no bubble icon here: the Thoughts
+                                                                 header already shows one -->
+                                                            <div class="reasoning-row" x-show="message.reasoning_content">
+                                                                <div class="reasoning-text" x-fade-text="message.reasoning_content"></div>
+                                                            </div>
+                                                            <template x-if="message.content">
+                                                                <div class="step-content" x-md="{ message: message, live: false }"></div>
+                                                            </template>
+                                                        </div>
+                                                    </div>
+                                                </template>
                                             </div>
                                         </template>
-                                        <div class="chain-end">
-                                            {% include 'svg/finish_flag.svg' %}
-                                            <span class="chain-end-label">Finished</span>
-                                        </div>
+                                        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+                                             every chain item is a backend step now; no more
+                                             combined-vs-regular runtime branch -->
+                                        <template x-if="!thoughtsOnly">
+                                            <template x-for="(message, messageIndex) in turn.steps" :key="messageIndex">
+                                                <div class="chain-station">
+                                                    <div class="chain-rail"><div class="chain-dot"></div></div>
+                                                    <div class="chain-content">
+                                                        {% set combined_stream = False %}
+                                                        {% include 'chat/combined_block.html' %}
+                                                    </div>
+                                                </div>
+                                            </template>
+                                            <div class="chain-end">
+                                                {% include 'svg/finish_flag.svg' %}
+                                                <span class="chain-end-label">Finished</span>
+                                            </div>
+                                        </template>
                                     </div>
                                 </template>
                             </div>
