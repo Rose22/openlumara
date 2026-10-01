@@ -1,51 +1,13 @@
 /*
- * structural equality check between two turns.
- *
- * used so that reloading a chat can keep the *existing* turn objects around
- * for every turn that didn't actually change. alpine's x-for keys turns by
- * index, so if you hand it a fresh array of fresh objects it re-seeds the
- * scope of every single turn, which re-runs every x-html in the chat, which
- * re-parses the markdown of your entire conversation on every reload.
- *
- * keeping the object identity stable means only genuinely new/changed turns
- * ever re-render.
+ * -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+ * turns carry a backend-stamped content hash (core/turns.py turn_hash):
+ * reloading a chat keeps the *existing* turn objects around for every
+ * turn whose hash didn't actually change. alpine's x-for keys turns by
+ * index, so handing it a fresh array of fresh objects re-seeds the scope
+ * of every single turn, re-running every x-html (i.e. re-parsing the
+ * markdown of your entire conversation on every reload). the old
+ * deep-equality walk (turnsEqual) is gone: one string compare per turn.
  */
-function turnsEqual(a, b) {
-    if (!a || !b) return false;
-    if (a.role !== b.role) return false;
-    if (a.first_message_index !== b.first_message_index) return false;
-    if (a.last_message_index !== b.last_message_index) return false;
-
-    const am = a.messages || [];
-    const bm = b.messages || [];
-    if (am.length !== bm.length) return false;
-
-    for (let i = 0; i < am.length; i++) {
-        const x = am[i];
-        const y = bm[i];
-
-        if (x === y) continue;
-        if (!x || !y) return false;
-
-        if (x.index !== y.index) return false;
-        if (x.role !== y.role) return false;
-        if (x.content !== y.content) return false;
-        if (x.reasoning_content !== y.reasoning_content) return false;
-        if (x._metadata?.is_cmd !== y._metadata?.is_cmd) return false;
-
-        const xc = x.tool_calls || [];
-        const yc = y.tool_calls || [];
-        if (xc.length !== yc.length) return false;
-
-        for (let j = 0; j < xc.length; j++) {
-            if (xc[j].id !== yc[j].id) return false;
-            if (xc[j].response !== yc[j].response) return false;
-        }
-    }
-
-    return true;
-}
-
 function mergeTurnHistory(existing, incoming) {
     incoming = incoming || [];
     if (!Array.isArray(existing) || existing.length === 0) return incoming;
@@ -53,7 +15,9 @@ function mergeTurnHistory(existing, incoming) {
     const merged = new Array(incoming.length);
 
     for (let i = 0; i < incoming.length; i++) {
-        merged[i] = turnsEqual(existing[i], incoming[i]) ? existing[i] : incoming[i];
+        merged[i] = (existing[i] && existing[i].hash && existing[i].hash === incoming[i].hash)
+            ? existing[i]
+            : incoming[i];
     }
 
     return merged;
@@ -105,10 +69,25 @@ CHAT_STORE = {
     last_user_input: '',
 
     // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-26)
-    // shell-style input history (global across chats), persisted to localStorage
+    // shell-style input history (global across chats).
+    // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+    // persisted backend-side now (/api/input_history); localStorage stays
+    // as an instant-display cache while the server copy loads.
     inputHistory: JSON.parse(localStorage.getItem('input_history') || '[]'),
     historyIndex: -1,
     draftValue: '',
+
+    async loadInputHistory() {
+        try {
+            const saved = await simpleApiFetch('/api/input_history');
+            if (Array.isArray(saved)) {
+                this.inputHistory = saved;
+                localStorage.setItem('input_history', JSON.stringify(saved));
+            }
+        } catch (err) {
+            console.warn('loading input history failed:', err);
+        }
+    },
 
     pushInputHistory(msg) {
         msg = (msg || '').trim();
@@ -117,6 +96,8 @@ CHAT_STORE = {
             this.inputHistory.push(msg);
             if (this.inputHistory.length > 100) this.inputHistory.shift();
             localStorage.setItem('input_history', JSON.stringify(this.inputHistory));
+            // fire-and-forget: the backend is the source of truth now
+            simpleApiPost('/api/input_history', { message: msg }).catch(() => {});
         }
         this.historyIndex = -1;
         this.draftValue = '';
@@ -150,6 +131,7 @@ CHAT_STORE = {
     async load() {
         // called by Alpine.init
         await this.reloadCategories();
+        this.loadInputHistory();
 
         const result = await simpleApiFetch(`/api/chat/current`);
         if (!result) { return }
@@ -676,24 +658,15 @@ CHAT_STORE = {
         this.categories = await simpleApiFetch('/api/chats/categories');
     },
 
-    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
-       options for the sidebar category dropdown. always includes the
-       selected category, even if the backend list doesn't contain it
-       yet (e.g. a chat was just loaded/created in a brand new category)
-       - a select whose value matches no option renders blank.
-       sorted alphabetically, with 'general' pinned to the top. */
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+       the backend returns the list pre-sorted (alphabetical, 'general'
+       pinned first); all that's left here is guaranteeing the selected
+       category is present even if the backend list doesn't contain it
+       yet - a select whose value matches no option renders blank. */
     dropdownCategories() {
         let cats = [...(this.categories ?? [])];
         if (this.selectedCategory && !cats.includes(this.selectedCategory)) {
             cats.push(this.selectedCategory);
-        }
-
-        cats.sort((a, b) => (a ?? '').localeCompare(b ?? ''));
-
-        const generalIndex = cats.indexOf('general');
-        if (generalIndex > 0) {
-            cats.splice(generalIndex, 1);
-            cats.unshift('general');
         }
 
         return cats;
@@ -854,24 +827,21 @@ CHAT_STORE = {
      * ----------------------- */
     async export() {
         try {
-            // Get the export string from the backend
-            const exportStr = await simpleApiFetch('/api/chat/export');
-            
-            if (!exportStr) {
+            // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+            // the backend returns {content, filename}: title->filename
+            // sanitization moved server-side
+            const result = await simpleApiFetch('/api/chat/export');
+
+            if (!result || !result.content) {
                 throw new Error('Export returned empty data');
             }
 
-            // Get chat title for filename
-            const chatTitle = this.chat?.title || 'chat-export';
-            const safeTitle = chatTitle.replace(/[\/\\:*?"<>|]/g, '_');
-            const filename = `${safeTitle}.txt`;
-
             // Create blob and trigger download
-            const blob = new Blob([exportStr], { type: 'text/plain' });
+            const blob = new Blob([result.content], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = filename;
+            a.download = result.filename || 'chat-export.txt';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -917,29 +887,27 @@ CHAT_STORE = {
      * chat-specific getters
      * ----------------------- */
     get promptprogress() {
-        // does the math for the prompt processing indicator over in components/promptprocess.html
-        // the math was ported straight over from the old webUI because, well, it works, and it's clean code
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+        // percent + ETA are computed backend-side now (core/turns.py
+        // enriches every prompt_progress token); this getter only shapes
+        // the strings the indicator template consumes.
         const progressData = Alpine.store("stream").processing;
 
         const cache = progressData.cache || 0;
-        const processed = progressData.processed - cache;
-        const total = progressData.total - cache;
-        const percent = total > 0 ? Math.round((processed / total) * 100) : 0;
-        const elapsed = progressData.time_ms / 1000;
-        const remaining = (total - processed) > 0 ? (elapsed / processed) * (total - processed) : 0;
+        const processed = (progressData.processed || 0) - cache;
+        const total = (progressData.total || 0) - cache;
+        const percent = progressData.percent ?? 0;
+        const remaining = progressData.eta_seconds || 0;
 
-        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
-        // expose show_eta so the indicator hides ETA until it can actually be estimated
         return {
             cache,
             processed,
             total,
             percent,
             percent_str: `${percent}%`,
-            elapsed: elapsed.toFixed(1),
+            elapsed: ((progressData.time_ms || 0) / 1000).toFixed(1),
             remaining,
             show_eta: processed > 0 && remaining > 0,
-            // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
             // placeholder instead of hiding ETA so pill width stays stable
             remaining_str: (processed > 0 && remaining > 0) ? `(ETA: ${Math.ceil(remaining)}s)` : `(ETA: ...)`
         };

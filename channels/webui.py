@@ -15,6 +15,7 @@ import core
 
 # system
 import os
+import copy
 import json
 import asyncio
 import calendar
@@ -172,6 +173,15 @@ class Webui(core.channel.Channel):
 
         # initialize the websocket manager
         self.websocket_manager = WebSocketManager(self)
+
+        # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+        # shell-style input history, persisted server-side so it follows
+        # the user across browsers/devices instead of living in localStorage
+        self.input_history = core.storage.StorageList(
+            name="webui_input_history",
+            type="json",
+            manager=self
+        )
 
     async def run(self):
         self.log("webui", f"Starting WebUI on {self.url}")
@@ -775,6 +785,37 @@ def session_authenticated(channel, session_cookie):
     return bool(isinstance(data, dict) and data.get("authenticated"))
 
 
+# -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+# single source of truth for category name validation. returns
+# (error, normalized_name).
+def validate_category_format(name):
+    name = (name or "").strip().lower()
+
+    if not name:
+        return "category name cannot be empty", None
+    if ":" in name:
+        return "':' is reserved for subcategories", None
+
+    return None, name
+
+
+def validate_category_name(name, chat_store):
+    """format validation + duplicate check, for explicitly creating a
+    new category. returns (error, normalized_name)."""
+    error, name = validate_category_format(name)
+    if error:
+        return error, None
+
+    existing = [
+        (chat.get("category") or "general").lower()
+        for chat in chat_store.data
+    ]
+    if name in existing:
+        return f"'{name}' already exists", None
+
+    return None, name
+
+
 async def op_chat_rename(channel, title, chat_id=None):
     """renames a chat (current chat when no id given), saves, notifies"""
     chat_store = channel.context.chat
@@ -962,8 +1003,14 @@ async def create_fastapi(channel):
 
     @app.get("/api/chat/export")
     async def chat_export():
-        """Gives you the chat history as a human-readable string, which you can save to a file or do whatever else with"""
-        return api_result(await channel.context.chat.export())
+        """Gives you the chat history as a human-readable string, plus a safe filename, which you can save to a file or do whatever else with"""
+        # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+        # filename sanitization moved here from the frontend: the backend
+        # owns the title, so it owns turning it into a filename too.
+        content = await channel.context.chat.export()
+        title = channel.context.chat.get("title") or ""
+        safe_title = re.sub(r'[\\/:*?"<>|]', "_", title).strip() or "chat-export"
+        return api_result({"content": content, "filename": f"{safe_title}.txt"})
 
     @app.get("/api/chats")
     async def get_chats(request: fastapi.Request):
@@ -1108,8 +1155,28 @@ async def create_fastapi(channel):
 
     @app.get("/api/chats/categories")
     async def get_chat_categories():
-        """Returns a list of all existing chat categories"""
-        return api_result(channel.context.chat.get_categories(), True)
+        """Returns a list of all existing chat categories, sorted with 'general' pinned to the top"""
+        # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+        # ordering moved here from the frontend's dropdownCategories()
+        categories = [c or "general" for c in channel.context.chat.get_categories()]
+        categories = sorted(set(categories))
+        if "general" in categories:
+            categories.remove("general")
+            categories.insert(0, "general")
+        return api_result(categories, True)
+
+    # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+    # per-category chat counts for the manage-categories modal. the
+    # frontend used to fetch every single chat (limit=100000) just to
+    # count them itself.
+    @app.get("/api/chats/categories/count")
+    async def get_chat_category_counts():
+        """Returns how many chats live in each category"""
+        counts = {}
+        for chat in channel.context.chat.data:
+            cat = chat.get("category") or "general"
+            counts[cat] = counts.get(cat, 0) + 1
+        return api_result(counts, True)
 
     # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-26)
     # all tags in use, optionally scoped to a category (the sidebar's
@@ -1126,6 +1193,22 @@ async def create_fastapi(channel):
                     tags.add(tag)
 
         return api_result(sorted(tags), success=True)
+
+    # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+    # explicitly create a category: validation happens here, then a fresh
+    # chat is created inside it (a category exists once a chat uses it).
+    @app.post("/api/chats/categories/create")
+    async def create_chat_category(request: fastapi.Request):
+        """Validates a category name and creates a new chat inside it"""
+        data = await request.json()
+        name = data.get("name") or ""
+
+        error, name = validate_category_name(name, channel.context.chat)
+        if error:
+            return api_result(error, success=False)
+
+        new_id = await op_chat_new(channel, category=name)
+        return api_result({"id": new_id}, True)
 
     # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
     # deleting a category = moving all of its chats to 'general'.
@@ -1224,6 +1307,15 @@ async def create_fastapi(channel):
         except Exception:
             pass
 
+        # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+        # category name format validation lives here now. duplicates are
+        # fine on this path (creating a chat inside the current category
+        # is the normal flow); the create-category endpoint rejects those.
+        if category != "general":
+            error, category = validate_category_format(category)
+            if error:
+                return api_result(error, success=False)
+
         new_id = await op_chat_new(channel, category=category)
         return api_result({"id": new_id})
 
@@ -1274,6 +1366,36 @@ async def create_fastapi(channel):
         except Exception as e:
             return api_result(str(e), success=False)
 
+    # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+    # shell-style input history, persisted server-side (used to be
+    # localStorage-only, so it didn't follow the user between browsers).
+    @app.get("/api/input_history")
+    async def input_history_get():
+        """Returns the saved input history, oldest first"""
+        return api_result(list(channel.input_history), True)
+
+    @app.post("/api/input_history")
+    async def input_history_add(request: fastapi.Request):
+        """Appends a message to the input history (dedupes against the last entry)"""
+        data = await request.json()
+        message = (data.get("message") or "").strip()
+
+        if not message:
+            return api_result(success=True)
+
+        history = channel.input_history
+        history.load()
+
+        if history and history[-1] == message:
+            return api_result(list(history), True)
+
+        history.append(message)
+        while len(history) > 100:
+            history.pop(0)
+        history.save()
+
+        return api_result(list(history), True)
+
     # --- Settings
     # -- GET
     # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
@@ -1311,7 +1433,7 @@ async def create_fastapi(channel):
     # -- POST
     @app.post("/api/settings/save")
     async def settings_save(request: fastapi.Request):
-        """Saves the (possibly edited) settings structure back to the backend. Accepts exactly what /api/settings/load returned, flattens it server-side and writes it to the config"""
+        """Saves the (possibly edited) settings structure back to the backend. Accepts exactly what /api/settings/load returned, flattens it server-side and writes it to the config. Returns requires_restart/requires_reconnect so the frontend never has to diff config itself"""
         data = await request.json()
 
         changed_modules = list(data.get("changed_modules", []))
@@ -1320,11 +1442,27 @@ async def create_fastapi(channel):
         # with edited values; rebuild the raw config dict from it
         flattened = flatten_categories(data.get("categories", {}))
 
+        # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+        # snapshot the pre-save config so we can tell the frontend whether
+        # the changes need a server restart (module/channel lists) or an
+        # API reconnect (api section); that decision used to be made
+        # client-side with four JSON.stringify diffs
+        old_config = copy.deepcopy(dict(core.config.config))
+
         result = core.config.config.load(data=flattened)
         core.config.config.save()
 
         if not result:
             return api_result(success=False)
+
+        requires_restart = any(
+            {k: (old_config.get(key) or {}).get(k) for k in ("enabled", "disabled")} !=
+            {k: (flattened.get(key) or {}).get(k) for k in ("enabled", "disabled")}
+            for key in MODULE_CATEGORY_KEYS
+        )
+        requires_reconnect = (not requires_restart) and (
+            old_config.get("api") != flattened.get("api")
+        )
 
         # Reload modules that had their settings changed
         if changed_modules:
@@ -1337,7 +1475,10 @@ async def create_fastapi(channel):
                     # which turned any module reload error into a NameError
                     channel.log(channel.name, f"Error reloading module {module_name}: {core.detail_error(e)}")
 
-        return api_result(success=True)
+        return api_result({
+            "requires_restart": requires_restart,
+            "requires_reconnect": requires_reconnect,
+        }, success=True)
     
     @app.post("/api/reconnect")
     async def reconnect():

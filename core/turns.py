@@ -1,5 +1,52 @@
 import asyncio
+import hashlib
 import json
+
+import partial_json_parser
+
+
+# -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+# parse streamed tool-call arguments with partial_json_parser (same
+# approach as core/channel.py): the backend parses what it can at every
+# yield point and stamps `args_parsed` onto each tool call, so channels
+# only ever render a plain object. a `_raw` fallback mirrors the old
+# frontend behaviour for non-JSON argument blobs.
+
+def parse_lenient_json(raw):
+    """parse a (possibly incomplete) JSON object string into a plain dict.
+    never raises: falls back to {'_raw': text} for non-JSON input."""
+    if not isinstance(raw, str) or not raw.strip():
+        return {}
+    try:
+        parsed = partial_json_parser.loads(raw, allow_partial=partial_json_parser.Allow.ALL)
+        if isinstance(parsed, dict):
+            return parsed
+    except Exception:
+        pass
+    return {"_raw": raw}
+
+
+def turn_hash(turn):
+    """stable content hash for a grouped turn. channels can reuse their
+    existing turn object when the hash is unchanged instead of deep-diffing
+    every message on every history reload."""
+    parts = []
+    for message in turn.get("messages", []):
+        calls = ",".join(
+            f"{tc.get('id')}:{tc.get('response')}"
+            for tc in (message.get("tool_calls") or [])
+        )
+        parts.append("|".join([
+            str(message.get("index")),
+            str(message.get("role")),
+            str(message.get("content")),
+            str(message.get("reasoning_content")),
+            str((message.get("_metadata") or {}).get("is_cmd")),
+            calls,
+        ]))
+    payload = "\n".join(parts).encode("utf-8")
+    return hashlib.md5(payload).hexdigest()
+
 
 class TurnCollector:
     """
@@ -81,6 +128,18 @@ class TurnCollector:
                         tool["failed"] = self._tool_call_failed(tool)
                         # ... and the one-line arg summary for headers
                         tool["summary"] = self._tool_call_summary(tool)
+                        # ... and the parsed arguments, so channels never
+                        # parse the raw json string themselves
+                        tool["args_parsed"] = parse_lenient_json(
+                            (tool.get("function") or {}).get("arguments")
+                        )
+
+        # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+        # stamp a content hash per turn so channels can keep their existing
+        # turn objects (and their render caches) on reloads by comparing
+        # one string instead of deep-diffing every message.
+        for turn in turns:
+            turn["hash"] = turn_hash(turn)
 
         # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
         # fold each assistant turn's chain into display steps so channels
@@ -409,9 +468,41 @@ class TurnCollector:
         step_num = 0
         step_has_tools = False
 
+        # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+        # monotonic args_parsed cache keyed by tool call id: a mid-stream
+        # parse can never yield fewer keys than what was already sent.
+        args_cache = {}
+
+        def _stamp_args(tool):
+            tool_id = tool.get("id")
+            parsed = parse_lenient_json((tool.get("function") or {}).get("arguments"))
+            prev = args_cache.get(tool_id)
+            if prev is not None and len(prev) > len(parsed):
+                parsed = prev
+            else:
+                args_cache[tool_id] = parsed
+            tool["args_parsed"] = parsed
+
         async for raw_token in stream_generator:
             # copy the token so we don't mutate it
             token = dict(raw_token)
+
+            # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+            # enrich prompt progress with precomputed percent + ETA so
+            # channels render the indicator without doing the math
+            if token.get("type") == "prompt_progress" and isinstance(token.get("content"), dict):
+                progress = dict(token["content"])
+                cache = progress.get("cache") or 0
+                processed = (progress.get("processed") or 0) - cache
+                total = (progress.get("total") or 0) - cache
+                elapsed_ms = progress.get("time_ms") or 0
+
+                percent = round((processed / total) * 100) if total > 0 else 0
+                eta = (elapsed_ms / 1000 / processed) * (total - processed) if (processed > 0 and total > processed) else 0
+
+                progress["percent"] = percent
+                progress["eta_seconds"] = round(eta, 1)
+                token["content"] = progress
 
             # yield the raw token in case it needs to be processed 
             # (for things like user messages, API errors, etc)
@@ -538,6 +629,8 @@ class TurnCollector:
                             tool["failed"] = self._tool_call_failed(tool)
                         # arg summary (mirrors group_history)
                         tool["summary"] = self._tool_call_summary(tool)
+                        # parsed args (mirrors group_history)
+                        _stamp_args(tool)
                     # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
                     # live step status + precomputed module display data
                     current_segment["step_status"] = self._step_status(current_segment["tool_calls"])
@@ -558,6 +651,7 @@ class TurnCollector:
                         # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
                         tool["failed"] = self._tool_call_failed(tool)
                     tool["summary"] = self._tool_call_summary(tool)
+                    _stamp_args(tool)
                 # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
                 # responses landed: refresh the re-yielded step's status
                 last_tool_calls_segment["step_status"] = self._step_status(last_tool_calls_segment["tool_calls"])

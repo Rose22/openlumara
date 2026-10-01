@@ -64,7 +64,10 @@
                         {% include 'chat/tool_displays.html' %}
                         <template x-if="!toolDisplayView(tool)">
                         <div class="default-display">
-                            <template x-for="(value, key) in partialJsonParse(tool.function?.arguments ?? '{}', tool.id ?? (message.tool_call_id + ':' + toolIdx))">
+                            <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+                                 args are parsed backend-side now (args_parsed
+                                 is stamped onto every tool call) -->
+                            <template x-for="(value, key) in tool.args_parsed ?? {}">
                                 <div class="arg-row">
                                     <span class="arg-name" x-fade-text="key"></span>
                                     <span class="arg-value" x-box x-auto-scroll x-fade-text="(value !== null && typeof value === 'object') ? JSON.stringify(value, null, 2) : value"></span>

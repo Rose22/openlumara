@@ -1,9 +1,9 @@
 /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
    logic for the sidebar's "manage categories" modal.
 
-   categories are derived from the chats that use them, so there is no
-   create endpoint: adding a category = creating a fresh chat inside it
-   (chat store's newChat(name)). deleting goes through
+   categories are derived from the chats that use them, so creating one
+   goes through /api/chats/categories/create (backend validation + a
+   fresh chat inside the new category). deleting goes through
    /api/chats/categories/delete, which moves the category's chats to
    'general'. */
 function categoryManager() {
@@ -19,17 +19,14 @@ function categoryManager() {
         },
 
         async refresh() {
-            // one unpaginated fetch of every chat, counted per category.
-            // blank categories count towards 'general' (backend treats
-            // blank as general).
-            const result = await simpleApiFetch('/api/chats?offset=0&limit=100000');
-
-            const counts = {};
-            for (const chat of (result?.messages ?? [])) {
-                const cat = chat.category || 'general';
-                counts[cat] = (counts[cat] ?? 0) + 1;
+            // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+            // counts come from the backend now; this used to fetch every
+            // chat (limit=100000) just to count them client-side.
+            try {
+                this.counts = await simpleApiFetch('/api/chats/categories/count') ?? {};
+            } catch (err) {
+                this.counts = {};
             }
-            this.counts = counts;
         },
 
         countFor(category) {
@@ -40,26 +37,18 @@ function categoryManager() {
             this.error = '';
             const name = this.newCategory.trim().toLowerCase();
 
-            if (!name) {
-                this.error = 'category name cannot be empty';
-                return;
-            }
-            if (name.includes(':')) {
-                this.error = "':' is reserved for subcategories";
-                return;
-            }
-
-            const existing = (Alpine.store('chat').categories ?? [])
-                .map(c => (c ?? '').toLowerCase());
-            if (existing.includes(name)) {
-                this.error = `"${name}" already exists`;
-                return;
-            }
-
             this.busy = true;
             try {
-                // the new chat becomes the active chat in the new category
-                await Alpine.store('chat').newChat(name);
+                // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+                // name validation (empty, ':' reserved for subcategories,
+                // duplicates) moved backend-side; the endpoint creates the
+                // new chat inside the new category, making it the active chat
+                await simpleApiPost('/api/chats/categories/create', { name: name });
+
+                await Alpine.store('chat').reloadCategories();
+                await Alpine.store('chat').reloadChats();
+                await Alpine.store('chat').reloadChat();
+
                 this.newCategory = '';
                 await this.refresh();
             } catch (e) {

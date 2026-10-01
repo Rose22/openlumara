@@ -109,22 +109,16 @@ SETTINGS_STORE = {
         try {
             // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
             // send the (edited) category tree straight through; the
-            // backend flattens it back into raw config itself now.
-            await simpleApiPost('/api/settings/save', {
+            // backend flattens it back into raw config itself, and now
+            // also tells us whether the changes require a server restart
+            // or an API reconnect (the client-side config diffing is gone)
+            const result = await simpleApiPost('/api/settings/save', {
                 categories: JSON.parse(JSON.stringify(this.categories)),
                 changed_modules: Array.from(this.changedModuleSettings)
             });
 
             // restart server if enabled modules/channels changed
-            if (
-                (JSON.stringify(this.categories.modules.enabled) !== JSON.stringify(this.originalCategories.modules.enabled))
-                ||
-                (JSON.stringify(this.categories.user_modules.enabled) !== JSON.stringify(this.originalCategories.user_modules.enabled))
-                ||
-                (JSON.stringify(this.categories.channels.enabled) !== JSON.stringify(this.originalCategories.channels.enabled))
-                ||
-                (JSON.stringify(this.categories.user_channels.enabled) !== JSON.stringify(this.originalCategories.user_channels.enabled))
-            ) {
+            if (result?.requires_restart) {
                 console.log("restarting server..");
                 this.originalCategories = JSON.parse(JSON.stringify(this.categories));
                 this.changedModuleSettings.clear();
@@ -134,9 +128,7 @@ SETTINGS_STORE = {
             }
 
             // Reconnect API if API settings changed
-            else if (
-                (JSON.stringify(this.categories.api) !== JSON.stringify(this.originalCategories.api))
-            ) {
+            else if (result?.requires_reconnect) {
                 try {
                     console.log("reconnecting API");
                     await simpleApiPost('/api/reconnect', {});

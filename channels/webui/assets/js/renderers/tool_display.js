@@ -53,11 +53,14 @@ function toolCallResultSummary(tool, cacheKey) {
 
 // parsed (possibly PARTIAL, mid-stream) arguments for a claimed tool
 // call, for use inside the view templates. {} until anything parses.
+// -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+// arguments are parsed backend-side now (core/turns.py stamps a
+// monotonic args_parsed object onto every tool call, in history and
+// while streaming); the frontend's partial-JSON parser is gone.
+// cacheKey is kept in the signature so view call-sites don't churn.
 function toolArgs(tool, cacheKey) {
-    try {
-        const a = partialJsonParse(tool.function?.arguments ?? '{}', cacheKey + ':args');
-        if (a !== null && typeof a === 'object') return a;
-    } catch { /* no parsable args yet */ }
+    const a = tool?.args_parsed;
+    if (a !== null && typeof a === 'object') return a;
     return {};
 }
 
