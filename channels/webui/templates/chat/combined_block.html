@@ -8,8 +8,17 @@
      auto-collapse once done (mirrors reasoning.html). -->
 <div class="combined-block" :class="{collapsed: collapsed, expanded: !collapsed}"
     {% if combined_stream %}
-     x-data="{ collapsed: $store.stream.state === 'idle', autoCollapsed: false, done: $store.stream.state === 'idle' }"
-     x-effect="const msgs = $store.stream.turn?.messages ?? []; const isLast = msgs[msgs.length - 1] === message._tail; done = $store.stream.state === 'idle' || !isLast; if (done && !autoCollapsed) { autoCollapsed = true; collapsed = true }"
+     x-data="{ collapsed: $store.stream.state === 'idle' || localStorage.getItem('collapseStepsDefault') === 'true', autoCollapsed: false, done: $store.stream.state === 'idle',
+               // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+               // reasoning is live only while the newest stream segment is
+               // this step's reasoning: once content/tools arrive the
+               // header reads Thoughts even though the step is still open
+               get thinkingActive() {
+                   const msgs = $store.stream.turn?.messages ?? [];
+                   const last = msgs[msgs.length - 1];
+                   return !!last && last.step === message.step && last.type === 'reasoning';
+               } }"
+     x-effect="const msgs = $store.stream.turn?.messages ?? []; const hasNewerStep = msgs.some(m => m.step != null && m.step > message.step); done = $store.stream.state === 'idle' || hasNewerStep; if (done && !autoCollapsed) { autoCollapsed = true; if (localStorage.getItem('collapseStepsDefault') !== 'true') collapsed = true }"
     {% else %}
      x-data="{ collapsed: true }"
     {% endif %}>
@@ -24,7 +33,7 @@
         <span class="step-badge" x-text="message.step"
             :class="{ 'step-failed': message.status === 'failed' }"></span>
         <span class="text">
-            <span class="dots" {% if combined_stream %}x-show="!done"{% else %}x-show="false"{% endif %}><span aria-hidden="true">&nbsp;</span><span aria-hidden="true">&nbsp;</span><span aria-hidden="true">&nbsp;</span></span>
+            <span class="dots" {% if combined_stream %}x-show="!done && (message.modules?.length > 0 || thinkingActive)"{% else %}x-show="false"{% endif %}><span aria-hidden="true">&nbsp;</span><span aria-hidden="true">&nbsp;</span><span aria-hidden="true">&nbsp;</span></span>
             <!-- module-grouped tool names straight from step.modules:
                  "Coder: file edit x2 · Memory create" - separators via css -->
             <span class="tool-names" x-show="message.modules?.length > 0">
@@ -43,7 +52,7 @@
                  live reasoning reads Thinking.., finished reads Thoughts -->
             <span class="tool-names" x-show="!message.modules || message.modules.length === 0"
                   {% if combined_stream %}
-                  x-text="message.reasoning_content ? (done ? 'Thoughts' : 'Thinking..') : 'writing'"></span>
+                  x-text="message.reasoning_content ? (thinkingActive ? 'Thinking..' : 'Thoughts') : 'writing'"></span>
                   {% else %}
                   x-text="message.reasoning_content ? 'Thoughts' : 'writing'"></span>
                   {% endif %}

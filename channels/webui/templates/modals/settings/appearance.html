@@ -129,6 +129,17 @@
                 <span class="description">Hide the details of what your AI is doing from you, and instead only show the basics on one line while your AI works. You can still expand the chain by clicking on it.</span>
             </div>
 
+            <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+             Individual agentic steps: start collapsed, stay collapsed. -->
+            <div class="item">
+                <div class="toggle-row">
+                    <label>Collapse steps by default</label>
+                    <button class="toggle" type="button" :class="{ active: collapseStepsDefault }" @click="handleCollapseStepsToggle()">
+                    </button>
+                </div>
+                <span class="description">Start each agentic step collapsed instead of expanded, and keep it that way unless you expand it yourself. The step header still shows what the AI is doing while it works.</span>
+            </div>
+
             <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
              Tool call cards: collapsed while streaming, details on expand. -->
             <div class="item">

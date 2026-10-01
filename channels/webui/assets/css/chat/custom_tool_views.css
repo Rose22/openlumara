@@ -12,7 +12,7 @@
     .display-footer {
         margin-top: 6px;
         font-size: 0.78rem;
-        color: var(--text-muted);
+        color: var(--text-secondary);
         opacity: 0.8;
         font-family: var(--code-font);
         white-space: nowrap;
@@ -113,7 +113,7 @@
 
         .search-url {
             font-size: 0.72rem;
-            color: var(--text-muted);
+            color: var(--text-secondary);
             opacity: 0.75;
             white-space: nowrap;
             overflow: hidden;
@@ -251,7 +251,7 @@
         .glob-file {
             font-family: var(--code-font);
             font-size: 0.78rem;
-            color: var(--text-muted);
+            color: var(--text-secondary);
             word-break: break-all;
         }
     }
@@ -259,7 +259,7 @@
     /* grep while running: dim one-liner of the streamed args */
     .grep-running {
         font-size: 0.8rem;
-        color: var(--text-muted);
+        color: var(--text-secondary);
         display: flex;
         gap: 6px;
         flex-wrap: wrap;
@@ -290,7 +290,7 @@
             padding: 4px 12px;
             border: 1px solid var(--border-color);
             border-radius: var(--radius-full, 999px);
-            color: var(--text-muted);
+            color: var(--text-secondary);
             font-size: 0.82rem;
             font-weight: 500;
 
@@ -333,7 +333,7 @@
             padding: 1px 7px;
             border-radius: var(--radius-full, 999px);
             border: 1px solid var(--border-color);
-            color: var(--text-muted);
+            color: var(--text-secondary);
             text-transform: lowercase;
         }
 
@@ -349,7 +349,7 @@
     .grep-note {
         margin-top: 6px;
         font-size: 0.75rem;
-        color: var(--text-muted);
+        color: var(--text-secondary);
         opacity: 0.75;
         font-style: italic;
     }

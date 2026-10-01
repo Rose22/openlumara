@@ -33,7 +33,7 @@
         cursor: pointer;
         user-select: none;
         font-size: 0.85rem;
-        color: var(--text-muted);
+        color: var(--text-secondary);
         border-radius: var(--radius-sm);
         padding: 0;
         transition: filter 0.2s ease;
@@ -49,13 +49,13 @@
     .icon {
         width: 1.18em;
         height: 1.18em;
-        color: var(--text-muted);
+        color: var(--text-secondary);
         flex-shrink: 0;
     }
 
     .name {
         font-size: 0.85rem;
-        color: var(--text-muted);
+        color: var(--text-secondary);
         /* was flex:1 - now shrinkable-auto so the arg summary sits right
            after the tool name instead of being pushed to the far edge */
         flex: 0 1 auto;
@@ -74,7 +74,7 @@
        hard single line (ellipsis eats the overflow) */
     .call-args {
         font-size: 0.78rem;
-        color: var(--text-muted);
+        color: var(--text-secondary);
         opacity: 0.8;
         font-family: var(--code-font);
         flex: 0 1 auto;
@@ -87,7 +87,7 @@
     /* result hint on the header (registry summaries; empty by default) */
     .call-result {
         font-size: 0.78rem;
-        color: var(--text-muted);
+        color: var(--text-secondary);
         opacity: 0.8;
         flex: 0 0 auto;
         white-space: nowrap;
