@@ -1,5 +1,6 @@
 import core
 import os
+import time
 
 class Messages:
     def __init__(self, channel, chat):
@@ -62,6 +63,9 @@ class Messages:
             else:
                 # this happens when the user uploads a media file. don't set that as a title, lol
                 pass
+
+        # add current time as a timestamp to the message, so that it can be displayed in channels
+        new_message["_metadata"]["timestamp"] = int(time.time())
 
         # if marked as a ghost message, set the flag. gets handled in self.trim()
         # ghost messages are invisible to the AI
