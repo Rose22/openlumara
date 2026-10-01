@@ -17,12 +17,16 @@ import core
 import os
 import json
 import asyncio
+import calendar
 import datetime
+import re
 import time
+import html as html_lib
 
 # webui stuff
 import fastapi, fastapi.templating, fastapi.staticfiles
 import starlette, starlette.middleware.sessions
+import itsdangerous
 import uvicorn
 import base64
 
@@ -342,6 +346,459 @@ def inject_indexes_into_chat(chat):
     return chat_copy
 
 # -------------------
+# Settings Structure (backend-side)
+# -------------------
+# -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+# ported from the webui frontend's processors/settings_structure.js and
+# settings_flatten.js. the backend now returns a ready-to-render category
+# tree from /api/settings/load and accepts that same (edited) tree on
+# /api/settings/save, flattening it back into raw config server-side.
+# the frontend never merges schemas or reassembles nested config again.
+
+# special keys that render with a bespoke widget instead of a generic field
+SPECIAL_FIELD_TYPES = {
+    "model.name": "model_select",
+    "api.url": "api_url",
+    "api.key": "api_key",
+    "model.reasoning_effort": "reasoning_effort_slider",
+}
+
+MODULE_CATEGORY_KEYS = ("modules", "user_modules", "channels", "user_channels")
+
+
+def format_label(key):
+    if not isinstance(key, str):
+        return key
+    spaced = key.replace("_", " ")
+    return re.sub(r"\b\w", lambda m: m.group(0).upper(), spaced)
+
+
+def is_toggle_list(data):
+    return (
+        isinstance(data, dict)
+        and isinstance(data.get("enabled"), list)
+        and isinstance(data.get("disabled"), list)
+    )
+
+
+def detect_field_type(value, key=""):
+    if key in SPECIAL_FIELD_TYPES:
+        return SPECIAL_FIELD_TYPES[key]
+    if value is None:
+        return "text"
+    elif isinstance(value, bool):
+        return "boolean"
+    elif isinstance(value, (int, float)) and not key.lower().endswith("id"):
+        return "number"
+    elif isinstance(value, list):
+        return "array"
+    elif isinstance(value, str):
+        if value.startswith("http://") or value.startswith("https://"):
+            return "url"
+        elif "\n" in value:
+            return "textarea"
+        else:
+            return "text"
+    return "text"
+
+
+def build_field_settings(obj, schema, prefix=""):
+    if not obj or not isinstance(obj, dict):
+        return {}
+
+    settings = {}
+
+    for key, value in obj.items():
+        full_key = f"{prefix}.{key}" if prefix else key
+        field_schema = schema.get(key) or {}
+        if not isinstance(field_schema, dict):
+            field_schema = {}
+
+        has_schema_definition = any(
+            k in field_schema for k in ("type", "default", "description")
+        )
+
+        if has_schema_definition:
+            # schema defines the field - use schema for metadata, value for current value
+            schema_value = field_schema["default"] if "default" in field_schema else value
+            raw_type = field_schema.get("type")
+            if raw_type == "long_text":
+                field_type = "textarea"
+            elif raw_type is not None:
+                field_type = raw_type
+            else:
+                field_type = detect_field_type(schema_value, full_key)
+
+            settings[key] = {
+                "title": format_label(key),
+                "type": field_type,
+                "description": field_schema.get("description") or None,
+                "unsafe": field_schema.get("unsafe", False),
+                "value": value,
+                "options": field_schema.get("options") or None,
+                "min": field_schema.get("min"),
+                "max": field_schema.get("max"),
+                "step": field_schema.get("step"),
+                "depends": field_schema.get("depends") or None,
+            }
+        elif isinstance(value, dict) and not is_toggle_list(value):
+            # nested object without schema definition - recurse
+            settings[key] = {
+                "type": "object",
+                "title": format_label(key),
+                "description": field_schema.get("description") or None,
+                "depends": field_schema.get("depends") or None,
+                "settings": build_field_settings(value, field_schema, full_key),
+            }
+        elif is_toggle_list(value):
+            settings[key] = {
+                "type": "toggle_list",
+                "title": format_label(key),
+                "description": field_schema.get("description") or None,
+                "value": value,
+            }
+        elif isinstance(value, list):
+            settings[key] = {
+                "type": "array",
+                "title": format_label(key),
+                "description": field_schema.get("description") or None,
+                "value": value,
+            }
+        else:
+            # primitive value without schema definition
+            settings[key] = {
+                "title": format_label(key),
+                "type": detect_field_type(value, full_key),
+                "description": field_schema.get("description") or None,
+                "unsafe": field_schema.get("unsafe", False),
+                "depends": field_schema.get("depends") or None,
+                "value": value,
+                "options": field_schema.get("options") or None,
+                "min": field_schema.get("min"),
+                "max": field_schema.get("max"),
+                "step": field_schema.get("step"),
+            }
+
+    return settings
+
+
+def build_settings_structure(original_data, module_info):
+    categories = {}
+    order = 0
+
+    categories["appearance"] = {
+        "title": "Appearance",
+        "description": "Theme and interface customization",
+        "order": order,
+        "isThemeCategory": True,
+    }
+    order += 1
+    categories["audio"] = {
+        "title": "Audio",
+        "description": "Audio settings",
+        "order": order,
+        "isThemeCategory": True,
+    }
+    categories["system_prompt"] = {
+        "title": "System Prompt",
+        "description": "See the current system prompt",
+        "order": 100,
+        "isThemeCategory": True,
+    }
+    categories["system_logs"] = {
+        "title": "System Logs",
+        "description": "Peek into the great unknown",
+        "order": 999,
+        "isThemeCategory": True,
+    }
+
+    for top_key, top_value in original_data.items():
+        if top_key.lower() in ("theme", "theme_mode"):
+            continue
+
+        category = {
+            "title": format_label(top_key),
+            "description": f"Configure {format_label(top_key).lower()}",
+            "order": order,
+        }
+        order += 1
+
+        if top_key in MODULE_CATEGORY_KEYS:
+            category["isModuleCategory"] = True
+            category["enabled"] = (top_value or {}).get("enabled") or []
+            category["disabled"] = (top_value or {}).get("disabled") or []
+
+            descriptions = {}
+            unsafe_modules = {}
+            for item_name, info in module_info.items():
+                if info.get("description"):
+                    descriptions[item_name] = info["description"]
+                if info.get("unsafe"):
+                    unsafe_modules[item_name] = True
+            category["descriptions"] = descriptions
+            category["unsafeModules"] = unsafe_modules
+
+            category["settings"] = {}
+            top_settings = (top_value or {}).get("settings")
+            if isinstance(top_settings, dict):
+                for item_name, item_settings in top_settings.items():
+                    if not item_settings:
+                        continue
+                    item_info = module_info.get(item_name) or {}
+                    item_schema = item_info.get("settings_schema") or {}
+                    category["settings"][item_name] = {
+                        "title": format_label(item_name),
+                        "description": item_info.get("description") or "",
+                        "unsafe": item_info.get("unsafe", False),
+                        "value": build_field_settings(item_settings, item_schema, item_name),
+                    }
+        else:
+            # core config sections (api, model, core, etc.), schema from module_info
+            section_schema = (module_info.get(top_key) or {}).get("settings_schema") or {}
+            if isinstance(top_value, dict) and top_value:
+                category["settings"] = build_field_settings(top_value, section_schema, top_key)
+            else:
+                category["settings"] = {}
+
+        categories[top_key] = category
+
+    return categories
+
+
+def flatten_field_settings(settings):
+    """reduces a (possibly edited) field tree back to plain key -> value config"""
+    result = {}
+    for key, setting in settings.items():
+        if not isinstance(setting, dict):
+            continue
+        if setting.get("type") == "object" and setting.get("settings"):
+            result[key] = flatten_field_settings(setting["settings"])
+        else:
+            result[key] = setting.get("value")
+    return result
+
+
+def flatten_categories(categories):
+    """inverse of build_settings_structure: category tree -> raw config dict"""
+    result = {}
+
+    for cat_key, category in categories.items():
+        if not isinstance(category, dict):
+            continue
+
+        has_settings = bool(category.get("settings"))
+        has_enabled = "enabled" in category
+        has_disabled = "disabled" in category
+        if not has_settings and not has_enabled and not has_disabled:
+            continue
+
+        if category.get("isModuleCategory"):
+            entry = {}
+            if has_enabled:
+                entry["enabled"] = category["enabled"]
+            if has_disabled:
+                entry["disabled"] = category["disabled"]
+            if has_settings:
+                module_settings = {}
+                for name, module in category["settings"].items():
+                    if isinstance(module, dict) and module.get("value"):
+                        module_settings[name] = flatten_field_settings(module["value"])
+                entry["settings"] = module_settings
+            result[cat_key] = entry
+        else:
+            result[cat_key] = flatten_field_settings(category.get("settings") or {})
+
+    return result
+
+
+def get_module_info():
+    """schemas (descriptions, settings schemas, etc) for all modules and core config sections"""
+    module_info = {}
+
+    for module_name, module_data in core.config.get_module_structure().items():
+        metadata = module_data.get("metadata", {})
+        module_info[module_name] = {
+            "description": metadata.get("doc", ""),
+            "unsafe": metadata.get("unsafe", False),
+            "settings_schema": module_data.get("settings", {}),
+        }
+
+    for section_name, section_data in core.config.get_core_settings_structure().items():
+        module_info[section_name] = {
+            "description": section_data.get("metadata", {}).get("doc", ""),
+            "unsafe": section_data.get("metadata", {}).get("unsafe", False),
+            "settings_schema": section_data.get("settings", {}),
+        }
+
+    return module_info
+
+# -------------------
+# Chat List Projection & Search Highlighting
+# -------------------
+# -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+# list endpoints only ever render a handful of chat fields; sending whole
+# chat dicts (with descriptions, prompt data, etc) was pure payload waste.
+CHAT_LIST_FIELDS = (
+    "id", "title", "category", "tags", "created", "updated",
+    "messages_found", "message_snippets",
+)
+
+
+def project_chat(chat, extra_fields=()):
+    projected = {key: chat.get(key) for key in CHAT_LIST_FIELDS if key in chat}
+    for key in extra_fields:
+        if key in chat:
+            projected[key] = chat[key]
+    return projected
+
+
+def highlight_query(text, query):
+    """html-escaped text with case-insensitive query matches wrapped in <strong>"""
+    if text is None:
+        return None
+    escaped_text = html_lib.escape(str(text), quote=True)
+    if not query:
+        return escaped_text
+    # escape both sides identically before regexing, so queries containing
+    # html-ish characters still match the escaped text
+    pattern = re.escape(html_lib.escape(str(query), quote=True))
+    return re.sub(
+        f"({pattern})",
+        lambda m: '<strong class="search-highlight">' + m.group(1) + "</strong>",
+        escaped_text,
+        flags=re.IGNORECASE,
+    )
+
+
+def day_label_from_key(key, tz_offset_min=0):
+    """human label for a day/week/month group key (see _group_key)"""
+    if not key:
+        return "Undated"
+    if key.startswith("last-week"):
+        return "Last Week"
+
+    parts = key.split("-")
+    try:
+        year = int(parts[0])
+        month = int(parts[1])
+        day = int(parts[2]) if len(parts) > 2 else 1
+        date = datetime.date(year, month, day)
+    except (ValueError, IndexError):
+        return "Undated"
+
+    # month group keys are 'YYYY-MM': always show the year, month groups
+    # can span years and 'September' alone gets ambiguous
+    if len(parts) == 2:
+        return f"{calendar.month_name[month]} {year}"
+
+    today = (datetime.datetime.utcnow() - datetime.timedelta(minutes=tz_offset_min)).date()
+    diff_days = (today - date).days
+
+    if diff_days == 0:
+        return "Today"
+    if diff_days == 1:
+        return "Yesterday"
+    if 1 < diff_days < 7:
+        return date.strftime("%A")
+    if date.year == today.year:
+        return f"{calendar.month_name[month]} {day}"
+    return f"{calendar.month_name[month]} {day}, {year}"
+
+# -------------------
+# Shared Chat Operations
+# -------------------
+# -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+# one implementation per chat mutation, used by BOTH the REST routes and
+# the websocket commands, so the two transports can never drift apart.
+# every chat_switched broadcast uses 'id' for the chat id (that's what
+# the frontend listens for - the old ws handlers sent 'chat_id', which
+# silently fell through to a broken loadChat(undefined) round-trip).
+
+
+async def op_chat_switch(channel, chat_id):
+    """loads a chat, cancels any stream, notifies all clients"""
+    ws_mgr = channel.websocket_manager
+    if ws_mgr.active_stream_task and not ws_mgr.active_stream_task.done():
+        ws_mgr.active_stream_task.cancel()
+
+    try:
+        success = await channel.context.chat.load(chat_id)
+    except Exception as e:
+        return False
+
+    if success:
+        ws_mgr.active_chat_id = chat_id
+        await ws_mgr.broadcast({"type": "chat_switched", "id": chat_id})
+
+    return True
+
+
+async def op_chat_new(channel, category="general"):
+    """creates a chat, switches to it, notifies all clients"""
+    ws_mgr = channel.websocket_manager
+    if ws_mgr.active_stream_task and not ws_mgr.active_stream_task.done():
+        ws_mgr.active_stream_task.cancel()
+
+    new_id = await channel.context.chat.new(category=category)
+    ws_mgr.active_chat_id = new_id
+
+    await ws_mgr.broadcast({"type": "chat_switched", "id": new_id})
+    return new_id
+
+
+async def op_chat_delete(channel, chat_id):
+    """deletes a chat and points all clients at whatever is loaded now"""
+    await channel.context.chat.delete(chat_id)
+    await channel.websocket_manager.broadcast({
+        "type": "chat_switched",
+        "id": channel.context.chat.get("id"),
+    })
+
+
+def session_authenticated(channel, session_cookie):
+    """validates a raw session cookie the same way SessionMiddleware would.
+    websockets bypass the http middleware stack, so they must verify the
+    cookie themselves (existence alone proved nothing - a garbage cookie
+    sailed through)."""
+    if not session_cookie:
+        return False
+
+    try:
+        serializer = itsdangerous.URLSafeTimedSerializer(
+            channel.config.get("session_secret", "openlumara-default-session-secret-change-me"),
+            salt="session"
+        )
+        data = serializer.loads(session_cookie, max_age=int(channel.config.get("login_lifetime", 30)) * 86400)
+    except Exception:
+        return False
+
+    return bool(isinstance(data, dict) and data.get("authenticated"))
+
+
+async def op_chat_rename(channel, title, chat_id=None):
+    """renames a chat (current chat when no id given), saves, notifies"""
+    chat_store = channel.context.chat
+
+    if chat_id:
+        index = chat_store._find_index(chat_id)
+        if index is None:
+            return False
+        await chat_store.set("title", title, index=index)
+        tags = chat_store.data[index].get("tags") or []
+    else:
+        await chat_store.set("title", title)
+        tags = chat_store.get("tags") or []
+
+    chat_store.data.save()
+
+    await channel.websocket_manager.broadcast({
+        "type": "chat_metadata_updated",
+        "title": title,
+        "tags": tags,
+    })
+    return True
+
+# -------------------
 # FastAPI creator (contains routes and so on)
 # -------------------
 def api_result(obj = None, success: bool = True):
@@ -482,20 +939,9 @@ async def create_fastapi(channel):
     @app.get("/api/chat/load/{chat_id}")
     async def chat_load(chat_id: str, request: fastapi.Request):
         """Loads a specific chat by its id"""
-        try:
-            success = await channel.context.chat.load(chat_id)
-        except Exception as e:
-            return api_result(f"error while loading chat: {core.detail_error(e)}", success=False)
-
+        success = await op_chat_switch(channel, chat_id)
         if not success:
-            # that likely means this is already the loaded chat
-            chat = dict(channel.context.chat.get())
-            chat["turn_history"] = await channel.group_history()
-            chat["token_usage"] = await channel.context.get_total_tokens()
-            return api_result(chat, success=True)
-
-        # broadcast the switch to any connected clients
-        await channel.websocket_manager.broadcast({"type": "chat_switched", "id": chat_id})
+            return api_result("error while loading chat", success=False)
 
         chat = dict(channel.context.chat.get())
         chat["turn_history"] = await channel.group_history()
@@ -533,7 +979,10 @@ async def create_fastapi(channel):
         paginated = all_chats[offset:offset + limit]
         has_more = offset + limit < len(all_chats)
 
-        return api_result({"messages": paginated, "has_more": has_more}, success=True)
+        return api_result({
+            "messages": [project_chat(c) for c in paginated],
+            "has_more": has_more
+        }, success=True)
 
     # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
     # day-grouped chat listing for the sidebar's collapsible date
@@ -620,7 +1069,13 @@ async def create_fastapi(channel):
             if day > newest.get(key, ""):
                 newest[key] = day
 
-        groups = [{"key": k, "count": c} for k, c in counts.items()]
+        # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+        # labels are computed server-side now: the frontend used to mirror
+        # the grouping/labeling rules in format.js, kept in sync by prayer
+        groups = [
+            {"key": k, "count": c, "label": day_label_from_key(k, tz_offset)}
+            for k, c in counts.items()
+        ]
         groups.sort(key=lambda entry: newest.get(entry["key"], ""), reverse=True)
 
         return api_result(groups, success=True)
@@ -645,7 +1100,11 @@ async def create_fastapi(channel):
         paginated = day_chats[offset:offset + limit]
         has_more = offset + limit < len(day_chats)
 
-        return api_result({"messages": paginated, "has_more": has_more, "count": len(day_chats)}, success=True)
+        return api_result({
+            "messages": [project_chat(c) for c in paginated],
+            "has_more": has_more,
+            "count": len(day_chats)
+        }, success=True)
 
     @app.get("/api/chats/categories")
     async def get_chat_categories():
@@ -702,13 +1161,13 @@ async def create_fastapi(channel):
         query = data.get("query", "").strip()
         search_in_content = data.get("search_in_content", True)
         category = data.get("category")
+        # the browser's tz offset (minutes behind UTC), used to bucket
+        # results into the same local day groups as the sidebar
+        tz_offset = int(data.get("tz_offset") or 0)
 
         if not query:
             return api_result([])
 
-        # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16) (rosie-approved task: sidebar search)
-        # search_in_content was accepted but never forwarded to the search;
-        # title-only searches no longer need to read every history file.
         results = await channel.context.chat.search(query, search_in_content=search_in_content)
 
         # filter by category if provided
@@ -717,13 +1176,32 @@ async def create_fastapi(channel):
         elif category == 'general':
             results = [r for r in results if not r.get('category') or r.get('category') == 'general']
 
-        # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-26)
         # respect the sidebar's active tag filter (AND semantics)
         tags = data.get("tags") or []
         if tags:
             results = [r for r in results if all(t in (r.get("tags") or []) for t in tags)]
 
-        return api_result(results)
+        # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+        # pure updated-descending sort (the core's title-match priority
+        # would scramble the sidebar's day groups). each result is slimmed
+        # down and gains pre-highlighted title/snippets plus its day group
+        # key + label, so the frontend renders without deriving anything.
+        results.sort(key=lambda r: r.get("updated") or "", reverse=True)
+
+        projected = []
+        for chat in results:
+            group = _group_key(chat.get("updated", ""), tz_offset)
+            entry = project_chat(chat, extra_fields=("title_match",))
+            entry["group_key"] = group or "undated"
+            entry["group_label"] = day_label_from_key(group, tz_offset)
+            entry["title_highlighted"] = highlight_query(chat.get("title") or "", query)
+            entry["snippets_highlighted"] = [
+                highlight_query(snippet, query)
+                for snippet in (chat.get("message_snippets") or [])
+            ]
+            projected.append(entry)
+
+        return api_result(projected)
 
     @app.get("/api/chat/prompt")
     async def get_prompt():
@@ -737,7 +1215,6 @@ async def create_fastapi(channel):
     @app.post("/api/chat/new")
     async def chat_new(request: fastapi.Request):
         """Creates a new chat"""
-        # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
         # optional json body with a category, so the webui can create
         # the chat inside the currently selected category.
         category = "general"
@@ -747,7 +1224,8 @@ async def create_fastapi(channel):
         except Exception:
             pass
 
-        return api_result(await channel.context.chat.new(category=category))
+        new_id = await op_chat_new(channel, category=category)
+        return api_result({"id": new_id})
 
     @app.post("/api/chat/rename/{chat_id}")
     async def chat_rename(chat_id: str, request: fastapi.Request):
@@ -757,15 +1235,11 @@ async def create_fastapi(channel):
             new_title = data.get('title', '').strip()
             if not new_title:
                 return api_result("Title cannot be empty", success=False)
-            
-            # Find the index for this chat ID
-            index = channel.context.chat._find_index(chat_id)
-            if index is None:
+
+            renamed = await op_chat_rename(channel, new_title, chat_id=chat_id)
+            if not renamed:
                 return api_result("Chat not found", success=False)
-            
-            # Direct update without loading the chat
-            await channel.context.chat.set("title", new_title, index=index)
-            
+
             return api_result(success=True)
         except Exception as e:
             return api_result(str(e), success=False)
@@ -773,7 +1247,7 @@ async def create_fastapi(channel):
     @app.post("/api/chat/delete/{chat_id}")
     async def chat_delete(chat_id: str):
         """Deletes a chat by its ID"""
-        await channel.context.chat.delete(chat_id)
+        await op_chat_delete(channel, chat_id)
         return api_result(success=True)
 
     # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
@@ -802,39 +1276,20 @@ async def create_fastapi(channel):
 
     # --- Settings
     # -- GET
+    # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+    # the config + module schemas are merged into a ready-to-render
+    # category tree here, instead of shipping both to the frontend and
+    # letting processors/settings_structure.js stitch them together.
+    # /api/settings/get_module_info is gone along with that processor.
     @app.get("/api/settings/load")
     async def settings_load():
-        """Returns the core's config object as a json object"""
-        return api_result(core.config.config)
+        """Returns the complete, render-ready settings structure (categories, field types, schemas and current values merged)"""
+        structure = build_settings_structure(core.config.config, get_module_info())
 
-    @app.get("/api/settings/get_module_info")
-    async def get_module_info():
-        """Returns the schemas (descriptions, settings schemas, etc) for all modules and core config sections"""
-        module_info = {}
-        
-        # Add module/channel settings schemas
-        for module_name, module_data in core.config.get_module_structure().items():
-            metadata = module_data.get("metadata", {})
-            settings_schema = module_data.get("settings", {})
-
-            if module_name not in module_info.keys():
-                module_info[module_name] = {
-                    "description": metadata.get("doc", ""),
-                    "unsafe": metadata.get("unsafe", False),
-                    "settings_schema": settings_schema
-                }
-        
-        # Add core config sections settings schemas
-        core_structure = core.config.get_core_settings_structure()
-        for section_name, section_data in core_structure.items():
-            if section_name not in module_info.keys():
-                module_info[section_name] = {
-                    "description": section_data.get("metadata", {}).get("doc", ""),
-                    "unsafe": section_data.get("metadata", {}).get("unsafe", False),
-                    "settings_schema": section_data.get("settings", {})
-                }
-
-        return api_result(module_info)
+        return api_result({
+            "categories": structure,
+            "show_unsafe_settings": bool(channel.config.get("show_unsafe_settings"))
+        })
 
     @app.get("/api/check_connection")
     async def check_connection():
@@ -856,13 +1311,16 @@ async def create_fastapi(channel):
     # -- POST
     @app.post("/api/settings/save")
     async def settings_save(request: fastapi.Request):
-        """Saves config data to the backend. Accepts a structure that reflects core.config.config exactly (check /api/settings/load to see that structure"""
+        """Saves the (possibly edited) settings structure back to the backend. Accepts exactly what /api/settings/load returned, flattens it server-side and writes it to the config"""
         data = await request.json()
 
         changed_modules = list(data.get("changed_modules", []))
-        data.pop("changed_modules")
-        
-        result = core.config.config.load(data=data)
+
+        # the frontend sends the category tree it got from settings/load,
+        # with edited values; rebuild the raw config dict from it
+        flattened = flatten_categories(data.get("categories", {}))
+
+        result = core.config.config.load(data=flattened)
         core.config.config.save()
 
         if not result:
@@ -874,7 +1332,10 @@ async def create_fastapi(channel):
                 try:
                     await channel.manager.reload_module(module_name)
                 except Exception as e:
-                    channel.log(self.name, f"Error reloading module {module_name}: {core.detail_error(e)}")
+                    # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+                    # bugfix: referenced `self` outside of a class context,
+                    # which turned any module reload error into a NameError
+                    channel.log(channel.name, f"Error reloading module {module_name}: {core.detail_error(e)}")
 
         return api_result(success=True)
     
@@ -997,18 +1458,22 @@ async def create_fastapi(channel):
 
     @app.get('/sw.js')
     async def service_worker():
+        # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+        # bugfix: scanned channels/webui/static/, which hasn't existed
+        # since the rewrite, so the precache list was always empty.
+        # assets live in assets/ now (and keep their /assets/ url prefix).
         base_path = core.get_path("channels/webui")
-        static_base = os.path.join(base_path, 'static')
+        assets_base = os.path.join(base_path, 'assets')
 
         files_to_cache = []
         for subdir in ['js', 'css']:
-            dir_path = os.path.join(static_base, subdir)
+            dir_path = os.path.join(assets_base, subdir)
             if os.path.isdir(dir_path):
                 for root, _, files in os.walk(dir_path):
                     for filename in files:
                         full_path = os.path.join(root, filename)
-                        rel_path = os.path.relpath(full_path, static_base)
-                        files_to_cache.append('/static/' + rel_path)
+                        rel_path = os.path.relpath(full_path, assets_base)
+                        files_to_cache.append('/assets/' + rel_path.replace(os.sep, "/"))
         files_to_cache.sort()
 
         sw_template_path = os.path.join(base_path, 'sw.js')
@@ -1061,7 +1526,7 @@ async def create_fastapi(channel):
         # WebSocket auth check
         if channel.config.get("require_login", False):
             session_cookie = websocket.cookies.get("session")
-            if not session_cookie:
+            if not session_authenticated(channel, session_cookie):
                 # check if rate limited
                 client_ip = websocket.client.host if websocket.client else "unknown"
                 now = time.time()
@@ -1097,61 +1562,34 @@ async def create_fastapi(channel):
                             await ws_mgr.broadcast({
                                 "type": "sync"
                             })
+                        # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+                        # these handlers now call the same shared ops as the
+                        # REST routes (rename persists again, broadcasts use
+                        # 'id' like the frontend expects)
                         case "rename":
                             new_title = data.get("title")
                             if channel and new_title:
-                                await channel.context.chat.set("title", new_title)
-                                await ws_mgr.broadcast({
-                                    "type": "chat_metadata_updated",
-                                    "title": new_title,
-                                    "tags": channel.context.chat.get("tags") or []
-                                })
+                                await op_chat_rename(channel, new_title)
                         case "switch_chat":
                             new_chat_id = data.get("chat_id")
                             if new_chat_id:
-                                if ws_mgr.active_stream_task and not ws_mgr.active_stream_task.done():
-                                    ws_mgr.active_stream_task.cancel()
-
-
-                                try:
-                                    await channel.context.chat.load(new_chat_id)
-                                except Exception as e:
-                                    await ws_mgr.broadcast({"type": "error", "content": f"Failed to load chat: {e}"})
-
-                                ws_mgr.active_chat_id = new_chat_id
-
-                                await ws_mgr.broadcast({
-                                    "type": "chat_switched",
-                                    "chat_id": new_chat_id,
-                                })
+                                success = await op_chat_switch(channel, new_chat_id)
+                                if not success:
+                                    await ws_mgr.broadcast({"type": "error", "content": "Failed to load chat"})
                         case "new_chat":
-                            if ws_mgr.active_stream_task and not ws_mgr.active_stream_task.done():
-                                ws_mgr.active_stream_task.cancel()
-
-                            new_id = await channel.context.chat.new()
-                            ws_mgr.active_chat_id = new_id
-
-                            await ws_mgr.broadcast({
-                                "type": "chat_switched",
-                                "chat_id": new_id,
-                                "buffer": []
-                            })
+                            await op_chat_new(channel)
                         case "chat_delete":
                             chat_id = data.get("chat_id")
                             if not chat_id:
                                 return False
 
-                            await channel.context.chat.delete(chat_id)
-                            await ws_mgr.broadcast({
-                                "type": "chat_switched",
-                                "chat_id": channel.context.chat.get("id"),
-                                "buffer": []
-                            })
+                            await op_chat_delete(channel, chat_id)
                         case "user_message":
                             text = data.get("content")
                             files_data = data.get("files")
 
-                            if not text and not files:
+                            # bugfix: referenced undefined `files` here
+                            if not text and not files_data:
                                 break
 
                             files_dict = None

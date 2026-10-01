@@ -7,8 +7,8 @@
  *    objects shaped exactly like the backend history steps
  *  - streamTurnSplit(): the final-content-detection heuristic the backend
  *    can't know mid-stream
- *  - toolCallArgsSummary(): the one-line arg hint (pending backend move)
- * failed flags and collapsed-header labels are stamped by the backend now.
+ * failed flags, collapsed-header labels and the one-line tool arg hint
+ * (now tool.summary, stamped in core/turns.py) are all backend-side.
  */
 
 // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
@@ -44,51 +44,6 @@ function streamSteps(chain) {
         s._tail = m;
     }
     return Array.from(steps.values());
-}
-
-// -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
-// one-line arg summary for a COMPLETED tool call header: the single most
-// informative argument, value only (no key), eg. "Coder: file edit
-// (toolcalls.css)". paths keep their TAIL (the interesting end).
-const ARG_PRIORITY = [
-    'path', 'file_path', 'filepath', 'file', 'filename', 'url',
-    'query', 'pattern', 'regex_pattern', 'sub_path', 'subfolder',
-    'folder', 'id', 'name', 'content', 'text'
-];
-
-// keep the end of path-ish strings, the end of everything else
-function truncateArg(s) {
-    if (s.length <= 70) return s;
-    if (s.includes('/') || s.includes('\\')) return '..' + s.slice(-68);
-    return s.slice(0, 69).trimEnd() + '..';
-}
-
-function argToString(v) {
-    if (v !== null && typeof v === 'object') return JSON.stringify(v);
-    if (typeof v === 'string') return v;
-    return String(v);
-}
-
-function toolCallArgsSummary(tool) {
-    let args;
-    try {
-        args = JSON.parse(tool.function?.arguments ?? '{}');
-    } catch {
-        return '';
-    }
-    if (!args || typeof args !== 'object' || Array.isArray(args)) return '';
-    const entries = Object.entries(args);
-    if (entries.length === 0) return '';
-    // highest-priority known key wins; otherwise the first string value;
-    // otherwise the first value, period
-    let chosen = null;
-    for (const pk of ARG_PRIORITY) {
-        const hit = entries.find(([k]) => k === pk);
-        if (hit) { chosen = hit; break; }
-    }
-    if (!chosen) chosen = entries.find(([, v]) => typeof v === 'string');
-    if (!chosen) chosen = entries[0];
-    return '(' + truncateArg(argToString(chosen[1])) + ')';
 }
 
 // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)

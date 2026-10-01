@@ -174,8 +174,8 @@
         </template>
 
         <!--
-            special fields can be defined in the detectFieldType() function
-            over in js/processors/settings_structure.js
+            special fields are assigned by the detect_field_type() function
+            in channels/webui.py (SPECIAL_FIELD_TYPES)
         -->
         <!-- API url field -->
         <template x-if="setting.type === 'api_url'">

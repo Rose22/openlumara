@@ -286,9 +286,9 @@
                                 </div>
                             </div>
 
-                            <!-- 3-line content snippet (only in content-search mode) -->
-                            <template x-if="$store.chat.searching && $store.chat.searchInContent && $store.chat.sidebarSnippet(chat)">
-                                <div class="snippet snippet-3" x-html="$store.chat.sidebarSnippet(chat)"></div>
+                            <!-- content snippet (search results only, pre-highlighted by the backend) -->
+                            <template x-if="$store.chat.searching && $store.chat.searchInContent && (chat.snippets_highlighted ?? []).length > 0">
+                                <div class="snippet snippet-3" x-html="chat.snippets_highlighted[0]"></div>
                             </template>
                         </div>
                     </div>

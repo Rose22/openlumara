@@ -60,7 +60,7 @@
                  single-call step: arg + result summaries ride along in the
                  step header (same helpers + cacheKey the tool card uses) -->
             <span class="step-args" x-show="message.tool_calls?.length === 1"
-                  x-text="message.tool_calls?.[0] ? toolCallArgsSummary(message.tool_calls[0]) : ''"></span>
+                  x-text="message.tool_calls?.[0]?.summary ?? ''"></span>
             <span class="step-summary" x-show="message.tool_calls?.length === 1 && message.tool_calls[0].response"
                   x-text="message.tool_calls?.[0]?.response ? toolCallResultSummary(message.tool_calls[0], message.tool_calls[0].id ?? (message.tool_call_id + ':0')) : ''"></span>
         </span>

@@ -4,7 +4,6 @@ SETTINGS_STORE = {
     apiError: false,
     
     // --- Settings Data ---
-    settings: {},
     originalCategories: {},
     changedModuleSettings: new Set(),
     categories: {},
@@ -18,7 +17,6 @@ SETTINGS_STORE = {
     // --- Model Cache ---
     cachedModels: null,
     modelsLoadError: null,
-    moduleInfoCache: {},
 
     systemPrompt: '',
     
@@ -53,20 +51,17 @@ SETTINGS_STORE = {
         this.error = null;
 
         try {
-            const rawSettings = await simpleApiFetch('/api/settings/load');
-            this.settings = rawSettings;
-            
-            try {
-                this.moduleInfoCache = await simpleApiFetch('/api/settings/get_module_info');
-            } catch (infoErr) {
-                console.warn('Failed to fetch module info:', infoErr);
-            }
+            // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+            // the backend now returns the fully merged, render-ready
+            // category tree (schemas + values), so the client-side
+            // structure builder and the module-info round-trip are gone.
+            const payload = await simpleApiFetch('/api/settings/load');
 
-            this.categories = buildSettingsStructure(rawSettings, this.moduleInfoCache);
+            this.categories = payload.categories;
             this.originalCategories = JSON.parse(JSON.stringify(this.categories));
             this.changedModuleSettings.clear();
 
-            this.showUnsafe = this.settings.channels.settings.webui.show_unsafe_settings;
+            this.showUnsafe = payload.show_unsafe_settings;
 
             this.systemPrompt = await simpleApiFetch("/api/chat/prompt");
 
@@ -112,10 +107,13 @@ SETTINGS_STORE = {
         console.log("saving settings to server..");
 
         try {
-            const backendData = flattenForBackend(this.categories);
-            backendData.changed_modules = Array.from(this.changedModuleSettings);
-
-            await simpleApiPost('/api/settings/save', backendData);
+            // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+            // send the (edited) category tree straight through; the
+            // backend flattens it back into raw config itself now.
+            await simpleApiPost('/api/settings/save', {
+                categories: JSON.parse(JSON.stringify(this.categories)),
+                changed_modules: Array.from(this.changedModuleSettings)
+            });
 
             // restart server if enabled modules/channels changed
             if (
@@ -128,7 +126,6 @@ SETTINGS_STORE = {
                 (JSON.stringify(this.categories.user_channels.enabled) !== JSON.stringify(this.originalCategories.user_channels.enabled))
             ) {
                 console.log("restarting server..");
-                this.settings = backendData;
                 this.originalCategories = JSON.parse(JSON.stringify(this.categories));
                 this.changedModuleSettings.clear();
 
@@ -150,7 +147,6 @@ SETTINGS_STORE = {
                 }
             }
 
-            this.settings = backendData;
             this.originalCategories = JSON.parse(JSON.stringify(this.categories));
 
             // re-fetch system prompt

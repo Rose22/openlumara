@@ -32,14 +32,6 @@ function globalSearch() {
             clearTimeout(this.focusTimer);
         },
 
-        highlightQuery(text, query) {
-            if (!query || !text) return text;
-            const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const text_escaped = escapeHtml(text);
-            const regex = new RegExp(`(${escaped})`, 'gi');
-            return text_escaped.replace(regex, '<strong class="search-highlight">$1</strong>');
-        },
-
         async search() {
             clearTimeout(this.debounceTimer);
             const q = this.query.trim();
@@ -80,7 +72,10 @@ function globalSearch() {
         async enterResult() {
             if (this.results.length === 0) return;
             const idx = this.activeIndex >= 0 ? this.activeIndex : 0;
-            await this.selectResult(this.results[idx]?.chat?.id);
+            // bugfix: results are chat objects (id at top level), not
+            // wrappers - the .chat.id lookup was always undefined, so
+            // hitting Enter on a selected result never opened anything
+            await this.selectResult(this.results[idx]?.id);
         }
     }
 }

@@ -83,13 +83,17 @@
                                 tabindex="0"
                                 role="button"
                             >
+                                <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+                                     titles/snippets arrive pre-highlighted from the
+                                     backend (title_highlighted / snippets_highlighted),
+                                     so the client-side highlightQuery helper is gone -->
                                 <div class="global-search-result-header">
-                                    <span class="global-search-result-title" x-html="highlightQuery(result.title, query)"></span>
+                                    <span class="global-search-result-title" x-html="result.title_highlighted ?? ''"></span>
                                     <span class="global-search-result-date" x-text="formatDate(result.updated) || formatDate(result.created)"></span>
                                 </div>
                                 
-                                <template x-if="result.message_snippets">
-                                    <div class="global-search-result-snippet" x-html="highlightQuery(result.message_snippets[0], query)"></div>
+                                <template x-if="(result.snippets_highlighted ?? []).length > 0">
+                                    <div class="global-search-result-snippet" x-html="result.snippets_highlighted[0]"></div>
                                 </template>
                                 
                                 <template x-if="result.tags && result.tags.length > 0">

@@ -364,20 +364,21 @@ CHAT_STORE = {
     },
 
     // the x-for source in sidebar.html: day groups while browsing,
-    // client-side grouped search results while searching
+    // search results bucketed into groups while searching
     displayGroups() {
         if (!this.searching) { return this.dayGroups; }
 
-        // search results arrive newest-first, so first-seen order is
-        // the correct (descending) day order. groupKeyOf mirrors the
-        // backend: past week by day, older by month.
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+        // results arrive newest-first with group_key/group_label already
+        // stamped by the backend (same grouping rules as /api/chats/days),
+        // so this is a pure bucketing pass - no date logic on this side.
         const groups = [];
         const byKey = {};
 
         for (const chat of this.searchResults) {
-            const key = groupKeyOf(chat.updated) || 'undated';
+            const key = chat.group_key || 'undated';
             if (!(key in byKey)) {
-                byKey[key] = { key: key, label: dayLabelFromKey(key), chats: [] };
+                byKey[key] = { key: key, label: chat.group_label || 'Undated', chats: [] };
                 groups.push(byKey[key]);
             }
             byKey[key].chats.push(chat);
@@ -405,7 +406,9 @@ CHAT_STORE = {
 
         this.dayGroups = (groupList ?? []).map(g => ({
             key: g.key,
-            label: dayLabelFromKey(g.key),
+            // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+            // labels come pre-computed from the backend now
+            label: g.label,
             count: g.count,
             chats: [],
             offset: 0,
@@ -467,27 +470,6 @@ CHAT_STORE = {
         // re-run the active search so the mode switch applies immediately
         clearTimeout(this.searchDebounce);
         if (this.searching) { this._runChatSearch(this.searchQuery.trim()); }
-    },
-
-    sidebarSnippet(chat) {
-        // 3-line content preview for search results (shown when content
-        // search is on). returns html with the query highlighted.
-        if (!this.searchInContent) { return ''; }
-
-        const snippets = chat.message_snippets;
-        if (!snippets || snippets.length === 0) { return ''; }
-
-        const text = escapeHtml(snippets[0]);
-        const q = this.searchQuery.trim();
-        if (!q) { return text; }
-
-        // both sides escaped identically before regexing, so queries with
-        // & < > " ' still match the escaped text
-        const pattern = escapeHtml(q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        return text.replace(
-            new RegExp(pattern, 'gi'),
-            (m) => `<strong class="search-highlight">${m}</strong>`
-        );
     },
 
     setSearchQuery(q) {
@@ -905,20 +887,18 @@ CHAT_STORE = {
      * ----------------------- */
     async searchGlobal(query, searchInContent = true, category = null, tags = []) {
         try {
-            const result = await simpleApiPost('/api/chats/search', {
+            // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+            // the backend returns results already sorted newest-first and
+            // stamped with group_key/group_label + pre-highlighted title
+            // and snippets; tz_offset lets it bucket days in our local
+            // calendar (JS getTimezoneOffset, minutes behind UTC).
+            return await simpleApiPost('/api/chats/search', {
                 query: query,
                 search_in_content: searchInContent,
                 category: category,
-                tags: tags
+                tags: tags,
+                tz_offset: this.tzOffset()
             });
-            
-            // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
-            // pure updated-descending sort (the old title-matches-first
-            // priority scrambled the day groups in the sidebar, which
-            // rely on strict newest-first order).
-            result.sort((a, b) => (b.updated || '').localeCompare(a.updated || ''));
-
-            return result;
         } catch (err) {
             console.error('Global search failed:', err);
             return [];

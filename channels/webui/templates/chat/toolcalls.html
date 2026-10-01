@@ -35,11 +35,11 @@
                         <span class="name" x-show="!tool.function?.name">unknown</span>
                         <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
                              once the call completes, the header shows its args
-                             inline, eg. docs_list(folder="x", sub="y") - each
-                             value cut to 20 chars, whole thing on one line,
-                             de-emphasized vs the tool name -->
+                             inline, de-emphasized vs the tool name.
+                             -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+                             the summary is precomputed backend-side (turns.py) -->
                         <span class="call-args" x-show="tool.response"
-                              x-text="toolCallArgsSummary(tool)"></span>
+                              x-text="tool.summary ?? ''"></span>
                         <!-- result hint from the display registry (default:
                              displays define no summary, so this stays empty) -->
                         <span class="call-result" x-show="tool.response"

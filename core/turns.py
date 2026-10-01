@@ -75,6 +75,12 @@ class TurnCollector:
                     for tool in msg["tool_calls"]:
                         if tool.get("id") in response_map:
                             tool["response"] = response_map[tool["id"]]
+                        # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+                        # precompute the failed flag so channels don't
+                        # re-parse every response just to tint a card
+                        tool["failed"] = self._tool_call_failed(tool)
+                        # ... and the one-line arg summary for headers
+                        tool["summary"] = self._tool_call_summary(tool)
 
         # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
         # fold each assistant turn's chain into display steps so channels
@@ -106,6 +112,63 @@ class TurnCollector:
         except (json.JSONDecodeError, TypeError):
             return False
         return isinstance(parsed, dict) and parsed.get("status") == "error"
+
+    # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+    # one-line arg summary for completed tool call headers, ported from
+    # the webui frontend's toolCallArgsSummary(): the single most
+    # informative argument value, paths keep their tail.
+    TOOL_ARG_PRIORITY = [
+        "path", "file_path", "filepath", "file", "filename", "url",
+        "query", "pattern", "regex_pattern", "sub_path", "subfolder",
+        "folder", "id", "name", "content", "text",
+    ]
+
+    @staticmethod
+    def _truncate_arg(s):
+        if len(s) <= 70:
+            return s
+        if "/" in s or "\\" in s:
+            return ".." + s[-68:]
+        return s[:69].rstrip() + ".."
+
+    @staticmethod
+    def _arg_to_string(value):
+        if isinstance(value, str):
+            return value
+        if isinstance(value, (dict, list)):
+            try:
+                return json.dumps(value)
+            except (TypeError, ValueError):
+                return str(value)
+        if value is None:
+            return "null"
+        if value is True:
+            return "true"
+        if value is False:
+            return "false"
+        return str(value)
+
+    @classmethod
+    def _tool_call_summary(cls, tool):
+        raw = (tool.get("function") or {}).get("arguments")
+        if not isinstance(raw, str):
+            return ""
+        try:
+            args = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            return ""
+        if not isinstance(args, dict) or not args:
+            return ""
+        entries = list(args.items())
+        chosen = None
+        for priority_key in cls.TOOL_ARG_PRIORITY:
+            hit = next(((k, v) for k, v in entries if k == priority_key), None)
+            if hit:
+                chosen = hit
+                break
+        if chosen is None:
+            chosen = next(((k, v) for k, v in entries if isinstance(v, str)), entries[0])
+        return "(" + cls._truncate_arg(cls._arg_to_string(chosen[1])) + ")"
 
     @staticmethod
     def _modules_for(tool_calls):
@@ -157,6 +220,22 @@ class TurnCollector:
             and isinstance(msg.get("content"), str)
             and msg.get("content", "").strip() != ""
         )
+
+    @staticmethod
+    def _segment_label(segment):
+        # short human label for the collapsed Process header: the last
+        # tool call as "Module: action", or what the model is busy doing
+        tool_calls = segment.get("tool_calls")
+        if tool_calls:
+            fn = (tool_calls[-1].get("function") or {}).get("name")
+            if fn:
+                parts = fn.split("_")
+                return parts[0][:1].upper() + parts[0][1:] + ": " + " ".join(parts[1:])
+        if isinstance(segment.get("reasoning_content"), str) and segment["reasoning_content"].strip():
+            return "Thinking.."
+        if isinstance(segment.get("content"), str) and segment["content"].strip():
+            return "writing"
+        return ""
 
     @staticmethod
     def _has_visible_chain_content(msg):
@@ -454,20 +533,34 @@ class TurnCollector:
                     for tool in current_segment["tool_calls"]:
                         if tool.get("id") in stream_response_map:
                             tool["response"] = stream_response_map[tool["id"]]
+                            # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+                            # precomputed failed flag (mirrors group_history)
+                            tool["failed"] = self._tool_call_failed(tool)
+                        # arg summary (mirrors group_history)
+                        tool["summary"] = self._tool_call_summary(tool)
                     # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
                     # live step status + precomputed module display data
                     current_segment["step_status"] = self._step_status(current_segment["tool_calls"])
                     current_segment["modules"] = self._modules_for(current_segment["tool_calls"])
                 else:
                     current_segment["step_status"] = "thinking"
-                yield {"type": "turn", "content": current_segment}
+                # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+                # stamp the collapsed-header label, and skip yielding
+                # segments with nothing visible: they'd be ghost stations
+                current_segment["label"] = self._segment_label(current_segment)
+                if self._has_visible_chain_content(current_segment):
+                    yield {"type": "turn", "content": current_segment}
             elif last_tool_calls_segment:
                 # tool response segment: update and re-yield the tool_calls segment instead
                 for tool in last_tool_calls_segment["tool_calls"]:
                     if tool.get("id") in stream_response_map:
                         tool["response"] = stream_response_map[tool["id"]]
+                        # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+                        tool["failed"] = self._tool_call_failed(tool)
+                    tool["summary"] = self._tool_call_summary(tool)
                 # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
                 # responses landed: refresh the re-yielded step's status
                 last_tool_calls_segment["step_status"] = self._step_status(last_tool_calls_segment["tool_calls"])
+                last_tool_calls_segment["label"] = self._segment_label(last_tool_calls_segment)
                 yield {"type": "turn", "content": last_tool_calls_segment}
 
