@@ -12,11 +12,7 @@
 
 <!-- the main message view -->
 <div id="messages" x-ref="messages" x-cloak
-    @scroll.throttle="
-        const el = $el;
-        const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-        $store.ui.shouldScroll = distFromBottom < $store.ui.scrollThreshold;
-    "
+    @scroll.throttle="$store.ui.onScroll()"
 >
     <!--
         a "turn" is:

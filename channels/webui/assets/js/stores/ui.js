@@ -47,6 +47,7 @@ UI_STORE = {
         const chase = _chases.get(el);
         if (!chase) return;
         if (chase.raf) cancelAnimationFrame(chase.raf);
+        if (chase.mo) chase.mo.disconnect();
         _chases.delete(el);
         this._suppressScroll = false;
     },
@@ -54,15 +55,27 @@ UI_STORE = {
     _chaseScrollToBottom(el) {
         if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
             this._stopChase(el);
-            el.scrollTop = el.scrollHeight;
+            // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+            // instant: global scroll-behavior:smooth would animate this jump
+            el.scrollTo({ top: el.scrollHeight, behavior: 'instant' });
             return;
         }
 
         let chase = _chases.get(el);
         if (!chase) {
-            chase = { raf: null };
+            chase = { raf: null, mo: null };
             _chases.set(el, chase);
             this._suppressScroll = true;
+
+            // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+            // keep gliding while content grows: streamed tokens mutate the
+            // dom without re-calling scrollToBottom, so without this the
+            // chase dies the moment remaining < 1 and a later token restarts
+            // it from scratch (visible stutter). cheap coalesced re-arm.
+            chase.mo = new MutationObserver(() => {
+                if (chase.raf === null) chase.raf = requestAnimationFrame(step);
+            });
+            chase.mo.observe(el, { childList: true, subtree: true });
 
             // user input wins: give up the chase and let onScroll track
             // their real position again. bound once per element.
@@ -80,15 +93,23 @@ UI_STORE = {
         if (chase.raf) return; // already chasing; the step re-reads the target
 
         const step = () => {
+            // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+            // scrollTo with behavior:'instant' overrides the global
+            // scroll-behavior:smooth. with plain scrollTop writes, each frame
+            // spawned a fresh browser smooth-scroll animation that the next
+            // frame interrupted: the chase double-eased (our lerp + browser
+            // easing) and read back lagging animated positions, so it crawled
+            // and turned choppy as scroll deltas grew with the chat.
+            // instant writes make the lerp the only easing in play.
             const target = el.scrollHeight - el.clientHeight;
             const remaining = target - el.scrollTop;
             if (Math.abs(remaining) < 1) {
-                el.scrollTop = target;
+                el.scrollTo({ top: target, behavior: 'instant' });
                 this._stopChase(el);
                 this._updateShouldScroll(el);
                 return;
             }
-            el.scrollTop += remaining * this.scrollFollowSpeed;
+            el.scrollTo({ top: el.scrollTop + remaining * this.scrollFollowSpeed, behavior: 'instant' });
             chase.raf = requestAnimationFrame(step);
         };
         chase.raf = requestAnimationFrame(step);

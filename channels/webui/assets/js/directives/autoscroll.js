@@ -29,15 +29,20 @@ function autoScroll(el) {
   };
 
   const step = () => {
+    // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+    // scrollTo with behavior:'instant' overrides the global
+    // scroll-behavior:smooth; plain scrollTop writes would spawn a browser
+    // smooth-scroll animation per frame that the next frame interrupts,
+    // double-easing the chase and reading back lagging positions.
     const target = el.scrollHeight - el.clientHeight;
     const remaining = target - el.scrollTop;
     if (Math.abs(remaining) < 1) {
-      el.scrollTop = target;
+      el.scrollTo({ top: target, behavior: 'instant' });
       stopChase();
       checkBottom();
       return;
     }
-    el.scrollTop += remaining * AUTO_SCROLL_SPEED;
+    el.scrollTo({ top: el.scrollTop + remaining * AUTO_SCROLL_SPEED, behavior: 'instant' });
     raf = requestAnimationFrame(step);
   };
 
@@ -54,7 +59,7 @@ function autoScroll(el) {
     if (!isAtBottom) return;
 
     if (reducedMotion.matches) {
-      el.scrollTop = el.scrollHeight;
+      el.scrollTo({ top: el.scrollHeight, behavior: 'instant' });
       return;
     }
 
