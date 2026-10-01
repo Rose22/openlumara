@@ -193,7 +193,7 @@
                 
                 textarea {
                     width: 100%;
-                    min-height: 60px;
+                    min-height: 240px;
                     padding: 8px;
                     background: var(--bg-input);
                     color: var(--text-primary);
