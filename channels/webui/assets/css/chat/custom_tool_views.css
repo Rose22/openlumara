@@ -482,14 +482,14 @@
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 8px;
-        margin-bottom: 2px;
+        margin-bottom: 0px;
 
         /* flex row of gutter + code, like the unified diff-line rows */
         .diff2-cell {
             display: flex;
             gap: 8px;
             min-width: 0;
-            border-radius: 3px;
+            border-radius: 0px;
             padding: 0 6px;
         }
 
