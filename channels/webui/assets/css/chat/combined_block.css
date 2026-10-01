@@ -155,6 +155,9 @@
         align-items: flex-start;
         gap: 8px;
         color: var(--text-secondary);
+        /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+           reasoning spans the full width of its chain station */
+        width: 100%;
 
         .icon {
             width: 1.18em;
@@ -162,6 +165,14 @@
             flex-shrink: 0;
             /* align the bubble with the first text line */
             margin-top: 0.15em;
+        }
+
+        /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+           text column grows to fill the rest of the row instead of
+           sizing to its content */
+        .reasoning-text {
+            flex: 1;
+            min-width: 0;
         }
     }
 
