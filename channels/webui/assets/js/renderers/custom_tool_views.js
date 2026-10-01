@@ -130,12 +130,15 @@ function collapseContext(rows, keep) {
     return out;
 }
 
-// full diff markup for the view box. THE ONE html-string view: the box is
-// painted via x-fade-html, and token fade requires whole-content repaints
-// (x-for rows can't survive that), so this view generates its row markup
-// here instead of in the template. all text goes through escapeHtml or
-// hljs (whose output is escaped), so it's safe markup.
+// full diff markup for the unified (mobile) view box. THE html-string
+// view: the box is painted via x-fade-html, and token fade requires
+// whole-content repaints (x-for rows can't survive that), so this view
+// generates its row markup here instead of in the template. all text goes
+// through escapeHtml or hljs (whose output is escaped), so it's safe markup.
+// returns '' on desktop, where the side-by-side view takes over - that
+// skips the render AND lets x-show collapse the box (see diffSideHtml).
 function diffHtml(original, replacement, lang, cacheKey) {
+    if (_DESKTOP_MQ.matches) return '';
     // memoized + throttled while the args stream in (see streamMemo)
     return streamMemo('edit:' + cacheKey, [original, replacement, lang],
         () => _diffHtmlNow(original, replacement, lang));
@@ -159,6 +162,81 @@ function _diffHtmlNow(original, replacement, lang) {
         return `<div class="diff-line ${clsFor(sign)}">` +
             `<span class="diff-gutter">${gutter}</span>` +
             `<span class="diff-text">${body}</span></div>`;
+    }).join('');
+}
+
+// -- coder_file_edit: github-style side-by-side view ---------------------------
+
+// pairs the linear diff rows into split-view rows: consecutive -/+ runs are
+// matched up line-by-line (shorter side gets an empty filler cell), while
+// context and gap rows span the full width, like github's split view.
+function sideBySideRows(rows) {
+    const out = [];
+    let dels = [], adds = [];
+    const flush = () => {
+        const n = Math.max(dels.length, adds.length);
+        for (let k = 0; k < n; k++)
+            out.push({
+                left: k < dels.length ? dels[k] : null,
+                right: k < adds.length ? adds[k] : null,
+            });
+        dels = []; adds = [];
+    };
+    for (const [sign, text] of rows) {
+        if (sign === '-') dels.push(text);
+        else if (sign === '+') adds.push(text);
+        else { flush(); out.push({ full: text, kind: sign === '..' ? 'gap' : 'ctx' }); }
+    }
+    flush();
+    return out;
+}
+
+// full side-by-side markup for the desktop diff view. css shows either
+// this or the unified diffHtml, never both (see custom_tool_views.css);
+// no line numbers - the cell tints convey which side is which. memoized
+// like diffHtml: each box keeps its own memo entry, so the hidden one
+// only recomputes on real arg changes.
+// desktop/mobile split: each view returns '' off-breakpoint so css hides it
+// (visibility collapse, see custom_tool_views.css) AND its render is
+// skipped - computing both diffs per streamed chunk would double the cost.
+// matchMedia is not reactive, so a window resize mid-stream only picks the
+// other view up on the next streamed chunk (getter re-evaluates, memo sees
+// the flip); a resize while idle self-heals on the next edit call.
+const _DESKTOP_MQ = window.matchMedia('(min-width: 1025px)');
+
+function diffSideHtml(original, replacement, lang, cacheKey) {
+    if (!_DESKTOP_MQ.matches) return '';
+    return streamMemo('edit2:' + cacheKey, [original, replacement, lang],
+        () => _diffSideHtmlNow(original, replacement, lang));
+}
+
+function _diffSideHtmlNow(original, replacement, lang) {
+    if (!original && !replacement) return '';
+    let rows;
+    if (!original || !replacement) {
+        // while only one side has streamed in, show it as context/plain
+        const solo = (original || replacement || '').replace(/\n$/, '').split('\n');
+        rows = solo.map(t => [' ', t]);
+    } else {
+        rows = collapseContext(diffLines(original, replacement), 2);
+    }
+    // cells carry the same +/- gutter as the unified view: flex row of
+    // gutter span + code, so the sign stays put when the code wraps
+    const cell = (gutter, text, cls) =>
+        `<div class="diff2-cell ${cls}"><span class="diff2-gutter">${gutter}</span>` +
+        `<span class="diff2-text">${highlightDiffLine(text, lang) || '\u200b'}</span></div>`;
+    return sideBySideRows(rows).map(p => {
+        if (p.full !== undefined) {
+            const gap = p.kind === 'gap';
+            const body = gap ? escapeHtml(p.full) : highlightDiffLine(p.full, lang);
+            return `<div class="diff2-row diff2-${p.kind}">` +
+                `<div class="diff2-cell diff2-full"><span class="diff2-gutter">${gap ? '..' : ' '}</span>` +
+                `<span class="diff2-text">${body || '\u200b'}</span></div></div>`;
+        }
+        return '<div class="diff2-row diff2-changed">' +
+            (p.left === null ? '<div class="diff2-cell diff2-empty"></div>' : cell('-', p.left, 'diff2-del')) +
+            (p.right === null ? '<div class="diff2-cell diff2-empty"></div>' : cell('+', p.right, 'diff2-add')) +
+            '</div>';
     }).join('');
 }
 

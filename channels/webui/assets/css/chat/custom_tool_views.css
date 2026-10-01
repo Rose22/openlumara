@@ -424,3 +424,99 @@
         font-style: italic;
     }
 }
+
+/* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+   coder file edit view: github-style two-column diff on desktop.
+   both layouts render inside .diff-container; this media query (same
+   desktop breakpoint as responsive.css) flips which one is visible.
+   display here beats the base rules' specificity tie because it comes
+   later in the file, and x-show's inline display:none still hides a
+   layout when its content is empty. no line numbers - the cell tints
+   convey old vs new. */
+.diff-container {
+    .diff-side {
+        display: none;
+    }
+}
+
+@media (min-width: 1025px) {
+    .tool-call-card .diff-container {
+        .diff-unified {
+            display: none;
+        }
+
+        .diff-side {
+            display: block;
+            font-family: var(--code-font);
+            font-size: 0.8rem;
+            line-height: 1.55;
+            max-height: 320px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px 10px;
+            /* the .hljs class pulls token colors from the active code
+               theme, but themes also set an opaque .hljs background -
+               kill it, the box keeps the card's own background */
+            background: transparent;
+        }
+    }
+}
+
+.diff-container .diff-side {
+    .diff2-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-bottom: 2px;
+
+        /* flex row of gutter + code, like the unified diff-line rows */
+        .diff2-cell {
+            display: flex;
+            gap: 8px;
+            min-width: 0;
+            border-radius: 3px;
+            padding: 0 6px;
+        }
+
+        .diff2-gutter {
+            flex-shrink: 0;
+            width: 1em;
+            user-select: none;
+            opacity: 0.7;
+        }
+
+        .diff2-text {
+            min-width: 0;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .diff2-del {
+            background: color-mix(in srgb, var(--error, #f87171) 10%, transparent);
+            .diff2-gutter { color: var(--error, #f87171); }
+        }
+
+        .diff2-add {
+            background: color-mix(in srgb, #4ade80 10%, transparent);
+            .diff2-gutter { color: #4ade80; }
+        }
+
+        /* filler cell opposite a pure add/delete run */
+        .diff2-empty {
+            background: color-mix(in srgb, var(--text-secondary, #888) 5%, transparent);
+        }
+
+        /* context and collapsed-gap rows span both columns */
+        &.diff2-ctx .diff2-full,
+        &.diff2-gap .diff2-full {
+            grid-column: 1 / -1;
+        }
+
+        &.diff2-gap {
+            opacity: 0.55;
+
+            .diff2-full { font-style: italic; }
+        }
+    }
+}
