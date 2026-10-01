@@ -213,18 +213,24 @@ function diffSideHtml(original, replacement, lang, cacheKey) {
 function _diffSideHtmlNow(original, replacement, lang) {
     if (!original && !replacement) return '';
     let rows;
-    if (!original || !replacement) {
-        // while only one side has streamed in, show it as context/plain
-        const solo = (original || replacement || '').replace(/\n$/, '').split('\n');
-        rows = solo.map(t => [' ', t]);
-    } else {
-        rows = collapseContext(diffLines(original, replacement), 2);
-    }
     // cells carry the same +/- gutter as the unified view: flex row of
     // gutter span + code, so the sign stays put when the code wraps
     const cell = (gutter, text, cls) =>
         `<div class="diff2-cell ${cls}"><span class="diff2-gutter">${gutter}</span>` +
         `<span class="diff2-text">${highlightDiffLine(text, lang) || '\u200b'}</span></div>`;
+    if (!original || !replacement) {
+        // while only one side has streamed in, keep the two-column layout:
+        // the streamed code sits plain (no tint, no gutter sign) in its
+        // own column - old left, new right - the other stays empty filler
+        const solo = (original || replacement || '').replace(/\n$/, '').split('\n')
+            .map(t => '<div class="diff2-row diff2-changed">' +
+                (original
+                    ? cell('', t, '') + '<div class="diff2-cell diff2-empty"></div>'
+                    : '<div class="diff2-cell diff2-empty"></div>' + cell('', t, '')) +
+                '</div>').join('');
+        return solo;
+    }
+    rows = collapseContext(diffLines(original, replacement), 2);
     return sideBySideRows(rows).map(p => {
         if (p.full !== undefined) {
             const gap = p.kind === 'gap';
