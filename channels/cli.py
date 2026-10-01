@@ -193,6 +193,37 @@ class Cli(core.channel.Channel):
         progress = rich.progress.Progress(expand=False, transient=False)
         progress_task = None
 
+        # tracks whether we're tracking llamacpp router model loading progress,
+        # or prompt processing progress
+        bar_mode = None
+
+        def show_bar(mode, description):
+            nonlocal processing_prompt, progress_task, first_processing_prompt, bar_mode
+
+            if not processing_prompt:
+                if not first_processing_prompt:
+                    # create a newline so that the progress bar doesnt replace the content
+                    self.console.print()
+                first_processing_prompt = False
+
+                progress.start()
+                progress_task = progress.add_task(f"[{accent_color}]{description}", total=1)
+                processing_prompt = True
+            elif bar_mode != mode:
+                progress.update(progress_task, description=f"[{accent_color}]{description}")
+
+            bar_mode = mode
+
+        def hide_bar():
+            nonlocal processing_prompt, progress_task, bar_mode
+
+            if processing_prompt:
+                # remove the progress bar upon receival of the first non-progress token
+                progress.remove_task(progress_task)
+                progress.stop()
+                processing_prompt = False
+                bar_mode = None
+
         # sending_prompt = True
         # sending = rich.status.Status("Sending", console=self.console)
         # sending.start()
@@ -235,24 +266,34 @@ class Cli(core.channel.Channel):
                 #     sending_prompt = False
 
                 if token_type == "prompt_progress":
-                    if not processing_prompt:
-                        if first_processing_prompt:
-                            first_processing_prompt = False
-                        else:
-                            # create a newline so that the progress bar doesnt replace the content
-                            self.console.print()
+                    show_bar("prompt", "Processing..")
 
-                        # display a progress bar
-                        progress.start()
-                        progress_task = progress.add_task(f"[{accent_color}]Processing..", total=1)
-                        processing_prompt = True
+                    cache = token_content.get("cache") or 0
+                    processed = (token_content.get("processed") or 0) - cache
+                    total = (token_content.get("total") or 0) - cache
 
-                    progress.update(progress_task, completed=(token_content.get("processed") / token_content.get("total")), refresh=True)
+                    progress.update(progress_task, completed=(processed / total) if total > 0 else 0, refresh=True)
+                elif token_type == "model_load_progress":
+                    model_name = (token_content.get("model") or "").split("/")[-1]
+
+                    labels = {
+                        "queued": "Queued",
+                        "downloading": "Downloading",
+                    }
+                    label = labels.get(token_content.get("status"), "Loading")
+
+                    desc = f"{label} {model_name}" if model_name else f"{label} model"
+
+                    # stage = token_content.get("stage") or ""
+                    # if stage:
+                    #     desc += f" · {stage.replace('_', ' ')}"
+
+                    show_bar("model_load", desc)
+
+                    percent = token_content.get("percent")
+                    progress.update(progress_task, completed=(percent / 100) if percent is not None else 0, refresh=True)
                 elif processing_prompt:
-                    # remove the progress bar upon receival of the first non-progress token
-                    progress.remove_task(progress_task)
-                    progress.stop()
-                    processing_prompt = False
+                    hide_bar()
 
                 if token_type == "reasoning":
                     final_reasoning.append(token_content)
