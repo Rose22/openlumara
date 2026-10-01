@@ -205,47 +205,43 @@ class APIClient():
         except Exception as e:
             pass
 
-    async def _watch_model_load(self, model_name, stop_event, queue):
-        """reads the llamacpp router's /models/sse feed"""
+    async def _watch_model_load(self, model_name, queue):
+        """reads the llamacpp router's /models/sse feed while a model loads"""
         try:
-            async with self._httpx_client.stream("GET", f"{self._router_origin}/models/sse", headers=self._api_headers()) as feed:
+            url = f"{self._router_origin}/models/sse"
+            async with self._httpx_client.stream("GET", url, headers=self._api_headers()) as feed:
                 buffer = ""
 
-                async for raw in feed.aiter_text():
-                    if stop_event.is_set():
-                        break
+                async for chunk in feed.aiter_text():
+                    buffer += chunk
 
-                    buffer += raw
-
-                    # SSE records are separated by blank lines
                     while "\n\n" in buffer:
                         record, buffer = buffer.split("\n\n", 1)
+                        record = record.strip()
 
-                        event = None
-                        for line in record.splitlines():
-                            if line.startswith("data:"):
-                                try:
-                                    event = json.loads(line[5:].strip())
-                                except json.JSONDecodeError:
-                                    event = None
-
-                        if not isinstance(event, dict):
+                        if not record.startswith("data:"):
                             continue
 
-                        if event.get("event") not in ("status_change", "model_status", "status_update"):
+                        try:
+                            event = json.loads(record[5:])
+                        except json.JSONDecodeError:
+                            continue
+
+                        if event.get("event") not in ("status_change", "model_status"):
                             continue
 
                         data = event.get("data") or {}
                         status = data.get("status") or ""
                         name = event.get("model") or ""
 
-                        # match our model by name, or trust any loading/queued
-                        # event since the router id may be an alias we can't resolve
-                        if name != model_name and status not in ("loading", "queued"):
+                        if status in ("loaded", "unloaded"):
+                            # let the prompt/content tokens take over the progress indicator
+                            if name == model_name:
+                                return
                             continue
 
-                        if status in ("loaded", "failed", "unloaded"):
-                            return
+                        if status not in ("loading", "queued", "downloading"):
+                            continue
 
                         progress = data.get("progress") or {}
                         value = progress.get("value")
@@ -254,14 +250,13 @@ class APIClient():
                             "model": name,
                             "status": status,
                             "stage": progress.get("current") or "",
-                            "percent": int(round(value * 100)) if isinstance(value, (int, float)) else None,
+                            "percent": round(value * 100) if isinstance(value, (int, float)) else None,
                         })
 
         except asyncio.CancelledError:
             raise
-        except Exception as e:
-            if core.debug:
-                self.manager.log("debug:api", f"model load watch ended: {core.detail_error(e)}")
+        except Exception:
+            pass
 
     def get_model(self):
         return core.config.get("model", "name")
@@ -590,12 +585,10 @@ class APIClient():
         # model_load_progress tokens until the request resolves.
         load_task = None
         load_queue = None
-        load_stop = None
 
         if self._router_origin:
             load_queue = asyncio.Queue()
-            load_stop = asyncio.Event()
-            load_task = asyncio.create_task(self._watch_model_load(core.config.get("model", "name"), load_stop, load_queue))
+            load_task = asyncio.create_task(self._watch_model_load(core.config.get("model", "name"), load_queue))
 
         request_task = asyncio.create_task(self._request(context, tools=(tools if use_tools else None), stream=True, use_thinking=use_thinking, **kwargs))
 
@@ -613,7 +606,6 @@ class APIClient():
 
         finally:
             if load_task and not load_task.done():
-                load_stop.set()
                 load_task.cancel()
 
         # return errors if applicable
