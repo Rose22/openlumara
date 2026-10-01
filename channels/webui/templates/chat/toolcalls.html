@@ -50,7 +50,11 @@
                              inline, de-emphasized vs the tool name.
                              -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
                              the summary is precomputed backend-side (turns.py) -->
-                        <span class="call-args" x-show="tool.response"
+                        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+                             args now show live while streaming (lenient-parse
+                             summary from the backend); only the result hint
+                             below still waits for tool.response -->
+                        <span class="call-args" x-show="tool.summary"
                               x-text="tool.summary ?? ''"></span>
                         <!-- result hint from the display registry (default:
                              displays define no summary, so this stays empty) -->

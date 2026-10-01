@@ -209,12 +209,16 @@ class TurnCollector:
 
     @classmethod
     def _tool_call_summary(cls, tool):
+        # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+        # lenient parse instead of strict json.loads: headers can now show
+        # the arg summary LIVE while arguments stream in, not only once
+        # the full JSON is complete.
         raw = (tool.get("function") or {}).get("arguments")
         if not isinstance(raw, str):
             return ""
-        try:
-            args = json.loads(raw)
-        except (json.JSONDecodeError, TypeError):
+        args = parse_lenient_json(raw)
+        # drop the non-JSON fallback so raw garbage never shows in headers
+        if "_raw" in args:
             return ""
         if not isinstance(args, dict) or not args:
             return ""
