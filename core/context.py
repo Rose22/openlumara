@@ -470,10 +470,7 @@ Hard rules:
         try:
             if isinstance(data, list):
                 # this is likely an array of messages
-
-                # count only the text tokens, since API's exempt multimodal content from token limits,
-                # and we auto remove all previous multimodal content from context when passing to the API,
-                # sending only the current message's multimodal content (such as an image)
+                # count only the text tokens, since API's exempt multimodal content from token limits
 
                 # first i coded this function by hand using a for loop that copied each message and stripped it of any non-text content, 
                 # then i asked my local AI for a more compact and performance friendly way to do it.
