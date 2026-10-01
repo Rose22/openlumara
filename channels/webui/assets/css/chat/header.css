@@ -71,6 +71,45 @@ header {
         }
     }
 
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+       quick model switcher in the header, styled like the neighbouring .btns */
+    .model-switcher {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+
+        .model-select {
+            background: none;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            font-family: inherit;
+            padding: 7px 8px;
+            max-width: 220px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-overflow: ellipsis;
+
+            &:hover {
+                background: var(--bg-secondary);
+                color: var(--text-primary);
+                border-color: var(--accent);
+            }
+
+            &:disabled {
+                opacity: 0.5;
+                cursor: wait;
+            }
+
+            option {
+                background: var(--bg-primary);
+                color: var(--text-primary);
+            }
+        }
+
+    }
+
     .menu-btn {
         padding: 4px 7px;
         background: transparent;

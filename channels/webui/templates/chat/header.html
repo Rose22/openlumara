@@ -19,6 +19,21 @@
             {% include 'svg/search.svg' %}
         </button>
         -->
+        {% if config.get("enable_model_switcher") %}
+        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+             quick model switcher: same cached model list and model.name
+             setting as the settings modal, just one click away in the header.
+             hidden on mobile due to lack of space (like the stream state). -->
+        <div class="model-switcher" x-data="modelQuickSwitch()" x-show="!$store.ui.isMobile" x-cloak>
+            <select class="model-select" :value="currentModel" :disabled="saving"
+                    @change="setModel($event.target.value)"
+                    title="Switch model">
+                <template x-for="model in options" :key="model">
+                    <option :value="model" x-text="model"></option>
+                </template>
+            </select>
+        </div>
+        {% endif %}
         <button class="btn" id="settings-btn" title="Settings (Ctrl+S)" @click="await $store.ui.openModal('settings')">
             {% include 'svg/gear.svg' %}
         </button>

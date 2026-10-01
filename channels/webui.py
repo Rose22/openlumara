@@ -97,6 +97,11 @@ class Webui(core.channel.Channel):
             "default": True,
             "depends": "enable_chat_header",
         },
+        "enable_model_switcher": {
+            "description": "Whether to show a model dropdown in the header, so you can quickly switch models without opening the settings. Disabled on mobile due to lack of space.",
+            "default": True,
+            "depends": "enable_chat_header",
+        },
         "enable_sidebar": {
             "description": "Whether to enable the sidebar at the left of the screen. Without it, you can\'t switch chats the graphical way, but you can still use commands like `/chat`!",
             "default": True
@@ -1408,6 +1413,22 @@ async def create_fastapi(channel):
             return api_result(str(result), success=False)
 
         return api_result(result)
+
+    # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+    # quick model switch from the header dropdown. set_model() writes to
+    # config and saves it; requests read model.name fresh every time, so
+    # no reconnect is needed.
+    @app.post("/api/model/set")
+    async def model_set(request: fastapi.Request):
+        """Switches the active model to the given name"""
+        data = await request.json()
+        name = (data.get("name") or "").strip()
+
+        if not name:
+            return api_result("Model name cannot be empty", success=False)
+
+        channel.manager.API.set_model(name)
+        return api_result({"name": name}, success=True)
 
     # -- POST
     @app.post("/api/settings/save")
