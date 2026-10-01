@@ -523,6 +523,14 @@ class Manager:
         module = self.modules[module_name]
         self.log("core", f"Reloading module: {module_name}")
 
+        # save the active tools so that they can be reloaded
+        previously_active = {}
+        for ch_name, ch in self.channels.items():
+            previously_active[ch_name] = [
+                name for name, entry in ch.tool_loader.catalog.items()
+                if entry["module"] == module.name and name in ch.tool_loader.active_names
+            ]
+
         # remove old tools for this module
         await self.unload_module_tools(module)
 
@@ -541,6 +549,17 @@ class Manager:
 
         # re-add the module tools based on the new state (after on_ready's modifications)
         await self.load_module_tools(module)
+
+        # restore active tools for each channel
+        for ch_name, ch in self.channels.items():
+            loader = ch.tool_loader
+            for tool_name in previously_active.get(ch_name, []):
+                entry = loader.catalog.get(tool_name)
+                if entry is None or tool_name in loader.active_names:
+                    continue
+
+                loader.active_tools.append(entry["tool"])
+                loader.active_names.append(tool_name)
 
         # make sure any hardcoded default tools belonging to this module get re-preloaded
         for channel in self.channels.values():
