@@ -114,8 +114,11 @@ UI_STORE = {
         if (cached) return cached;
 
         // rough first-visit estimate; adjustScroll() compensates the error
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+        // null-guard: a malformed/null message shouldn't kill the whole
+        // lazy-mount placeholder computation
         const chars = (turn.messages || []).reduce(
-            (n, m) => n + (typeof m.content === 'string' ? m.content.length : 200), 0
+            (n, m) => n + (m && typeof m.content === 'string' ? m.content.length : 200), 0
         );
         return Math.min(400, Math.max(40, Math.round(chars / 6)));
     },

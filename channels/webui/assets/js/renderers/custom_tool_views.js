@@ -322,6 +322,43 @@ function codeLinesHtml(code, lang, startLine, cacheKey) {
         () => splitHighlightedLines(highlightedCode(code, lang), startLine ?? 1));
 }
 
+// -- coder tools: sandbox/path one-liners --------------------------------------
+
+// footer text for the coder views: sandbox name in front of the path,
+// eg. "dev: foo/bar.py". falls back to the bare path if no sandbox parsed.
+function coderFooterText(args) {
+    if (!args.path) return '';
+    return args.sandbox ? args.sandbox + ': ' + args.path : args.path;
+}
+
+// running (no response yet) preview for the generic coder-path view:
+// "moving · dev: foo/bar.py". path picks whichever arg the tool uses.
+const CODER_RUNNING_LABELS = {
+    coder_glob: 'listing',
+    coder_file_move: 'moving',
+    coder_file_delete: 'deleting',
+    coder_folder_delete: 'deleting folder',
+};
+
+// glob response -> plain list of file paths (content is a list or
+// { results, truncated, note } when the result cap hit).
+function globFiles(response) {
+    if (!response || response.status !== 'success') return [];
+    const c = response.content;
+    const items = Array.isArray(c) ? c : (Array.isArray(c?.results) ? c.results : []);
+    return items.filter(f => typeof f === 'string');
+}
+
+function coderRunningInfo(tool, cacheKey) {
+    const args = toolArgs(tool, cacheKey);
+    const path = args.path ?? args.orig_path ?? args.sub_path ?? '';
+    return {
+        label: CODER_RUNNING_LABELS[tool?.function?.name] ?? 'in',
+        sandbox: args.sandbox ?? '',
+        path,
+    };
+}
+
 // -- scheduler_add_job: schedule card ------------------------------------------
 
 const WEEKDAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -418,13 +455,21 @@ document.addEventListener('alpine:init', () => {
         }
     });
 
-    // coder glob: file list + count
+    // coder glob: file list + count (claiming it now so the running
+    // sandbox/path one-liner shows too; the result rows stay default)
     registerToolDisplay({
         match: /^coder_glob$/,
+        view: 'coder-path',
         summary: res => {
-            const n = Array.isArray(res?.content) ? res.content.length : 0;
+            const n = globFiles(res).length;
             return n ? `${n} file${n === 1 ? '' : 's'}` : '';
         }
+    });
+
+    // coder move/delete/folder_delete: running sandbox/path one-liner
+    registerToolDisplay({
+        match: /^coder_(file_move|file_delete|folder_delete)$/,
+        view: 'coder-path'
     });
 
     // scheduler jobs: card with clock, when + action

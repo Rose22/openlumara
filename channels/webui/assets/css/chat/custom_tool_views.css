@@ -238,6 +238,24 @@
         }
     }
 
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+       coder-path view (glob/move/delete): plain list of result file paths */
+    .glob-files {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        max-height: 240px;
+        overflow-y: auto;
+        margin-top: 4px;
+
+        .glob-file {
+            font-family: var(--code-font);
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            word-break: break-all;
+        }
+    }
+
     /* grep while running: dim one-liner of the streamed args */
     .grep-running {
         font-size: 0.8rem;

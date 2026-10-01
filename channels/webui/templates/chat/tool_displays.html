@@ -47,7 +47,7 @@
         <!-- successful read: highlighted code block. x-html is the one
              sanctioned escape hatch: hljs output is escaped markup -->
         <div class="file-read-box hljs" x-show="!isError && html" x-html="html"></div>
-        <div class="display-footer" x-show="args.path" x-text="'file: ' + (args.path ?? '')"></div>
+        <div class="display-footer" x-show="args.sandbox || args.path" x-text="coderFooterText(args)"></div>
         <div class="grep-note" x-show="response?.truncation_note" x-text="response?.truncation_note ?? ''"></div>
     </div>
 </template>
@@ -65,7 +65,7 @@
              x-fade-html fades in the new tail chars per paint; faded chars
              sit inside their hljs token spans so they keep their colors -->
         <div class="file-read-box hljs" x-show="!isError && html" x-auto-scroll x-fade-html="html"></div>
-        <div class="display-footer" x-show="args.path" x-text="'file: ' + (args.path ?? '')"></div>
+        <div class="display-footer" x-show="args.sandbox || args.path" x-text="coderFooterText(args)"></div>
     </div>
 </template>
 
@@ -122,8 +122,9 @@
         <div class="grep-running" x-show="!response">
             <span class="grep-running-label">searching</span>
             <span class="grep-running-pattern" x-show="args.regex_pattern" x-text="args.regex_pattern"></span>
-            <span class="grep-running-label" x-show="args.regex_pattern && (args.file_path || args.sub_path)">in</span>
-            <span class="grep-running-pattern" x-show="args.file_path || args.sub_path" x-text="args.file_path ?? args.sub_path ?? ''"></span>
+            <span class="grep-running-label" x-show="args.regex_pattern && (args.sandbox || args.file_path || args.sub_path)">in</span>
+            <span class="grep-running-pattern" x-show="args.sandbox || args.file_path || args.sub_path"
+                  x-text="(args.sandbox ? args.sandbox + ': ' : '') + (args.file_path ?? args.sub_path ?? '')"></span>
         </div>
         <div class="search-snippet" x-show="errorText" x-text="errorText"></div>
         <div class="grep-results" x-show="groups.length">
@@ -144,6 +145,39 @@
     </div>
 </template>
 
+<template x-if="toolDisplayView(tool) === 'coder-path'"
+          x-data="{ get args() { return toolArgs(tool, cacheKey) },
+                    get response() { return toolResponse(tool) },
+                    get info() { return coderRunningInfo(tool, cacheKey) },
+                    get files() { return globFiles(this.response) },
+                    get errorText() {
+                        if (!this.response || this.response.status !== 'error') return '';
+                        const c = this.response.content;
+                        return typeof c === 'string' ? c : JSON.stringify(c);
+                    } }">
+    <!-- single root element: x-if only renders the template's FIRST child -->
+    <div>
+        <!-- while running (no response yet): dim one-liner of the streamed
+             args, eg. "moving · dev: foo/bar.py" - same idea as the grep
+             running preview -->
+        <div class="grep-running" x-show="!response">
+            <span class="grep-running-label" x-text="info.label"></span>
+            <span class="grep-running-pattern" x-show="info.sandbox || info.path"
+                  x-text="(info.sandbox ? info.sandbox + ': ' : '') + info.path"></span>
+        </div>
+        <div class="search-snippet" x-show="errorText" x-text="errorText"></div>
+        <!-- glob results: plain file list -->
+        <div class="glob-files" x-show="files.length">
+            <template x-for="f in files">
+                <div class="glob-file" x-text="f"></div>
+            </template>
+        </div>
+        <div class="grep-note" x-show="response?.content?.note" x-text="response?.content?.note ?? ''"></div>
+        <div class="display-footer" x-show="response && !errorText && (args.sandbox || args.path || args.orig_path)"
+             x-text="coderFooterText({ sandbox: args.sandbox, path: args.path ?? args.orig_path })"></div>
+    </div>
+</template>
+
 <template x-if="toolDisplayView(tool) === 'coder-file-edit'"
           x-data="{ get args() { return toolArgs(tool, cacheKey) },
                     get html() { return diffHtml(this.args.original_code, this.args.replacement_code, langForPath(this.args.path), cacheKey) } }">
@@ -152,6 +186,6 @@
              repaints (x-fade-html), which x-for rows can't survive. see
              diffHtml() in custom_tool_views.js -->
         <div class="tool-display hljs" x-show="html" x-auto-scroll x-fade-html="html"></div>
-        <div class="display-footer" x-show="args.path" x-text="'file: ' + (args.path ?? '')"></div>
+        <div class="display-footer" x-show="args.sandbox || args.path" x-text="coderFooterText(args)"></div>
     </div>
 </template>

@@ -48,8 +48,11 @@
        slow gear spin while the chain is still running. NOTE: `&.is-streaming`
        - the class is on the .agent-chain element ITSELF, a plain nested
        `.is-streaming` selector would compile to a descendant match and never
-       fire (which is why the spin, and the node pulses below, were dead) */
-    &.is-streaming .gear {
+       fire (which is why the spin, and the node pulses below, were dead)
+       -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-27)
+       scoped to the Process header: Step headers use the gear icon too, and
+       every step gear spinning at once would be a washing machine */
+    &.is-streaming .agent-chain-header .gear {
         animation: gearSpin 9s linear infinite;
     }
 
@@ -153,16 +156,27 @@
         min-width: 0;
     }
 
-    /* stations whose content draws its own nodes (reasoning, tool cards)
-       hide the plain station dot so there's never a double */
+    /* stations whose content draws its own nodes (reasoning, tool cards,
+       combined blocks) hide the plain station dot so there's never a double */
     .chain-station:has(.tool-call-card) > .chain-rail .chain-dot,
-    .chain-station:has(.reasoning-wrapper) > .chain-rail .chain-dot {
+    .chain-station:has(.reasoning-wrapper) > .chain-rail .chain-dot,
+    .chain-station:has(.combined-block) > .chain-rail .chain-dot {
         display: none;
     }
 
     /* safety net: a station that rendered nothing renders no node */
-    .chain-station:not(:has(.tool-call-card, .reasoning-wrapper, .content)) > .chain-rail .chain-dot {
+    .chain-station:not(:has(.tool-call-card, .reasoning-wrapper, .combined-block, .content)) > .chain-rail .chain-dot {
         display: none;
+    }
+
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-26)
+       a combined block still streaming pulses its own node (the block adds
+       no is-streaming class; the station being last + chain streaming is
+       enough signal) */
+    &.is-streaming .chain-station:last-child .combined-block:not(.collapsed) > .node-dot {
+        border-color: var(--accent);
+        color: var(--accent);
+        animation: statusPulse 1.5s ease-in-out infinite;
     }
 
     /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)

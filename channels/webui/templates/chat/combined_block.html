@@ -1,0 +1,74 @@
+<!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+     merged reasoning + content + tool calls: ONE collapsible header per
+     agentic step, marked by a filled numbered circle (counter assigned by
+     chainDisplay() in turn_grouping.js) instead of a gear icon + "Step N"
+     label - the tool names are the header text now. built from the
+     chainDisplay() grouping (history
+     carries the fields on one message; streaming merges adjacent segments
+     that lead to a tool call). header shows the called tool names, deduped.
+     {% set combined_stream = true %} switches to the streaming behaviour:
+     activity dots while this is the newest segment, auto-collapse
+     once done (mirrors reasoning.html). -->
+<div class="combined-block" :class="{collapsed: collapsed, expanded: !collapsed}"
+    {% if combined_stream %}
+     x-data="{ collapsed: $store.stream.state === 'idle', autoCollapsed: false, done: $store.stream.state === 'idle' }"
+     x-effect="const msgs = $store.stream.turn?.messages ?? []; const isLast = msgs[msgs.length - 1] === message._tail; done = $store.stream.state === 'idle' || !isLast; if (done && !autoCollapsed) { autoCollapsed = true; collapsed = true }"
+    {% else %}
+     x-data="{ collapsed: true }"
+    {% endif %}>
+    <!-- timeline node: the whole step collapses/expands as one -->
+    <div class="node-dot" :class="{expanded: !collapsed}" @click.stop="collapsed = !collapsed">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"></polyline></svg>
+    </div>
+    <div class="header" @click="collapsed = !collapsed">
+        <svg class="standalone-chevron" :class="{'expanded': !collapsed}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="9 6 15 12 9 18"></polyline>
+        </svg>
+        <span class="step-badge" x-text="message._step"
+            :class="{ 'step-failed': message.tool_calls.length > 0 && message.tool_calls.every(t => toolCallFailed(t)) }"></span>
+        <span class="text">
+            <span class="dots" {% if combined_stream %}x-show="!done"{% else %}x-show="false"{% endif %}><span aria-hidden="true">&nbsp;</span><span aria-hidden="true">&nbsp;</span><span aria-hidden="true">&nbsp;</span></span>
+            <!-- deduped tool names, ellipsis-truncated so the header never
+                 exceeds its width -->
+            <span class="tool-names" x-show="message.tool_calls.length > 0" x-html="stepToolNamesHtml(message.tool_calls)"></span>
+            <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+                 provisional step (reasoning streaming, no tool call yet):
+                 label it so the header isn't empty while thinking -->
+            <span class="tool-names" x-show="message.tool_calls.length === 0"
+                  {% if combined_stream %}
+                  x-text="message.reasoning_content ? (done ? 'Thoughts' : 'Thinking..') : 'writing'"></span>
+                  {% else %}
+                  x-text="message.reasoning_content ? 'Thoughts' : 'writing'"></span>
+                  {% endif %}
+            <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+                 single-call step: the registry's result summary rides along
+                 in the step header too (same fn + cacheKey the tool card
+                 uses), so collapsed steps show e.g. "12 matches" without
+                 expanding. only for steps with exactly ONE call. -->
+            <span class="step-args" x-show="message.tool_calls?.length === 1"
+                  x-text="message.tool_calls?.[0] ? toolCallArgsSummary(message.tool_calls[0]) : ''"></span>
+            <span class="step-summary" x-show="message.tool_calls?.length === 1 && message.tool_calls[0].response"
+                  x-text="message.tool_calls?.[0]?.response ? toolCallResultSummary(message.tool_calls[0], message.tool_calls[0].id ?? (message.tool_call_id + ':0')) : ''"></span>
+        </span>
+    </div>
+    <div x-show="!collapsed" x-collapse.duration.250>
+        <div class="block">
+            <!-- reasoning gets the thought bubble, like a mini Thoughts
+                 block inside the step -->
+            <div class="reasoning-row" x-show="message.reasoning_content">
+                {% include 'svg/thought_bubble.svg' %}
+                <div class="reasoning-text" x-fade-text="message.reasoning_content" x-auto-scroll></div>
+            </div>
+            <!-- intermediate content riding along with the step (the model
+                 narrating before/while it calls tools) -->
+            <template x-if="message.content">
+                {% if combined_stream %}
+                <div class="step-content" x-md="{ message: message, live: ($store.stream.turn?.messages ?? [])[$store.stream.turn.messages.length - 1] === message._tail }"></div>
+                {% else %}
+                <div class="step-content" x-md="{ message: message, live: false }"></div>
+                {% endif %}
+            </template>
+            {% include 'chat/toolcalls.html' %}
+        </div>
+    </div>
+</div>

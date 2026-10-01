@@ -101,7 +101,7 @@
                                     <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
                                          step count so you know if expanding is
                                          worth it before clicking -->
-                                    <span class="activity" x-show="collapsed" x-text="'(' + historyTurnSplit(turn).chain.length + (historyTurnSplit(turn).chain.length === 1 ? ' step)' : ' steps)')"></span>
+                                    <span class="activity" x-show="collapsed" x-text="'(' + chainDisplay(historyTurnSplit(turn).chain).length + (chainDisplay(historyTurnSplit(turn).chain).length === 1 ? ' step)' : ' steps)')"></span>
                                 </div>
                                 <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
                                      timeline layout: each chain segment is a station
@@ -110,11 +110,21 @@
                                      finish flag. -->
                                 <template x-if="!collapsed">
                                     <div class="agent-chain-body">
-                                        <template x-for="(message, messageIndex) in historyTurnSplit(turn).chain" :key="messageIndex">
+                                        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-26)
+                                             chainDisplay() folds reasoning + its tool calls into one
+                                             combined item so the step gets a single header -->
+                                        <template x-for="(message, messageIndex) in chainDisplay(historyTurnSplit(turn).chain)" :key="messageIndex">
                                             <div class="chain-station">
                                                 <div class="chain-rail"><div class="chain-dot"></div></div>
                                                 <div class="chain-content">
-                                                    {% include 'chat/turns/assistant_history.html' %}
+                                                    <!-- runtime branch: merged step vs regular segment -->
+                                                    <template x-if="message._combined">
+                                                        {% set combined_stream = False %}
+                                                        {% include 'chat/combined_block.html' %}
+                                                    </template>
+                                                    <template x-if="!message._combined">
+                                                        {% include 'chat/turns/assistant_history.html' %}
+                                                    </template>
                                                 </div>
                                             </div>
                                         </template>
@@ -172,7 +182,13 @@
                                     kept showing the previous 'thinking' label */
                                  const split = streamTurnSplit($store.stream.turn);
                                  const items = split.chain.concat(split.final);
-                                 return items.length ? chainItemLabel(items[items.length - 1]) : '';
+                                 if (!items.length) return '';
+                                 const label = chainItemLabel(items[items.length - 1]);
+                                 // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+                                 // finished reasoning reads Thoughts, only the
+                                 // live stream keeps Thinking.. (no double
+                                 // quotes in here, this lives in an html attr!)
+                                 return $store.stream.state === 'idle' ? label.replace('Thinking..', 'Thoughts') : label;
                              }
                          }">
                         <div class="agent-chain-header" @click="collapsed = !collapsed">
@@ -190,11 +206,20 @@
                              station's node pulses instead. -->
                         <template x-if="!collapsed">
                             <div class="agent-chain-body">
-                                <template x-for="(message, messageIndex) in streamTurnSplit($store.stream.turn).chain" :key="messageIndex">
+                                <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-26)
+                                     adjacent reasoning + tool_calls segments fold into one
+                                     combined step (see chainDisplay) -->
+                                <template x-for="(message, messageIndex) in chainDisplay(streamTurnSplit($store.stream.turn).chain)" :key="messageIndex">
                                     <div class="chain-station">
                                         <div class="chain-rail"><div class="chain-dot"></div></div>
                                         <div class="chain-content">
-                                            {% include 'chat/turns/assistant_stream.html' %}
+                                            <template x-if="message._combined">
+                                                {% set combined_stream = True %}
+                                                {% include 'chat/combined_block.html' %}
+                                            </template>
+                                            <template x-if="!message._combined">
+                                                {% include 'chat/turns/assistant_stream.html' %}
+                                            </template>
                                         </div>
                                     </div>
                                 </template>
