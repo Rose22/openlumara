@@ -359,6 +359,53 @@ function coderRunningInfo(tool, cacheKey) {
     };
 }
 
+// -- sandboxed_shell_run: terminal view ----------------------------------------
+
+// flatten a shell tool call into terminal display bits: the command text
+// (from args, streams live) plus the combined output (stdout, then stderr,
+// then any module errors like timeouts). done = response arrived, which
+// hides the blinking cursor. response shape: { status, content:
+// { stdout, stderr, exit_code, errors? } }, or content as a plain string
+// when the module itself errored before running anything.
+function shellViewInfo(tool, cacheKey) {
+    const args = toolArgs(tool, cacheKey);
+    const resp = toolResponse(tool);
+    // a literal newline in the command means it spans lines: the output
+    // then gets a dashed divider so where the command ends is clear
+    const multiline = String(args.command ?? '').includes('\n');
+    if (!resp) {
+        // response present but unparseable (plain-string error): show raw
+        return {
+            command: args.command ?? '',
+            output: typeof tool?.response === 'string' ? tool.response : '',
+            done: !!tool?.response,
+            multiline,
+        };
+    }
+    const c = resp.content;
+    const parts = [];
+    if (typeof c === 'string') parts.push(c);
+    else if (c && typeof c === 'object') {
+        if (c.stdout) parts.push(c.stdout);
+        if (c.stderr) parts.push(c.stderr);
+        if (Array.isArray(c.errors)) parts.push(c.errors.join('\n'));
+    }
+    let output = parts.join('\n\n');
+    // silent non-zero exits would leave an empty box - say something
+    if (!output && typeof c === 'object' && c && c.exit_code)
+        output = `(exit code ${c.exit_code})`;
+    return { command: args.command ?? '', output, done: true, multiline };
+}
+
+// bash-highlighted command html, memoized + throttled per view instance
+// (see streamMemo): long commands re-highlighting on every getter read per
+// streamed chunk would go quadratic.
+function shellCommandHtml(command, cacheKey) {
+    if (!command) return '';
+    return streamMemo('shell:' + cacheKey, [command],
+        () => highlightedCode(command, 'bash'));
+}
+
 // -- scheduler_add_job: schedule card ------------------------------------------
 
 const WEEKDAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -470,6 +517,18 @@ document.addEventListener('alpine:init', () => {
     registerToolDisplay({
         match: /^coder_(file_move|file_delete|folder_delete)$/,
         view: 'coder-path'
+    });
+
+    // sandboxed shell: terminal-style view, command streams in with a
+    // blinking cursor, output lands below it once the call completes
+    registerToolDisplay({
+        match: /^sandboxed_shell_run$/,
+        view: 'shell',
+        summary: (res, tool, cacheKey) => {
+            if (!res) return '';
+            const code = res.content?.exit_code;
+            return typeof code === 'number' && code !== 0 ? `exit ${code}` : '';
+        }
     });
 
     // scheduler jobs: card with clock, when + action

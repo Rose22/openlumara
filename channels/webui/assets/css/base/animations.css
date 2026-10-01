@@ -157,6 +157,13 @@
     to { background-position: 200% center; }
 }
 
+/* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+   blinking block cursor for the sandboxed shell tool view */
+@keyframes shellCursorBlink {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0; }
+}
+
 /* ==========================================================================
  *  Chat - Streamed Tokens
  *  ========================================================================== */

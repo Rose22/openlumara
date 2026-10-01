@@ -178,6 +178,30 @@
     </div>
 </template>
 
+<template x-if="toolDisplayView(tool) === 'shell'"
+          x-data="{ get info() { return shellViewInfo(tool, cacheKey) },
+                    get commandHtml() { return shellCommandHtml(this.info.command, cacheKey) } }">
+    <!-- single root element: x-if only renders the template's FIRST child -->
+    <div class="shell-box" x-auto-scroll>
+        <!-- terminal look: prompt symbol + command streaming in via token
+             fade, blinking cursor trails it until the output lands.
+             highlighted with the bash grammar while streaming too - hljs
+             tolerates partial input, tokens recolor as the command grows.
+             inline flow (no flex) so the cursor follows the LAST CHARACTER
+             across wrapped lines instead of hanging off the whole span -->
+        <div class="shell-prompt">
+            <span class="shell-prompt-symbol">$</span><span class="shell-command hljs" x-fade-html="commandHtml"></span><span class="shell-cursor" x-show="!info.done"></span>
+        </div>
+        <!-- dashed divider between a multiline command and its output, so
+             where the command ends stays clear; single-line commands need
+             no separator -->
+        <div class="shell-divider" x-show="info.multiline && info.output"></div>
+        <!-- output appears below the command once the call completes, as if
+             printed by the shell itself; cursor is gone by then -->
+        <div class="shell-output" x-show="info.output" x-fade-text="info.output"></div>
+    </div>
+</template>
+
 <template x-if="toolDisplayView(tool) === 'coder-file-edit'"
           x-data="{ get args() { return toolArgs(tool, cacheKey) },
                     get html() { return diffHtml(this.args.original_code, this.args.replacement_code, langForPath(this.args.path), cacheKey) } }">

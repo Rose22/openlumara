@@ -276,6 +276,76 @@
         }
     }
 
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+       shell view: terminal look. the command streams in after the prompt
+       symbol with a blinking block cursor trailing it; once the response
+       arrives the cursor hides and the output renders below, as if printed
+       by the command itself */
+    .shell-box {
+        font-family: var(--code-font);
+        font-size: 0.8rem;
+        line-height: 1.55;
+        max-height: 300px;
+        overflow-y: auto;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 10px 12px;
+        background: color-mix(in srgb, var(--bg-secondary, #000) 60%, transparent);
+
+        /* inline flow, NOT flex - the cursor must sit directly after the
+           last command character, so it wraps along with the text onto
+           continuation lines instead of hanging off the end of the block.
+           no whitespace between the spans in markup: pre-wrap would
+           render stray gaps */
+        .shell-prompt {
+            line-height: 1.55;
+        }
+
+        .shell-prompt-symbol {
+            color: #4ade80;
+            font-weight: 700;
+            user-select: none;
+            margin-right: 8px;
+        }
+
+        .shell-command {
+            white-space: pre-wrap;
+            word-break: break-word;
+            /* the hljs class pulls token colors from the active code
+               theme, but themes also set an opaque .hljs background -
+               kill it, the terminal box keeps its own bg */
+            background: transparent;
+        }
+
+        /* blinking block cursor, trails the streamed command inline.
+           explicit display: x-show hides via an inline display:none and
+           restores by removing it, so the css value must render the box */
+        .shell-cursor {
+            display: inline-block;
+            width: 0.55em;
+            height: 1.05em;
+            vertical-align: text-bottom;
+            margin-left: 2px;
+            background: var(--text-primary);
+            animation: shellCursorBlink 1.06s steps(1) infinite;
+        }
+
+        /* dashed separator for multiline commands (markup only renders
+           it when the command actually contains newlines) */
+        .shell-divider {
+            margin: 8px 0 6px;
+            border-top: 1px dashed var(--border-color);
+            opacity: 0.7;
+        }
+
+        .shell-output {
+            margin-top: 6px;
+            white-space: pre-wrap;
+            word-break: break-word;
+            color: var(--text-secondary);
+        }
+    }
+
     /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-18)
        tools_load: one soft chip per loaded module, box icon + name */
     .module-chips {
