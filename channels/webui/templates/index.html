@@ -70,6 +70,12 @@
 
         <link rel="stylesheet" id="code-theme" href="{{ url_for('assets', path='css/code-themes/github-dark.css') }}">
 
+        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+             admin lockdown flag: lets the stores skip their (now blocked)
+             settings-related fetches instead of throwing on 403s -->
+        {% if not config.get("enable_admin_settings") %}
+        <script>window.ADMIN_SETTINGS_DISABLED = true;</script>
+        {% endif %}
     </head>
     <body>
         <!-- 

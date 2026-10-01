@@ -1,3 +1,20 @@
+{% if not config.get('enable_chain_expansion') %}
+<!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+     reasoning display disabled: static, non-expandable stub so the user
+     still sees activity. label flips Thinking.. -> Thoughts just like the
+     real block, but there is no content and no click handler. -->
+<div class="reasoning-wrapper collapsed" :class="{ 'is-reasoning-active': !done }"
+     x-data="{ done: $store.stream.state === 'idle' }"
+     x-effect="const msgs = $store.stream.turn?.messages ?? []; const isLast = msgs[msgs.length - 1] === message; done = $store.stream.state === 'idle' || !isLast">
+    <div class="header">
+        {% include 'svg/thought_bubble.svg' %}
+        <span class="text">
+            <span class="label" x-text="done ? 'Thoughts' : 'Thinking..'"></span>
+            <span class="dots" x-show="!done"><span aria-hidden="true">&nbsp;</span><span aria-hidden="true">&nbsp;</span><span aria-hidden="true">&nbsp;</span></span>
+        </span>
+    </div>
+</div>
+{% else %}
 <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
      Auto-collapse reasoning once it's done thinking: a reasoning block is
      finished when it's no longer the last segment of the live stream (a
@@ -42,3 +59,4 @@
         </div>
     </div>
 </div>
+{% endif %}

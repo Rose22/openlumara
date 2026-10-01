@@ -71,10 +71,6 @@ class Webui(core.channel.Channel):
             "description": "What port to run the WebUI on. Set this to 80 to be able to access it like a normal website, and anything else to access it on that port (for example http://yourdomain.org:3000)",
             "default": 3000
         },
-        "allow_admin_commands": {
-            "description": "Whether to allow /commands that control the openlumara server. Turn this off if you expose your openlumara instance to the internet without a login!",
-            "default": True
-        },
         "enable_chat_header": {
             "description": "Whether to enable the header at the top of a chat. Disabling this removes access to all graphical controls, and strips the interface down to a very basic chat. You might want this for public instances!",
             "default": True
@@ -88,19 +84,31 @@ class Webui(core.channel.Channel):
             "default": "OpenLumara",
             "depends": {"enable_chat_header": True, "enable_title": True}
         },
-        "enable_chat_titlebar": {
-            "description": "Whether to show the name of the chat below the header",
-            "default": False
-        },
-        "enable_streaming_state_display": {
-            "description": "Whether to show an indicator in the header that tells you what the AI is currently doing. Very useful! Disabled on mobile due to lack of space.",
-            "default": True,
-            "depends": "enable_chat_header",
-        },
         "enable_model_switcher": {
             "description": "Whether to show a model dropdown in the header, so you can quickly switch models without opening the settings. Disabled on mobile due to lack of space.",
             "default": True,
             "depends": "enable_chat_header",
+        },
+        "enable_streaming_state_display": {
+            "description": "Whether to show an indicator in the header that tells you what the AI is currently doing. Very useful! Disabled on mobile due to lack of space.",
+            "default": False,
+            "depends": "enable_chat_header",
+        },
+        "enable_chain_expansion": {
+            "description": "Whether the processing chain can be expanded to view the AI's thoughts and intermediate steps. When disabled, it stays locked in its collapsed state (showing only 'Processing..'/'Thinking..' labels), so you always see that the AI is busy without being able to peek inside.",
+            "default": True
+        },
+        "enable_context_pill": {
+            "description": "Whether to show the context usage pill next to the message input.",
+            "default": True
+        },
+        "enable_file_upload": {
+            "description": "Whether to allow uploading files and pasting images into the chat",
+            "default": True
+        },
+        "show_welcome_screen": {
+            "description": "Whether to show the welcome panel in empty chats",
+            "default": True
         },
         "enable_sidebar": {
             "description": "Whether to enable the sidebar at the left of the screen. Without it, you can\'t switch chats the graphical way, but you can still use commands like `/chat`!",
@@ -110,6 +118,10 @@ class Webui(core.channel.Channel):
             "description": "Whether to show unsafe settings. This setting has to be manually toggled via `/config` or by editing the config file, because if you want access to the unsafe features, you hopefully know what you're doing!",
             "default": False,
             "unsafe": True
+        },
+        "enable_admin_settings": {
+            "description": "Whether to allow changing server settings from the webui. If you turn this off, it hides the settings button and blocks all other ways the settings could be changed, including commands. So if you turn this off, *the only way you can turn it back on is by editing the config file*. Be careful!",
+            "default": True
         },
         "require_login": {
             "description": "Whether to protect the WebUI with a username and password. **Highly recommended if your webui is exposed to the internet!!**",
@@ -826,6 +838,24 @@ async def op_chat_rename(channel, title, chat_id=None):
 # -------------------
 # FastAPI creator (contains routes and so on)
 # -------------------
+
+# -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+# endpoints blocked entirely when enable_admin_settings is off.
+# /api/system/data is deliberately NOT here: the context pill reads
+# max_context from it, and it's read-only.
+ADMIN_ONLY_ENDPOINTS = [
+    "/api/settings/load",
+    "/api/settings/save",
+    "/api/check_connection",
+    "/api/models",
+    "/api/model/set",
+    "/api/reconnect",
+    "/api/chat/prompt",
+    "/api/system/logs",
+    "/api/system/restart",
+    "/api/system/context_size",
+]
+
 def api_result(obj = None, success: bool = True):
     if obj is None:
         result = {}
@@ -841,6 +871,17 @@ async def create_fastapi(channel):
     # auth middleware for all routes
     @app.middleware("http")
     async def auth_middleware(request: fastapi.Request, call_next):
+        # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+        # admin lockdown: when enable_admin_settings is off, every
+        # settings-related endpoint is blocked outright, regardless of
+        # whether login is enabled.
+        if not channel.config.get("enable_admin_settings", True):
+            if request.url.path in ADMIN_ONLY_ENDPOINTS:
+                return fastapi.responses.JSONResponse(
+                    status_code=403,
+                    content={"data": "Admin settings are disabled", "success": False}
+                )
+
         # Skip auth check if login isn't required
         if not channel.config.get("require_login", False):
             return await call_next(request)
@@ -1735,6 +1776,16 @@ async def create_fastapi(channel):
 
                             files_dict = None
                             if files_data:
+                                # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+                                # enforce enable_file_upload server-side too:
+                                # hiding the button is only cosmetic otherwise
+                                if not channel.config.get("enable_file_upload", True):
+                                    await ws_mgr.broadcast({
+                                        "type": "error",
+                                        "error": "File uploads are disabled"
+                                    })
+                                    continue
+
                                 files_dict = {
                                     f["name"]: base64.b64decode(f["data"])
                                     for f in files_data
@@ -1857,7 +1908,10 @@ class WebSocketManager:
                 self.channel.send_stream(
                     message=message,
                     files=files,
-                    commands_authorized=self.channel.config.get("allow_admin_commands")
+                    # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+                    # admin commands are now gated by enable_admin_settings
+                    # (the old allow_admin_commands toggle was merged into it)
+                    commands_authorized=self.channel.config.get("enable_admin_settings", True)
                 )
             )
         finally:

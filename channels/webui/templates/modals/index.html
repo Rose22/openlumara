@@ -1,6 +1,10 @@
 {# this file just auto includes all modals #}
 
+{# -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+   admin lockdown: don't even ship the settings modal markup #}
+{% if config.get("enable_admin_settings") %}
 {% include 'modals/settings/index.html' %}
+{% endif %}
 {% include 'modals/system/state.html' %}
 {% include 'modals/global_search.html' %}
 {% include 'modals/categories.html' %}

@@ -46,6 +46,17 @@
         filter: brightness(1.03);
     }
 
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+       locked chain (enable_chain_expansion off): not expandable, so
+       no pointer cursor and no hover feedback */
+    .agent-chain-header.locked {
+        cursor: default;
+
+        &:hover {
+            filter: none;
+        }
+    }
+
     /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
        slow gear spin while the chain is still running. NOTE: `&.is-streaming`
        - the class is on the .agent-chain element ITSELF, a plain nested

@@ -2,9 +2,6 @@
 {% if config.get('enable_chat_header') %}
     {% include 'chat/header.html' %}
 {% endif %}
-{% if config.get('enable_chat_titlebar') %}
-    {% include 'chat/titlebar.html' %}
-{% endif %}
 
 <template x-if="$store.ui.notice">
     <div class="notice" x-html="$store.ui.notice"></div>
@@ -33,7 +30,9 @@
     -->
 
     <!-- welcome panel for empty chats -->
+    {% if config.get('show_welcome_screen') %}
     {% include 'chat/welcome.html' %}
+    {% endif %}
 
     <!-- historical turns -->
     <!--
@@ -102,10 +101,19 @@
                                      // tool-less chain (just reasoning/content):
                                      // the header reads standalone Thoughts
                                      get thoughtsOnly() { return turn.steps.every(s => s.status === 'thoughts') } }">
+                                <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+                                     reasoning display disabled: the chain is locked
+                                     collapsed - no chevron, clicking does nothing -->
+                                {% if not config.get('enable_chain_expansion') %}
+                                <div class="agent-chain-header locked">
+                                {% else %}
                                 <div class="agent-chain-header" @click="collapsed = !collapsed; if (!collapsed) mounted = true">
+                                {% endif %}
+                                    {% if config.get('enable_chain_expansion') %}
                                     <svg :class="{'toggle': true, 'toggle-expanded': !collapsed}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <polyline points="9 6 15 12 9 18"></polyline>
                                     </svg>
+                                    {% endif %}
                                     <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
                                          thoughts-only turns swap the gear + Process
                                          label for a thought bubble + Thoughts -->
@@ -206,7 +214,13 @@
                              // initial collapse state follows the Appearance
                              // setting (read fresh at mount, so it applies
                              // starting from the next turn)
+                             // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+                             // reasoning display disabled: locked collapsed
+                             {% if config.get('enable_chain_expansion') %}
                              collapsed: localStorage.getItem('collapseChainDefault') === 'true',
+                             {% else %}
+                             collapsed: true,
+                             {% endif %}
                              get processing() { return $store.stream.state !== 'idle' },
                              get lastLabel() {
                                  /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
@@ -225,10 +239,19 @@
                                  return $store.stream.state === 'idle' ? label.replace('Thinking..', 'Thoughts') : label;
                              }
                          }">
+                        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+                             reasoning display disabled: locked collapsed, no
+                             chevron and clicking does nothing -->
+                        {% if not config.get('enable_chain_expansion') %}
+                        <div class="agent-chain-header locked">
+                        {% else %}
                         <div class="agent-chain-header" @click="collapsed = !collapsed">
+                        {% endif %}
+                            {% if config.get('enable_chain_expansion') %}
                             <svg :class="{'toggle': true, 'toggle-expanded': !collapsed}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="9 6 15 12 9 18"></polyline>
                             </svg>
+                            {% endif %}
                             {% include 'svg/gear.svg' %}
                             <span class="label" x-text="processing ? 'Processing..' : 'Process'"></span>
                             <span class="activity" x-show="collapsed && lastLabel" x-text="'(' + lastLabel + ')'"></span>
@@ -293,7 +316,9 @@
 </div>
 
 <!-- invisible upload form -->
+{% if config.get('enable_file_upload') %}
 {% include 'chat/upload.html' %}
+{% endif %}
 
 <!-- token usage bar -->
 <div class="input-wrapper">

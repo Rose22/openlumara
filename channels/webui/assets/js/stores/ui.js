@@ -225,11 +225,55 @@ UI_STORE = {
         this._updateShouldScroll(el);
     },
 
-    async scrollToBottom(containerId = 'messages') {
+    /*
+     * -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01) (23:30)
+     * instant jump-to-bottom, shared by forceScrollToBottom() and the
+     * instant variant of scrollToBottom(). cancels any in-flight chase so
+     * its per-frame writes don't fight the jumps.
+     *
+     * lazy-mounted turns change scrollHeight asynchronously: the
+     * intersectionobserver only mounts placeholders into real dom a
+     * frame *after* we scroll, so a single nextTick scroll lands above
+     * the true bottom. iterate (scroll -> wait a frame -> check if the
+     * height changed) until it settles, so mounting near the bottom is
+     * always followed by another scroll to the new bottom.
+     * aborts if the user grabs the scrollbar mid-flight.
+     */
+    async _jumpToBottom(el) {
+        this._stopChase(el);
+
+        let lastHeight = -1;
+        for (let i = 0; i < 24; i++) {
+            await Alpine.nextTick();
+            // scrollTo with behavior:'instant' overrides the global
+            // scroll-behavior:smooth. with smooth, each jump animated through
+            // the whole chat and the lazy-mount zone mounted everything along
+            // the way down. instant jumps land at the bottom directly.
+            el.scrollTo({ top: el.scrollHeight, behavior: 'instant' });
+            await new Promise(resolve => requestAnimationFrame(resolve));
+
+            if (!this.shouldScroll) break;
+            if (el.scrollHeight === lastHeight) break;
+            lastHeight = el.scrollHeight;
+        }
+    },
+
+    /*
+     * -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01) (23:30)
+     * instant=true skips the lerp-chase glide entirely and jumps straight
+     * to the bottom: use this after chat reloads (e.g. stream_complete)
+     * where a smooth scroll across the whole chat looks awful.
+     */
+    async scrollToBottom(containerId = 'messages', instant = false) {
         if (!this.shouldScroll) return;
 
         const el = document.getElementById(containerId);
         if (!el) return;
+
+        if (instant) {
+            await this._jumpToBottom(el);
+            return;
+        }
 
         // lerp chase for the streaming follow; tokens arriving mid-chase
         // just extend the glide since the target is re-read every frame
@@ -242,38 +286,9 @@ UI_STORE = {
         const el = document.getElementById(containerId);
         if (!el) return;
 
-        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17) (02:45)
-        // cancel an in-flight chase so its per-frame writes don't fight
-        // the instant jumps below
-        this._stopChase(el);
-
         this.shouldScroll = true;
 
-        /*
-         * -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-15)
-         * lazy-mounted turns change scrollHeight asynchronously: the
-         * intersectionobserver only mounts placeholders into real dom a
-         * frame *after* we scroll, so a single nextTick scroll lands above
-         * the true bottom. iterate (scroll -> wait a frame -> check if the
-         * height changed) until it settles, so mounting near the bottom is
-         * always followed by another scroll to the new bottom.
-         * aborts if the user grabs the scrollbar mid-flight.
-         */
-        let lastHeight = -1;
-        for (let i = 0; i < 24; i++) {
-            await Alpine.nextTick();
-            // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-15)
-            // scrollTo with behavior:'instant' overrides the global
-            // scroll-behavior:smooth. with smooth, each jump animated through
-            // the whole chat and the lazy-mount zone mounted everything along
-            // the way down. instant jumps land at the bottom directly.
-            el.scrollTo({ top: el.scrollHeight, behavior: 'instant' });
-            await new Promise(resolve => requestAnimationFrame(resolve));
-
-            if (!this.shouldScroll) break;
-            if (el.scrollHeight === lastHeight) break;
-            lastHeight = el.scrollHeight;
-        }
+        await this._jumpToBottom(el);
     },
 
     async scrollToTurn(turnIndex) {

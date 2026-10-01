@@ -338,7 +338,10 @@ async function handleWebSocketMessage(data) {
             // finalize the stream
             responseSoundPlayed = false;
             AudioManager.play("completion");
-            await ui.scrollToBottom();
+            // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01) (23:30)
+            // instant: a forced chat reload after the stream ends must never
+            // smooth-scroll across the whole chat
+            await ui.scrollToBottom('messages', true);
 
             // and finally, sync back up with the backend
             await chat.reloadChat();
@@ -347,7 +350,7 @@ async function handleWebSocketMessage(data) {
             // the reload can swap in finalized turn objects after the earlier
             // scroll fired, which changes content heights - scroll once more so
             // we end up at the true bottom (no-op if the user scrolled up)
-            await ui.scrollToBottom();
+            await ui.scrollToBottom('messages', true);
 
             stream.state = 'idle';
 

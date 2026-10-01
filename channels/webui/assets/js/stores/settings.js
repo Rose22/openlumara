@@ -42,6 +42,11 @@ SETTINGS_STORE = {
 
     // --- Init & Load ---
     async init() {
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+        // admin lockdown: the settings endpoints are blocked server-side,
+        // so skip loading them entirely instead of erroring on 403s.
+        if (window.ADMIN_SETTINGS_DISABLED) return;
+
         await this.load();
         await this.checkApiConnection();
     },

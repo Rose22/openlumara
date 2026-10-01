@@ -75,7 +75,7 @@
 
         #user-input {
             flex: 1;
-            padding: 14px 0px;
+            padding: 14px 14px;
             height: 48px;
             min-height: auto;
             resize: vertical;
