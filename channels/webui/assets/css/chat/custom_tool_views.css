@@ -8,6 +8,18 @@
 
 .tool-call-card {
 
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+       error text for failed calls that render a custom view: always shown
+       below the view markup, in the error color */
+    .display-error {
+        margin-top: 6px;
+        font-size: 0.8rem;
+        color: var(--error, #f87171);
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-family: var(--code-font);
+    }
+
     /* single line below a custom display box (eg. file: foo.py) */
     .display-footer {
         margin-top: 6px;

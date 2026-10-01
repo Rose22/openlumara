@@ -82,6 +82,10 @@
                 <div class="step-content" x-md="{ message: message, live: false }"></div>
                 {% endif %}
             </template>
+            <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+                 flag for toolcalls.html: its first card defaults to expanded
+                 inside steps - see toolcalls.html -->
+            {% set toolcard_in_step = True %}
             {% include 'chat/toolcalls.html' %}
         </div>
     </div>

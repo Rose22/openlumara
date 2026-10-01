@@ -461,6 +461,10 @@ function shellViewInfo(tool, cacheKey) {
         };
     }
     const c = resp.content;
+    // module-level error (content is the error string): leave the terminal
+    // box empty - the shared .display-error row below the view shows it
+    if (resp.status === 'error' && typeof c === 'string')
+        return { command: args.command ?? '', output: '', done: true, multiline };
     const parts = [];
     if (typeof c === 'string') parts.push(c);
     else if (c && typeof c === 'object') {
@@ -507,6 +511,19 @@ function schedulerInfo(args) {
 // module) are shown as plain text instead.
 function toolLoadModules(args) {
     return Array.isArray(args.module_names) ? args.module_names : [];
+}
+
+// -- shared: error text below any custom view ----------------------------------
+// -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+// every registered view shows a failed call's error text below its markup,
+// in the error color (see .display-error in custom_tool_views.css). parses
+// the response itself so view scopes only need `tool`; content is usually
+// a string, stringified if a module returned an object.
+function toolDisplayError(tool) {
+    const resp = toolResponse(tool);
+    if (!resp || resp.status !== 'error') return '';
+    const c = resp.content;
+    return typeof c === 'string' ? c : JSON.stringify(c);
 }
 
 // -- registrations ------------------------------------------------------------

@@ -8,17 +8,14 @@
      generation anywhere - everything here is plain alpine markup.
      `tool` and `cacheKey` come from the including template's scope. -->
 
+<!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+     error handling unified: failed calls no longer render per-view error
+     branches - a shared .display-error row (toolcalls.html) now shows the
+     error text below whichever view is active. -->
 <template x-if="toolDisplayView(tool) === 'web-search'"
           x-data="{ get response() { return toolResponse(tool) },
-                    get results() { return searchResults(this.response) },
-                    get errorText() {
-                        if (!this.response || this.response.status !== 'error') return '';
-                        const c = this.response.content;
-                        return typeof c === 'string' ? c : JSON.stringify(c);
-                    } }">
+                    get results() { return searchResults(this.response) } }">
     <div>
-        <!-- search failed: show the error text instead of an empty body -->
-        <div class="search-snippet" x-show="errorText" x-text="errorText"></div>
         <div class="search-results" x-show="results.length">
             <template x-for="res in results">
                 <div class="search-card">
@@ -39,14 +36,19 @@
 <template x-if="toolDisplayView(tool) === 'file-read'"
           x-data="{ get args() { return toolArgs(tool, cacheKey) },
                     get response() { return toolResponse(tool) },
-                    get isError() { return !!this.response && this.response.status === 'error' },
-                    get html() { return codeLinesHtml(this.response?.content, langForPath(this.args.path), this.args.line_start, cacheKey) } }">
+                    get html() {
+                        // error responses carry the message in content -
+                        // don't paint it as a code block, the shared
+                        // .display-error row below the view shows it
+                        if (this.response && this.response.status === 'error') return '';
+                        return codeLinesHtml(this.response?.content, langForPath(this.args.path), this.args.line_start, cacheKey);
+                    } }">
     <div>
-        <!-- failed read: plain error text -->
-        <div class="search-snippet" x-show="isError" x-text="response?.content ?? ''"></div>
-        <!-- successful read: highlighted code block. x-html is the one
-             sanctioned escape hatch: hljs output is escaped markup -->
-        <div class="file-read-box hljs" x-show="!isError && html" x-html="html"></div>
+        <!-- read: highlighted code block (error responses render nothing
+             here; the shared .display-error row below the view shows the
+             failure). x-html is the one sanctioned escape hatch: hljs
+             output is escaped markup -->
+        <div class="file-read-box hljs" x-show="html" x-html="html"></div>
         <div class="display-footer" x-show="args.sandbox || args.path" x-text="coderFooterText(args)"></div>
         <div class="grep-note" x-show="response?.truncation_note" x-text="response?.truncation_note ?? ''"></div>
     </div>
@@ -55,32 +57,24 @@
 <template x-if="toolDisplayView(tool) === 'file-create'"
           x-data="{ get args() { return toolArgs(tool, cacheKey) },
                     get response() { return toolResponse(tool) },
-                    get isError() { return !!this.response && this.response.status === 'error' },
                     get html() { return codeLinesHtml(this.args.content, langForPath(this.args.path), 1, cacheKey) } }">
     <div>
-        <!-- failed create: plain error text -->
-        <div class="search-snippet" x-show="isError" x-text="typeof response?.content === 'string' ? response.content : ''"></div>
         <!-- the new file's content, highlighted, streaming live from the
-             args (no response needed - creation is the last step).
-             x-fade-html fades in the new tail chars per paint; faded chars
-             sit inside their hljs token spans so they keep their colors -->
-        <div class="file-read-box hljs" x-show="!isError && html" x-auto-scroll x-fade-html="html"></div>
+             args (no response needed - creation is the last step). a failed
+             create renders no box; the shared .display-error row shows the
+             reason. x-fade-html fades in the new tail chars per paint;
+             faded chars sit inside their hljs token spans so they keep
+             their colors -->
+        <div class="file-read-box hljs" x-show="html" x-auto-scroll x-fade-html="html"></div>
         <div class="display-footer" x-show="args.sandbox || args.path" x-text="coderFooterText(args)"></div>
     </div>
 </template>
 
 <template x-if="toolDisplayView(tool) === 'tools-load'"
           x-data="{ get args() { return toolArgs(tool, cacheKey) },
-                    get response() { return toolResponse(tool) },
-                    get errorText() {
-                        if (!this.response || this.response.status !== 'error') return '';
-                        const c = this.response.content;
-                        return typeof c === 'string' ? c : JSON.stringify(c);
-                    },
                     get modules() { return toolLoadModules(this.args) } }">
     <div>
-        <div class="search-snippet" x-show="errorText" x-text="errorText"></div>
-        <div class="module-chips" x-show="!errorText && modules.length">
+        <div class="module-chips" x-show="modules.length">
             <template x-for="mod in modules">
                 <span class="module-chip">
                     {% include 'svg/plug.svg' %}
@@ -109,12 +103,7 @@
 <template x-if="toolDisplayView(tool) === 'grep'"
           x-data="{ get args() { return toolArgs(tool, cacheKey) },
                     get response() { return toolResponse(tool) },
-                    get groups() { return grepGroups(this.response, this.args) },
-                    get errorText() {
-                        if (!this.response || this.response.status !== 'error') return '';
-                        const c = this.response.content;
-                        return typeof c === 'string' ? c : JSON.stringify(c);
-                    } }">
+                    get groups() { return grepGroups(this.response, this.args) } }">
     <!-- single root element: x-if only renders the template's FIRST child -->
     <div>
         <!-- while running (no response yet): live preview of the args, eg.
@@ -126,7 +115,6 @@
             <span class="grep-running-pattern" x-show="args.sandbox || args.file_path || args.sub_path"
                   x-text="(args.sandbox ? args.sandbox + ': ' : '') + (args.file_path ?? args.sub_path ?? '')"></span>
         </div>
-        <div class="search-snippet" x-show="errorText" x-text="errorText"></div>
         <div class="grep-results" x-show="groups.length">
             <template x-for="g in groups">
                 <div class="grep-file">
@@ -149,23 +137,18 @@
           x-data="{ get args() { return toolArgs(tool, cacheKey) },
                     get response() { return toolResponse(tool) },
                     get info() { return coderRunningInfo(tool, cacheKey) },
-                    get files() { return globFiles(this.response) },
-                    get errorText() {
-                        if (!this.response || this.response.status !== 'error') return '';
-                        const c = this.response.content;
-                        return typeof c === 'string' ? c : JSON.stringify(c);
-                    } }">
+                    get files() { return globFiles(this.response) } }">
     <!-- single root element: x-if only renders the template's FIRST child -->
     <div>
         <!-- while running (no response yet): dim one-liner of the streamed
              args, eg. "moving · dev: foo/bar.py" - same idea as the grep
-             running preview -->
+             running preview. hidden once the call settles (errors are shown
+             by the shared .display-error row below the view) -->
         <div class="grep-running" x-show="!response">
             <span class="grep-running-label" x-text="info.label"></span>
             <span class="grep-running-pattern" x-show="info.sandbox || info.path"
                   x-text="(info.sandbox ? info.sandbox + ': ' : '') + info.path"></span>
         </div>
-        <div class="search-snippet" x-show="errorText" x-text="errorText"></div>
         <!-- glob results: plain file list -->
         <div class="glob-files" x-show="files.length">
             <template x-for="f in files">
@@ -173,7 +156,7 @@
             </template>
         </div>
         <div class="grep-note" x-show="response?.content?.note" x-text="response?.content?.note ?? ''"></div>
-        <div class="display-footer" x-show="response && !errorText && (args.sandbox || args.path || args.orig_path)"
+        <div class="display-footer" x-show="response && response.status !== 'error' && (args.sandbox || args.path || args.orig_path)"
              x-text="coderFooterText({ sandbox: args.sandbox, path: args.path ?? args.orig_path })"></div>
     </div>
 </template>

@@ -111,6 +111,15 @@
         display: flex;
         gap: 1.18em;
         min-width: 0;
+
+        /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+           render-skipping for gigantic chains: off-screen stations skip
+           layout + paint entirely (the browser keeps a placeholder sized
+           by contain-intrinsic-size, which then remembers the real size
+           after the first paint). makes mounting/scrolling a long chain
+           body cheap without touching the DOM. */
+        content-visibility: auto;
+        contain-intrinsic-size: auto 120px;
     }
 
     .chain-rail {

@@ -94,8 +94,15 @@
                              steps arrive precomputed from the backend
                              (core/turns.py group_history) -->
                         <template x-if="(turn.steps ?? []).length > 0">
-                            <div class="agent-chain" x-data="{ collapsed: true }">
-                                <div class="agent-chain-header" @click="collapsed = !collapsed">
+                            <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+                                 mount-once collapse: x-if keeps the (possibly huge)
+                                 chain body OUT of the DOM until the first expand
+                                 (agentic chains can be gigantic), but from then on
+                                 the body persists and x-show just hides it - so
+                                 re-expanding is instant instead of rebuilding the
+                                 whole chain (the jump). -->
+                            <div class="agent-chain" x-data="{ collapsed: true, mounted: false }">
+                                <div class="agent-chain-header" @click="collapsed = !collapsed; if (!collapsed) mounted = true">
                                     <svg :class="{'toggle': true, 'toggle-expanded': !collapsed}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <polyline points="9 6 15 12 9 18"></polyline>
                                     </svg>
@@ -108,8 +115,8 @@
                                      with a node dot on the spine that starts at the
                                      Process chevron; the turn's chain ends on a
                                      finish flag. -->
-                                <template x-if="!collapsed">
-                                    <div class="agent-chain-body">
+                                <template x-if="mounted">
+                                    <div class="agent-chain-body" x-show="!collapsed">
                                         <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
                                              every chain item is a backend step now; no more
                                              combined-vs-regular runtime branch -->

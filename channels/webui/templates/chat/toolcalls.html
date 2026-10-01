@@ -5,8 +5,20 @@
                  Auto-collapse each tool card the moment its response arrives
                  during streaming. autoCollapsed guards against re-collapsing
                  if the user manually expands it again mid-stream. -->
+            <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+                 in-step cards (toolcard_in_step set by combined_block.html):
+                 while streaming, a call is expanded while running and the
+                 auto-collapse x-effect folds it when the response lands
+                 (unchanged); once idle, the step's FIRST card starts
+                 expanded - it's the step's payload, already open when the
+                 step opens, so no follow-up toggle can lag behind. the
+                 collapse-toolcalls-by-default pref wins over both.
+                 autoCollapsed seeds from !!tool.response: the collapse
+                 x-effect fires on init, which would otherwise re-collapse a
+                 settled expanded card (history cards always have a
+                 response) the instant it renders. -->
             <div class="tool-calls-container"
-                 x-data="{ collapsed: $store.stream.state === 'idle' || !!tool.response || localStorage.getItem('collapseToolcallsDefault') === 'true', autoCollapsed: false, cacheKey: tool.id ?? (message.tool_call_id + ':' + toolIdx) }"
+                 x-data="{ collapsed: {% if toolcard_in_step %}localStorage.getItem('collapseToolcallsDefault') === 'true' || ($store.stream.state === 'idle' ? toolIdx > 0 : !!tool.response){% else %}$store.stream.state === 'idle' || !!tool.response || localStorage.getItem('collapseToolcallsDefault') === 'true'{% endif %}, autoCollapsed: !!tool.response, cacheKey: tool.id ?? (message.tool_call_id + ':' + toolIdx) }"
                  x-effect="if (tool.response && !autoCollapsed) { autoCollapsed = true; collapsed = true }">
             <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
                  tool-pending marks in-flight calls (no response yet) so the
@@ -62,6 +74,14 @@
                              (tool_displays.html) instead of the default arg
                              rows - no html strings involved -->
                         {% include 'chat/tool_displays.html' %}
+                        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+                             failed calls with a custom view: the error text always
+                             shows below the view markup, in the error color (the
+                             default display renders its own raw response) -->
+                        <template x-if="toolDisplayView(tool)">
+                            <div class="display-error" x-show="toolDisplayError(tool)"
+                                 x-text="toolDisplayError(tool)"></div>
+                        </template>
                         <template x-if="!toolDisplayView(tool)">
                         <div class="default-display">
                             <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
