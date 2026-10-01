@@ -13,7 +13,7 @@
                  timeline pulses exactly the active nodes regardless of
                  collapse state; tool-error marks calls whose response has
                  status:"error" -->
-            <div class="tool-call-card" :class="{ 'tool-pending': !tool.response, 'tool-error': toolCallFailed(tool) }">
+            <div class="tool-call-card" :class="{ 'tool-pending': !tool.response, 'tool-error': tool.failed }">
                     <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
                          timeline node: circle + chevron on the spine (design B) -->
                     <div class="node-dot" :class="{expanded: !collapsed}" @click.stop="collapsed = !collapsed">

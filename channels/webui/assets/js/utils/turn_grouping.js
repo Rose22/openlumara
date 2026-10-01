@@ -7,25 +7,9 @@
  *    objects shaped exactly like the backend history steps
  *  - streamTurnSplit(): the final-content-detection heuristic the backend
  *    can't know mid-stream
- *  - tool call display helpers shared with the tool cards
+ *  - toolCallArgsSummary(): the one-line arg hint (pending backend move)
+ * failed flags and collapsed-header labels are stamped by the backend now.
  */
-
-// -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
-// messages that render nothing at all (empty content segments, empty
-// reasoning) would become ghost stations on the timeline: invisible body
-// with a node dot. they get filtered out of the chain entirely.
-function hasVisibleChainContent(message) {
-    // tool calls: needs an actual non-empty array (the template loops over
-    // message.tool_calls; an empty/missing array renders nothing)
-    if (message.tool_calls || message.type === 'tool_calls' || message.type === 'tool_call_delta') {
-        return Array.isArray(message.tool_calls) && message.tool_calls.length > 0;
-    }
-    if (message.reasoning_content && message.reasoning_content.trim() !== '') return true;
-    // content only renders for assistant messages (see assistant_history.html);
-    // tool-result / system messages with string content would be ghost stations
-    if (message.role === 'assistant' && typeof message.content === 'string' && message.content.trim() !== '') return true;
-    return false;
-}
 
 // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
 // group streaming segments by the step number the backend stamped on them
@@ -60,17 +44,6 @@ function streamSteps(chain) {
         s._tail = m;
     }
     return Array.from(steps.values());
-}
-
-// -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
-// a tool call failed when its parsed response is {status: "error", ..}
-function toolCallFailed(tool) {
-    try {
-        const p = JSON.parse(tool.response);
-        return p !== null && typeof p === 'object' && p.status === 'error';
-    } catch {
-        return false;
-    }
 }
 
 // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
@@ -118,26 +91,6 @@ function toolCallArgsSummary(tool) {
     return '(' + truncateArg(argToString(chosen[1])) + ')';
 }
 
-// -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
-// short human label for a chain segment, shown in parentheses on the
-// collapsed Process header (what is the agent busy with right now?)
-function chainItemLabel(message) {
-    if (Array.isArray(message.tool_calls) && message.tool_calls.length > 0) {
-        const fn = message.tool_calls[message.tool_calls.length - 1].function?.name;
-        if (fn) {
-            const parts = fn.split('_');
-            return parts[0].replace(/^\w/, c => c.toUpperCase()) + ': ' + parts.slice(1).join(' ');
-        }
-    }
-    if (message.reasoning_content && message.reasoning_content.trim() !== '') return 'Thinking..';
-    if (message.role === 'assistant' && typeof message.content === 'string' && message.content.trim() !== '') {
-        // content segments: the ai is putting words together, not reasoning -
-        // 'writing' reads better than a raw snippet here
-        return 'writing';
-    }
-    return '';
-}
-
 // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
 // while streaming we can't know which content will be the final one:
 // content only counts as final while it is the most recent segment. if a
@@ -147,9 +100,11 @@ function streamTurnSplit(turn) {
     const messages = turn?.messages || [];
     const last = messages[messages.length - 1];
 
+    // empty segments are already filtered out backend-side (group_stream
+    // only yields segments with visible content), so no filter here
     if (last && last.type === 'content' && !last.tool_calls) {
-        return { chain: messages.slice(0, -1).filter(hasVisibleChainContent), final: [last] };
+        return { chain: messages.slice(0, -1), final: [last] };
     }
 
-    return { chain: messages.filter(hasVisibleChainContent), final: [] };
+    return { chain: messages, final: [] };
 }

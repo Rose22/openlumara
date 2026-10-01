@@ -177,7 +177,7 @@
                                  const split = streamTurnSplit($store.stream.turn);
                                  const items = split.chain.concat(split.final);
                                  if (!items.length) return '';
-                                 const label = chainItemLabel(items[items.length - 1]);
+                                 const label = items[items.length - 1].label ?? '';
                                  // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
                                  // finished reasoning reads Thoughts, only the
                                  // live stream keeps Thinking.. (no double
