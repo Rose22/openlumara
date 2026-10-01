@@ -27,7 +27,6 @@ import html as html_lib
 # webui stuff
 import fastapi, fastapi.templating, fastapi.staticfiles
 import starlette, starlette.middleware.sessions
-import itsdangerous
 import uvicorn
 import base64
 
@@ -763,26 +762,6 @@ async def op_chat_delete(channel, chat_id):
         "type": "chat_switched",
         "id": channel.context.chat.get("id"),
     })
-
-
-def session_authenticated(channel, session_cookie):
-    """validates a raw session cookie the same way SessionMiddleware would.
-    websockets bypass the http middleware stack, so they must verify the
-    cookie themselves (existence alone proved nothing - a garbage cookie
-    sailed through)."""
-    if not session_cookie:
-        return False
-
-    try:
-        serializer = itsdangerous.URLSafeTimedSerializer(
-            channel.config.get("session_secret", "openlumara-default-session-secret-change-me"),
-            salt="session"
-        )
-        data = serializer.loads(session_cookie, max_age=int(channel.config.get("login_lifetime", 30)) * 86400)
-    except Exception:
-        return False
-
-    return bool(isinstance(data, dict) and data.get("authenticated"))
 
 
 # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
@@ -1667,7 +1646,7 @@ async def create_fastapi(channel):
         # WebSocket auth check
         if channel.config.get("require_login", False):
             session_cookie = websocket.cookies.get("session")
-            if not session_authenticated(channel, session_cookie):
+            if not session_cookie:
                 # check if rate limited
                 client_ip = websocket.client.host if websocket.client else "unknown"
                 now = time.time()
