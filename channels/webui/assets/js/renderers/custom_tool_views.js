@@ -228,11 +228,17 @@ function _diffSideHtmlNow(original, replacement, lang) {
     rows = collapseContext(diffLines(original, replacement), 2);
     return sideBySideRows(rows).map(p => {
         if (p.full !== undefined) {
-            const gap = p.kind === 'gap';
-            const body = gap ? escapeHtml(p.full) : highlightDiffLine(p.full, lang);
-            return `<div class="diff2-row diff2-${p.kind}">` +
-                `<div class="diff2-cell diff2-full"><span class="diff2-gutter">${gap ? '..' : ' '}</span>` +
-                `<span class="diff2-text">${body || '\u200b'}</span></div></div>`;
+            if (p.kind === 'ctx') {
+                // unchanged lines sit plain in the left column, like the
+                // solo streaming rows - no full-width spanning rows
+                return '<div class="diff2-row diff2-ctx">' +
+                    cell('', p.full, '') +
+                    '<div class="diff2-cell diff2-empty"></div></div>';
+            }
+            // collapsed-unchanged marker stays a full-width meta row
+            return `<div class="diff2-row diff2-gap">` +
+                `<div class="diff2-cell diff2-full"><span class="diff2-gutter">..</span>` +
+                `<span class="diff2-text">${escapeHtml(p.full)}</span></div></div>`;
         }
         return '<div class="diff2-row diff2-changed">' +
             (p.left === null ? '<div class="diff2-cell diff2-empty"></div>' : cell('-', p.left, 'diff2-del')) +

@@ -521,8 +521,8 @@
             background: color-mix(in srgb, var(--text-secondary, #888) 5%, transparent);
         }
 
-        /* context and collapsed-gap rows span both columns */
-        &.diff2-ctx .diff2-full,
+        /* collapsed-unchanged marker spans both columns; unchanged code
+           lines sit plain in the left column instead */
         &.diff2-gap .diff2-full {
             grid-column: 1 / -1;
         }
