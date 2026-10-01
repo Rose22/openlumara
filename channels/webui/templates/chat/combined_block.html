@@ -17,8 +17,13 @@
                    const msgs = $store.stream.turn?.messages ?? [];
                    const last = msgs[msgs.length - 1];
                    return !!last && last.step === message.step && last.type === 'reasoning';
-               } }"
-     x-effect="const msgs = $store.stream.turn?.messages ?? []; const hasNewerStep = msgs.some(m => m.step != null && m.step > message.step); done = $store.stream.state === 'idle' || hasNewerStep; if (done && !autoCollapsed) { autoCollapsed = true; if (localStorage.getItem('collapseStepsDefault') !== 'true') collapsed = true }"
+               },
+               // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+               // activity only while the step's own status is open: a
+               // finished tool step at the end of the chain (waiting for
+               // the model's next step) must not keep pulsing
+               get active() { return !this.done && (message.status === 'thinking' || message.status === 'running') } }"
+     x-effect="const msgs = $store.stream.turn?.messages ?? []; const hasNewerStep = msgs.some(m => m.step != null && m.step > message.step); done = $store.stream.state === 'idle' || hasNewerStep || message.status === 'done' || message.status === 'failed' || message.status === 'thoughts'; if (done && !autoCollapsed) { autoCollapsed = true; if (localStorage.getItem('collapseStepsDefault') !== 'true') collapsed = true }"
     {% else %}
      x-data="{ collapsed: true }"
     {% endif %}>
@@ -33,7 +38,7 @@
         <span class="step-badge" x-text="message.step"
             :class="{ 'step-failed': message.status === 'failed' }"></span>
         <span class="text">
-            <span class="dots" {% if combined_stream %}x-show="!done && (message.modules?.length > 0 || thinkingActive)"{% else %}x-show="false"{% endif %}><span aria-hidden="true">&nbsp;</span><span aria-hidden="true">&nbsp;</span><span aria-hidden="true">&nbsp;</span></span>
+            <span class="dots" {% if combined_stream %}x-show="active && (message.modules?.length > 0 || thinkingActive)"{% else %}x-show="false"{% endif %}><span aria-hidden="true">&nbsp;</span><span aria-hidden="true">&nbsp;</span><span aria-hidden="true">&nbsp;</span></span>
             <!-- module-grouped tool names straight from step.modules:
                  "Coder: file edit x2 · Memory create" - separators via css -->
             <span class="tool-names" x-show="message.modules?.length > 0">
@@ -77,7 +82,10 @@
                  narrating before/while it calls tools) -->
             <template x-if="message.content">
                 {% if combined_stream %}
-                <div class="step-content" x-md="{ message: message, live: ($store.stream.turn?.messages ?? [])[$store.stream.turn.messages.length - 1] === message._tail }"></div>
+                <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+     optional-chain BOTH messages accesses: the stream store's turn
+     starts as a bare [] with no messages key, which threw here -->
+<div class="step-content" x-md="{ message: message, live: ($store.stream.turn?.messages ?? [])[($store.stream.turn?.messages?.length ?? 1) - 1] === message._tail }"></div>
                 {% else %}
                 <div class="step-content" x-md="{ message: message, live: false }"></div>
                 {% endif %}
