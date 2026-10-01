@@ -161,6 +161,7 @@ async function handleWebSocketMessage(data) {
                 case "reasoning":
                     stream.state = 'thinking';
                     stream.processing = {};
+                    stream.modelLoad = null;
                     AudioManager.stopProcessingSound();
                     AudioManager.play("token");
                     if (!responseSoundPlayed) {
@@ -171,6 +172,7 @@ async function handleWebSocketMessage(data) {
                 case "content":
                     stream.state = 'streaming';
                     stream.processing = {};
+                    stream.modelLoad = null;
                     AudioManager.stopProcessingSound();
                     AudioManager.play("token");
                     if (!responseSoundPlayed) {
@@ -235,6 +237,7 @@ async function handleWebSocketMessage(data) {
             // process tokens based on their type
             switch (token_type) {
                 case "error":
+                    stream.modelLoad = null;
                     // restore the user's last input
                     if (!chat.user_input && chat.last_user_input) {
                         chat.user_input = chat.last_user_input;
@@ -251,7 +254,23 @@ async function handleWebSocketMessage(data) {
                         stream.state = 'processing';
                     }
 
+                    // prompt eval started, so any model-load progress is done
+                    stream.modelLoad = null;
+
                     stream.processing = token_content;
+
+                    AudioManager.playProcessingSound();
+                    break;
+                case "model_load_progress":
+                    // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+                    // the llama.cpp router is swapping a model in: hijack the
+                    // processing indicator with load progress until the real
+                    // stream starts (cleared on prompt_progress/content below)
+                    stream.modelLoad = token_content;
+
+                    if (stream.state != "processing_tools") {
+                        stream.state = 'processing';
+                    }
 
                     AudioManager.playProcessingSound();
                     break;
@@ -261,6 +280,7 @@ async function handleWebSocketMessage(data) {
                 case "tool_call_delta":
                     stream.state = 'calling_tools';
                     stream.processing = {};
+                    stream.modelLoad = null;
                     break;
                 case "tool_calls":
                     stream.state = 'calling_tools';

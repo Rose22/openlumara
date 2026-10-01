@@ -888,6 +888,32 @@ CHAT_STORE = {
      * ----------------------- */
     get promptprogress() {
         // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+        // llama.cpp router model-load progress takes over the indicator
+        // while a model is being swapped in, before prompt eval begins.
+        const load = Alpine.store("stream").modelLoad;
+        if (load) {
+            const percent = load.percent ?? 0;
+
+            // trim the org prefix from the router's repo:tag id
+            // ("ggml-org/gemma-3-4b-it-GGUF:Q4_K_M" -> "gemma-3-4b-it-GGUF:Q4_K_M")
+            const modelName = (load.model || "").split("/").pop();
+
+            let label = modelName ? `Loading ${modelName}` : "Loading model";
+            if (load.status === "queued") { label = `Queued: ${modelName || "model"}`; }
+            if (load.status === "downloading") { label = `Downloading ${modelName || "model"}`; }
+
+            const stage = load.stage ? ` · ${load.stage.replace(/_/g, " ")}` : "";
+
+            return {
+                mode: "model_load",
+                percent,
+                percent_str: `${percent}%`,
+                remaining_str: `(${label}${stage})`,
+                show_eta: false
+            };
+        }
+
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
         // percent + ETA are computed backend-side now (core/turns.py
         // enriches every prompt_progress token); this getter only shapes
         // the strings the indicator template consumes.

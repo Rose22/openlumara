@@ -5,6 +5,7 @@ import asyncio
 import json
 import time
 import inspect
+import urllib.parse
 
 class APIError:
     """Simple class that holds an error message, used for passing on to channels"""
@@ -52,6 +53,9 @@ class APIClient():
         self._httpx_client = None
 
         self.supports_developer_role = False
+
+        # origin of the API when it's a llama.cpp router. enables the model load progress feed.
+        self._router_origin = None
 
     async def connect(self, silent=False):
         if self.connected:
@@ -114,6 +118,9 @@ class APIClient():
         self.connected = True
         self.supports_developer_role = core.config.get("api", "use_developer_role", default=False)
 
+        # probe for a llama.cpp router so we can stream model-load progress
+        await self._detect_router()
+
         if not silent:
             self.manager.log("API", "Successfully connected to AI")
 
@@ -159,6 +166,102 @@ class APIClient():
         """disconnect and reconnect to the API"""
         await self.disconnect()
         return await self.connect()
+
+    # llama.cpp router support
+    def _api_headers(self):
+        """auth headers for httpx calls to the API"""
+        key = core.config.get("api", "key")
+        if key:
+            return {"Authorization": f"Bearer {key}"}
+        return {}
+
+    async def _detect_router(self):
+        """
+        probe the API to detect if it's a llamacpp instance that's in router mode
+        (to support features exclusive to llamacpp, such as
+        model loading progress bars, prompt progress, and so on)
+        """
+        self._router_origin = None
+
+        try:
+            api_url = core.config.get("api", "url") or ""
+            parsed = urllib.parse.urlsplit(api_url)
+
+            if not parsed.scheme or not parsed.netloc:
+                return
+
+            origin = f"{parsed.scheme}://{parsed.netloc}"
+            resp = await self._httpx_client.get(f"{origin}/models", timeout=5.0, headers=self._api_headers())
+
+            if resp.status_code != 200:
+                return
+
+            body = resp.json()
+            entries = body.get("data")
+
+            if isinstance(entries, list) and any(isinstance(e, dict) and "status" in e for e in entries):
+                self._router_origin = origin
+
+        except Exception as e:
+            pass
+
+    async def _watch_model_load(self, model_name, stop_event, queue):
+        """reads the llamacpp router's /models/sse feed"""
+        try:
+            async with self._httpx_client.stream("GET", f"{self._router_origin}/models/sse", headers=self._api_headers()) as feed:
+                buffer = ""
+
+                async for raw in feed.aiter_text():
+                    if stop_event.is_set():
+                        break
+
+                    buffer += raw
+
+                    # SSE records are separated by blank lines
+                    while "\n\n" in buffer:
+                        record, buffer = buffer.split("\n\n", 1)
+
+                        event = None
+                        for line in record.splitlines():
+                            if line.startswith("data:"):
+                                try:
+                                    event = json.loads(line[5:].strip())
+                                except json.JSONDecodeError:
+                                    event = None
+
+                        if not isinstance(event, dict):
+                            continue
+
+                        if event.get("event") not in ("status_change", "model_status", "status_update"):
+                            continue
+
+                        data = event.get("data") or {}
+                        status = data.get("status") or ""
+                        name = event.get("model") or ""
+
+                        # match our model by name, or trust any loading/queued
+                        # event since the router id may be an alias we can't resolve
+                        if name != model_name and status not in ("loading", "queued"):
+                            continue
+
+                        if status in ("loaded", "failed", "unloaded"):
+                            return
+
+                        progress = data.get("progress") or {}
+                        value = progress.get("value")
+
+                        await queue.put({
+                            "model": name,
+                            "status": status,
+                            "stage": progress.get("current") or "",
+                            "percent": int(round(value * 100)) if isinstance(value, (int, float)) else None,
+                        })
+
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            if core.debug:
+                self.manager.log("debug:api", f"model load watch ended: {core.detail_error(e)}")
 
     def get_model(self):
         return core.config.get("model", "name")
@@ -482,7 +585,36 @@ class APIClient():
         if not tools:
             tools = self.manager.tools
 
-        response = await self._request(context, tools=(tools if use_tools else None), stream=True, use_thinking=use_thinking, **kwargs)
+        # against a llama.cpp router, the request below blocks while a model
+        # is swapped in. run the SSE load watcher alongside it and yield
+        # model_load_progress tokens until the request resolves.
+        load_task = None
+        load_queue = None
+        load_stop = None
+
+        if self._router_origin:
+            load_queue = asyncio.Queue()
+            load_stop = asyncio.Event()
+            load_task = asyncio.create_task(self._watch_model_load(core.config.get("model", "name"), load_stop, load_queue))
+
+        request_task = asyncio.create_task(self._request(context, tools=(tools if use_tools else None), stream=True, use_thinking=use_thinking, **kwargs))
+
+        try:
+            while True:
+                while load_queue and not load_queue.empty():
+                    yield {"type": "model_load_progress", "content": load_queue.get_nowait()}
+
+                if request_task.done():
+                    break
+
+                await asyncio.wait([request_task], timeout=0.25)
+
+            response = await request_task
+
+        finally:
+            if load_task and not load_task.done():
+                load_stop.set()
+                load_task.cancel()
 
         # return errors if applicable
         if isinstance(response, APIError):

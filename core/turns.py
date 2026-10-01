@@ -509,7 +509,9 @@ class TurnCollector:
             yield {"type": "token", "content": token}
 
             # skip grouping for non-display tokens
-            if token.get("type") in ['prompt_progress', 'token_usage', 'timings', 'user_message']:
+            # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+            # model_load_progress: llama.cpp router load progress, passthrough
+            if token.get("type") in ['prompt_progress', 'token_usage', 'timings', 'user_message', 'model_load_progress']:
                 continue
 
             # remove timing data from the token

@@ -6,6 +6,9 @@ let STREAM_STORE = {
     turn: [],
     processing: {},
 
+    // llama.cpp router model-load progress ({status, stage, percent}), null when idle
+    modelLoad: null,
+
     // stores the final message after the stream has finished
     finalMessage: [],
 
@@ -13,5 +16,6 @@ let STREAM_STORE = {
         this.turn = [];
         this.userMsg = null;
         this.processing = {};
+        this.modelLoad = null;
     }
 }
