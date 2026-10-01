@@ -59,5 +59,25 @@ function formatLabel(key) {
     return key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+/* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-02)
+   timestamp label for message turns: reads the epoch seconds stamped by
+   core/messages.py add() onto _metadata.timestamp. shows just the clock
+   time for today, and prepends the date on older turns. */
+function formatMessageTimestamp(turn) {
+    const messages = turn && turn.messages ? turn.messages : [];
+    const ts = (messages[0]?._metadata ?? {}).timestamp;
+    if (!ts) return '';
+
+    const date = new Date(ts * 1000);
+    if (isNaN(date.getTime())) return '';
+
+    // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-02)
+    // hour12: false forces 24-hour time regardless of locale
+    const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+    const isToday = localDayKey(date) === localDayKey(new Date());
+    const label = isToday ? time : `${date.toLocaleDateString()} ${time}`;
+    return label;
+}
+
 
 

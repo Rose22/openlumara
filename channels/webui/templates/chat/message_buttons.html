@@ -1,4 +1,10 @@
 <div class="message-buttons">
+    <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-02)
+         timestamp inline with the action buttons, from _metadata.timestamp -->
+    <span class="turn-timestamp" x-show="formatMessageTimestamp(turn)" :title="new Date((turn.messages[0]?._metadata ?? {}).timestamp * 1000).toLocaleString()">
+        {% include 'svg/clock.svg' %}
+        <span x-text="formatMessageTimestamp(turn)"></span>
+    </span>
     <button
         x-data="{ copied: false }"
         @click="
