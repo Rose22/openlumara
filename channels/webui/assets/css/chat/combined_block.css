@@ -89,6 +89,18 @@
                 font-weight: 600;
             }
 
+            /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+               module groups are rendered by an x-for in combined_block.html;
+               the · separator between groups is css so the template only
+               ever outputs bare groups */
+            .module-group {
+                white-space: nowrap;
+            }
+
+            .module-group + .module-group::before {
+                content: ' · ';
+            }
+
             /* repeat badge for functions called multiple times in one
                step: "Coder: file edit x3" */
             .tool-repeat {

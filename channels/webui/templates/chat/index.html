@@ -90,7 +90,10 @@
                              everything that isn't the turn's final content (the
                              thinking -> toolcall -> thinking chain) is grouped into
                              a collapsible wrapper. history turns start collapsed -->
-                        <template x-if="historyTurnSplit(turn).chain.length > 0">
+                        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+                             steps arrive precomputed from the backend
+                             (core/turns.py group_history) -->
+                        <template x-if="(turn.steps ?? []).length > 0">
                             <div class="agent-chain" x-data="{ collapsed: true }">
                                 <div class="agent-chain-header" @click="collapsed = !collapsed">
                                     <svg :class="{'toggle': true, 'toggle-expanded': !collapsed}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -98,10 +101,7 @@
                                     </svg>
                                     {% include 'svg/gear.svg' %}
                                     <span class="label">Process</span>
-                                    <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
-                                         step count so you know if expanding is
-                                         worth it before clicking -->
-                                    <span class="activity" x-show="collapsed" x-text="'(' + chainDisplay(historyTurnSplit(turn).chain).length + (chainDisplay(historyTurnSplit(turn).chain).length === 1 ? ' step)' : ' steps)')"></span>
+                                    <span class="activity" x-show="collapsed" x-text="'(' + turn.steps.length + (turn.steps.length === 1 ? ' step)' : ' steps)')"></span>
                                 </div>
                                 <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
                                      timeline layout: each chain segment is a station
@@ -110,21 +110,15 @@
                                      finish flag. -->
                                 <template x-if="!collapsed">
                                     <div class="agent-chain-body">
-                                        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-26)
-                                             chainDisplay() folds reasoning + its tool calls into one
-                                             combined item so the step gets a single header -->
-                                        <template x-for="(message, messageIndex) in chainDisplay(historyTurnSplit(turn).chain)" :key="messageIndex">
+                                        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+                                             every chain item is a backend step now; no more
+                                             combined-vs-regular runtime branch -->
+                                        <template x-for="(message, messageIndex) in turn.steps" :key="messageIndex">
                                             <div class="chain-station">
                                                 <div class="chain-rail"><div class="chain-dot"></div></div>
                                                 <div class="chain-content">
-                                                    <!-- runtime branch: merged step vs regular segment -->
-                                                    <template x-if="message._combined">
-                                                        {% set combined_stream = False %}
-                                                        {% include 'chat/combined_block.html' %}
-                                                    </template>
-                                                    <template x-if="!message._combined">
-                                                        {% include 'chat/turns/assistant_history.html' %}
-                                                    </template>
+                                                    {% set combined_stream = False %}
+                                                    {% include 'chat/combined_block.html' %}
                                                 </div>
                                             </div>
                                         </template>
@@ -137,7 +131,7 @@
                             </div>
                         </template>
 
-                        <template x-for="(message, messageIndex) in historyTurnSplit(turn).final" :key="'final-'+messageIndex">
+                        <template x-for="(message, messageIndex) in turn.final_messages ?? []" :key="'final-'+messageIndex">
                             {% include 'chat/turns/assistant_history.html' %}
                         </template>
 
@@ -206,20 +200,15 @@
                              station's node pulses instead. -->
                         <template x-if="!collapsed">
                             <div class="agent-chain-body">
-                                <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-26)
-                                     adjacent reasoning + tool_calls segments fold into one
-                                     combined step (see chainDisplay) -->
-                                <template x-for="(message, messageIndex) in chainDisplay(streamTurnSplit($store.stream.turn).chain)" :key="messageIndex">
+                                <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+                                     segments carry backend step numbers; streamSteps()
+                                     folds them into step objects matching history steps -->
+                                <template x-for="(message, messageIndex) in streamSteps(streamTurnSplit($store.stream.turn).chain)" :key="messageIndex">
                                     <div class="chain-station">
                                         <div class="chain-rail"><div class="chain-dot"></div></div>
                                         <div class="chain-content">
-                                            <template x-if="message._combined">
-                                                {% set combined_stream = True %}
-                                                {% include 'chat/combined_block.html' %}
-                                            </template>
-                                            <template x-if="!message._combined">
-                                                {% include 'chat/turns/assistant_stream.html' %}
-                                            </template>
+                                            {% set combined_stream = True %}
+                                            {% include 'chat/combined_block.html' %}
                                         </div>
                                     </div>
                                 </template>

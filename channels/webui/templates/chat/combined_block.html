@@ -1,14 +1,11 @@
 <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
-     merged reasoning + content + tool calls: ONE collapsible header per
-     agentic step, marked by a filled numbered circle (counter assigned by
-     chainDisplay() in turn_grouping.js) instead of a gear icon + "Step N"
-     label - the tool names are the header text now. built from the
-     chainDisplay() grouping (history
-     carries the fields on one message; streaming merges adjacent segments
-     that lead to a tool call). header shows the called tool names, deduped.
-     {% set combined_stream = true %} switches to the streaming behaviour:
-     activity dots while this is the newest segment, auto-collapse
-     once done (mirrors reasoning.html). -->
+     one collapsible header per agentic STEP. steps arrive precomputed:
+     history via turn.steps (core/turns.py group_history), streaming via
+     streamSteps() folding backend-stamped segments. header = numbered
+     circle + module-grouped tool names rendered straight from
+     step.modules. {% set combined_stream = true %} switches to the
+     streaming behaviour: activity dots while this is the newest segment,
+     auto-collapse once done (mirrors reasoning.html). -->
 <div class="combined-block" :class="{collapsed: collapsed, expanded: !collapsed}"
     {% if combined_stream %}
      x-data="{ collapsed: $store.stream.state === 'idle', autoCollapsed: false, done: $store.stream.state === 'idle' }"
@@ -24,27 +21,35 @@
         <svg class="standalone-chevron" :class="{'expanded': !collapsed}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="9 6 15 12 9 18"></polyline>
         </svg>
-        <span class="step-badge" x-text="message._step"
-            :class="{ 'step-failed': message.tool_calls.length > 0 && message.tool_calls.every(t => toolCallFailed(t)) }"></span>
+        <span class="step-badge" x-text="message.step"
+            :class="{ 'step-failed': message.status === 'failed' }"></span>
         <span class="text">
             <span class="dots" {% if combined_stream %}x-show="!done"{% else %}x-show="false"{% endif %}><span aria-hidden="true">&nbsp;</span><span aria-hidden="true">&nbsp;</span><span aria-hidden="true">&nbsp;</span></span>
-            <!-- deduped tool names, ellipsis-truncated so the header never
-                 exceeds its width -->
-            <span class="tool-names" x-show="message.tool_calls.length > 0" x-html="stepToolNamesHtml(message.tool_calls)"></span>
-            <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
-                 provisional step (reasoning streaming, no tool call yet):
-                 label it so the header isn't empty while thinking -->
-            <span class="tool-names" x-show="message.tool_calls.length === 0"
+            <!-- module-grouped tool names straight from step.modules:
+                 "Coder: file edit x2 · Memory create" - separators via css -->
+            <span class="tool-names" x-show="message.modules?.length > 0">
+                <template x-for="(group, gi) in message.modules" :key="gi">
+                    <span class="module-group">
+                        <span class="tool-module" x-show="group.actions.some(a => a.name)" x-text="group.module + ':'"></span>
+                        <template x-for="(action, ai) in group.actions.filter(a => a.name)" :key="'act-'+ai">
+                            <span class="tool-action">
+                                <span x-text="(ai > 0 ? ', ' : '') + action.name.replaceAll('_', ' ')"></span><span class="tool-repeat" x-show="action.count > 1" x-text="'x' + action.count"></span>
+                            </span>
+                        </template>
+                    </span>
+                </template>
+            </span>
+            <!-- tool-less step: label it so the header isn't empty.
+                 live reasoning reads Thinking.., finished reads Thoughts -->
+            <span class="tool-names" x-show="!message.modules || message.modules.length === 0"
                   {% if combined_stream %}
                   x-text="message.reasoning_content ? (done ? 'Thoughts' : 'Thinking..') : 'writing'"></span>
                   {% else %}
                   x-text="message.reasoning_content ? 'Thoughts' : 'writing'"></span>
                   {% endif %}
             <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
-                 single-call step: the registry's result summary rides along
-                 in the step header too (same fn + cacheKey the tool card
-                 uses), so collapsed steps show e.g. "12 matches" without
-                 expanding. only for steps with exactly ONE call. -->
+                 single-call step: arg + result summaries ride along in the
+                 step header (same helpers + cacheKey the tool card uses) -->
             <span class="step-args" x-show="message.tool_calls?.length === 1"
                   x-text="message.tool_calls?.[0] ? toolCallArgsSummary(message.tool_calls[0]) : ''"></span>
             <span class="step-summary" x-show="message.tool_calls?.length === 1 && message.tool_calls[0].response"

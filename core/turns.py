@@ -1,4 +1,5 @@
 import asyncio
+import json
 
 class TurnCollector:
     """
@@ -75,7 +76,205 @@ class TurnCollector:
                         if tool.get("id") in response_map:
                             tool["response"] = response_map[tool["id"]]
 
+        # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+        # fold each assistant turn's chain into display steps so channels
+        # don't re-derive the agentic-step grouping themselves.
+        for turn in turns:
+            if turn["role"] != "assistant":
+                continue
+            steps, final_messages = self.build_steps(turn["messages"])
+            turn["steps"] = steps
+            turn["final_messages"] = final_messages
+
         return turns
+
+    # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+    # -- step model: ports of the webui frontend's chainDisplay()/
+    # -- historyTurnSplit() grouping. a step = one reasoning/content run
+    # -- plus the tool calls it leads to (or a tool-less thinking-only step).
+    # -- steps carry precomputed "modules" display data so templates only
+    # -- need to render, never to group.
+
+    @staticmethod
+    def _tool_call_failed(tool):
+        # a tool call failed when its parsed response is {status: "error"}
+        response = tool.get("response")
+        if response is None:
+            return False
+        try:
+            parsed = json.loads(response) if isinstance(response, str) else response
+        except (json.JSONDecodeError, TypeError):
+            return False
+        return isinstance(parsed, dict) and parsed.get("status") == "error"
+
+    @staticmethod
+    def _modules_for(tool_calls):
+        # deduped per-function counts grouped by module (first token):
+        # [{"module": "Coder", "actions": [{"name": "file edit", "count": 2}]}]
+        counts = {}
+        order = []
+        for tool in tool_calls or []:
+            fn = (tool.get("function") or {}).get("name")
+            if not fn:
+                continue
+            if fn not in counts:
+                counts[fn] = 0
+                order.append(fn)
+            counts[fn] += 1
+        groups = {}
+        group_order = []
+        for fn in order:
+            parts = fn.split("_")
+            module = parts[0][:1].upper() + parts[0][1:]
+            action = "_".join(parts[1:])
+            if module not in groups:
+                groups[module] = []
+                group_order.append(module)
+            existing = next((a for a in groups[module] if a["name"] == action), None)
+            if existing:
+                existing["count"] += counts[fn]
+            else:
+                groups[module].append({"name": action, "count": counts[fn]})
+        return [{"module": m, "actions": groups[m]} for m in group_order]
+
+    @staticmethod
+    def _step_status(tool_calls):
+        # running: some call still lacks a response. failed: every call
+        # failed. thoughts: tool-less step.
+        if not tool_calls:
+            return "thoughts"
+        if any(t.get("response") is None for t in tool_calls):
+            return "running"
+        if all(TurnCollector._tool_call_failed(t) for t in tool_calls):
+            return "failed"
+        return "done"
+
+    @staticmethod
+    def _is_final_content(msg):
+        return (
+            msg.get("role") == "assistant"
+            and not msg.get("tool_calls")
+            and isinstance(msg.get("content"), str)
+            and msg.get("content", "").strip() != ""
+        )
+
+    @staticmethod
+    def _has_visible_chain_content(msg):
+        if msg.get("tool_calls"):
+            return len(msg["tool_calls"]) > 0
+        if isinstance(msg.get("reasoning_content"), str) and msg["reasoning_content"].strip():
+            return True
+        if msg.get("role") == "assistant" and isinstance(msg.get("content"), str) and msg["content"].strip():
+            return True
+        return False
+
+    def build_steps(self, messages):
+        # split a finalized assistant turn's messages into (steps, final).
+        # the last content-without-toolcalls message is the final answer;
+        # everything else is the chain. reasoning riding on the final
+        # answer becomes its own trailing Thoughts step (copies, the
+        # stored messages are never mutated).
+        final_index = -1
+        for i in range(len(messages) - 1, -1, -1):
+            if self._is_final_content(messages[i]):
+                final_index = i
+                break
+
+        chain = []
+        final = []
+        for i, message in enumerate(messages):
+            if i == final_index:
+                if isinstance(message.get("reasoning_content"), str) and message["reasoning_content"].strip():
+                    chain_copy = dict(message)
+                    chain_copy["content"] = ""
+                    chain.append(chain_copy)
+                    final_copy = dict(message)
+                    final_copy.pop("reasoning_content", None)
+                    final.append(final_copy)
+                else:
+                    final.append(message)
+            elif self._has_visible_chain_content(message):
+                chain.append(message)
+
+        steps = []
+        step_num = 0
+        i = 0
+        while i < len(chain):
+            m = chain[i]
+            has_tools = bool(m.get("tool_calls"))
+
+            if has_tools:
+                step_num += 1
+                steps.append({
+                    "step": step_num,
+                    "status": self._step_status(m["tool_calls"]),
+                    "reasoning_content": m.get("reasoning_content") or "",
+                    "content": m.get("content") or "",
+                    "tool_calls": m["tool_calls"],
+                    "modules": self._modules_for(m["tool_calls"]),
+                })
+                i += 1
+                continue
+
+            # thought run: consecutive reasoning/content segments
+            def is_thought(msg):
+                return (
+                    not msg.get("tool_calls")
+                    and ((isinstance(msg.get("reasoning_content"), str) and msg["reasoning_content"].strip())
+                         or (isinstance(msg.get("content"), str) and msg["content"].strip()))
+                )
+            j = i
+            while j < len(chain) and is_thought(chain[j]):
+                j += 1
+            tool_seg = chain[j] if (j > i and j < len(chain) and chain[j].get("tool_calls")) else None
+
+            reasoning = ""
+            content = ""
+            for k in range(i, j):
+                if chain[k].get("reasoning_content"):
+                    reasoning = (reasoning + "\n\n" if reasoning else "") + chain[k]["reasoning_content"]
+                if chain[k].get("content"):
+                    content = (content + "\n\n" if content else "") + chain[k]["content"]
+
+            if tool_seg:
+                # the run led to a tool call: fold it into that step
+                step_num += 1
+                steps.append({
+                    "step": step_num,
+                    "status": self._step_status(tool_seg["tool_calls"]),
+                    "reasoning_content": reasoning,
+                    "content": content,
+                    "tool_calls": tool_seg["tool_calls"],
+                    "modules": self._modules_for(tool_seg["tool_calls"]),
+                })
+                i = j + 1
+            elif j == len(chain):
+                # trailing thought run with no tool call: a thoughts step
+                step_num += 1
+                steps.append({
+                    "step": step_num,
+                    "status": "thoughts",
+                    "reasoning_content": reasoning,
+                    "content": content,
+                    "tool_calls": [],
+                    "modules": [],
+                })
+                i = j
+            else:
+                # thought run followed by something odd (e.g. tool-result
+                # only message): keep the message as its own thoughts step
+                step_num += 1
+                steps.append({
+                    "step": step_num,
+                    "status": "thoughts",
+                    "reasoning_content": m.get("reasoning_content") or "",
+                    "content": m.get("content") or "",
+                    "tool_calls": [],
+                    "modules": [],
+                })
+                i += 1
+
+        return steps, final
 
     async def group_stream(self, stream_generator):
         """
@@ -122,6 +321,15 @@ class TurnCollector:
         last_tool_call_id = None
         last_tool_calls_segment = None
 
+        # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-1)
+        # -- step tracking: reasoning/content runs and the tool calls they
+        # -- lead to share one step number; the step increments when a new
+        # -- segment starts after the current one already attached tools
+        # -- (that step is then complete). consumers accumulate steps from
+        # -- the active-step-only yields by grouping on the step field.
+        step_num = 0
+        step_has_tools = False
+
         async for raw_token in stream_generator:
             # copy the token so we don't mutate it
             token = dict(raw_token)
@@ -164,6 +372,19 @@ class TurnCollector:
                 current_segment = token.copy()
                 current_segment["role"] = "assistant" if segment_type != 'tool' else "tool"
                 current_segment["type"] = segment_type
+
+                # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+                # step bookkeeping: a new assistant segment starts a new
+                # step only if the current one already attached tools (or
+                # no step exists yet); tool calls themselves join the
+                # reasoning run that preceded them
+                if segment_type != 'tool':
+                    if step_num == 0 or step_has_tools:
+                        step_num += 1
+                        step_has_tools = False
+                    if segment_type == 'tool_calls':
+                        step_has_tools = True
+                    current_segment["step"] = step_num
                 
                 if segment_type == 'reasoning':
                     if "content" in current_segment.keys():
@@ -233,11 +454,20 @@ class TurnCollector:
                     for tool in current_segment["tool_calls"]:
                         if tool.get("id") in stream_response_map:
                             tool["response"] = stream_response_map[tool["id"]]
+                    # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+                    # live step status + precomputed module display data
+                    current_segment["step_status"] = self._step_status(current_segment["tool_calls"])
+                    current_segment["modules"] = self._modules_for(current_segment["tool_calls"])
+                else:
+                    current_segment["step_status"] = "thinking"
                 yield {"type": "turn", "content": current_segment}
             elif last_tool_calls_segment:
                 # tool response segment: update and re-yield the tool_calls segment instead
                 for tool in last_tool_calls_segment["tool_calls"]:
                     if tool.get("id") in stream_response_map:
                         tool["response"] = stream_response_map[tool["id"]]
+                # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+                # responses landed: refresh the re-yielded step's status
+                last_tool_calls_segment["step_status"] = self._step_status(last_tool_calls_segment["tool_calls"])
                 yield {"type": "turn", "content": last_tool_calls_segment}
 

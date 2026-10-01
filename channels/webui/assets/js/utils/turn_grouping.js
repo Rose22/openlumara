@@ -1,20 +1,14 @@
 /*
- * -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
- * splits assistant turns into a collapsible "agent chain" (reasoning, tool
- * calls and intermediate content) and the final content that renders outside
- * of the wrapper.
+ * -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+ * step grouping now lives in the backend (core/turns.py): history turns
+ * arrive with a ready-made `steps` list, streaming segments carry a `step`
+ * number + `step_status` stamped by group_stream. what's left here:
+ *  - streamSteps(): fold the active-step-only stream segments into step
+ *    objects shaped exactly like the backend history steps
+ *  - streamTurnSplit(): the final-content-detection heuristic the backend
+ *    can't know mid-stream
+ *  - tool call display helpers shared with the tool cards
  */
-
-// -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
-// a final content message is assistant content with no tool calls attached
-function isFinalContentMessage(message) {
-    return (
-        message.role === 'assistant' &&
-        !message.tool_calls &&
-        typeof message.content === 'string' &&
-        message.content.trim() !== ''
-    );
-}
 
 // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
 // messages that render nothing at all (empty content segments, empty
@@ -33,46 +27,39 @@ function hasVisibleChainContent(message) {
     return false;
 }
 
-// -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
-// for finalized history: the last content-without-toolcalls message of the
-// turn is the final answer, everything before it is chain
-function historyTurnSplit(turn) {
-    const messages = turn?.messages || [];
-
-    let finalIndex = -1;
-    for (let i = messages.length - 1; i >= 0; i--) {
-        if (isFinalContentMessage(messages[i])) {
-            finalIndex = i;
-            break;
+// -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
+// group streaming segments by the step number the backend stamped on them
+// into objects shaped like the backend's history steps. segments of one
+// step: reasoning runs, narration content, then the tool_calls segment
+// that carries the step's status + modules.
+function streamSteps(chain) {
+    const steps = new Map();
+    for (const m of chain) {
+        if (m.step == null) continue;
+        let s = steps.get(m.step);
+        if (!s) {
+            s = { step: m.step, status: 'thinking', reasoning_content: '', content: '', tool_calls: [], modules: [] };
+            steps.set(m.step, s);
         }
+        if (m.reasoning_content && m.reasoning_content.trim() !== '') {
+            s.reasoning_content += (s.reasoning_content ? '\n\n' : '') + m.reasoning_content;
+        }
+        if (!m.tool_calls && typeof m.content === 'string' && m.content.trim() !== '') {
+            s.content += (s.content ? '\n\n' : '') + m.content;
+        }
+        if (Array.isArray(m.tool_calls) && m.tool_calls.length > 0) {
+            s.tool_calls = m.tool_calls;
+            s.modules = m.modules ?? [];
+        }
+        // status: the backend stamps step_status on every yielded segment;
+        // a step with tools takes the tool segment's status (running ->
+        // done/failed as responses land), a tool-less step stays thinking
+        s.status = (s.tool_calls.length > 0)
+            ? (m.step_status ?? (s.status === 'thinking' ? 'running' : s.status))
+            : (m.step_status ?? s.status);
+        s._tail = m;
     }
-
-    const chain = [];
-    const final = [];
-    messages.forEach((message, i) => {
-        if (i === finalIndex) {
-            // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
-            // the final answer often carries its reasoning on the same
-            // object: split it into a chain message so it renders as a
-            // "Thoughts" step INSIDE the chain, matching streaming (copies,
-            // never mutate stored messages)
-            if (message.reasoning_content && message.reasoning_content.trim() !== '') {
-                const chainCopy = { ...message, content: '' };
-                const finalCopy = { ...message };
-                // delete rather than blank: the history template gates the
-                // reasoning block on Object.hasOwn(), so an empty-string
-                // value would still render an empty Thoughts block
-                delete finalCopy.reasoning_content;
-                chain.push(chainCopy);
-                final.push(finalCopy);
-            } else {
-                final.push(message);
-            }
-        }
-        else if (hasVisibleChainContent(message)) chain.push(message);
-    });
-
-    return { chain, final };
+    return Array.from(steps.values());
 }
 
 // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
@@ -149,134 +136,6 @@ function chainItemLabel(message) {
         return 'writing';
     }
     return '';
-}
-
-// -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-26)
-// groups a chain into render items so reasoning + its tool calls share ONE
-// collapsible header instead of stacking two. history messages carry both
-// fields on a single object; streaming delivers them as adjacent segments,
-// which get folded into a merged item referencing the tool_calls segment
-// (_tail) so the block knows when it's still the live one.
-function chainDisplay(chain) {
-    const out = [];
-    let step = 0;
-    let i = 0;
-    while (i < chain.length) {
-        const m = chain[i];
-        const hasTools = Array.isArray(m.tool_calls) && m.tool_calls.length > 0;
-
-        if (hasTools) {
-            // history shape: one message carrying tool calls (reasoning
-            // and/or intermediate content optional on the same object)
-            out.push({ _combined: true, _step: ++step, reasoning_content: m.reasoning_content ?? '', content: m.content ?? '', tool_calls: m.tool_calls, _tail: m });
-            i++;
-            continue;
-        }
-
-        // stream shape: consecutive reasoning/content segments that lead to
-        // a tool_calls segment fold into that step; if no tool call follows
-        // (pure thinking or standalone content), they render as-is
-        const isThoughtSeg = (x) => !!x && !Array.isArray(x.tool_calls) &&
-            ((!!x.reasoning_content && x.reasoning_content.trim() !== '') ||
-             (typeof x.content === 'string' && x.content.trim() !== ''));
-        let j = i;
-        while (j < chain.length && isThoughtSeg(chain[j])) j++;
-        const toolSeg = (j > i && j < chain.length && Array.isArray(chain[j].tool_calls) && chain[j].tool_calls.length > 0) ? chain[j] : null;
-        if (toolSeg) {
-            let reasoning = '', content = '';
-            for (let k = i; k < j; k++) {
-                if (chain[k].reasoning_content) reasoning += (reasoning ? '\n\n' : '') + chain[k].reasoning_content;
-                if (chain[k].content) content += (content ? '\n\n' : '') + chain[k].content;
-            }
-            out.push({ _combined: true, _step: ++step, reasoning_content: reasoning, content: content, tool_calls: toolSeg.tool_calls, _tail: toolSeg });
-            i = j + 1;
-        } else if (j === chain.length) {
-            // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
-            // thought run at the END of the chain with no tool call yet:
-            // render as a provisional step (empty tool_calls) so streaming
-            // reasoning appears AS a step from the start. when the tool
-            // call segment lands it folds into this same step via the
-            // branch above - same index, so Alpine keeps the DOM and the
-            // step number never jumps
-            let reasoning = '', content = '';
-            for (let k = i; k < j; k++) {
-                if (chain[k].reasoning_content) reasoning += (reasoning ? '\n\n' : '') + chain[k].reasoning_content;
-                if (chain[k].content) content += (content ? '\n\n' : '') + chain[k].content;
-            }
-            out.push({ _combined: true, _step: ++step, reasoning_content: reasoning, content: content, tool_calls: [], _tail: chain[j - 1] });
-            i = j;
-        } else {
-            out.push(m);
-            i++;
-        }
-    }
-    return out;
-}
-
-// -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
-// deduped, prettified tool names for the step header, GROUPED by module
-// (first token): "Coder: glob, file read · Memory: create, search" -
-// actions within a module are comma-joined, modules separated by the same
-// · the tool result summaries use. one entry per function no matter how
-// many times it was called, order of first appearance kept for both
-// groups and actions within a group.
-function stepToolNames(tool_calls) {
-    const seen = new Set();
-    const groups = new Map();
-    for (const t of tool_calls ?? []) {
-        const fn = t.function?.name;
-        if (!fn || seen.has(fn)) continue;
-        seen.add(fn);
-        const parts = fn.split('_');
-        const module = parts[0].replace(/^\w/, c => c.toUpperCase());
-        const action = parts.slice(1).join(' ');
-        if (!groups.has(module)) groups.set(module, []);
-        groups.get(module).push(action);
-    }
-    const names = [];
-    for (const [module, actions] of groups) {
-        // single-token tool names have no action part: no trailing colon
-        names.push(actions.length > 0 && actions[0] !== '' ? module + ': ' + actions.join(', ') : module);
-    }
-    return names.join(' · ');
-}
-
-// -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
-// html variant of stepToolNames for the step header: module names wrapped
-// in a bold span (mirrors .module in the tool call headers). safe to feed
-// to x-html - tokens are split on '_' from function names, so they can
-// only contain letters/digits/underscores; spaces are inserted by us.
-function stepToolNamesHtml(tool_calls) {
-    // count per function so repeated calls can show an xN badge
-    const counts = new Map();
-    const order = [];
-    for (const t of tool_calls ?? []) {
-        const fn = t.function?.name;
-        if (!fn) continue;
-        if (!counts.has(fn)) { counts.set(fn, 0); order.push(fn); }
-        counts.set(fn, counts.get(fn) + 1);
-    }
-    const groups = new Map();
-    for (const fn of order) {
-        const parts = fn.split('_');
-        const module = parts[0].replace(/^\w/, c => c.toUpperCase());
-        // sanitize FIRST, then wrap the badge: nothing user-derived ever
-        // touches the markup
-        const action = parts.slice(1).join(' ').replace(/[^\w ]/g, '');
-        const repeat = counts.get(fn) > 1 ? ' <span class="tool-repeat">x' + counts.get(fn) + '</span>' : '';
-        if (!groups.has(module)) groups.set(module, []);
-        groups.get(module).push({ action, repeat });
-    }
-    const names = [];
-    for (const [module, actions] of groups) {
-        const safe = module.replace(/[^\w]/g, '');
-        const actionText = actions.map(a => a.action + a.repeat).join(', ');
-        const hasAction = actions.some(a => a.action !== '');
-        names.push(hasAction
-            ? '<span class="tool-module">' + safe + ':</span> ' + actionText
-            : '<span class="tool-module">' + safe + '</span>');
-    }
-    return names.join(' · ');
 }
 
 // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
