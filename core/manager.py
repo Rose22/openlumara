@@ -176,7 +176,7 @@ class Manager:
                 core.log(loaded_module.name, f"Error during module internal _start() method: {core.detail_error(e)}")
                 continue
 
-            await self.load_module_tools(loaded_module)
+            await self.register_module_tools(loaded_module)
 
             storage[loaded_module.name] = loaded_module
 
@@ -523,16 +523,8 @@ class Manager:
         module = self.modules[module_name]
         self.log("core", f"Reloading module: {module_name}")
 
-        # save the active tools so that they can be reloaded
-        previously_active = {}
-        for ch_name, ch in self.channels.items():
-            previously_active[ch_name] = [
-                name for name, entry in ch.tool_loader.catalog.items()
-                if entry["module"] == module.name and name in ch.tool_loader.active_names
-            ]
-
         # remove old tools for this module
-        await self.unload_module_tools(module)
+        await self.unregister_module_tools(module)
 
         # run the module shutdown hook
         try:
@@ -548,18 +540,13 @@ class Manager:
             return False
 
         # re-add the module tools based on the new state (after on_ready's modifications)
-        await self.load_module_tools(module)
+        await self.register_module_tools(module)
 
-        # restore active tools for each channel
-        for ch_name, ch in self.channels.items():
-            loader = ch.tool_loader
-            for tool_name in previously_active.get(ch_name, []):
-                entry = loader.catalog.get(tool_name)
-                if entry is None or tool_name in loader.active_names:
-                    continue
-
-                loader.active_tools.append(entry["tool"])
-                loader.active_names.append(tool_name)
+        # re-activate the module's tools in all channels
+        for ch in self.channels.values():
+            chat = ch.context.chat
+            if chat is not None and module.name in chat.get_loaded_modules():
+                ch.tool_loader.activate_module_tools(module.name)
 
         # make sure any hardcoded default tools belonging to this module get re-preloaded
         for channel in self.channels.values():
@@ -697,14 +684,14 @@ class Manager:
         return settings_structure
 
     # --- tools ---
-    async def load_module_tools(self, module):
+    async def register_module_tools(self, module):
         """Register a module's tools in the catalog"""
         for channel in self.channels.values():
             channel.tool_loader.register_module(module)
             # keep the dynamic tools_load description in sync with enabled modules
             channel.tool_loader.refresh_meta_tool_descriptions()
 
-    async def unload_module_tools(self, module):
+    async def unregister_module_tools(self, module):
         """Unregister a module's tools from the catalog and active set."""
         for channel in self.channels.values():
             channel.tool_loader.unregister_module(module)

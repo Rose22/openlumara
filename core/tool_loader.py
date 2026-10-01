@@ -167,9 +167,6 @@ class ToolLoader:
         ]
         self.active_names = [n for n in self.active_names if not n.startswith(prefix)]
 
-        if removed:
-            self.channel.log("core", f"unloaded {len(removed)} tools from '{module.name}'")
-
     # ------------------------------------------------------------------
     # Meta tool
     # ------------------------------------------------------------------
@@ -322,13 +319,13 @@ class ToolLoader:
         if chat is None or chat.current is None:
             return
         for module_name in chat.get_loaded_modules():
-            self._load_module_tools(module_name)
+            self.activate_module_tools(module_name)
 
     # ------------------------------------------------------------------
     # Meta tool implementation
     # ------------------------------------------------------------------
 
-    def _load_module_tools(self, module_name):
+    def activate_module_tools(self, module_name):
         """Load all cataloged tools of an enabled module"""
         module_name = str(module_name).lower().strip()
         module = self.channel.manager.modules.get(module_name)
@@ -370,7 +367,7 @@ class ToolLoader:
         enabled_modules = None
 
         for module_name in module_names:
-            result = self._load_module_tools(module_name)
+            result = self.activate_module_tools(module_name)
             if result.get("status") == "error":
                 unknown.append(str(module_name).lower().strip())
                 enabled_modules = result["enabled_modules"]
