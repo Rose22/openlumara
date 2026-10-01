@@ -99,32 +99,6 @@ class Context:
             if len(messages) > max_messages:
                 messages = messages[-max_messages:]
 
-            # Strip multimodal data from all messages except the last one to save tokens
-            if messages:
-                for i in range(len(messages) - 1):
-                    msg = messages[i]
-                    if msg.get("role") in ("tool", "tool_calls"):
-                        # Don't mess with tool calls
-                        continue
-
-                    content = msg.get("content")
-                    if isinstance(content, list):
-                        # Keep only the text parts of the message
-                        text_parts = [
-                            part for part in content
-                            if isinstance(part, dict) and part.get("type") == "text"
-                        ]
-                        # If stripping leaves nothing, convert to a placeholder string
-                        # to avoid sending an empty content list (which some APIs reject)
-                        if text_parts:
-                            msg["content"] = text_parts
-                        else:
-                            msg["content"] = "[multimedia content]"
-                    elif isinstance(content, str):
-                        pass
-                    # Non-string, non-list content is left as-is (don't silently drop messages)
-
-
         end_msg = []
         if end_prompt:
             histend = await self.channel.manager.get_end_prompt(prevent_recursion=prevent_recursion)
