@@ -89,7 +89,10 @@
                                      so the client-side highlightQuery helper is gone -->
                                 <div class="global-search-result-header">
                                     <span class="global-search-result-title" x-html="result.title_highlighted ?? ''"></span>
-                                    <span class="global-search-result-date" x-text="formatDate(result.updated) || formatDate(result.created)"></span>
+                                    <!-- -- AI GENERATED CODE (qwen/Qwen3.8-Flash-Next-Q4) :: (2026-10-02)
+                                         backend-stamped group_label (identical to the sidebar's
+                                         day headers); always set by the endpoint, worst case 'Undated' -->
+                                    <span class="global-search-result-date" x-text="result.group_label"></span>
                                 </div>
                                 
                                 <template x-if="(result.snippets_highlighted ?? []).length > 0">
