@@ -105,9 +105,6 @@ class Chats(core.module.Module):
 
         results = await core.search.search(entries, query, field_weights={"title": 2.0, "category": 1.0, "text": 1.0}, top_n=20)
 
-        if isinstance(results, str):
-            return self.result(results)
-
         if not results:
             return self.result("no results found")
 
@@ -116,9 +113,9 @@ class Chats(core.module.Module):
             entry = hit["entry"]
             line = f'[{entry["category"]}] "{entry["title"]}" (score {hit["score"]:.2f})'
             if entry["text"]:
-                snippet = core.search.make_snippet(entry["text"], query)
-                if snippet:
-                    line += f"\n  {snippet}"
+                snippets = core.search.make_snippets(entry["text"], query, max_snippets=1)
+                if snippets:
+                    line += f"\n  {snippets[0]}"
             lines.append(line)
 
         return self.result("\n".join(lines))

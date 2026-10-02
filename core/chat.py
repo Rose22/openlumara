@@ -448,38 +448,8 @@ class Chat:
         cached[path] = (mtime, text)
         return text
 
-    def _search_snippets(self, text, query, max_snippets=3, radius=50):
-        # produces up to max_snippets excerpts around each distinct match of the query in the text
-        snippets = []
-        low = text.lower()
-        qlow = query.strip().lower()
-        search_term = qlow if qlow else ""
-
-        if not search_term:
-            for term in core.search.tokenize(query):
-                if term in low:
-                    search_term = term
-                    break
-
-        if not search_term:
-            return snippets
-
-        pos = low.find(search_term)
-        while pos != -1 and len(snippets) < max_snippets:
-            start = max(0, pos - radius)
-            end = min(len(text), pos + len(search_term) + radius)
-            snippet = text[start:end].replace("\n", " ")
-            if start > 0:
-                snippet = "..." + snippet
-            if end < len(text):
-                snippet = snippet + "..."
-            snippets.append(snippet)
-            pos = low.find(search_term, end)
-
-        return snippets
-
     async def search(self, query: str, max_results: int = 100, search_in_content: bool = True):
-        """search across all chats for messages matching the query, ranked by core.search (BM25 or embeddings)"""
+        """search across all chats for messages matching the query, ranked by core.search (BM25)"""
         if not query or not str(query).strip():
             return []
 
@@ -506,11 +476,6 @@ class Chat:
 
         ranked = await core.search.search(entries, query, field_weights=weights, top_n=max_results)
 
-        # embeddings can fail and return an error string,
-        # so just return a blank list if that occurs
-        if isinstance(ranked, str):
-            return []
-
         if not ranked:
             return []
 
@@ -524,7 +489,7 @@ class Chat:
                 found["title_match"] = True
 
             if entry.get("text"):
-                snippets = self._search_snippets(entry["text"], query)
+                snippets = core.search.make_snippets(entry["text"], query, max_snippets=3)
                 if snippets:
                     found["messages_found"] = len(snippets)
                     found["message_snippets"] = snippets

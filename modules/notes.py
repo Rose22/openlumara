@@ -67,9 +67,6 @@ class Notes(core.module.Module):
 
         results = await core.search.search(entries, query, field_weights={"path": 2.0, "content": 1.0}, top_n=10)
 
-        if isinstance(results, str):
-            return self.result(results)
-
         if not results:
             return self.result(f"no notes found matching '{query}'")
 
@@ -77,9 +74,9 @@ class Notes(core.module.Module):
         for hit in results:
             entry = hit["entry"]
             line = f"{entry['path']} (score {hit['score']:.2f})"
-            snippet = core.search.make_snippet(entry["content"], query)
-            if snippet:
-                line += f"\n  {snippet}"
+            snippets = core.search.make_snippets(entry["content"], query, max_snippets=1)
+            if snippets:
+                line += f"\n  {snippets[0]}"
             lines.append(line)
 
         return self.result("\n".join(lines))

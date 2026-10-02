@@ -131,17 +131,6 @@ When disabled, it will instead remove your old messages from context to make spa
             "depends": "enable_thinking"
         },
     },
-    "task_models": {
-        "embeddings_url": {
-            "default": "",
-            "description": "URL of an OpenAI-compatible server that serves an embedding model. When set, text search (memories, chats, etc.) uses embeddings instead of the built-in keyword ranking. Leave empty to use keyword search. It's recommended to use llamacpp's router mode to load a tiny embeddings model (it's so small it can run on a CPU) next to your bigger chat model."
-        },
-        "embeddings_model_name": {
-            "default": "embeddings",
-            "description": "The model name to request when fetching embeddings. In llama.cpp router mode, this must match the name of your embedding model or preset.",
-            "depends": "embeddings_url"
-        },
-    },
     "channels": {
         "enabled": {
             "default": [],

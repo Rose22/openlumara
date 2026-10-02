@@ -138,8 +138,6 @@ class Memory(core.module.Module):
         weights = {"tags": 2.0, "content": 1.0} if search_in_content else {"tags": 2.0}
 
         results = await self._mem.search(query, field_weights=weights, top_n=10)
-        if isinstance(results, str):
-            return self.result(results)
 
         if not results:
             return self.result(f"No memories found matching '{query}'.")

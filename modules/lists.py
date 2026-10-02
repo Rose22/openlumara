@@ -147,11 +147,6 @@ class Lists(core.module.Module):
         list_results = await core.search.search(list_entries, query, field_weights={"name": 1.0}, top_n=5)
         item_results = await core.search.search(item_entries, query, field_weights={"item": 1.0}, top_n=15)
 
-        if isinstance(list_results, str):
-            return self.result(list_results)
-        if isinstance(item_results, str):
-            return self.result(item_results)
-
         if not list_results and not item_results:
             return self.result(f"no lists or list items found matching '{query}'")
 

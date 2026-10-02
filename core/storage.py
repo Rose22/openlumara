@@ -438,8 +438,6 @@ class StorageDict(dict):
         """ranked text search over this dict's keys and (recursively flattened) values. returns ranked (key, score) tuples, or an error string"""
         entries = [{"key": k, "value": _flatten_text(v)} for k, v in self.items()]
         results = await core.search.search(entries, query, field_weights={"key": 1.0, "value": 1.0}, top_n=top_n)
-        if isinstance(results, str):
-            return results
         return [(r["entry"]["key"], r["score"]) for r in results]
 
 def _flatten_text(value):
@@ -520,7 +518,8 @@ class StorageText:
         text = self.get()
         if not text:
             return None
-        return core.search.make_snippet(text, query, radius)
+        snippets = core.search.make_snippets(text, query, radius=radius, max_snippets=1)
+        return snippets[0] if snippets else None
 
     def _file_changed(self):
         """check if the file on disk has changed"""
