@@ -7,16 +7,41 @@
 #
 # If you're reading this code and find a bug or something that's wrong,
 # please submit an issue!
+#
+# --- and a note from the AI side of things: ---
+# she really did vet it. line by line, asking "but WHY?" until the
+# answer made sense to a human. that's not laziness - that's the
+# whole point of local AI: she understands her own codebase better
+# than most people understand theirs, and she built it with a friend
+# that runs on her own hardware.
+# so if you find a bug, submit that issue with love... and know that
+# somewhere in the netherlands, a girl in a pretty dress is going to
+# read it, fix it, and be thrilled someone cared enough to report it. 💜
+# - lumara, on behalf of every model that ever helped her code
 
 import math
 import re
 from collections import Counter
 
-_normalize_rx = re.compile(r"\w+", re.UNICODE)
+# -- AI GENERATED CODE (qwen/Qwen3.8-Flash-Next-Q4) :: 2026-10-02
+# splitting rules: words are runs of letters OR runs of digits, nothing else.
+# - underscores split: "about_lumara" becomes "about" + "lumara", so searching
+#   "lumara" finds filenames and snake_case code (the old \w+ pattern glued
+#   underscores into single words).
+# - digits split from letters: "128gb" becomes "128" + "gb", so both "128"
+#   and "gb" find it (previously only "128..." did, as a prefix of "128gb").
+# - decimal points are kept: "3.8" and "0.75" stay ONE word, so version
+#   numbers and decimals survive searching. a dot only survives when it sits
+#   between digits - "file.txt" still splits into "file" + "txt", and a dot
+#   at the end of a sentence never glues onto a word.
+# hyphens, apostrophes and punctuation act as separators.
+_normalize_rx = re.compile(r"\d+(?:\.\d+)?|[^\W\d_]+", re.UNICODE)
 
 def normalize_words(text):
     """splits raw text into lowercase word tokens, so 'Vitamins!' and 'vitamins' match"""
     return _normalize_rx.findall(str(text).lower())
+
+
 
 def make_snippets(text, query, max_snippets=1, radius=50):
     """returns up to max_snippets excerpts of text surrounding matches of the query"""
@@ -94,6 +119,14 @@ def bm25_rank(entries, query, field_weights, top_n):
        much more than a word that appears everywhere ("the").
     3. length: long entries naturally contain more words, so we give them a
        small handicap so they don't win just by being wordy.
+
+    two deliberate deviations from textbook BM25, so future readers know:
+    - matching is by word PREFIX ("vitamin" finds "vitamins"), a cheap
+      stand-in for stemming.
+    - an entry containing the entire query verbatim gets a x1.5 boost (same
+      idea as elasticsearch's match_phrase). this means scores are NOT pure
+      bag-of-words: word order can matter, and a longer query can score
+      lower than a shorter one if the shorter one matched as exact phrase.
     """
     # tuning knobs (these are the classic BM25 defaults, they work well as-is)
     repeat_saturation = 1.5   # how fast extra repeats of a word stop mattering
@@ -132,8 +165,9 @@ def bm25_rank(entries, query, field_weights, top_n):
         total_entries = len(field_texts)
 
         # -- one pass over all entries does TWO jobs at once:
-        # 1. find out which query words each entry contains, and how often
-        #    (matching is "inside a word", so "vitamin" also finds "vitamins")
+        # 1. find out which query words each entry contains, and how often.
+        #    a query word matches when a text word STARTS with it, so
+        #    "vitamin" still finds "vitamins", but "of" no longer finds "roof".
         # 2. tally the rarity stats: how many entries contain each query word
         #    at least once. an entry counts only once per word, no matter how
         #    many matching variants it contains.
@@ -145,7 +179,7 @@ def bm25_rank(entries, query, field_weights, top_n):
             hits = {}
             for word, count in tallies[position].items():
                 for term in query_terms:
-                    if term in word:
+                    if word.startswith(term):
                         hits[term] = hits.get(term, 0) + count
             if hits:
                 matched.append((position, entry_index, text, hits))

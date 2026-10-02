@@ -434,6 +434,9 @@ class Chat:
 
         parts = []
         for message in messages:
+            if message.get("role") == "tool":
+                continue
+
             content = message.get("content", "")
             if isinstance(content, list):
                 content = " ".join(
@@ -441,6 +444,7 @@ class Chat:
                     for part in content
                     if isinstance(part, dict) and part.get("type") == "text"
                 )
+
             if isinstance(content, str) and content.strip():
                 parts.append(content)
 
