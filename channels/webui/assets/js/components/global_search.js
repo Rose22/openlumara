@@ -43,7 +43,7 @@ function globalSearch() {
 
             this.loading = true;
             this.debounceTimer = setTimeout(async () => {
-                this.results = await Alpine.store('chat').searchGlobal(q, this.searchInContent);
+                this.results = await Alpine.store('chat').searchGlobal(q, this.searchInContent, null, [], 'relevance');
                 this.loading = false;
                 this.activeIndex = -1;
             }, 150);

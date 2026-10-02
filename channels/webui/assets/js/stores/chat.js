@@ -855,7 +855,7 @@ CHAT_STORE = {
     /* ----------------------
      * global search
      * ----------------------- */
-    async searchGlobal(query, searchInContent = true, category = null, tags = []) {
+    async searchGlobal(query, searchInContent = true, category = null, tags = [], sort = 'updated') {
         try {
             // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
             // the backend returns results already sorted newest-first and
@@ -867,6 +867,7 @@ CHAT_STORE = {
                 search_in_content: searchInContent,
                 category: category,
                 tags: tags,
+                sort: sort,
                 tz_offset: this.tzOffset()
             });
         } catch (err) {
