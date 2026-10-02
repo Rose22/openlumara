@@ -56,10 +56,6 @@ core_settings_schema = {
             "default": 200,
             "description": "Maximum number of messages to keep in conversation history. If this amount of messages is exceeded, it will trim the context window even if the token limit hasn't been reached!"
         },
-        "use_embeddings_for_search": {
-            "default": False,
-            "description": "Use an embeddings model for text search (memories, chats, etc.) instead of the built-in keyword ranking. When enabled, embeddings are requested from your configured API URL (the same server as your chat model), so make sure it serves an embedding model ([llama.cpp can serve one alongside your chat model](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md#post-v1embeddings-openai-compatible-embeddings-api)). Leave off unless you know you want it."
-        },
         "use_developer_role": {
             "default": False,
             "description": "Enables the `developer` role for system prompts (see [this page](https://developers.openai.com/api/docs/guides/text#message-roles-and-instruction-following)). This helps the model distinguish between openlumara's instructions and your messages. Note: Not all models support this; unsupported models may crash if enabled.",
@@ -133,6 +129,17 @@ When disabled, it will instead remove your old messages from context to make spa
                 "max": 5
             },
             "depends": "enable_thinking"
+        },
+    },
+    "task_models": {
+        "embeddings_url": {
+            "default": "",
+            "description": "URL of an OpenAI-compatible server that serves an embedding model. When set, text search (memories, chats, etc.) uses embeddings instead of the built-in keyword ranking. Leave empty to use keyword search. It's recommended to use llamacpp's router mode to load a tiny embeddings model (it's so small it can run on a CPU) next to your bigger chat model."
+        },
+        "embeddings_model_name": {
+            "default": "embeddings",
+            "description": "The model name to request when fetching embeddings. In llama.cpp router mode, this must match the name of your embedding model or preset.",
+            "depends": "embeddings_url"
         },
     },
     "channels": {

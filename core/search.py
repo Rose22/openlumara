@@ -192,13 +192,13 @@ def _get_cached_vector(url, text):
 
 async def _embed_search(entries, query, field_weights, top_n):
     """embeds entries (cached) and the query, then ranks by cosine similarity"""
-    api_url = core.config.get("api", "url") or ""
+    api_url = core.config.get("task_models", "embeddings_url") or ""
     if not api_url:
-        return "search error: embeddings are enabled but no API URL is configured. Set the API URL, or disable 'use_embeddings_for_search' to use keyword search instead."
+        return "search error: no embeddings URL is configured. Set 'embeddings_url' in the core settings, or clear it to use keyword search instead."
 
     url = api_url.rstrip("/") + "/embeddings"
     key = core.config.get("api", "key") or ""
-    model = core.config.get("model", "name") or "embeddings"
+    model = core.config.get("task_models", "embeddings_model_name") or "embeddings"
 
     texts = [" ".join(_extract(entry, field_weights).values()) for entry in entries]
 
@@ -215,8 +215,8 @@ async def _embed_search(entries, query, field_weights, top_n):
     except Exception as e:
         return (
             f"search error: could not get embeddings from {url} ({core.detail_error(e)}). "
-            "Make sure your server serves an embedding model, or disable 'use_embeddings_for_search' "
-            "in the core settings to use keyword search instead."
+            "Make sure the server at 'embeddings_url' serves an embedding model named "
+            f"'{model}', or clear 'embeddings_url' in the core settings to use keyword search instead."
         )
 
     qnorm, qvec = _get_cached_vector(url, query)
@@ -247,7 +247,7 @@ async def search(entries, query, id_field="id", field_weights=None, top_n=10):
     restricts which fields are searched and how heavily they count (BM25 mode only;
     in embed mode the selected fields are simply joined into one text).
 
-    Uses embeddings when the core setting 'use_embeddings_for_search' is enabled,
+    Uses embeddings when the core setting 'embeddings_url' is set,
     otherwise ranks with BM25 (computed fresh per call, always local).
 
     Returns a ranked list of {"id": ..., "score": ..., "entry": ...} dicts,
@@ -255,7 +255,7 @@ async def search(entries, query, id_field="id", field_weights=None, top_n=10):
     if not entries or not query or not str(query).strip():
         return []
 
-    if core.config.get("api", "use_embeddings_for_search"):
+    if core.config.get("task_models", "embeddings_url"):
         scored = await _embed_search(entries, query, field_weights, top_n)
     else:
         scored = _bm25(entries, query, field_weights, top_n)

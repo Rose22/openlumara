@@ -126,24 +126,48 @@ class Lists(core.module.Module):
 
         return self.result("list unpinned!")
 
-    # async def search(self, query: str, search_in_content: bool = False):
-    #     """searches all lists for your query"""
-    #     found_list = None
-    #     for category_name, category in self.data.items():
-    #         for list_name, list in category.items():
-    #             for list_item in list["items"]:
-    #                 for word in list_item:
-    #                     if word.lower().strip() in query:
-    #                         found_list = list
-    #
-    #     if not found_list:
-    #         return self.result("no lists found")
-    #
-    #     output = ""
-    #     for index, list_item in enumerate(found_list.get("items")):
-    #                 output += f"{index+1}. {list_item}\n"
-    #
-    #     return self.result(output)
+    async def search(self, query: str):
+        """Searches all lists for your query: matches both list names and individual list items, ranked by relevance."""
+        self.data.load()
+
+        list_entries = []
+        item_entries = []
+        for category_name, category in self.data.items():
+            if not isinstance(category, dict):
+                continue
+            for list_name, lst in category.items():
+                if not isinstance(lst, dict):
+                    continue
+
+                items = [i for i in lst.get("items", []) if isinstance(i, str) and i.strip()]
+                list_entries.append({"name": f"[{category_name}] {list_name}", "items": len(items)})
+                for item in items:
+                    item_entries.append({"category": category_name, "list": list_name, "item": item})
+
+        list_results = await core.search.search(list_entries, query, field_weights={"name": 1.0}, top_n=5)
+        item_results = await core.search.search(item_entries, query, field_weights={"item": 1.0}, top_n=15)
+
+        if isinstance(list_results, str):
+            return self.result(list_results)
+        if isinstance(item_results, str):
+            return self.result(item_results)
+
+        if not list_results and not item_results:
+            return self.result(f"no lists or list items found matching '{query}'")
+
+        lines = []
+        if list_results:
+            lines.append("lists matching the query:")
+            for hit in list_results:
+                entry = hit["entry"]
+                lines.append(f"- {entry['name']} ({entry['items']} items, score {hit['score']:.2f})")
+        if item_results:
+            lines.append("list items matching the query:")
+            for hit in item_results:
+                entry = hit["entry"]
+                lines.append(f"- [{entry['category']}] {entry['list']}: {entry['item']} (score {hit['score']:.2f})")
+
+        return self.result("\n".join(lines))
 
     async def get(self, category: str, list_name: str):
         if not self._verify_target(category, list_name):

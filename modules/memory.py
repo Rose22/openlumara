@@ -133,7 +133,7 @@ class Memory(core.module.Module):
         self._mem.save()
         return self.result(f"memory {id} unpinned")
 
-    async def search(self, query: str, search_in_content: bool = False):
+    async def search(self, query: str, search_in_content: bool = True):
         """Searches memories by query. Use when you need to recall past info but don't know the exact ID."""
         weights = {"tags": 2.0, "content": 1.0} if search_in_content else {"tags": 2.0}
 
