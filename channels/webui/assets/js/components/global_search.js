@@ -38,12 +38,25 @@ function globalSearch() {
 
             if (!q) {
                 this.results = [];
+                this.loading = false;
                 return;
             }
 
+            // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-02)
+            // clear stale results and show loading immediately, then
+            // debounce the actual API call.
+            this.results = [];
+            this.activeIndex = -1;
             this.loading = true;
+
             this.debounceTimer = setTimeout(async () => {
-                this.results = await Alpine.store('chat').searchGlobal(q, this.searchInContent, null, [], 'relevance');
+                const results = await Alpine.store('chat').searchGlobal(q, this.searchInContent, null, [], 'relevance');
+                // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-02)
+                // discard in-flight responses for a query the user has
+                // since typed over, so slow responses can't clobber
+                // fresher results.
+                if (this.query.trim() !== q) return;
+                this.results = results;
                 this.loading = false;
                 this.activeIndex = -1;
             }, 150);
