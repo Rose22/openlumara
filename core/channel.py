@@ -316,70 +316,14 @@ class Channel:
             content_blocks.append({"type": "text", "text": message})
             filenames.append("") # so that indexes match
 
-        format_map = {
-            "audio/wav": "wav", "audio/mp3": "mp3", "audio/mpeg": "mp3",
-            "audio/ogg": "ogg", "audio/flac": "flac",
-            "audio/webm": "webm", "audio/mp4": "mp4", "audio/aac": "mp4",
-        }
-
         message_dict = {"role": "user"}
 
         for filename, file_data in files.items():
-            if not file_data:
+            block = self._file_to_block(filename, file_data)
+            if block is None:
                 continue
 
-            kind = filetype.guess(file_data)
-            mime_type = kind.mime if kind else "application/octet-stream"
-
-            if mime_type.startswith("image/"):
-                b64 = base64.b64encode(file_data).decode("utf-8")
-                content_blocks.append({
-                    "type": "image_url",
-                    "image_url": {"url": f"data:{mime_type};base64,{b64}"}
-                })
-
-            elif mime_type.startswith("audio/"):
-                b64 = base64.b64encode(file_data).decode("utf-8")
-                content_blocks.append({
-                    "type": "input_audio",
-                    "input_audio": {
-                        "data": b64,
-                        "format": format_map.get(mime_type, "wav")
-                    }
-                })
-
-            elif mime_type == "application/pdf":
-                try:
-                    from PyPDF2 import PdfReader
-                    reader = PdfReader(io.BytesIO(file_data))
-                    text_parts = []
-                    for page in reader.pages:
-                        page_text = page.extract_text()
-                        if page_text:
-                            text_parts.append(page_text)
-                    combined = "\n\n".join(text_parts)
-                    content_blocks.append({
-                        "type": "text",
-                        "text": f"File: {filename}\n\n```pdf\n{combined}\n```"
-                    })
-                except Exception as e:
-                    content_blocks.append({
-                        "type": "text",
-                        "text": f"[Error extracting PDF '{filename}': {e}]"
-                    })
-
-            else:
-                try:
-                    content_blocks.append({
-                        "type": "text",
-                        "text": f"File: {filename}\n\n```{file_data.decode('utf-8')}```"
-                    })
-                except UnicodeDecodeError:
-                    content_blocks.append({
-                        "type": "text",
-                        "text": f"[Binary file: {filename}]"
-                    })
-
+            content_blocks.append(block)
             filenames.append(filename)
 
         if content_blocks:
@@ -388,6 +332,71 @@ class Channel:
             return message_dict
 
         return {"role": "user", "content": message}
+
+    def _file_to_block(self, filename: str, file_data: bytes):
+        """
+        Builds a single openAI API content block for one uploaded file.
+        Returns None if the file data is empty.
+        """
+        if not file_data:
+            return None
+
+        kind = filetype.guess(file_data)
+        mime_type = kind.mime if kind else "application/octet-stream"
+
+        format_map = {
+            "audio/wav": "wav", "audio/mp3": "mp3", "audio/mpeg": "mp3",
+            "audio/ogg": "ogg", "audio/flac": "flac",
+            "audio/webm": "webm", "audio/mp4": "mp4", "audio/aac": "mp4",
+        }
+
+        if mime_type.startswith("image/"):
+            b64 = base64.b64encode(file_data).decode("utf-8")
+            return {
+                "type": "image_url",
+                "image_url": {"url": f"data:{mime_type};base64,{b64}"}
+            }
+
+        if mime_type.startswith("audio/"):
+            b64 = base64.b64encode(file_data).decode("utf-8")
+            return {
+                "type": "input_audio",
+                "input_audio": {
+                    "data": b64,
+                    "format": format_map.get(mime_type, "wav")
+                }
+            }
+
+        if mime_type == "application/pdf":
+            try:
+                from PyPDF2 import PdfReader
+                reader = PdfReader(io.BytesIO(file_data))
+                text_parts = []
+                for page in reader.pages:
+                    page_text = page.extract_text()
+                    if page_text:
+                        text_parts.append(page_text)
+                combined = "\n\n".join(text_parts)
+                return {
+                    "type": "text",
+                    "text": f"File: {filename}\n\n```pdf\n{combined}\n```"
+                }
+            except Exception as e:
+                return {
+                    "type": "text",
+                    "text": f"[Error extracting PDF '{filename}': {e}]"
+                }
+
+        try:
+            return {
+                "type": "text",
+                "text": f"File: {filename}\n\n```{file_data.decode('utf-8')}```"
+            }
+        except UnicodeDecodeError:
+            return {
+                "type": "text",
+                "text": f"[Binary file: {filename}]"
+            }
 
     def format_message(self, orig_message: dict):
         formatted = ""
