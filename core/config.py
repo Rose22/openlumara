@@ -33,7 +33,7 @@ core_settings_schema = {
         "tool_timeout": {
             "default": 30,
             "description": "Timeout in seconds for tool execution. This applies per individual tool, and is used to forcefully kill off tools that run too long."
-        }
+        },
     },
     "api": {
         "url": {
@@ -55,6 +55,10 @@ core_settings_schema = {
         "max_messages": {
             "default": 200,
             "description": "Maximum number of messages to keep in conversation history. If this amount of messages is exceeded, it will trim the context window even if the token limit hasn't been reached!"
+        },
+        "use_embeddings_for_search": {
+            "default": False,
+            "description": "Use an embeddings model for text search (memories, chats, etc.) instead of the built-in keyword ranking. When enabled, embeddings are requested from your configured API URL (the same server as your chat model), so make sure it serves an embedding model ([llama.cpp can serve one alongside your chat model](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md#post-v1embeddings-openai-compatible-embeddings-api)). Leave off unless you know you want it."
         },
         "use_developer_role": {
             "default": False,

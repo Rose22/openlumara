@@ -152,6 +152,10 @@ class StorageList(list):
 
         return super().__getitem__(args[0])
 
+    async def search(self, query, field_weights=None, top_n=10):
+        """ranked text search over this list's contents. returns ranked results (or an error string) from core.search"""
+        return await core.search.search(self, query, field_weights=field_weights, top_n=top_n)
+
 class StorageDict(dict):
     """subclassed dict that handles storage of data. supports a variety of storage formats."""
     def __init__(self, name: str, type: str, manager=None, path=None, autoload=True, override_temporary=False, *args):
@@ -430,6 +434,24 @@ class StorageDict(dict):
 
         return super().get(*args)
 
+    async def search(self, query, top_n=10):
+        """ranked text search over this dict's keys and (recursively flattened) values. returns ranked (key, score) tuples, or an error string"""
+        entries = [{"key": k, "value": _flatten_text(v)} for k, v in self.items()]
+        results = await core.search.search(entries, query, field_weights={"key": 1.0, "value": 1.0}, top_n=top_n)
+        if isinstance(results, str):
+            return results
+        return [(r["entry"]["key"], r["score"]) for r in results]
+
+def _flatten_text(value):
+    # recursively joins all strings inside nested dicts/lists so nested storages (like notes) stay searchable.
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        return " \n ".join(_flatten_text(v) for v in value.values())
+    if isinstance(value, list):
+        return " ".join(_flatten_text(i) for i in value)
+    return ""
+
 class StorageText:
     """simple class that saves its content to a text file"""
     def __init__(self, name: str, manager=None, path=None, autoload=True, *args):
@@ -492,6 +514,13 @@ class StorageText:
         # update mtime after saving so we know our cache is fresh
         self._update_mtime()
         return self
+
+    def search(self, query, radius=50):
+        """searches the text for your query and returns a snippet if found"""
+        text = self.get()
+        if not text:
+            return None
+        return core.search.make_snippet(text, query, radius)
 
     def _file_changed(self):
         """check if the file on disk has changed"""
