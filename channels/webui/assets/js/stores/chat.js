@@ -451,7 +451,14 @@ CHAT_STORE = {
 
         // re-run the active search so the mode switch applies immediately
         clearTimeout(this.searchDebounce);
-        if (this.searching) { this._runChatSearch(this.searchQuery.trim()); }
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-02)
+        // blank stale results while the re-run is in flight, same as
+        // setSearchQuery does
+        if (this.searching) {
+            this.searchResults = [];
+            this.searchLoading = true;
+            this._runChatSearch(this.searchQuery.trim());
+        }
     },
 
     setSearchQuery(q) {
@@ -465,6 +472,13 @@ CHAT_STORE = {
             this.searchLoading = false;
             return;
         }
+
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-02)
+        // wipe the previous query's results immediately so the stale
+        // list doesn't linger while the new search is pending (the
+        // 'searching..' row takes its place)
+        this.searchResults = [];
+        this.searchLoading = true;
 
         // debounce so we don't hit the backend on every keystroke
         this.searchDebounce = setTimeout(() => this._runChatSearch(q.trim()), 200);
