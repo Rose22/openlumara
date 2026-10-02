@@ -56,6 +56,32 @@ def _extract(entry, field_weights):
                 fields[key] = " ".join(parts)
     return fields
 
+# -- AI GENERATED CODE (qwen/Qwen3.8-Flash-Next-Q4) :: 2026-10-02
+# word-tally cache: counting the words in a big chat is the slowest part of
+# searching, but the same text almost never changes between searches. so we
+# remember the tally for every text we have ever counted and reuse it.
+# identical text always produces identical counts, so this can never go stale.
+# memory is kept in check by budgeting the TOTAL number of cached unique
+# words (that's what the counters actually grow with), not the number of
+# cached texts - one giant chat costs far more than a hundred small notes.
+# when the budget is spent we simply empty the cache and start over.
+_word_count_cache = {}
+_word_count_cache_words = 0  # running total of unique words stored in the cache
+_WORD_COUNT_CACHE_BUDGET = 300_000  # ~50 MB worst case
+
+def _count_words(text):
+    """returns a {word: count} tally for the text, reusing a cached one if possible"""
+    global _word_count_cache_words
+    counts = _word_count_cache.get(text)
+    if counts is None:
+        counts = Counter(normalize_words(text))
+        if _word_count_cache_words + len(counts) > _WORD_COUNT_CACHE_BUDGET:
+            _word_count_cache.clear()
+            _word_count_cache_words = 0
+        _word_count_cache[text] = counts
+        _word_count_cache_words += len(counts)
+    return counts
+
 def bm25_rank(entries, query, field_weights, top_n):
     """
     scores each entry against the query using the BM25 algorithm, returning
@@ -79,50 +105,60 @@ def bm25_rank(entries, query, field_weights, top_n):
     if not query_terms:
         return []
 
-    # -- step 1: count the words in every entry.
-    # for each entry we build a tally of which words appear and how often,
-    # like {"cat": 2, "dog": 1}. we also keep the entry's original position
-    # in the list, so when scores are handed out later they always land on
-    # the correct entry.
-    # the entries are grouped by field name, because fields like "title" and
-    # "content" are scored separately and then combined.
+    # -- step 1: sort entries into one group per field, remembering each
+    # entry's original position so scores always land on the correct entry.
+    # fields like "title" and "content" are scored separately, then combined.
+    # the actual word-counting happens in step 2, through the cache.
     entries_by_field = {}
     for entry_index, entry in enumerate(entries):
         for field_name, text in _extract(entry, field_weights).items():
-            word_counts = Counter(normalize_words(text))
-            entries_by_field.setdefault(field_name, []).append((entry_index, word_counts, text))
+            entries_by_field.setdefault(field_name, []).append((entry_index, text))
 
     # -- step 2: score every entry, field by field
     total_scores = {}  # {entry_index: final score}
-    for field_name, field_data in entries_by_field.items():
-        lengths = [sum(counts.values()) for _, counts, _ in field_data]
+    for field_name, field_texts in entries_by_field.items():
+        # look up (or compute) the word tally for each entry in this field
+        tallies = []
+        lengths = []
+        for _, text in field_texts:
+            counts = _count_words(text)
+            tallies.append(counts)
+            lengths.append(sum(counts.values()))
+
         avg_length = sum(lengths) / len(lengths)
         if not avg_length:
             continue  # every entry is empty in this field, nothing to score
 
-        total_entries = len(field_data)
+        total_entries = len(field_texts)
 
-        # for each query term: how many entries contain it AT LEAST ONCE.
-        # matching is done as "inside a word", so "vitamin" also finds "vitamins".
-        # an entry counts only once even if it contains several matching words.
-        entries_with_term = {}
-        for term in query_terms:
-            entries_with_term[term] = sum(
-                1 for _, counts, _ in field_data if any(term in word for word in counts)
-            )
+        # -- one pass over all entries does TWO jobs at once:
+        # 1. find out which query words each entry contains, and how often
+        #    (matching is "inside a word", so "vitamin" also finds "vitamins")
+        # 2. tally the rarity stats: how many entries contain each query word
+        #    at least once. an entry counts only once per word, no matter how
+        #    many matching variants it contains.
+        # entries that match nothing are dropped immediately - they can never
+        # earn points anyway, so we skip all their scoring math.
+        entries_with_term = dict.fromkeys(query_terms, 0)
+        matched = []  # entries that contain at least one query word
+        for position, (entry_index, text) in enumerate(field_texts):
+            hits = {}
+            for word, count in tallies[position].items():
+                for term in query_terms:
+                    if term in word:
+                        hits[term] = hits.get(term, 0) + count
+            if hits:
+                matched.append((position, entry_index, text, hits))
+                for term in hits:
+                    entries_with_term[term] += 1
 
         field_weight = (field_weights or {}).get(field_name, 1.0)
 
-        for position, (entry_index, word_counts, text) in enumerate(field_data):
+        # -- score only the entries that actually matched something
+        for position, entry_index, text, hits in matched:
             entry_score = 0.0
-            entry_length = lengths[position]
 
-            for term in query_terms:
-                # how many times this term appears inside THIS entry's words
-                term_hits = sum(count for word, count in word_counts.items() if term in word)
-                if not term_hits:
-                    continue
-
+            for term, term_hits in hits.items():
                 # rarity bonus: rare terms score higher than common ones.
                 # this is the "lucene-style" formula, which stays >= 0 as long
                 # as entries_with_term never exceeds total_entries (it can't now).
@@ -131,7 +167,7 @@ def bm25_rank(entries, query, field_weights, top_n):
 
                 # length handicap: an entry of average size gets 1.0; longer
                 # entries get > 1.0 (making it harder to score), shorter < 1.0.
-                length_handicap = 1 - length_penalty + length_penalty * entry_length / avg_length
+                length_handicap = 1 - length_penalty + length_penalty * lengths[position] / avg_length
 
                 # the diminishing-returns part: term_hits lifts the score, but
                 # the denominator makes each extra hit count a bit less.
@@ -141,11 +177,10 @@ def bm25_rank(entries, query, field_weights, top_n):
                 entry_score += term_score
 
             # small bonus when the whole query appears verbatim in the entry
-            if entry_score > 0 and full_query and full_query in text.lower():
+            if full_query and full_query in text.lower():
                 entry_score *= 1.5
 
-            if entry_score:
-                total_scores[entry_index] = total_scores.get(entry_index, 0.0) + entry_score * field_weight
+            total_scores[entry_index] = total_scores.get(entry_index, 0.0) + entry_score * field_weight
 
     # -- step 3: sort by score (best first) and keep only the top_n results
     return sorted(total_scores.items(), key=lambda item: item[1], reverse=True)[:top_n]
