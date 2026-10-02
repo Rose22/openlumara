@@ -255,7 +255,7 @@ async def search(entries, query, id_field="id", field_weights=None, top_n=10):
     if not entries or not query or not str(query).strip():
         return []
 
-    if core.config.get("core", "use_embeddings_for_search"):
+    if core.config.get("api", "use_embeddings_for_search"):
         scored = await _embed_search(entries, query, field_weights, top_n)
     else:
         scored = _bm25(entries, query, field_weights, top_n)
