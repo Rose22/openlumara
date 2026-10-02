@@ -1,6 +1,3 @@
-# -- AI GENERATED CODE (qwen/Qwen3.8-Flash-Next-Q4) :: 2026-10-02 14:55
-# Central search helper: ranks any list of entries by keyword (BM25) or, when enabled in core config, by embeddings from the configured API.
-
 import core
 import math
 import re
@@ -11,7 +8,7 @@ import httpx
 _vector_cache = {}
 
 # matches runs of unicode word characters; drops punctuation and number-only tokens
-_token_rx = re.compile(r"[^\W\d_]+", re.UNICODE)
+_token_rx = re.compile(r"\w+", re.UNICODE)
 
 
 def tokenize(text):
@@ -109,7 +106,15 @@ def _bm25(entries, query, field_weights, top_n):
             total_len += len(tokens)
             for term in set(tokens):
                 dfs[term] = dfs.get(term, 0) + 1
-        stats[fname] = {"df": dfs, "avgdl": (total_len / count) if count else 0}
+        stats[fname] = {"df": dfs, "avgdl": (total_len / count) if count else 0, "n": count}
+
+    # search within each word using substrings
+    substr_df = {}
+    for fname in field_names:
+        vocab = stats[fname]["df"]
+        substr_df[fname] = {}
+        for qt in qterms:
+            substr_df[fname][qt] = sum(c for term, c in vocab.items() if qt in term)
 
     scored = []
     for index, fields in enumerate(fielded):
@@ -129,12 +134,16 @@ def _bm25(entries, query, field_weights, top_n):
 
             field_score = 0.0
             for qt in qterms:
-                df = st["df"].get(qt, 0)
-                tf = tfs.get(qt, 0)
+                df = substr_df[fname][qt]
+                # tf summed over all document tokens that contain the query term
+                tf = 0
+                for term, c in tfs.items():
+                    if qt in term:
+                        tf += c
                 if df == 0 or tf == 0:
                     continue
                 # Lucene-style IDF, guaranteed non-negative
-                idf = math.log(1 + (count - df + 0.5) / (df + 0.5))
+                idf = math.log(1 + (st["n"] - df + 0.5) / (df + 0.5))
                 field_score += idf * (tf * (k1 + 1)) / (tf + k1 * (1 - b + b * len(tokens) / st["avgdl"]))
 
             if field_score > 0 and raw and raw in text.lower():
