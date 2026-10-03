@@ -125,6 +125,17 @@ class Context:
         approved_keys = ["role", "content", "reasoning_content", "tool_calls", "tool_call_id", "function_call", "tool"]
         messages = [{k: v for k, v in msg.items() if k in approved_keys} for msg in messages]
 
+        # Only keep basic tool_calls entries (to reduce context)
+        # (the stripped entries were never relevant for OAI API
+        # but poluted context length calculations)
+        tool_call_keys = ["id", "type", "function", "index"]
+        for msg in messages:
+            if msg.get("tool_calls"):
+                msg["tool_calls"] = [
+                    {k: v for k, v in tc.items() if k in tool_call_keys}
+                    for tc in msg["tool_calls"]
+                ]
+
         # enforce correct turn order
         # system -> user -> assistant -> user -> assistant -> ...
         # assistant -> tool -> assistant is VALID (tool use flow)
