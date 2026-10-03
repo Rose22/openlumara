@@ -10,7 +10,8 @@
 {% include 'modals/categories.html' %}
 {% include 'modals/move_chat.html' %}
 
-{# extension injection point: modules can add modals via <module>/webui/templates/modals/index.html #}
-{% for tpl in extensions() %}
+{# -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-03)
+   auto-discovery: every .html under <module>/webui/templates/modals/ is included #}
+{% for tpl in extension_modals() %}
 {% include tpl %}
 {% endfor %}

@@ -76,6 +76,8 @@
         {% if not config.get("enable_admin_settings") %}
         <script>window.ADMIN_SETTINGS_DISABLED = true;</script>
         {% endif %}
+
+        {{ extension_slot("head") }}
     </head>
     <body>
         <!-- 
@@ -98,6 +100,8 @@
             }
         ">
             <section id="main-wrapper">
+                {{ extension_slot("above_page") }}
+
                 {% if config.get("enable_sidebar") %}
                     <section id="sidebar" 
                         x-show="$store.ui.showSidebar"
@@ -122,10 +126,7 @@
                 {% include 'modals/index.html' %}
             </section>
 
-            <!-- extension injection point: modules can append page-level UI via <module>/webui/templates/index.html -->
-            {% for tpl in extensions() %}
-            {% include tpl %}
-            {% endfor %}
+            {{ extension_slot("below_page") }}
         </div>
 
         <!-- utility functions used by everything else -->

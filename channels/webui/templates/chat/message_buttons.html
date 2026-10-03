@@ -1,10 +1,15 @@
 <div class="message-buttons">
+    {{ extension_slot("before_timestamp") }}
+
     <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-02)
          timestamp inline with the action buttons, from _metadata.timestamp -->
     <span class="turn-timestamp" x-show="formatMessageTimestamp(turn)" :title="new Date((turn.messages[0]?._metadata ?? {}).timestamp * 1000).toLocaleString()">
         {% include 'svg/clock.svg' %}
         <span x-text="formatMessageTimestamp(turn)"></span>
     </span>
+
+    {{ extension_slot("before_buttons") }}
+
     <button
         x-data="{ copied: false }"
         @click="
@@ -33,8 +38,6 @@
     <button @click="if (!confirm('Are you sure you want to delete this message?')) { return }; $store.chat.deleteMessage(turnIndex)" title="Delete" :disabled="$store.stream.state != 'idle'">
         {% include 'svg/trash.svg' %}
     </button>
-    <!-- extension injection point: modules can add message actions inline via <module>/webui/templates/chat/message_buttons.html -->
-    {% for tpl in extensions() %}
-    {% include tpl %}
-    {% endfor %}
+
+    {{ extension_slot("after_buttons") }}
 </div>

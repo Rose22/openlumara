@@ -160,9 +160,9 @@ class Webui(core.channel.Channel):
     # webui extension system: modules ship UI by placing templates in
     # <module>/webui/templates/. the jinja loader becomes a ChoiceLoader where the
     # core webui templates always win, plus a PrefixLoader exposing each enabled
-    # module's templates under "<module_name>/..". core templates contain small
-    # injection loops (`{% for tpl in extensions("name.html") %}{% include tpl %}{% endfor %}`)
-    # and extensions() returns exactly the module templates that provide that point.
+    # module's templates under "<module_name>/..". core templates call
+    # `extension_slot("name")` for named regions, and the modal area auto-includes
+    # everything under each module's templates/modals/ via `extension_modals()`.
     def _ui_extension_dirs(self):
         """collect webui template folders from all enabled modules, as {module_name: path}"""
         dirs = {}
@@ -211,16 +211,28 @@ class Webui(core.channel.Channel):
                 found.append(template_name)
             return found
 
-        @jinja2.pass_context
-        def extensions(ctx, relative_path=None):
-            """returns the module templates that provide this exact injection point.
-            with no argument, uses the name of the calling template - so a hook in
-            chat/message_buttons.html automatically picks up <module>/chat/message_buttons.html.
-            the explicit path stays as an override for odd cases (string templates have no name)."""
-            relative_path = relative_path or ctx.name
-            if not relative_path:
-                return []
-            return _extension_templates(relative_path)
+        def extension_modals():
+            """auto-discovers modal templates: every .html file under
+            <module>/webui/templates/modals/ is included by the core modal area.
+            index.html inside modals/ is skipped (legacy manual-hook file)."""
+            found = []
+            for module_name in sorted(dirs):
+                modal_root = os.path.join(dirs[module_name], "modals")
+                if not os.path.isdir(modal_root):
+                    continue
+                for root, _sub, files in os.walk(modal_root):
+                    for filename in sorted(files):
+                        if not filename.endswith(".html") or filename == "index.html":
+                            continue
+                        rel = os.path.relpath(os.path.join(root, filename), dirs[module_name]).replace(os.sep, "/")
+                        template_name = f"{module_name}/{rel}"
+                        try:
+                            env.get_template(template_name)
+                        except Exception as e:
+                            self.log("webui", f"skipping UI modal '{template_name}': {core.detail_error(e)}")
+                            continue
+                        found.append(template_name)
+            return found
 
         @jinja2.pass_context
         def extension_slot(ctx, slot_name, relative_path=None):
@@ -230,6 +242,10 @@ class Webui(core.channel.Channel):
             {% macro left() %}...{% endmacro %} -> {{ extension_slot("left") }}.
             slot templates should contain macro definitions only - importing runs
             the template body, so stray markup outside macros is executed and discarded.
+            the caller's context is passed to a macro as the `ctx` kwarg only if the
+            macro declares it, so slots needing scoped data (turn/message in chat
+            templates) declare `{% macro below_message(ctx) %}` and read
+            `ctx['message']`. zero-arg macros are called plain, untouched.
             modules that don't define the slot are silently skipped."""
             relative_path = relative_path or ctx.name
             if not relative_path:
@@ -239,13 +255,16 @@ class Webui(core.channel.Channel):
                 try:
                     macro = getattr(env.get_template(template_name).module, slot_name, None)
                     if macro is not None:
-                        parts.append(str(macro()))
+                        if "ctx" in getattr(macro, "arguments", ()):
+                            parts.append(str(macro(ctx=ctx.get_all())))
+                        else:
+                            parts.append(str(macro()))
                 except Exception as e:
                     self.log("webui", f"skipping extension slot '{slot_name}' in '{template_name}': {core.detail_error(e)}")
                     continue
             return markupsafe.Markup("\n".join(parts))
 
-        env.globals["extensions"] = extensions
+        env.globals["extension_modals"] = extension_modals
         env.globals["extension_slot"] = extension_slot
         env.cache.clear()
 

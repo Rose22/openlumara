@@ -4,12 +4,12 @@
      initial load before the current chat has been fetched. -->
 <template x-if="$store.chat.chat.id && $store.chat.turnHistory.length === 0 && !$store.stream.turn.messages">
     <div class="welcome-panel">
+        {{ extension_slot("above_message") }}
+
         {% include 'svg/sparkle.svg' %}
         <h2 class="welcome-title">Hello there!</h2>
         <p class="welcome-hint">Say hi, ask me anything, or let's plan something together.</p>
-        <!-- extension injection point: modules can extend the welcome panel via <module>/webui/templates/chat/welcome.html -->
-        {% for tpl in extensions() %}
-        {% include tpl %}
-        {% endfor %}
+
+        {{ extension_slot("below_message") }}
     </div>
 </template>
