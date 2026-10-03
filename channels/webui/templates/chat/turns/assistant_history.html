@@ -31,4 +31,9 @@
     <template x-if="Object.hasOwn(message, 'tool_calls') || message.type === 'tool_calls'">
         {% include 'chat/toolcalls.html' %}
     </template>
+
+    <!-- extension injection point: modules can annotate assistant messages via <module>/webui/templates/chat/turns/assistant_history.html -->
+    {% for tpl in extensions() %}
+    {% include tpl %}
+    {% endfor %}
 </div>

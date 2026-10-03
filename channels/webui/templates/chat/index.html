@@ -3,6 +3,8 @@
     {% include 'chat/header.html' %}
 {% endif %}
 
+{{ extension_slot("below_header") }}
+
 <template x-if="$store.ui.notice">
     <div class="notice" x-html="$store.ui.notice"></div>
 </template>
@@ -33,6 +35,8 @@
     {% if config.get('show_welcome_screen') %}
     {% include 'chat/welcome.html' %}
     {% endif %}
+
+    {{ extension_slot("above_chat_history") }}
 
     <!-- historical turns -->
     <!--
@@ -313,16 +317,16 @@
             {% include 'chat/prompt_processing.html' %}
         </div>
     </template>
+
+    {{ extension_slot("below_chat_history") }}
 </div>
+
+{{ extension_slot("above_input_bar") }}
 
 <!-- invisible upload form -->
 {% if config.get('enable_file_upload') %}
 {% include 'chat/upload.html' %}
 {% endif %}
-
-<!-- token usage bar -->
-<div class="input-wrapper">
-</div>
 
 <!-- input field -->
 <div id="input">
@@ -330,3 +334,5 @@
         {% include 'chat/input.html' %}
     </div>
 </div>
+
+{{ extension_slot("below_input_bar") }}

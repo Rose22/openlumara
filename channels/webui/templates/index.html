@@ -121,6 +121,11 @@
             <section id="modals">
                 {% include 'modals/index.html' %}
             </section>
+
+            <!-- extension injection point: modules can append page-level UI via <module>/webui/templates/index.html -->
+            {% for tpl in extensions() %}
+            {% include tpl %}
+            {% endfor %}
         </div>
 
         <!-- utility functions used by everything else -->

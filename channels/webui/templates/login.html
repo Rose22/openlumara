@@ -13,6 +13,8 @@
         <div class="login-card">
             <h1>OpenLumara</h1>
             <form method="POST" action="/login" @submit="loading = true">
+                {{ extension_slot("top") }}
+
                 {% if error %}
                     <div class="error-msg">{{ error }}</div>
                 {% endif %}
@@ -24,7 +26,12 @@
                     <label for="password">Password</label>
                     <input type="password" id="password" name="password" x-model="password" required>
                 </div>
+
+                {{ extension_slot("before_signin_button") }}
+
                 <button type="submit" :disabled="loading">Sign In</button>
+
+                {{ extension_slot("bottom") }}
             </form>
         </div>
     </div>

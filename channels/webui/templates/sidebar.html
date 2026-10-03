@@ -18,6 +18,8 @@
          shows the active category's icon + name, menu is teleported to
          body like the chat action menu. 'general' gets home.svg, every
          other category gets folder.svg. -->
+    {{ extension_slot("top") }}
+
     <div class="category-select" x-data="{ open: false, top: 0, left: 0, width: 0 }">
         <button
             type="button"
@@ -146,7 +148,11 @@
         </button>
     </div>
 
+    {{ extension_slot("above_chat_list") }}
+
     <div class="chats">
+        {{ extension_slot("top_of_chat_list") }}
+
         <!-- search loading state -->
         <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-02)
              spinner next to the 'searching..' label -->
@@ -326,11 +332,13 @@
                 </template>
             </div>
         </template>
+
+        {{ extension_slot("bottom_of_chat_list") }}
     </div>
 
+    {{ extension_slot("buttons") }}
     <button class="sidebar-btn" @click="$store.chat.newChat()" :disabled="$store.stream.state !== 'idle'">
         {% include 'svg/add.svg' %}
         New Chat
     </button>
-
 </div>

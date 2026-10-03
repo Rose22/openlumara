@@ -9,3 +9,8 @@
 {% include 'modals/global_search.html' %}
 {% include 'modals/categories.html' %}
 {% include 'modals/move_chat.html' %}
+
+{# extension injection point: modules can add modals via <module>/webui/templates/modals/index.html #}
+{% for tpl in extensions() %}
+{% include tpl %}
+{% endfor %}

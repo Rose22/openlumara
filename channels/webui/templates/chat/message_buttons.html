@@ -33,4 +33,8 @@
     <button @click="if (!confirm('Are you sure you want to delete this message?')) { return }; $store.chat.deleteMessage(turnIndex)" title="Delete" :disabled="$store.stream.state != 'idle'">
         {% include 'svg/trash.svg' %}
     </button>
+    <!-- extension injection point: modules can add message actions inline via <module>/webui/templates/chat/message_buttons.html -->
+    {% for tpl in extensions() %}
+    {% include tpl %}
+    {% endfor %}
 </div>

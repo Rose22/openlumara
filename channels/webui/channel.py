@@ -18,6 +18,7 @@ import os
 import copy
 import json
 import asyncio
+import importlib
 import calendar
 import datetime
 import re
@@ -28,6 +29,8 @@ import html as html_lib
 import fastapi, fastapi.templating, fastapi.staticfiles
 import starlette, starlette.middleware.sessions
 import uvicorn
+import jinja2
+import markupsafe
 import base64
 
 # security libraries
@@ -153,6 +156,99 @@ class Webui(core.channel.Channel):
             return False
         return secrets.compare_digest(password, correct_password)
 
+    # -- AI GENERATED CODE (qwen/Qwen3.8-Flash-Next-Q4) :: 2026-10-03
+    # webui extension system: modules ship UI by placing templates in
+    # <module>/webui/templates/. the jinja loader becomes a ChoiceLoader where the
+    # core webui templates always win, plus a PrefixLoader exposing each enabled
+    # module's templates under "<module_name>/..". core templates contain small
+    # injection loops (`{% for tpl in extensions("name.html") %}{% include tpl %}{% endfor %}`)
+    # and extensions() returns exactly the module templates that provide that point.
+    def _ui_extension_dirs(self):
+        """collect webui template folders from all enabled modules, as {module_name: path}"""
+        dirs = {}
+        for package_name in ("modules", "user_modules"):
+            try:
+                package = importlib.import_module(package_name)
+            except ImportError:
+                continue
+
+            for module_name in core.config.get(package_name, "enabled", []):
+                for sub_path in getattr(package, "__path__", []):
+                    candidate = os.path.join(sub_path, module_name, "webui", "templates")
+                    if os.path.isdir(candidate):
+                        dirs[module_name] = candidate
+        return dirs
+
+    def setup_ui_extensions(self):
+        """(re)build the jinja loader so module-provided templates become available.
+        called at startup and after settings saves (module reloads)."""
+        dirs = self._ui_extension_dirs()
+
+        loaders = [jinja2.FileSystemLoader(self.template_path)]
+        if dirs:
+            loaders.append(jinja2.PrefixLoader(
+                {name: jinja2.FileSystemLoader(path) for name, path in dirs.items()},
+                delimiter="/"
+            ))
+
+        env = self.templates.env
+        env.loader = jinja2.ChoiceLoader(loaders)
+
+        def _extension_templates(relative_path):
+            """all module templates that mirror the given template path, sorted by module name.
+            each is compiled once here, so a broken extension is skipped and logged
+            instead of breaking the page."""
+            found = []
+            for module_name in sorted(dirs):
+                template_name = f"{module_name}/{relative_path}"
+                if not os.path.isfile(os.path.join(dirs[module_name], relative_path)):
+                    continue
+                try:
+                    env.get_template(template_name)
+                except Exception as e:
+                    self.log("webui", f"skipping UI extension '{template_name}': {core.detail_error(e)}")
+                    continue
+                found.append(template_name)
+            return found
+
+        @jinja2.pass_context
+        def extensions(ctx, relative_path=None):
+            """returns the module templates that provide this exact injection point.
+            with no argument, uses the name of the calling template - so a hook in
+            chat/message_buttons.html automatically picks up <module>/chat/message_buttons.html.
+            the explicit path stays as an override for odd cases (string templates have no name)."""
+            relative_path = relative_path or ctx.name
+            if not relative_path:
+                return []
+            return _extension_templates(relative_path)
+
+        @jinja2.pass_context
+        def extension_slot(ctx, slot_name, relative_path=None):
+            """renders the macro `slot_name` from every module template mirroring the
+            calling template's path (or the explicit one). lets a single module file
+            fill multiple named regions of a core component:
+            {% macro left() %}...{% endmacro %} -> {{ extension_slot("left") }}.
+            slot templates should contain macro definitions only - importing runs
+            the template body, so stray markup outside macros is executed and discarded.
+            modules that don't define the slot are silently skipped."""
+            relative_path = relative_path or ctx.name
+            if not relative_path:
+                return markupsafe.Markup("")
+            parts = []
+            for template_name in _extension_templates(relative_path):
+                try:
+                    macro = getattr(env.get_template(template_name).module, slot_name, None)
+                    if macro is not None:
+                        parts.append(str(macro()))
+                except Exception as e:
+                    self.log("webui", f"skipping extension slot '{slot_name}' in '{template_name}': {core.detail_error(e)}")
+                    continue
+            return markupsafe.Markup("\n".join(parts))
+
+        env.globals["extensions"] = extensions
+        env.globals["extension_slot"] = extension_slot
+        env.cache.clear()
+
     async def on_ready(self):
         # paths
         self.path = core.get_path(os.path.join("channels", "webui"))
@@ -161,6 +257,7 @@ class Webui(core.channel.Channel):
 
         # fastapi-specific instances
         self.templates = fastapi.templating.Jinja2Templates(self.template_path)
+        self.setup_ui_extensions()
 
         # aaand create it
         self.app = await create_fastapi(self)
@@ -1527,6 +1624,11 @@ async def create_fastapi(channel):
                     # bugfix: referenced `self` outside of a class context,
                     # which turned any module reload error into a NameError
                     channel.log(channel.name, f"Error reloading module {module_name}: {core.detail_error(e)}")
+
+        # -- AI GENERATED CODE (qwen/Qwen3.8-Flash-Next-Q4) :: 2026-10-03
+        # rebuild the UI extension loader: modules may have gained or lost
+        # their webui/templates folder, and cached templates must be dropped
+        channel.setup_ui_extensions()
 
         return api_result({
             "requires_restart": requires_restart,
