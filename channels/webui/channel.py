@@ -1093,6 +1093,61 @@ async def create_fastapi(channel):
             raise fastapi.HTTPException(status_code=404, detail="Asset not found")
         return fastapi.responses.FileResponse(full_path)
 
+    # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-03)
+    # phase 4 of the extension system: modules expose API endpoints via the
+    # zero-dependency marker in channels/webui/api.py (@webui.route). the
+    # lookup scans live module classes on every request, so module reloads
+    # (enable/disable/edit) are picked up with no rebuild hook. routes are
+    # exact-match against module-declared paths, so no traversal concerns.
+    def _ui_api_lookup(module_name, route_path, method):
+        """resolve /api/ext/<module>/<path> to a bound handler.
+        returns (handler, None) on success or (None, reason) on miss."""
+        module = channel.manager.modules.get(module_name)
+        if module is None:
+            return None, "unknown module"
+        wanted_path = str(route_path).strip("/").lower()
+        route_exists = False
+        for klass in type(module).__mro__:
+            for attr_name, attr in vars(klass).items():
+                meta = getattr(attr, "_ui_route", None)
+                if not meta or meta["path"] != wanted_path:
+                    continue
+                route_exists = True
+                if meta["method"] != method:
+                    continue
+                return getattr(module, attr_name), None
+        if not route_exists:
+            return None, "route not found"
+        return None, f"route only accepts {'GET' if method != 'GET' else 'POST'}"
+
+    @app.api_route("/api/ext/{module_name}/{route_path:path}", methods=["GET", "POST", "PUT", "DELETE"])
+    async def ext_api(module_name: str, route_path: str, request: fastapi.Request):
+        """forwards to a module handler marked with @webui.route. handlers
+        take (body=None, query=None) and return raw data (wrapped in the
+        standard api envelope) or the self.result() dict (unwrapped)."""
+        handler, reason = _ui_api_lookup(module_name, route_path, request.method)
+        if handler is None:
+            status = 405 if "accepts" in reason else 404
+            return fastapi.responses.JSONResponse(api_result(reason, success=False), status_code=status)
+
+        body = None
+        if request.method != "GET":
+            try:
+                body = await request.json()
+            except Exception:
+                body = None
+
+        try:
+            outcome = await handler(body=body, query=dict(request.query_params))
+        except Exception as e:
+            channel.log("webui", f"ext api error {module_name}/{route_path}: {core.detail_error(e)}")
+            return api_result(core.detail_error(e), success=False)
+
+        # unwrap the module-side self.result() convention into the api envelope
+        if isinstance(outcome, dict) and "status" in outcome and "content" in outcome:
+            return api_result(outcome["content"], outcome["status"] == "success")
+        return api_result(outcome, True)
+
     # ------------------
     # Web pages
     # ------------------

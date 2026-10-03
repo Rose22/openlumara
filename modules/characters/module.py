@@ -3,6 +3,7 @@ import json
 import os
 import shutil
 import sys
+import channels.webui.api as webui
 
 # -- AI GENERATED CODE (Qwen3.8-Flash-Next-Q4) :: (2026-10-03)
 # Full rewrite: characters live in one flat internal format (name + profile + optional scenario/first_message/post_history/category/tags),
@@ -245,7 +246,6 @@ class Characters(core.module.Module):
 
             # don't overwrite an existing character with the same name
             if self._find_character(normalized["name"]):
-                core.log("warning", f"png '{filename}' skipped: character '{normalized['name']}' already exists")
                 continue
 
             self.characters[normalized["name"]] = normalized
@@ -651,3 +651,71 @@ class Characters(core.module.Module):
         self.user_profile["name"] = name
         self.user_profile.save()
         return "Your name has been set!"
+
+    # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-03)
+    # webui extension routes (reference implementation for the @webui.route
+    # convention, see channels/webui/api.py). handlers are private methods so
+    # the tool loader ignores them; they forward to the existing tool methods
+    # and pass their self.result() dicts through untouched - the webui
+    # forwarder unwraps those into the standard api envelope.
+    # reachable at /api/ext/characters/<path>
+
+    @webui.route("list")
+    async def _route_list(self, body=None, query=None):
+        """compact character list grouped by category, for pickers/UIs"""
+        grouped = {}
+        for name, char in self.characters.items():
+            category = char.get("category") or "general"
+            grouped.setdefault(category, []).append({
+                "name": char.get("name") or name,
+                "tags": char.get("tags") or [],
+            })
+        return {
+            "categories": [
+                {"name": cat, "characters": sorted(chars, key=lambda c: c["name"].lower())}
+                for cat, chars in sorted(grouped.items())
+            ]
+        }
+
+    @webui.route("current")
+    async def _route_current(self, body=None, query=None):
+        """name of the character active in the current chat, or null"""
+        return self.channel.context.chat.get("metadata").get("character") or None
+
+    @webui.route("get")
+    async def _route_get(self, body=None, query=None):
+        name = (query or {}).get("name", "")
+        char = self._find_character(name)
+        if not char:
+            return self.result("character not found", success=False)
+        return self.result(char)
+
+    @webui.route("switch", method="POST")
+    async def _route_switch(self, body=None, query=None):
+        name = (body or {}).get("name", "")
+        if not name:
+            return self.result("error: no character name given", success=False)
+        return await self.switch(name)
+
+    @webui.route("switch_default", method="POST")
+    async def _route_switch_default(self, body=None, query=None):
+        await self.switch_to_default()
+        return self.result("switched to default character")
+
+    @webui.route("delete", method="POST")
+    async def _route_delete(self, body=None, query=None):
+        name = (body or {}).get("name", "")
+        char = self._find_character(name)
+        if not char:
+            return self.result("character not found", success=False)
+        stored_key = self._find_char_name(name)
+        del self.characters[stored_key]
+        self.characters.save()
+        return self.result(f"deleted character {stored_key}")
+
+    @webui.route("import", method="POST")
+    async def _route_import(self, body=None, query=None):
+        json_code = (body or {}).get("json_code", "")
+        if isinstance(json_code, (dict, list)):
+            json_code = json.dumps(json_code)
+        return await self.import_json(json_code)
