@@ -179,6 +179,42 @@ class Webui(core.channel.Channel):
                         dirs[module_name] = candidate
         return dirs
 
+    # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-03)
+    # phase 3 of the extension system: modules can ship static assets
+    # (css/js/...) in <module>/webui/assets/, served under /ext-assets/.
+    def _ui_asset_dirs(self):
+        """collect webui asset folders from all enabled modules, as {module_name: path}"""
+        dirs = {}
+        for package_name in ("modules", "user_modules"):
+            try:
+                package = importlib.import_module(package_name)
+            except ImportError:
+                continue
+
+            for module_name in core.config.get(package_name, "enabled", []):
+                for sub_path in getattr(package, "__path__", []):
+                    candidate = os.path.join(sub_path, module_name, "webui", "assets")
+                    if os.path.isdir(candidate):
+                        dirs[module_name] = candidate
+        return dirs
+
+    def _ui_asset_urls(self, ext):
+        """urls for css/js files shipped by enabled modules, as
+        /ext-assets/<module>/<relpath> entries meant to be appended to
+        the css_files/js_files template variables."""
+        urls = []
+        for module_name, assets_dir in sorted(self._ui_asset_dirs().items()):
+            ext_dir = os.path.join(assets_dir, ext)
+            if not os.path.isdir(ext_dir):
+                continue
+            for root, _sub, files in os.walk(ext_dir):
+                for filename in sorted(files):
+                    if not filename.endswith(f".{ext}"):
+                        continue
+                    rel = os.path.relpath(os.path.join(root, filename), assets_dir).replace(os.sep, "/")
+                    urls.append(f"/ext-assets/{module_name}/{rel}")
+        return urls
+
     def setup_ui_extensions(self):
         """(re)build the jinja loader so module-provided templates become available.
         called at startup and after settings saves (module reloads)."""
@@ -1038,6 +1074,20 @@ async def create_fastapi(channel):
     # serve asset files (formerly /static) using fastAPI's mount()
     app.mount("/assets", fastapi.staticfiles.StaticFiles(directory=channel.assets_path), name="assets")
 
+    # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-03)
+    # serve module-provided assets (<module>/webui/assets/) under /ext-assets/.
+    # auth is already handled by the middleware (path isn't /assets/* or /login).
+    @app.get("/ext-assets/{module_name}/{asset_path:path}")
+    async def ext_module_assets(module_name: str, asset_path: str):
+        module_dir = channel._ui_asset_dirs().get(module_name)
+        if module_dir is None:
+            raise fastapi.HTTPException(status_code=404, detail="Unknown module or no assets")
+        module_root = os.path.realpath(module_dir)
+        full_path = os.path.realpath(os.path.join(module_dir, asset_path))
+        if not full_path.startswith(module_root + os.sep) or not os.path.isfile(full_path):
+            raise fastapi.HTTPException(status_code=404, detail="Asset not found")
+        return fastapi.responses.FileResponse(full_path)
+
     # ------------------
     # Web pages
     # ------------------
@@ -1058,6 +1108,8 @@ async def create_fastapi(channel):
             "alpine_stores": alpine_stores,
             "js_utils": js_utils,
             "js_files": js_files,
+            "ext_css_files": channel._ui_asset_urls("css"),
+            "ext_js_files": channel._ui_asset_urls("js"),
             "login_enabled": channel.config.get("require_login"),
             "core_config": core.config
         })
@@ -1068,7 +1120,10 @@ async def create_fastapi(channel):
     async def login_page(request: fastapi.Request):
         """Shows the login form."""
         if channel.config.get("require_login"):
-            return channel.templates.TemplateResponse(request, "login.html", {"error": None})
+            return channel.templates.TemplateResponse(request, "login.html", {
+                "error": None,
+                "ext_css_files": channel._ui_asset_urls("css"),
+            })
         else:
             return fastapi.responses.RedirectResponse(url="/", status_code=303)
 
@@ -1109,7 +1164,10 @@ async def create_fastapi(channel):
             channel.login_attempts[client_ip] = []
         channel.login_attempts[client_ip].append(now)
         
-        return channel.templates.TemplateResponse(request, "login.html", {"error": "Invalid credentials"})
+        return channel.templates.TemplateResponse(request, "login.html", {
+            "error": "Invalid credentials",
+            "ext_css_files": channel._ui_asset_urls("css"),
+        })
 
     # ---- logout
     @app.get("/logout")

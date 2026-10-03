@@ -67,6 +67,11 @@
         {% for file in css_files %}
         <link rel="stylesheet" href="{{ url_for('assets', path='css/'+file) }}" />
         {% endfor %}
+        {# -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-03)
+           module-shipped stylesheets, already full urls #}
+        {% for url in ext_css_files %}
+        <link rel="stylesheet" href="{{ url }}" />
+        {% endfor %}
 
         <link rel="stylesheet" id="code-theme" href="{{ url_for('assets', path='css/code-themes/github-dark.css') }}">
 
@@ -137,6 +142,11 @@
         <!-- javascript files -->
         {% for file in js_files %}
         <script src="{{ url_for('assets', path='js/'+file) }}"></script>
+        {% endfor %}
+        {# -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-03)
+           module-shipped scripts, already full urls #}
+        {% for url in ext_js_files %}
+        <script src="{{ url }}"></script>
         {% endfor %}
 
         <!--

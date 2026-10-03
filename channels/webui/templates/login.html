@@ -7,6 +7,11 @@
     <link rel="stylesheet" href="{{ url_for('assets', path='css/base/base.css') }}">
     <link rel="stylesheet" href="{{ url_for('assets', path='css/base/variables.css') }}">
     <link rel="stylesheet" href="{{ url_for('assets', path='css/login.css') }}">
+    {# -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-03)
+       module-shipped stylesheets, so login slots can be styled too #}
+    {% for url in ext_css_files %}
+    <link rel="stylesheet" href="{{ url }}">
+    {% endfor %}
 </head>
 <body>
     <div class="login-wrapper">
