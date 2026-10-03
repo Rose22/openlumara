@@ -1799,9 +1799,36 @@ async def create_fastapi(channel):
                                 return False
 
                             message = await channel.context.chat.messages.get(index)
-                            message["content"] = data.get("content")
-
+                            content = data.get("content")
                             filenames = data.get("filenames")
+
+                            # new files attached during edit (same format as user_message)
+                            files_data = data.get("files")
+                            if files_data:
+                                files_dict = {
+                                    f["name"]: base64.b64decode(f["data"])
+                                    for f in files_data
+                                }
+
+                                # if the message had plain string content, convert it to blocks
+                                # so file blocks can be appended
+                                if isinstance(content, str):
+                                    content = [{"type": "text", "text": content}]
+                                    filenames = [""]
+
+                                # keep filenames aligned with content if not provided
+                                if filenames is None:
+                                    filenames = ["" for _ in content]
+
+                                for filename, file_data in files_dict.items():
+                                    block = channel._file_to_block(filename, file_data)
+                                    if block is None:
+                                        continue
+                                    content.append(block)
+                                    filenames.append(filename)
+
+                            message["content"] = content
+
                             if filenames is not None:
                                 message.setdefault("_metadata", {})["filenames"] = filenames
 

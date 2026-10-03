@@ -64,6 +64,7 @@ CHAT_STORE = {
     turnHistory: [],
     editingMessageIndex: null,
     editContent: '',
+    editAttached: [],
 
     user_input: '',
     last_user_input: '',
@@ -806,12 +807,24 @@ CHAT_STORE = {
         this.editContent = Array.isArray(msg.content)
             ? (msg.content.find((b, i) => b.type === 'text' && !msg._metadata?.filenames?.[i])?.text ?? '')
             : msg.content;
+        // existing attachments (names only; new files carry raw File objects)
+        this.editAttached = (msg._metadata?.filenames || []).filter(f => f).map(name => ({ name }));
         Alpine.store('ui').scrollToTurnIndex = turnIndex;
     },
 
     async cancelEdit() {
         this.editingMessageIndex = null;
         this.editContent = '';
+        this.editAttached = [];
+    },
+
+    addEditFile(event) {
+        for (const file of event.target.files) {
+            if (!this.editAttached.some(e => e.name === file.name)) {
+                this.editAttached.push({ name: file.name, file });
+            }
+        }
+        event.target.value = "";
     },
 
     async saveEdit(index) {
@@ -842,15 +855,28 @@ CHAT_STORE = {
             filenames = names;
         }
 
+        // newly attached files (raw File objects) - converted to blocks by the backend
+        const newFiles = this.editAttached.filter(e => e.file);
+        let files = null;
+        if (newFiles.length > 0) {
+            const uploadStore = Alpine.store("upload");
+            files = await Promise.all(newFiles.map(async (e) => ({
+                name: e.name,
+                data: await uploadStore.readFileAsBase64(e.file)
+            })));
+        }
+
         await simpleSocketSend({
             "type": "message_edit",
             "index": index,
             "content": content,
-            "filenames": filenames
+            "filenames": filenames,
+            "files": files
         });
 
         this.editingMessageIndex = null;
         this.editContent = '';
+        this.editAttached = [];
     },
 
     /* ----------------------

@@ -245,6 +245,32 @@
                                 box-shadow: 0 0 16px var(--accent-glow);
                             }
                         }
+
+                        .edit-add-file {
+                            width: 28px;
+                            height: 28px;
+                            padding: 0;
+                            flex-shrink: 0;
+                            background: var(--bg-tertiary);
+                            border: 1px solid var(--border-color);
+                            border-radius: var(--radius-md);
+                            color: var(--text-secondary);
+                            cursor: pointer;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+
+                            svg {
+                                width: 14px;
+                                height: 14px;
+                            }
+
+                            &:hover {
+                                background: var(--bg-secondary);
+                                color: var(--accent);
+                                border-color: var(--accent);
+                            }
+                        }
                     }
                 }
             }
