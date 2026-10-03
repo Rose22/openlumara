@@ -321,9 +321,6 @@ class ToolcallManager:
 
                 yield {"type": "final", "content": final_msg}
 
-                # set the agentic loop marker so that context.py knows where to start removing reasoning from toolcall messages
-                self.channel.agentic_loop_start = len(await self.channel.context.chat.messages.get())-1
-
         except asyncio.CancelledError:
             # cancellation during recursive toolcalling, so we just take the content/reasoning accumulated so far and add it to context
             if final_content or final_reasoning:
