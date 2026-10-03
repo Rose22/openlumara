@@ -26,6 +26,7 @@ if not os.path.exists(user_channel_path):
 
 import core.config
 import core.storage
+import core.search
 import core.module
 import core.commands
 import core.context

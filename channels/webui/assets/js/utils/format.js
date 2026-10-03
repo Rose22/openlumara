@@ -19,27 +19,9 @@ function escapeHtml(str) {
     return String(str).replace(/[&<>"']/g, (c) => _escapeReplacements[c]);
 }
 
-const _rtfCache = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
 
-function formatDate(dateString) {
-    if (!dateString) return '';
 
-    // Ensure UTC parsing by appending 'Z' if missing
-    const cleanDate = dateString.endsWith('Z') || dateString.endsWith('+00:00')
-        ? dateString
-        : dateString + 'Z';
 
-    const date = new Date(cleanDate);
-    const now = new Date();
-    const diffMs = date - now;
-
-    if (Math.abs(diffMs) < 60000) return _rtfCache.format(0, 'second');
-    if (Math.abs(diffMs) < 3600000) return _rtfCache.format(Math.round(diffMs / 60000), 'minute');
-    if (Math.abs(diffMs) < 86400000) return _rtfCache.format(Math.round(diffMs / 3600000), 'hour');
-    if (Math.abs(diffMs) < 604800000) return _rtfCache.format(Math.round(diffMs / 86400000), 'day');
-
-    return date.toLocaleDateString();
-}
 
 /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
    the sidebar date-grouping mirror (groupKeyOf/dayLabelFromKey and
@@ -71,12 +53,29 @@ function formatMessageTimestamp(turn) {
     const date = new Date(ts * 1000);
     if (isNaN(date.getTime())) return '';
 
-    // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-02)
     // hour12: false forces 24-hour time regardless of locale
     const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-    const isToday = localDayKey(date) === localDayKey(new Date());
-    const label = isToday ? time : `${date.toLocaleDateString()} ${time}`;
-    return label;
+
+    const today = new Date();
+    if (localDayKey(date) === localDayKey(today)) return time;
+
+    // -- AI GENERATED CODE (qwen/Qwen3.8-Flash-Next-Q4) :: (2026-10-02)
+    // day labels mirror day_label_from_key in channels/webui.py (the
+    // sidebar's vocabulary): Yesterday, weekday name within the past
+    // week, then 'October 26' / 'October 26, 2025'. en-US is pinned so
+    // the labels match the backend's English strings exactly.
+    const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const diffDays = Math.round((startOfToday - startOfDay) / 86400000);
+
+    if (diffDays === 1) return `Yesterday ${time}`;
+    if (diffDays > 1 && diffDays < 7) {
+        return `${date.toLocaleDateString('en-US', { weekday: 'long' })} ${time}`;
+    }
+    if (date.getFullYear() === today.getFullYear()) {
+        return `${date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })} ${time}`;
+    }
+    return `${date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} ${time}`;
 }
 
 

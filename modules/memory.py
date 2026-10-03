@@ -133,30 +133,23 @@ class Memory(core.module.Module):
         self._mem.save()
         return self.result(f"memory {id} unpinned")
 
-    async def search(self, query: str, search_in_content: bool = False):
+    async def search(self, query: str, search_in_content: bool = True):
         """Searches memories by query. Use when you need to recall past info but don't know the exact ID."""
-        query_lower = query.lower()
-        results = []
+        weights = {"tags": 2.0, "content": 1.0} if search_in_content else {"tags": 2.0}
 
-        for mem in self._mem:
-            content = str(mem.get("content", "")).lower()
-            tags = [str(t).lower() for t in mem.get("tags", [])]
-
-            match_found = False
-            # Check if query is in any of the tags
-            if any(query_lower in tag for tag in tags):
-                match_found = True
-            # Check if query is in content (if enabled)
-            elif search_in_content and query_lower in content:
-                match_found = True
-
-            if match_found:
-                results.append(f"ID: {mem.get('id')} | Tags: {mem.get('tags')} | Content: {mem.get('content')}")
+        results = await self._mem.search(query, field_weights=weights, top_n=10)
 
         if not results:
             return self.result(f"No memories found matching '{query}'.")
 
-        return self.result("\n".join(results))
+        lines = []
+        for hit in results:
+            mem = hit["entry"]
+            lines.append(
+                f"ID: {mem.get('id')} | Score: {hit['score']:.2f} | Tags: {mem.get('tags')} | Content: {mem.get('content')}"
+            )
+
+        return self.result("\n".join(lines))
 
     async def list_unpinned(self, tag: str = None):
         """Lists all unpinned memories. Use to browse long-term storage or filter by tag."""

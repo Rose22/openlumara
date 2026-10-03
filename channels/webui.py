@@ -685,9 +685,17 @@ def highlight_query(text, query):
     escaped_text = html_lib.escape(str(text), quote=True)
     if not query:
         return escaped_text
+    # -- AI GENERATED CODE (qwen/Qwen3.8-Flash-Next-Q4) :: (2026-10-02)
+    # highlight the verbatim phrase plus each normalized query token as a
+    # substring, mirroring what core.search's BM25 actually matches.
     # escape both sides identically before regexing, so queries containing
     # html-ish characters still match the escaped text
-    pattern = re.escape(html_lib.escape(str(query), quote=True))
+    candidates = [str(query).strip()] + core.search.normalize_words(query)
+    pattern = "|".join(dict.fromkeys(
+        re.escape(html_lib.escape(c, quote=True)) for c in candidates if c
+    ))
+    if not pattern:
+        return escaped_text
     return re.sub(
         f"({pattern})",
         lambda m: '<strong class="search-highlight">' + m.group(1) + "</strong>",
@@ -1294,7 +1302,11 @@ async def create_fastapi(channel):
         # would scramble the sidebar's day groups). each result is slimmed
         # down and gains pre-highlighted title/snippets plus its day group
         # key + label, so the frontend renders without deriving anything.
-        results.sort(key=lambda r: r.get("updated") or "", reverse=True)
+        # -- AI GENERATED CODE (qwen/Qwen3.8-Flash-Next-Q4) :: (2026-10-02)
+        # sort=relevance (global modal) keeps the BM25 ranking; the sidebar
+        # still wants newest-first so its day groups stay coherent.
+        if (data.get("sort") or "updated") != "relevance":
+            results.sort(key=lambda r: r.get("updated") or "", reverse=True)
 
         projected = []
         for chat in results:

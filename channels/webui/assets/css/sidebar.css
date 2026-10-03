@@ -297,6 +297,14 @@
                 font-style: normal;
             }
 
+            /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-02)
+               query matches inside search-result titles (backend wraps
+               them in <strong class="search-highlight">) */
+            .title .search-highlight {
+                color: var(--accent);
+                font-weight: 700;
+            }
+
             /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-17)
                single-line chat row: title fills the left, tag icon and
                three-dot actions sit right. (the old .meta line with the
@@ -489,6 +497,42 @@
                 width: 14px;
                 height: 14px;
             }
+        }
+
+        /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-02)
+           spinner shown in place of the magnifier while a search request
+           is in flight; margin-top centering (not translateY) so it
+           doesn't clash with the rotate animation */
+        .search-spinner {
+            position: absolute;
+            left: 11px;
+            top: 50%;
+            margin-top: -7px;
+            width: 14px;
+            height: 14px;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* spinner next to the 'searching..' row in the results list */
+        .search-loading-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .search-spinner-inline {
+            flex-shrink: 0;
+            width: 12px;
+            height: 12px;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
         }
 
         input {

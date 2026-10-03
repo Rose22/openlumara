@@ -73,7 +73,11 @@
         <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
              magnifier sits inside the field on the left (absolute, so
              it doesn't join the flex row); input gets left padding -->
-        <span class="search-icon">{% include 'svg/search.svg' %}</span>
+        <span class="search-icon" x-show="!$store.chat.searchLoading">{% include 'svg/search.svg' %}</span>
+        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-02)
+             spinner swaps in for the magnifier while a search is in
+             flight; absolute in the same spot, so no layout shift -->
+        <span class="search-spinner" x-show="$store.chat.searchLoading" x-cloak></span>
         <input name="search" type="text" placeholder="Search through your chats.."
             :value="$store.chat.searchQuery"
             @input.debounce="$store.chat.setSearchQuery($event.target.value)"
@@ -144,8 +148,13 @@
 
     <div class="chats">
         <!-- search loading state -->
+        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-02)
+             spinner next to the 'searching..' label -->
         <template x-if="$store.chat.searching && $store.chat.searchLoading && $store.chat.searchResults.length === 0">
-            <div class="item">searching..</div>
+            <div class="item search-loading-row">
+                <span class="search-spinner-inline"></span>
+                <span>searching..</span>
+            </div>
         </template>
 
         <!-- search empty state -->
@@ -213,7 +222,14 @@
                                  tag icon (hover popup, same as the old pill) and the
                                  three-dot actions on the right. -->
                             <div class="title-row">
-                                <template x-if="!renaming">
+                                <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-02)
+                                     search results render the backend's pre-escaped,
+                                     pre-highlighted title (same string the global
+                                     modal uses); normal browsing keeps plain x-text -->
+                                <template x-if="!renaming && chat.title_highlighted">
+                                    <span class="title" x-html="chat.title_highlighted"></span>
+                                </template>
+                                <template x-if="!renaming && !chat.title_highlighted">
                                     <span class="title" x-text="chat.title || 'New chat'"></span>
                                 </template>
 

@@ -1,5 +1,42 @@
 import core
+import os
+import json
 import datetime
+
+# Caches flattened chat history text per file, keyed by mtime, so unchanged histories skip re-reading.
+_history_cache = {}
+
+def _history_text(path):
+    # reads a chat history file and flattens its message contents into one searchable string, using the mtime cache
+    try:
+        mtime = os.path.getmtime(path)
+    except OSError:
+        return ""
+
+    cached = _history_cache.get(path)
+    if cached and cached[0] == mtime:
+        return cached[1]
+
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            messages = json.load(f)
+    except Exception:
+        return ""
+
+    parts = []
+    for msg in messages:
+        content = msg.get("content", "")
+        if isinstance(content, list):
+            content = " ".join(
+                p.get("text", "") for p in content
+                if isinstance(p, dict) and p.get("type") == "text"
+            )
+        if isinstance(content, str) and content.strip():
+            parts.append(content)
+
+    text = "\n".join(parts)
+    _history_cache[path] = (mtime, text)
+    return text
 
 class Chats(core.module.Module):
     """Lets you or the AI manage your chats"""
@@ -46,12 +83,39 @@ class Chats(core.module.Module):
         await self.channel.context.chat.set("tags", tags)
         return self.result(f"chat organised!")
 
-    async def _search(self, query: str, max_results: int = 20):
-        return await self.channel.context.chat.search(query, max_results)
-
     async def search(self, query: str):
         """Searches within all previous chats the user ever had with you. Very useful for recalling information from the past! Use only if user explicitly requests it, or if you can't find a past event the user is referring to within your current context!"""
-        found = await self._search(query)
-        if not found:
+        chat_list = self.channel.context.chat
+
+        entries = []
+        for meta in chat_list.get_all():
+            chat_id = meta.get("id")
+            if not chat_id:
+                continue
+
+            title = meta.get("title") or ""
+            category = meta.get("category") or ""
+            path = core.get_data_path(os.path.join(chat_list.path, "history", f"{chat_id}.json"))
+            text = _history_text(path)
+
+            if not title and not text:
+                continue
+
+            entries.append({"id": chat_id, "title": title, "category": category, "text": text})
+
+        results = await core.search.search(entries, query, field_weights={"title": 2.0, "category": 1.0, "text": 1.0}, top_n=20)
+
+        if not results:
             return self.result("no results found")
-        return self.result(found)
+
+        lines = []
+        for hit in results:
+            entry = hit["entry"]
+            line = f'[{entry["category"]}] "{entry["title"]}" (score {hit["score"]:.2f})'
+            if entry["text"]:
+                snippets = core.search.make_snippets(entry["text"], query, max_snippets=1)
+                if snippets:
+                    line += f"\n  {snippets[0]}"
+            lines.append(line)
+
+        return self.result("\n".join(lines))

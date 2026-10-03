@@ -57,11 +57,29 @@ class Notes(core.module.Module):
         return self.result(list(self.data.get(category, {}).keys()))
 
     async def search(self, query: str):
-        found = []
-        for key, content in self._recursive_items(dict(self.data)):
-            if query.lower() in key.lower() or query.lower() in content.lower():
-                found.append({key: content})
-        return self.result(found)
+        """searches all notes, ranked by relevance. returns paths and snippets, not entire notes."""
+        self.data.load()
+
+        entries = [
+            {"path": key, "content": str(value)}
+            for key, value in self._recursive_items(dict(self.data))
+        ]
+
+        results = await core.search.search(entries, query, field_weights={"path": 2.0, "content": 1.0}, top_n=10)
+
+        if not results:
+            return self.result(f"no notes found matching '{query}'")
+
+        lines = []
+        for hit in results:
+            entry = hit["entry"]
+            line = f"{entry['path']} (score {hit['score']:.2f})"
+            snippets = core.search.make_snippets(entry["content"], query, max_snippets=1)
+            if snippets:
+                line += f"\n  {snippets[0]}"
+            lines.append(line)
+
+        return self.result("\n".join(lines))
 
     async def delete(self, category: str, name: str):
         if category not in self.data.keys():

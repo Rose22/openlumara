@@ -535,6 +535,9 @@ class Channel:
         if not add_success:
             return {"type": "error", "content": "Unknown error while adding user message to context"}
 
+        # mark the start of the current agentic loop
+        self.agentic_loop_start = len(await self.context.chat.messages.get()) - 1
+
         # reconnect if needed
         result = await self.manager.API.attempt_connect()
         if result is not True:

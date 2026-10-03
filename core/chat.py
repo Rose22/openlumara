@@ -408,97 +408,98 @@ class Chat:
         else:
             return default
 
-    async def search(self, query: str, max_results: int = 100, search_in_content: bool = True):
-        """search across all chats for messages matching the query"""
+    def _history_text(self, chat_id):
+        # reads a chat history file and flattens its message contents into one searchable string,
+        # cached per-file by mtime so unchanged histories skip re-reading.
         import json
-        
-        results = []
-        query_lower = query.lower()
-        
-        found_chats = []
-        for chat_meta in self.data:
-            found = dict(chat_meta)
 
+        path = core.get_data_path(os.path.join(self.path, "history", f"{chat_id}.json"))
+        try:
+            mtime = os.path.getmtime(path)
+        except OSError:
+            return ""
+
+        cached = getattr(self, "_search_history_cache", None)
+        if cached is None:
+            cached = {}
+            self._search_history_cache = cached
+        if path in cached and cached[path][0] == mtime:
+            return cached[path][1]
+
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                messages = json.load(f)
+        except Exception:
+            return ""
+
+        parts = []
+        for message in messages:
+            if message.get("role") == "tool":
+                continue
+
+            content = message.get("content", "")
+            if isinstance(content, list):
+                content = " ".join(
+                    part.get("text", "")
+                    for part in content
+                    if isinstance(part, dict) and part.get("type") == "text"
+                )
+
+            if isinstance(content, str) and content.strip():
+                parts.append(content)
+
+        text = "\n".join(parts)
+        cached[path] = (mtime, text)
+        return text
+
+    async def search(self, query: str, max_results: int = 100, search_in_content: bool = True):
+        """search across all chats for messages matching the query, ranked by core.search (BM25)"""
+        if not query or not str(query).strip():
+            return []
+
+        entries = []
+        metas = {}
+        for chat_meta in self.data:
             chat_id = chat_meta.get("id")
             if not chat_id:
                 continue
-            
-            if query_lower in chat_meta.get("title").lower():
+
+            title = chat_meta.get("title") or ""
+            category = chat_meta.get("category") or ""
+            text = self._history_text(chat_id) if search_in_content else ""
+
+            if not title and not text:
+                continue
+
+            metas[chat_id] = chat_meta
+            entries.append({"id": chat_id, "title": title, "category": category, "text": text})
+
+        weights = {"title": 2.0, "category": 1.0}
+        if search_in_content:
+            weights["text"] = 1.0
+
+        ranked = await core.search.search(entries, query, field_weights=weights, top_n=max_results)
+
+        if not ranked:
+            return []
+
+        query_lower = query.strip().lower()
+        found_chats = []
+        for hit in ranked:
+            entry = hit["entry"]
+            found = dict(metas[entry["id"]])
+
+            if query_lower and query_lower in (entry.get("title") or "").lower():
                 found["title_match"] = True
 
-            if not search_in_content:
-                if found.get("title_match"):
-                    found_chats.append(found)
-                continue
-            
-            # Load messages from the history file
-            history_path = core.get_data_path(os.path.join(self.path, "history", f"{chat_id}.json"))
-            if not os.path.exists(history_path):
-                if found.get("title_match"):
-                    found_chats.append(found)
-                continue
-            
-            try:
-                with open(history_path, 'r', encoding='utf-8') as f:
-                    messages = json.load(f)
-            except (json.JSONDecodeError, Exception):
-                if found.get("title_match"):
-                    found_chats.append(found)
-                continue
-            
-            # Search through messages
-            found_messages = []
-            for msg_index, message in enumerate(messages):
-                content = message.get("content", "")
-                if not content:
-                    continue
-                
-                # Handle multimodal content - extract text parts
-                if isinstance(content, list):
-                    content = " ".join(
-                        part.get("text", "") 
-                        for part in content 
-                        if isinstance(part, dict) and part.get("type") == "text"
-                    )
-                
-                if not isinstance(content, str) or not content.strip():
-                    continue
-                
-                # Case-insensitive substring search
-                if query_lower in content.lower():
-                    # Find the match position for snippet generation
-                    match_pos = content.lower().find(query_lower)
-                    
-                    # Generate snippet with context
-                    snippet_start = max(0, match_pos - 50)
-                    snippet_end = min(len(content), match_pos + len(query) + 50)
-                    snippet = content[snippet_start:snippet_end]
-                    
-                    # Add ellipsis if truncated
-                    if snippet_start > 0:
-                        snippet = "..." + snippet
-                    if snippet_end < len(content):
-                        snippet = snippet + "..."
-                    
-                    found_messages.append(snippet)
-            
-            if found_messages:
-                found.update({
-                    "messages_found": len(found_messages),
-                    "message_snippets": found_messages
-                })
-                found_chats.append(found)
-            elif found.get("title_match"):
-                found_chats.append(found)
+            if entry.get("text"):
+                snippets = core.search.make_snippets(entry["text"], query, max_snippets=3)
+                if snippets:
+                    found["messages_found"] = len(snippets)
+                    found["message_snippets"] = snippets
 
-            if len(found_chats) >= max_results:
-                return found_chats
+            found_chats.append(found)
 
-        # sort with them by date last modified, then by title
-        # (so that the newest chats show up first)
-        found_chats.sort(key=lambda x: x["updated"] or "", reverse=True)
-        found_chats.sort(key=lambda x: not x.get("title_match"))  # not True=False=0 sorts before not False=True=1
-        
         return found_chats
 
     async def set(self, key, value, index = None):

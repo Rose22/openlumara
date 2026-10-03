@@ -33,7 +33,7 @@ core_settings_schema = {
         "tool_timeout": {
             "default": 30,
             "description": "Timeout in seconds for tool execution. This applies per individual tool, and is used to forcefully kill off tools that run too long."
-        }
+        },
     },
     "api": {
         "url": {
