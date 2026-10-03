@@ -802,7 +802,10 @@ CHAT_STORE = {
         if (!msg) { return; }
         
         this.editingMessageIndex = msg.index;
-        this.editContent = msg.content;
+        // multimodal messages store content as blocks; edit only the user's text block
+        this.editContent = Array.isArray(msg.content)
+            ? (msg.content.find((b, i) => b.type === 'text' && !msg._metadata?.filenames?.[i])?.text ?? '')
+            : msg.content;
         Alpine.store('ui').scrollToTurnIndex = turnIndex;
     },
 
@@ -812,10 +815,38 @@ CHAT_STORE = {
     },
 
     async saveEdit(index) {
+        // rebuild multimodal content: replace the user's text block, keep file blocks
+        const msg = this.turnHistory.flatMap(t => t.messages || []).find(m => m.index === index);
+        let content = this.editContent;
+        let filenames = null;
+
+        if (msg && Array.isArray(msg.content)) {
+            const blocks = [];
+            const names = [];
+            let replacedText = false;
+            msg.content.forEach((block, i) => {
+                const fname = msg._metadata?.filenames?.[i];
+                if (block.type === 'text' && !fname && !replacedText) {
+                    replacedText = true;
+                    blocks.push({ ...block, text: this.editContent });
+                } else {
+                    blocks.push(block);
+                }
+                names.push(fname || '');
+            });
+            if (!replacedText && this.editContent) {
+                blocks.unshift({ type: 'text', text: this.editContent });
+                names.unshift('');
+            }
+            content = blocks;
+            filenames = names;
+        }
+
         await simpleSocketSend({
             "type": "message_edit",
             "index": index,
-            "content": this.editContent
+            "content": content,
+            "filenames": filenames
         });
 
         this.editingMessageIndex = null;
