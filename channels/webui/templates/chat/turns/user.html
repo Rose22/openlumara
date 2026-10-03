@@ -46,5 +46,17 @@
             <button @click="$store.chat.cancelEdit()">Cancel</button>
         </div>
         <input type="file" x-ref="edit-file-input" @change="$store.chat.addEditFile($event)" x-show="false" x-cloak aria-hidden="true" multiple>
+        <template x-if="$store.chat.editAttached.length > 0">
+            <div class="edit-files">
+                <template x-for="entry in $store.chat.editAttached" :key="entry.name">
+                    <div class="edit-file-row">
+                        <button class="edit-file-remove" title="Remove file" @click="$store.chat.removeEditFile(entry.name)">
+                            {% include 'svg/cross.svg' %}
+                        </button>
+                        <span class="edit-file-name" x-text="entry.name"></span>
+                    </div>
+                </template>
+            </div>
+        </template>
     </div>
 </template>

@@ -827,6 +827,10 @@ CHAT_STORE = {
         event.target.value = "";
     },
 
+    removeEditFile(name) {
+        this.editAttached = this.editAttached.filter(e => e.name !== name);
+    },
+
     async saveEdit(index) {
         // rebuild multimodal content: replace the user's text block, keep file blocks
         const msg = this.turnHistory.flatMap(t => t.messages || []).find(m => m.index === index);
@@ -839,6 +843,7 @@ CHAT_STORE = {
             let replacedText = false;
             msg.content.forEach((block, i) => {
                 const fname = msg._metadata?.filenames?.[i];
+                if (fname && !this.editAttached.some(e => e.name === fname)) { return; } // file removed
                 if (block.type === 'text' && !fname && !replacedText) {
                     replacedText = true;
                     blocks.push({ ...block, text: this.editContent });
