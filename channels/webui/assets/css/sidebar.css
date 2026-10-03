@@ -119,6 +119,12 @@
     .chats {
         display: flex;
         flex-direction: column;
+        /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-03)
+           grow into all leftover height (min-height:0 so it can shrink
+           below content size) - this is what pushes .sidebar-footer to
+           the bottom instead of scattered margin-top:auto gaps */
+        flex: 1;
+        min-height: 0;
         width: 100%;
         overflow-x: hidden;
         overflow-y: scroll;
@@ -672,6 +678,18 @@
 
 
 
+/* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-03)
+   sidebar footer: extension bottom_of_chat_list + buttons slots and the
+   New Chat button, pinned to the bottom; .chats (flex:1) absorbs the
+   leftover height above it */
+.sidebar-footer {
+    margin-top: auto;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
 /* New Chat Button - Modern Style */
 .sidebar-btn {
     width: 100%;
@@ -682,7 +700,9 @@
     border-top: 1px solid var(--border-color);
     color: var(--text-primary, #eee);
     cursor: pointer;
-    margin-top: auto;  /* Pushes button to bottom of flex container */
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-03)
+       pinning moved to .sidebar-footer; margin-top:auto here split the
+       leftover space between extension buttons and New Chat */
     display: flex;
     align-items: center;
     justify-content: center;

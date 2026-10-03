@@ -1,5 +1,9 @@
 .message-buttons {
     display: flex;
+    /* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-03)
+       center so non-fixed-height children (extension chips) don't
+       stretch to the row height; core buttons are 28px regardless */
+    align-items: center;
     width: 100%;
     gap: var(--gap);
 

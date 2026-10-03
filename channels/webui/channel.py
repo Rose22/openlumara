@@ -248,26 +248,31 @@ class Webui(core.channel.Channel):
             return found
 
         def extension_modals():
-            """auto-discovers modal templates: every .html file under
+            """auto-discovers modal templates: every .html file directly in
             <module>/webui/templates/modals/ is included by the core modal area.
-            index.html inside modals/ is skipped (legacy manual-hook file)."""
+            index.html inside modals/ is skipped (legacy manual-hook file).
+            -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-03)
+            top level only: subdirs of modals/ mirror core slot template paths
+            (e.g. modals/settings/sidebar.html) and must not be auto-included."""
             found = []
             for module_name in sorted(dirs):
                 modal_root = os.path.join(dirs[module_name], "modals")
                 if not os.path.isdir(modal_root):
                     continue
-                for root, _sub, files in os.walk(modal_root):
-                    for filename in sorted(files):
-                        if not filename.endswith(".html") or filename == "index.html":
-                            continue
-                        rel = os.path.relpath(os.path.join(root, filename), dirs[module_name]).replace(os.sep, "/")
-                        template_name = f"{module_name}/{rel}"
-                        try:
-                            env.get_template(template_name)
-                        except Exception as e:
-                            self.log("webui", f"skipping UI modal '{template_name}': {core.detail_error(e)}")
-                            continue
-                        found.append(template_name)
+                for filename in sorted(os.listdir(modal_root)):
+                    filepath = os.path.join(modal_root, filename)
+                    if not os.path.isfile(filepath):
+                        continue
+                    if not filename.endswith(".html") or filename == "index.html":
+                        continue
+                    rel = os.path.relpath(filepath, dirs[module_name]).replace(os.sep, "/")
+                    template_name = f"{module_name}/{rel}"
+                    try:
+                        env.get_template(template_name)
+                    except Exception as e:
+                        self.log("webui", f"skipping UI modal '{template_name}': {core.detail_error(e)}")
+                        continue
+                    found.append(template_name)
             return found
 
         @jinja2.pass_context

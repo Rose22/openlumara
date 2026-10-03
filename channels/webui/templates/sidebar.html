@@ -333,12 +333,19 @@
             </div>
         </template>
 
-        {{ extension_slot("bottom_of_chat_list") }}
     </div>
 
-    {{ extension_slot("buttons") }}
-    <button class="sidebar-btn" @click="$store.chat.newChat()" :disabled="$store.stream.state !== 'idle'">
-        {% include 'svg/add.svg' %}
-        New Chat
-    </button>
+    {# -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-03)
+       footer wrapper: bottom_of_chat_list moved out of the scrollable
+       .chats area, and buttons + New Chat grouped with it, so the whole
+       block is pinned to the bottom of the sidebar (margin-top:auto in
+       sidebar.css) no matter how many extension buttons there are #}
+    <div class="sidebar-footer">
+        {{ extension_slot("bottom_of_chat_list") }}
+        {{ extension_slot("buttons") }}
+        <button class="sidebar-btn" @click="$store.chat.newChat()" :disabled="$store.stream.state !== 'idle'">
+            {% include 'svg/add.svg' %}
+            New Chat
+        </button>
+    </div>
 </div>

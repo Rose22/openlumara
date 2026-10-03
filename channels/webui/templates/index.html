@@ -104,9 +104,12 @@
                 $store.ui.showSidebar = !$store.ui.isMobile;
             }
         ">
-            <section id="main-wrapper">
-                {{ extension_slot("above_page") }}
+            {# -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-03)
+               above_page moved out of #main-wrapper (a flex ROW) into the
+               #main column, so page-level slots sandwich the app symmetrically #}
+            {{ extension_slot("above_page") }}
 
+            <section id="main-wrapper">
                 {% if config.get("enable_sidebar") %}
                     <section id="sidebar" 
                         x-show="$store.ui.showSidebar"
