@@ -3,6 +3,7 @@ import os
 import json
 import yaml
 import msgpack
+import regex as re
 
 TEMPORARY = False
 
@@ -199,11 +200,14 @@ class StorageDict(dict):
             case "msgpack":
                 file_ext = "mp"
                 self.binary = True
+            case "json_folder":
+                # json_folder stores each dict key as its own bare-json file inside a folder.
+                file_ext = "json"
 
         self.type = file_type
         self.ext = file_ext
 
-        if file_type not in ["markdown"]:
+        if file_type not in ["markdown", "json_folder"]:
             self.path += f".{self.ext}"
 
         if manager:
@@ -239,20 +243,39 @@ class StorageDict(dict):
             core.log("error", f"error reading {self.name}: {e}")
             return False
 
+    def _folder_filename(self, key):
+        # turns a dict key into a safe filename
+        safe = re.sub(r"[^\w. -]", "_", str(key))[:80]
+        return safe + ".json"
+
+    def _disk_mtime(self):
+        # newest modifiedtime across the folder's files files.
+        if self.type == "json_folder":
+            latest = 0.0
+            try:
+                for filename in os.listdir(self.path):
+                    if filename.endswith(".json"):
+                        latest = max(latest, os.path.getmtime(os.path.join(self.path, filename)))
+            except OSError:
+                return None
+            return latest
+        try:
+            return os.path.getmtime(self.path)
+        except OSError:
+            return None
+
     def _file_changed(self):
         """check if the file on disk has changed"""
-        try:
-            current_mtime = os.path.getmtime(self.path)
-            return current_mtime != self._last_modified
-        except OSError:
+        current_mtime = self._disk_mtime()
+        if current_mtime is None:
             return True
+        return current_mtime != self._last_modified
 
     def _update_mtime(self):
         """update the cached modification time"""
-        try:
-            self._last_modified = os.path.getmtime(self.path)
-        except OSError:
-            pass
+        current_mtime = self._disk_mtime()
+        if current_mtime is not None:
+            self._last_modified = current_mtime
 
     def _parse_nested_keys(self, flat_dict):
         """Convert flat keys like 'ideas/openlumara/topic' into nested dict structure."""
@@ -369,6 +392,22 @@ class StorageDict(dict):
             case "text":
                 if len(self) > 0:
                     self._write("\n".join(dict(self)))
+            # each key becomes a json file
+            case "json_folder":
+                if not os.path.exists(self.path):
+                    os.makedirs(self.path, exist_ok=True)
+
+                written = set()
+                for key, value in dict(self).items():
+                    filename = self._folder_filename(key)
+                    written.add(filename)
+                    with open(os.path.join(self.path, filename), "w", encoding="utf-8") as f:
+                        json.dump(value, f, indent=2)
+
+                # remove files whose keys no longer exist
+                for filename in os.listdir(self.path):
+                    if filename.endswith(".json") and filename not in written:
+                        os.remove(os.path.join(self.path, filename))
 
         # update mtime after saving so we know our cache is fresh
         self._update_mtime()
@@ -381,11 +420,32 @@ class StorageDict(dict):
             return True
 
         # skip reload if file hasn't changed on disk
-        if self.type not in ["markdown"] and not self._file_changed():
+        if self.type not in ["markdown", "json_folder"] and not self._file_changed():
             self._update_mtime()
             return True
 
         self.clear()
+
+        if self.type == "json_folder":
+            # load every json file in the folder.
+            # key is filename minus extension.
+            loaded = {}
+            try:
+                for filename in sorted(os.listdir(self.path)):
+                    if not filename.endswith(".json"):
+                        continue
+                    try:
+                        with open(os.path.join(self.path, filename), "r", encoding="utf-8") as f:
+                            value = json.load(f)
+                    except Exception as e:
+                        core.log("error", f"error reading {self.name}/{filename}: {e}")
+                        continue
+                    loaded[filename[:-5]] = value
+            except OSError:
+                pass
+            self.update(loaded)
+            self._update_mtime()
+            return True
 
         if self.type not in ["markdown"]:
             data = self._read()

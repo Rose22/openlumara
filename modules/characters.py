@@ -1,5 +1,12 @@
 import core
 import json
+import os
+import shutil
+import sys
+
+# -- AI GENERATED CODE (Qwen3.8-Flash-Next-Q4) :: (2026-10-03)
+# Full rewrite: characters live in one flat internal format (name + profile + optional scenario/first_message/post_history/category/tags),
+# stored as a folder of json files. Character card specs (V1/V2) are only understood at the import boundary.
 
 class Characters(core.module.Module):
     """Lets your AI embody different characters! inspired by characterAI, janitorAI, sillytavern, etc."""
@@ -13,33 +20,253 @@ class Characters(core.module.Module):
             "default": True,
             "description": "Automatically disables all prompts from other modules when a character is active, so that the only thing in the system prompt is the character definition. This can help a lot with making characters behave purely like characters, and less like, well, personal assistants."
         },
+        "use_first_messages": {
+            "description": "Whether a character's first message gets sent automatically when switching to that character in an empty chat",
+            "default": True
+        },
+        "use_post_history_instructions": {
+            "description": "Whether a character's post-history instructions (usually imported from character cards) get appended to the end of the prompt",
+            "default": True
+        },
         "use_writing_style": {
             "description": "Whether to use the writing style defined by the `writing style` module for characters. This will add that module's prompt to the character prompt even if agent prompts are disabled, making all your characters use your preferred writing style setup",
             "default": True
         }
     }
 
-    # since we use a tool based approach, and char card v2's naming is confusing for an AI,
-    # i've renamed the fields and just internally convert them to char card V1's names
-    char_card_v1_mappings = {
-        "name": "name",
-        "description": "identity",
-        "personality": "short_summary",
-        "scenario": "scenario",
-        "first_mes": "first_message",
-        "mes_example": "example_conversation"
-    }
-
     header = "Character"
 
     async def on_ready(self):
-        self.characters = core.storage.StorageDict("characters", type="json")
+        self.characters = core.storage.StorageDict("characters", type="json_folder")
         self.user_profile = core.storage.StorageDict("character_user", "json")
         self.active = False
+
+        self._migrate_if_needed()
+        self._ingest_pngs()
+        self._normalize_all()
 
         if self.config.get("insert_system_prompt"):
             # disable character listing tool
             self.disabled_tools.append("get_all")
+
+    # -- AI GENERATED CODE (Qwen3.8-Flash-Next-Q4) :: (2026-10-03)
+    # Migration from the old single-file characters.json to folder storage, following the same safety protocol as core/chat.py:
+    # mandatory backup (abort on failure), convert, verify on disk, only then remove the old file.
+    def _migrate_if_needed(self):
+        """migrates the old single-file characters.json into the folder storage, if it exists"""
+        old_file = core.get_data_path("characters.json")
+        if not os.path.exists(old_file):
+            return
+
+        folder = self.characters.path
+        if os.path.exists(folder) and any(f.endswith(".json") for f in os.listdir(folder)):
+            core.log("warning", "old characters.json found but folder storage already contains characters, skipping migration")
+            return
+
+        print("[MIGRATE] Old single-file character storage detected, migrating...")
+
+        backup_dir = core.get_data_path("character_migration_backups")
+        os.makedirs(backup_dir, exist_ok=True)
+
+        # copy the old file to the backup folder
+        # but if it fails for ANY reason, inform the user and abort openlumara
+        backup_path = os.path.join(backup_dir, "characters.json.bak")
+        try:
+            shutil.copy2(old_file, backup_path)
+            if not os.path.exists(backup_path):
+                raise Exception("Backup file not created")
+            print(f"[MIGRATE] Backed up old character storage to {backup_path}")
+        except Exception as e:
+            core.log("error", f"FATAL ERROR: could not back up characters.json before migrating. Aborting: {core.detail_error(e)}")
+            sys.exit(1)
+
+        try:
+            with open(old_file, "r", encoding="utf-8") as f:
+                old_chars = json.load(f)
+        except Exception as e:
+            core.log("error", f"could not read old character storage, leaving it in place: {core.detail_error(e)}")
+            return
+
+        if not isinstance(old_chars, dict):
+            core.log("error", "old character storage is not a dict, leaving it in place")
+            return
+
+        migrated = {}
+        for name, char in old_chars.items():
+            normalized = self._normalize_character(name, char)
+            if not normalized:
+                core.log("warning", f"skipping unreadable character '{name}' during migration (preserved in backup)")
+                continue
+            migrated[name] = normalized
+
+        self.characters.update(migrated)
+        self.characters.save()
+
+        # only remove the old file once the new storage is confirmed on disk
+        try:
+            written = [f for f in os.listdir(folder) if f.endswith(".json")]
+        except OSError:
+            written = []
+
+        if len(written) < len(migrated):
+            core.log("error", "migration verification failed, old characters.json left in place")
+            return
+
+        os.remove(old_file)
+        print(f"[MIGRATE] migrated {len(migrated)} characters to folder storage")
+
+    # -- AI GENERATED CODE (Qwen3.8-Flash-Next-Q4) :: (2026-10-03)
+    # Converts any supported card format (internal / legacy openlumara / char card V1 / V2) into the flat internal format.
+    def _normalize_character(self, stored_key, char):
+        """converts a character of any supported format into openlumara's flat internal format"""
+        if not isinstance(char, dict):
+            return None
+
+        if "profile" in char:
+            # already internal format; just make sure every field exists
+            return {
+                "name": char.get("name") or stored_key,
+                "profile": char.get("profile", ""),
+                "scenario": char.get("scenario", ""),
+                "first_message": char.get("first_message", ""),
+                "post_history": char.get("post_history", ""),
+                "category": char.get("category"),
+                "tags": char.get("tags", [])
+            }
+
+        # character card V2 wraps everything in a data field, V1 is flat
+        card = char.get("data", char)
+        if not isinstance(card, dict):
+            return None
+
+        name = card.get("name") or stored_key
+        profile = card.get("description", "")
+
+        if not profile:
+            # legacy openlumara format used 'identity' as its profile field
+            profile = char.get("identity", "")
+
+        if not profile:
+            return None
+
+        # fold personality and example conversations into the profile,
+        # since openlumara has no dedicated prompt slots for them
+        extras = []
+        if card.get("personality"):
+            extras.append(f"Personality: {card['personality']}")
+        if card.get("mes_example"):
+            extras.append(f"Example conversation:\n{card['mes_example']}")
+        if extras:
+            profile = profile + "\n\n" + "\n\n".join(extras)
+
+        return {
+            "name": name,
+            "profile": profile,
+            "scenario": card.get("scenario", ""),
+            "first_message": card.get("first_mes", char.get("first_message", "")),
+            "post_history": card.get("post_history_instructions", ""),
+            "category": char.get("category"),
+            "tags": card.get("tags", char.get("tags", []))
+        }
+
+    # -- AI GENERATED CODE (Qwen3.8-Flash-Next-Q4) :: (2026-10-03)
+    # Picks up character cards dropped into the characters folder as PNG files by reading the base64 JSON
+    # embedded in their tEXt/iTXt metadata chunks (the way sillytavern-style cards store them).
+    def _extract_card_from_png(self, png_path):
+        """extracts an embedded character card from a png's metadata chunks, returns a dict or None"""
+        import struct
+        import base64
+        import zlib
+
+        try:
+            with open(png_path, "rb") as f:
+                if f.read(8) != b"\x89PNG\r\n\x1a\n":
+                    return None
+
+                while True:
+                    header = f.read(8)
+                    if len(header) < 8:
+                        break
+
+                    length, chunk_type = struct.unpack(">I4s", header)
+                    data = f.read(length)
+                    f.read(4)  # crc, we don't verify it
+
+                    if chunk_type not in (b"tEXt", b"iTXt"):
+                        if chunk_type == b"IEND":
+                            break
+                        continue
+
+                    keyword, _, remainder = data.partition(b"\x00")
+                    if keyword not in (b"chara", b"ccv2"):
+                        continue
+
+                    if chunk_type == b"iTXt":
+                        # compression flag, compression method, language tag, translated keyword
+                        compressed = remainder[0] if remainder else 0
+                        remainder = remainder[3:]
+                        remainder = remainder.partition(b"\x00")[2]
+                        remainder = remainder.partition(b"\x00")[2]
+                        if compressed == 1:
+                            remainder = zlib.decompress(remainder)
+
+                    decoded = base64.b64decode(remainder).decode("utf-8")
+                    card = json.loads(decoded)
+                    if isinstance(card, dict):
+                        return card
+        except Exception:
+            return None
+
+        return None
+
+    def _ingest_pngs(self):
+        """converts any card-pngs in the characters folder into regular json characters"""
+        folder = self.characters.path
+        if not os.path.exists(folder):
+            return
+
+        changed = False
+        for filename in os.listdir(folder):
+            if not filename.lower().endswith(".png"):
+                continue
+
+            card = self._extract_card_from_png(os.path.join(folder, filename))
+            if not card:
+                continue
+
+            name = filename[:-4]
+            normalized = self._normalize_character(name, card)
+            if not normalized or not normalized.get("profile"):
+                core.log("warning", f"png '{filename}' had no usable character card, skipping")
+                continue
+
+            if not normalized.get("name"):
+                normalized["name"] = name
+
+            # don't overwrite an existing character with the same name
+            if self._find_character(normalized["name"]):
+                core.log("warning", f"png '{filename}' skipped: character '{normalized['name']}' already exists")
+                continue
+
+            self.characters[normalized["name"]] = normalized
+            changed = True
+
+        if changed:
+            self.characters.save()
+
+    def _normalize_all(self):
+        """normalizes all stored characters, so manually dropped-in card files also work"""
+        changed = False
+        for name, char in list(self.characters.items()):
+            normalized = self._normalize_character(name, char)
+            if not normalized:
+                continue
+            if normalized != char:
+                self.characters[name] = normalized
+                changed = True
+
+        if changed:
+            self.characters.save()
 
     @core.module.command("characters")
     async def _list_characters(self, args: list = []):
@@ -104,7 +331,13 @@ class Characters(core.module.Module):
 
         char_name = self._find_char_name(name)
 
-        response = await self.switch(char_name)
+        await self.switch(char_name)
+
+        first_msg = character.get("first_message", "")
+        if first_msg and self.config.get("use_first_messages"):
+            first_msg = self._replace_tags(char_name, first_msg)
+            return f"character switched to {char_name}\n\n{first_msg}"
+
         return f"character switched to {char_name}"
 
     async def on_system_prompt(self):
@@ -119,8 +352,7 @@ class Characters(core.module.Module):
         if not curr_char:
             return tool_text or None
 
-        char_name = self.channel.context.chat.get("metadata").get("character")
-        char = self._find_character(char_name)
+        char = self._find_character(curr_char)
 
         # if the character was deleted (or the metadata holds a stale/invalid
         # value), clean it up so the rest of the prompt isn't broken
@@ -129,40 +361,20 @@ class Characters(core.module.Module):
             self.active = False
             return tool_text or None
 
-        # the presence of the "data" key means it's
-        # either character card V2 or V3 or higher
-        char_data = char.get("data")
-
-        char_profile = None
-        char_scenario = None
-        first_msg = None
-        if char_data:
-            char_profile = char_data.get("description")
-            char_scenario = char_data.get('scenario')
-            first_msg = char_data.get("first_mes")
-        else:
-            # check if this is the legacy openlumara format or character spec V1,
-            # otherwise don't use the character
-
-            # if there is an "identity" key, this is openlumara's legacy format
-            if "identity" in char.keys():
-                char_profile = char.get("identity")
-
-            # otherwise, if there is a "description" field, this is char spec V1
-            elif "description" in char.keys():
-                char_profile = char.get("description")
-                char_scenario = char.get("scenario")
-                first_msg = char.get("first_mes")
+        char_name = char.get("name", curr_char)
+        char_profile = char.get("profile", "")
 
         if not char_profile:
-            return "Failed to extract character profile from character JSON"
+            return "Failed to extract character profile from character data"
+
+        char_scenario = char.get("scenario", "")
 
         # replace tags such as {{user}} and {{char}}
         char_profile = self._replace_tags(char_name, char_profile)
         if char_scenario:
             char_scenario = self._replace_tags(char_name, char_scenario)
 
-        # all of this is stored as json strings, so newlines need to be restored
+        # imported cards can contain escaped newlines, restore them
         char_profile = char_profile.replace("\\n", "\n")
         if char_scenario:
             char_scenario = char_scenario.replace("\\n", "\n")
@@ -182,7 +394,8 @@ class Characters(core.module.Module):
         char_text = "\n\n".join(character_text_build)
 
         # if this is an empty chat, insert the first message into history by sending it as a push
-        if first_msg:
+        first_msg = char.get("first_message", "")
+        if self.config.get("use_first_messages") and first_msg:
             if len(await self.channel.context.chat.messages.get()) == 0:
                 first_msg = self._replace_tags(char_name, first_msg)
                 await self.channel.push({"role": "assistant", "content": first_msg})
@@ -190,6 +403,9 @@ class Characters(core.module.Module):
         return char_text
 
     async def on_end_prompt(self):
+        if not self.config.get("use_post_history_instructions"):
+            return None
+
         curr_char = self.channel.context.chat.get("metadata").get("character")
         if not curr_char:
             return None
@@ -198,11 +414,7 @@ class Characters(core.module.Module):
         if not char:
             return None
 
-        char_data = char.get("data")
-        if not char_data:
-            return None
-
-        return char_data.get("post_history_instructions")
+        return char.get("post_history") or None
 
     async def switch(self, name: str):
         """Switches you to a different character. This will change your personality! Use this if user requests it."""
@@ -210,35 +422,27 @@ class Characters(core.module.Module):
         if not char:
             return self.result("character not found", False)
 
-        char_data = char.get("data", {})
-        if not char_data:
-            # default back to legacy openlumara character format
-            char_identity = char.get("identity")
-            if not char_identity:
-                return self.result("character data not found and auto conversion of legacy character format failed", False)
-
-            char_data = {
-                "name": self._find_char_name(name),
-                "description": char.get("identity")
-            }
-
         # prefer the canonical stored key so on_system_prompt() can always
         # resolve the character reliably, regardless of how it was invoked
-        char_name = self._find_char_name(name) or char_data.get("name")
+        char_name = self._find_char_name(name) or char.get("name")
 
         self.channel.context.chat.get("metadata")["character"] = char_name
         self.active = True
 
-        first_msg = char_data.get("first_mes")
-        if first_msg:
-            # bypass the usual tool response flow and instead send the first message as a push message
+        first_msg = char.get("first_message", "")
+        if first_msg and self.config.get("use_first_messages"):
+            # -- AI GENERATED CODE (Qwen3.8-Flash-Next-Q4) :: (2026-10-03)
+            # option B: never push mid-toolcall (pushes race with live stream rendering and
+            # corrupt message ordering). instead instruct the model to stream the greeting
+            # itself as its final response, so it flows through the normal display pipeline.
             first_msg = self._replace_tags(char_name, first_msg)
-            await self.channel.push({"role": "assistant", "content": first_msg})
-            await self.channel.context.chat.messages.add({"role": "assistant", "content": first_msg})
-            return None
+            return self.result(
+                f"Switched to {char_name}. "
+                f"Begin your reply now with this exact greeting, verbatim, and add nothing else:\n\n{first_msg}"
+            )
 
         return self.result(f"Switch successful. Write your response as the character's first message.")
-    
+
     async def switch_to_default(self):
         """Switches you back to your default identity."""
         self.channel.context.chat.get("metadata")["character"] = ""
@@ -309,7 +513,7 @@ class Characters(core.module.Module):
 
         return character
 
-    async def add(self, name: str, profile: str, short_summary: str, scenario: str, category: str, tags: list = None, post_history_instructions: str = ""):
+    async def add(self, name: str, profile: str, scenario: str = "", category: str = "", tags: list = None):
         """
         Adds a new character to your character storage.
 
@@ -319,10 +523,9 @@ class Characters(core.module.Module):
         Args:
             name: The character's name
             profile: The main description of the character. Within it, use {{char}} to refer to the character and {{user}} to refer to the user.
-            short_summary: A short summary of the character
-            scenario: The scenario/scene in which the conversation will take place
-            tags: Any tags that could be used to organize the character profile
-            post_history_instructions: Prompt to append at the end of chat history. Optional.
+            scenario: The scenario/scene in which the conversation will take place. Optional.
+            category: Category to organize the character under. Optional.
+            tags: Any tags that could be used to organize the character profile. Optional.
         """
         if not name.strip():
             return self.result("character name cannot be empty", False)
@@ -338,42 +541,29 @@ class Characters(core.module.Module):
             return self.result("character profile must not be blank.")
 
         self.characters[name] = {
-            "spec": "chara_card_v2",
-            "spec_version": "2.0",
-            "category": category,
-            "data": {
-                "name": name,
-                "description": profile,
-                "personality": short_summary,
-                "scenario": scenario,
-                "first_mes": "",
-                "mes_example": "", # why
-                "tags": tags,
-
-                "creator_notes": "", # not needed for openlumara
-                "system_prompt": "", # not needed for openlumara
-                "post_history_instructions": post_history_instructions,
-                "alternate_greetings": [], # no
-                "creator": self.user_profile.get("name", "OpenLumara User"),
-                "character_version": "1.0",
-                "extensions": {}
-            }
+            "name": name,
+            "profile": profile,
+            "scenario": scenario,
+            "first_message": "",
+            "post_history": "",
+            "category": category or None,
+            "tags": tags
         }
         self.characters.save()
         return self.result("character added")
 
-    async def edit(self, name: str, profile: str = None, short_summary: str = None, scenario: str = None, category: str = None, tags: list = None, first_message: str = None, post_history_instructions: str = None):
+    async def edit(self, name: str, profile: str = None, scenario: str = None, category: str = None, tags: list = None, first_message: str = None, post_history: str = None):
         """
         Edits an existing character. All fields except name are optional.
 
         Args:
             name: The character's name
             profile: The main description of the character. Within it, use {{char}} to refer to the character and {{user}} to refer to the user.
-            short_summary: A short summary of the character
             scenario: The scenario/scene in which the conversation will take place
+            category: Category to organize the character under
             tags: Any tags that could be used to organize the character profile
             first_message: The first message the character will send when starting a new chat.
-            post_history_instructions: Prompt to append at the end of chat history.
+            post_history: Prompt to append at the end of chat history.
         """
         if not name.strip():
             return self.result("character name cannot be empty", False)
@@ -382,59 +572,20 @@ class Characters(core.module.Module):
         if not char:
             return self.result("character doesn't exist!", False)
 
-        char_data = char.get("data")
-        if not char_data:
-            # normalize legacy openlumara and char card V1 formats to V2's
-            # data structure so editing works for every stored character
-            canonical_name = self._find_char_name(name)
-            char_data = {}
-
-            if "identity" in char.keys():
-                # legacy openlumara format
-                char_data["description"] = char.get("identity")
-                char_data["scenario"] = char.get("scenario")
-                char_data["first_mes"] = char.get("first_message", "")
-            elif "description" in char.keys():
-                # char card V1 format
-                char_data["description"] = char.get("description")
-                char_data["personality"] = char.get("personality")
-                char_data["scenario"] = char.get("scenario")
-                char_data["first_mes"] = char.get("first_mes", "")
-
-            char_data["name"] = char.get("name", canonical_name)
-            char_data["tags"] = char.get("tags", [])
-
         # always write back to the canonical (stored) key so we don't
         # accidentally create a duplicate entry with different casing
         canonical_name = self._find_char_name(name)
 
-        try:
-            ver_increment = float(char_data.get("character_version", 1.0))+0.1
-        except (TypeError, ValueError):
-            ver_increment = 1.1
-
         # we're using `is not None` because we need to retain the ability
         # to set stuff to blank strings
         self.characters[canonical_name] = {
-            "spec": "chara_card_v2",
-            "spec_version": "2.0",
+            "name": canonical_name,
+            "profile": profile if profile is not None else char.get("profile", ""),
+            "scenario": scenario if scenario is not None else char.get("scenario", ""),
+            "first_message": first_message if first_message is not None else char.get("first_message", ""),
+            "post_history": post_history if post_history is not None else char.get("post_history", ""),
             "category": category if category is not None else char.get("category"),
-            "data": {
-                "name": canonical_name,
-                "description": profile if profile is not None else char_data.get("description"),
-                "personality": short_summary if short_summary is not None else char_data.get("personality"),
-                "scenario": scenario if scenario is not None else char_data.get("scenario"),
-                "first_mes": first_message if first_message is not None else char_data.get("first_mes"),
-                "mes_example": "", # why
-                "tags": tags if tags is not None else char_data.get("tags"),
-                "creator_notes": "", # not needed for openlumara
-                "system_prompt": "", # not needed for openlumara
-                "post_history_instructions": post_history_instructions if post_history_instructions is not None else char_data.get("post_history_instructions"),
-                "alternate_greetings": [], # no
-                "creator": char_data.get("creator") or self.user_profile.get("name", "OpenLumara User"),
-                "character_version": ver_increment,
-                "extensions": {}
-            }
+            "tags": tags if tags is not None else char.get("tags", [])
         }
         self.characters.save()
         return self.result("character edited")
@@ -469,36 +620,27 @@ class Characters(core.module.Module):
 
         return self.result("user persona set")
 
+    # -- AI GENERATED CODE (Qwen3.8-Flash-Next-Q4) :: (2026-10-03)
+    # Import is now the only place that understands the character card spec; cards are flattened into the internal format on the way in.
     async def import_json(self, json_code: str):
-        """imports a json character V2 card into your character storage"""
+        """imports a character card (spec V1 or V2) into your character storage"""
         try:
             char_obj = json.loads(json_code)
         except Exception as e:
             return self.result(f"error: {core.detail_error(e)}", success=False)
 
-        if not char_obj:
+        if not isinstance(char_obj, dict) or not char_obj:
             return self.result("error: character card was empty", success=False)
 
-        char_data = char_obj.get("data")
-        if not char_data:
-            # might be char card V1, try to get the name first
-            if not char_obj.get("name"):
-                return self.result("error: character card did not have a data field", success=False)
+        normalized = self._normalize_character("", char_obj)
+        if not normalized or not normalized.get("name") or not normalized.get("profile"):
+            return self.result("error: failed to extract a usable name and profile from this character card", success=False)
 
-            # if so, convert it to V2
-            char_obj = {
-                "spec": "chara_card_v2",
-                "spec_version": "2.0",
-                "data": char_obj
-            }
+        # re-importing an existing character updates it in place
+        existing_name = self._find_char_name(normalized["name"])
+        name = existing_name or normalized["name"]
 
-        char_name = char_data.get("name")
-
-        if not char_name:
-            return self.result("error: failed to extract character name from character data", success=False)
-
-        # add it to storage
-        self.characters[char_name] = char_obj
+        self.characters[name] = normalized
         self.characters.save()
 
         return self.result("character successfully imported")
