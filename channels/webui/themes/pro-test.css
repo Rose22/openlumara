@@ -1,0 +1,546 @@
+/* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-04)
+   pro-test sidecar — "washi": warm rice-paper calm with full
+   sakura-ryokan decoration. Serif type, paper-fiber texture,
+   vermillion brush accents, Japanese ruby labels (相棒 / 会話),
+   a cherry branch in the corner, chopsticks above the chat list,
+   blossom watermarks on the chat cards and a gentle petal drift.
+   All pure CSS via pseudo-elements — no JS, no DOM changes. */
+
+/* ============================================================
+   1. TYPOGRAPHY — Japanese serif stack, applied theme-wide
+   ============================================================ */
+
+html {
+    --font-primary: Georgia, "Hiragino Mincho ProN", "Yu Mincho",
+                    "Noto Serif JP", "Times New Roman", serif !important;
+    background: var(--bg-primary) !important;
+}
+
+body {
+    font-family: var(--font-primary);
+    position: relative;
+    z-index: 0;
+}
+
+.chat-title-bar .text {
+    letter-spacing: 0.06em;
+    font-weight: 600;
+}
+
+/* ============================================================
+   1.5 BRAND — the header title becomes a stacked logo:
+   elegant serif wordmark, "SAKURA AI" ruby beneath it, and two
+   tapered brush lines under the brand (like the chopstick strokes
+   in the reference).
+   ============================================================ */
+
+header h1 {
+    position: relative;
+    display: inline-block;
+    padding-bottom: 16px;
+    font-size: 1.55em;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    line-height: 1.1;
+    /* the two tapered strokes below the brand */
+    background:
+        linear-gradient(101deg,
+            transparent 0 10%,
+            #8a5a3a 10% 12%,
+            transparent 12% 100%) 0 100% / 100% 9px no-repeat,
+        linear-gradient(99deg,
+            transparent 0 16%,
+            #a9714a 16% 18%,
+            transparent 18% 100%) 0 calc(100% - 4px) / 100% 9px no-repeat;
+}
+
+/* the pink 相棒 badge now trails the brand as a flex sibling */
+header .left::after {
+    content: "相棒";
+    align-self: center;
+    margin-left: 12px;
+    padding: 2px 10px;
+    border: 1px solid #f0b7c8;
+    border-radius: 8px;
+    background: #fde8ee;
+    color: #d4547a;
+    font-size: 0.72em;
+    font-weight: 600;
+    letter-spacing: 0.25em;
+    text-indent: 0.25em;
+    white-space: nowrap;
+}
+
+/* SAKURA AI ruby line under the wordmark */
+header h1::after {
+    content: "SAKURA AI";
+    display: block;
+    margin-top: 2px;
+    color: var(--accent-secondary);
+    font-size: 0.42em;
+    font-weight: 500;
+    letter-spacing: 0.55em;
+    text-indent: 0.55em;
+}
+
+/* ============================================================
+   2. WASHI PAPER — faint fiber texture + soft vignette
+   ============================================================ */
+
+html::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+        radial-gradient(120% 90% at 50% 0%, transparent 60%, rgba(120, 80, 40, 0.06) 100%),
+        repeating-linear-gradient(0deg,
+            rgba(140, 105, 60, 0.022) 0px,
+            rgba(140, 105, 60, 0.022) 1px,
+            transparent 1px,
+            transparent 4px),
+        repeating-linear-gradient(90deg,
+            rgba(140, 105, 60, 0.016) 0px,
+            rgba(140, 105, 60, 0.016) 1px,
+            transparent 1px,
+            transparent 5px);
+}
+
+/* ============================================================
+   3. HEADER — green status dot + 相棒 badge, red set title
+   (mirrors the reference: ● AI [相棒])
+   ============================================================ */
+
+header {
+    border-bottom: 1px solid var(--border-color) !important;
+}
+
+header h1 {
+    color: var(--accent) !important;
+}
+
+/* the green "online" dot before the brand */
+header h1::before {
+    content: "";
+    display: inline-block;
+    width: 11px;
+    height: 11px;
+    margin-right: 10px;
+    border-radius: 50%;
+    background: #4c845a;
+    box-shadow: 0 0 0 2px color-mix(in srgb, #4c845a 25%, transparent);
+    vertical-align: baseline;
+}
+
+/* hairline brush-stroke rule under the chat title bar */
+.chat-title-bar {
+    position: relative;
+}
+
+.chat-title-bar::after {
+    content: "";
+    position: absolute;
+    left: 2%;
+    right: 2%;
+    bottom: -3px;
+    height: 2px;
+    background: linear-gradient(90deg,
+        transparent 0%,
+        var(--accent) 8%,
+        var(--accent) 55%,
+        color-mix(in srgb, var(--accent) 40%, transparent) 85%,
+        transparent 100%);
+    border-radius: 9999px;
+    opacity: 0.6;
+    transform: skewX(-18deg) scaleY(0.9);
+}
+
+/* ============================================================
+   4. CHERRY BRANCH — top-right corner, arc + blossom dots.
+   body::before is the branch: a big transparent ellipse whose
+   bottom border curves like a bough; the blossoms are radial
+   gradients painted along that curve.
+   ============================================================ */
+
+body::before {
+    content: "";
+    position: fixed;
+    top: -150px;
+    right: -90px;
+    width: 380px;
+    height: 240px;
+    z-index: 1;
+    pointer-events: none;
+    border: none;
+    border-bottom: 3px solid #9c7a62;
+    border-radius: 0 0 48% 48%;
+    transform: rotate(-6deg);
+    background:
+        /* small twig stub */
+        radial-gradient(circle at 30% 88%, #9c7a62 2px, transparent 3px),
+        /* blossoms: petal halo + bright center */
+        radial-gradient(circle at 22% 84%, rgba(255, 166, 193, 0.9) 5px, rgba(255, 200, 218, 0.55) 9px, transparent 11px),
+        radial-gradient(circle at 22% 84%, #ffd9e4 2px, transparent 3px),
+        radial-gradient(circle at 38% 93%, rgba(255, 150, 185, 0.9) 6px, rgba(255, 200, 218, 0.5) 11px, transparent 13px),
+        radial-gradient(circle at 38% 93%, #ffe0ea 2.5px, transparent 4px),
+        radial-gradient(circle at 55% 96%, rgba(255, 166, 193, 0.85) 5px, rgba(255, 200, 218, 0.5) 9px, transparent 11px),
+        radial-gradient(circle at 55% 96%, #ffd9e4 2px, transparent 3px),
+        radial-gradient(circle at 70% 92%, rgba(250, 140, 175, 0.9) 6px, rgba(255, 200, 218, 0.5) 11px, transparent 13px),
+        radial-gradient(circle at 70% 92%, #ffe0ea 2.5px, transparent 4px),
+        radial-gradient(circle at 84% 82%, rgba(255, 166, 193, 0.85) 5px, rgba(255, 200, 218, 0.5) 9px, transparent 11px),
+        radial-gradient(circle at 84% 82%, #ffd9e4 2px, transparent 3px);
+}
+
+/* ============================================================
+   5. PETAL DRIFT — body::after rains sparse teardrop petals.
+   One tiny petal-shaped element whose box-shadows are the visible
+   petals, tiled on a 25vw x 100vh lattice (with duplicate rows at
+   y-100vh); translating one lattice cell (25vw, 100vh) per loop is
+   a seamless, gentle fall drifting with the wind to the right.
+   ============================================================ */
+
+body::after {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 9px;
+    height: 8px;
+    z-index: 1;
+    pointer-events: none;
+    background: transparent;
+    border-radius: 50% 0 50% 50%;
+    transform: rotate(15deg);
+    will-change: transform;
+    box-shadow:
+        /* row group 1 */
+        4vw 6vh  #ffc9d8,   29vw 6vh  #ffc9d8,   54vw 6vh  #ffc9d8,   79vw 6vh  #ffc9d8,   104vw 6vh  #ffc9d8,
+        4vw -94vh #ffc9d8,  29vw -94vh #ffc9d8,  54vw -94vh #ffc9d8,  79vw -94vh #ffc9d8,  104vw -94vh #ffc9d8,
+        14vw 23vh #ffd9e4,  39vw 23vh #ffd9e4,   64vw 23vh #ffd9e4,   89vw 23vh #ffd9e4,   114vw 23vh #ffd9e4,
+        14vw -77vh #ffd9e4, 39vw -77vh #ffd9e4,  64vw -77vh #ffd9e4,  89vw -77vh #ffd9e4,  114vw -77vh #ffd9e4,
+        21vw 44vh #ffb7c9,  46vw 44vh #ffb7c9,   71vw 44vh #ffb7c9,   96vw 44vh #ffb7c9,   121vw 44vh #ffb7c9,
+        21vw -56vh #ffb7c9, 46vw -56vh #ffb7c9,  71vw -56vh #ffb7c9,  96vw -56vh #ffb7c9,  121vw -56vh #ffb7c9,
+        /* row group 2 */
+        8vw 61vh #ffd0de,   33vw 61vh #ffd0de,   58vw 61vh #ffd0de,   83vw 61vh #ffd0de,   108vw 61vh #ffd0de,
+        8vw -39vh #ffd0de,  33vw -39vh #ffd0de,  58vw -39vh #ffd0de,  83vw -39vh #ffd0de,  108vw -39vh #ffd0de,
+        17vw 82vh #ffc9d8,  42vw 82vh #ffc9d8,   67vw 82vh #ffc9d8,   92vw 82vh #ffc9d8,   117vw 82vh #ffc9d8,
+        17vw -18vh #ffc9d8, 42vw -18vh #ffc9d8,  67vw -18vh #ffc9d8,  92vw -18vh #ffc9d8,  117vw -18vh #ffc9d8;
+    opacity: 0.5;
+    animation: washi-petal-drift 26s linear infinite;
+}
+
+@keyframes washi-petal-drift {
+    from { transform: translate(0, 0) rotate(15deg); }
+    to   { transform: translate(25vw, 100vh) rotate(15deg); }
+}
+
+/* ============================================================
+   6. CHAT LIST — 会話 ruby, chopsticks, blossom watermarks
+   ============================================================ */
+
+/* the 会話 ("conversation") ruby next to the category name */
+.cat-label::after {
+    content: " · 会話";
+    color: var(--accent-secondary);
+    font-size: 0.85em;
+    letter-spacing: 0.2em;
+}
+
+/* chat cards need relative positioning for the watermark */
+#chat-list .item {
+    position: relative;
+}
+
+/* the faint blossom watermark on the right of every chat card */
+#chat-list .item::after {
+    content: "❀";
+    position: absolute;
+    right: 12px;
+    bottom: 4px;
+    font-size: 26px;
+    line-height: 1;
+    color: #f2b8ca;
+    opacity: 0.28;
+    pointer-events: none;
+    transform: rotate(-12deg);
+}
+
+#chat-list .item.active::after {
+    opacity: 0.55;
+    color: #e88ba8;
+}
+
+/* tag chips as pink washi pills */
+.tag-chip {
+    background: #fbe3ea !important;
+    color: #c2402a !important;
+    border-color: #f3c1cf !important;
+    letter-spacing: 0.05em;
+}
+
+/* ============================================================
+   7. MESSAGES — paper cards on the desk
+   ============================================================ */
+
+.message-wrapper .message {
+    box-shadow: var(--shadow-soft) !important;
+    transition: box-shadow 0.25s ease, border-color 0.25s ease, transform 0.25s ease !important;
+}
+
+.message-wrapper .message:hover {
+    box-shadow: var(--shadow-medium) !important;
+    transform: translateY(-1px);
+}
+
+.message-wrapper .message.user {
+    border-left: 3px solid var(--border-user) !important;
+}
+
+/* ============================================================
+   7.5 HANKO STAMPS — section headings get a red carved seal with
+   kanji on the left and a pink hiragana reading after, cycling
+   through a word list via @counter-style (each h2/h3 gets the
+   next stamp, just like the reference's 生活/記憶/技術).
+   ============================================================ */
+
+@counter-style washi-hanko {
+    system: cyclic;
+    symbols: "生活" "記憶" "技術" "言葉" "心" "夢" "美";
+}
+
+@counter-style washi-hiragana {
+    system: cyclic;
+    symbols: "せいかつ" "きおく" "ぎじゅつ" "ことば" "こころ" "ゆめ" "び";
+}
+
+.message h2,
+.message h3 {
+    counter-increment: washi-hanko;
+}
+
+.message h2::before,
+.message h3::before {
+    content: counter(washi-hanko, washi-hanko);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5em;
+    height: 2.5em;
+    margin-right: 0.65em;
+    border: 2px solid var(--accent);
+    /* slightly uneven circle = hand-pressed ink seal */
+    border-radius: 48% 52% 50% 50% / 52% 48% 52% 48%;
+    background: color-mix(in srgb, var(--accent) 5%, transparent);
+    color: var(--accent);
+    font-size: 0.6em;
+    font-weight: 700;
+    letter-spacing: 0;
+    line-height: 1;
+    opacity: 0.92;
+    transform: rotate(-7deg);
+    vertical-align: middle;
+}
+
+/* the small pink hiragana reading trailing the heading */
+.message h2::after,
+.message h3::after {
+    content: counter(washi-hanko, washi-hiragana);
+    margin-left: 0.9em;
+    color: var(--accent-secondary);
+    font-size: 0.55em;
+    font-weight: 400;
+    letter-spacing: 0.3em;
+    opacity: 0.95;
+    vertical-align: middle;
+}
+
+/* ============================================================
+   8. INPUT — clean paper with a red seal button
+   ============================================================ */
+
+#input #user-input {
+    border: 1px solid var(--border-color) !important;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+#input #user-input:focus {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 3px var(--accent-glow) !important;
+}
+
+#input #send {
+    box-shadow: 0 2px 10px rgba(194, 64, 42, 0.30) !important;
+    letter-spacing: 0.04em;
+    transition: box-shadow 0.2s ease, transform 0.15s ease, filter 0.2s ease !important;
+}
+
+#input #send:hover:not(:disabled) {
+    box-shadow: 0 4px 16px rgba(194, 64, 42, 0.45) !important;
+    transform: translateY(-1px);
+    filter: brightness(1.05);
+}
+
+/* ============================================================
+   8.5 FLOWER BULLETS — unordered list items get a small pink
+   sakura instead of a dot, with a soft halo behind it.
+   ============================================================ */
+
+.message ul {
+    padding-left: 1.6em;
+}
+
+.message ul > li {
+    list-style: none;
+    position: relative;
+}
+
+.message ul > li::before {
+    content: "✿";
+    position: absolute;
+    left: -1.55em;
+    top: 0.08em;
+    font-size: 0.8em;
+    line-height: 1.4;
+    color: #e88ba8;
+    text-shadow: 0 0 6px rgba(232, 139, 168, 0.45);
+}
+
+/* nested lists get a lighter, smaller blossom */
+.message ul > li ul > li::before {
+    content: "❀";
+    font-size: 0.7em;
+    color: #f0a8bf;
+}
+
+/* ordered lists: vermillion numerals, serif */
+.message ol > li::marker {
+    color: var(--accent);
+    font-weight: 600;
+}
+
+/* ============================================================
+   8.6 BOOK SPACING — generous leading and air between blocks,
+   like well-set type in a printed page
+   ============================================================ */
+
+.message {
+    line-height: 1.75;
+}
+
+.message p {
+    margin: 0.9em 0;
+}
+
+.message ul > li,
+.message ol > li {
+    margin: 0.65em 0;
+    padding-left: 0.25em;
+}
+
+.message li > ul,
+.message li > ol {
+    margin: 0.55em 0;
+}
+
+.message h2,
+.message h3 {
+    margin-top: 1.6em;
+    margin-bottom: 0.7em;
+    line-height: 1.4;
+}
+
+.message h2:first-child,
+.message h3:first-child,
+.message p:first-child {
+    margin-top: 0.2em;
+}
+
+.message strong {
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+/* ============================================================
+   8.7 HEADER BUTTONS — round paper discs with a hairline border,
+   like the ceramic buttons in the reference
+   ============================================================ */
+
+header .btn {
+    width: 42px;
+    height: 42px;
+    border-radius: 50% !important;
+    background: var(--bg-secondary) !important;
+    border: 1px solid var(--border-color) !important;
+    color: var(--text-secondary) !important;
+    box-shadow: var(--shadow-soft) !important;
+    transition: border-color 0.2s ease, color 0.2s ease,
+                box-shadow 0.2s ease, transform 0.15s ease !important;
+}
+
+header .btn:hover {
+    border-color: var(--accent) !important;
+    color: var(--accent) !important;
+    box-shadow: 0 3px 10px rgba(194, 64, 42, 0.18) !important;
+    transform: translateY(-1px);
+}
+
+header .btn:active {
+    transform: translateY(0);
+}
+
+/* the model switcher: same paper-disc language, pill form */
+header .model-select {
+    border-radius: 9999px !important;
+    background: var(--bg-secondary) !important;
+    border: 1px solid var(--border-color) !important;
+    box-shadow: var(--shadow-soft) !important;
+    transition: border-color 0.2s ease !important;
+}
+
+header .model-select:hover {
+    border-color: var(--accent) !important;
+}
+
+/* ============================================================
+   9. CODE — lacquered tray
+   ============================================================ */
+
+pre {
+    border: 1px solid var(--border-color) !important;
+    box-shadow: var(--shadow-medium) !important;
+}
+
+/* ============================================================
+   10. SCROLLBAR + SELECTION
+   ============================================================ */
+
+/* hairline scrollbars to match the delicate line weights */
+::-webkit-scrollbar {
+    width: 7px;
+    height: 7px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--scrollbar) !important;
+    border-radius: var(--radius-full) !important;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-hover) !important;
+}
+
+::selection {
+    background: color-mix(in srgb, var(--accent-secondary) 45%, transparent);
+}
+
+/* ============================================================
+   11. REDUCED MOTION — the petals settle, everything else stays
+   ============================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+    body::after {
+        animation: none !important;
+        opacity: 0.25;
+    }
+}
