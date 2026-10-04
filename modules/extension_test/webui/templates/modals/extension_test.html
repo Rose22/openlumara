@@ -1,0 +1,22 @@
+{# -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-03)
+   extension_test: auto-discovered modal. Open with $store.ui.openModal('extension_test')
+   (sidebar button or header button). #}
+
+<template x-if="$store.ui.currentModal === 'extension_test'" x-cloak>
+    <div @keydown.escape.window="$store.ui.closeModal()">
+        <div class="modal ext-test-modal">
+            <div class="header">
+                <h2>🧪 extension test</h2>
+                <button class="close" @click="$store.ui.closeModal()" aria-label="Close">&times;</button>
+            </div>
+            <div class="ext-test-modal-body">
+                <div class="ext-test-big">✨ modal auto-discovery works ✨</div>
+                <p style="text-align: center;">
+                    If you can see this pink box, the full extension pipeline is alive:
+                    slot macros, asset serving (this box is styled by
+                    <code>/ext-assets/extension_test/css/test.css</code>), and modal discovery.
+                </p>
+            </div>
+        </div>
+    </div>
+</template>

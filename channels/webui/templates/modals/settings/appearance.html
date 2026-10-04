@@ -176,6 +176,8 @@
                        step="50"
                        @input="handleTokenFadeSpeed($event.target.value)">
             </div>
+
+            {{ extension_slot("settings") }}
         </div>
     </div>
 </template>

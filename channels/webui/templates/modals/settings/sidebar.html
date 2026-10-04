@@ -28,6 +28,8 @@
         <!-- special buttons like System Logs, Restart, etc -->
         <hr>
 
+        {{ extension_slot("buttons") }}
+
         <button 
             class="item" 
             @click="await $store.system.restart()"

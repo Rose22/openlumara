@@ -8,9 +8,38 @@
      for the current category, no pagination. the paginated visibleChats
      list is untouched while searching (scroll loader hidden), so clearing
      the box is an instant switch back with no refetch. -->
+<!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-04)
+     sidebar tab shell: modules can drop sidebars/<name>.html (+ optional
+     same-name .svg icon) into their webui templates and it renders as an
+     extra tab in the sidebar. extension_sidebars() (channel.py) discovers
+     them; the tab bar is pure markup and the active tab is plain local
+     Alpine state - zero core JS. empty sidebarTab = the built-in chat
+     list; the tab bar auto-hides via CSS (:has) when no extension
+     panels exist, so with no extensions this is byte-identical behavior
+     to before. -->
+<div class="sidebar-shell" x-data="{ sidebarTab: '' }">
+    <nav class="sidebar-tabbar" aria-label="Sidebar tabs">
+        <button type="button" class="sidebar-tab"
+            :class="{ 'active': sidebarTab === '' }"
+            :disabled="$store.stream.state !== 'idle'"
+            title="Chats"
+            @click="sidebarTab = ''">
+            {% include 'svg/home.svg' %}
+        </button>
+        {% for panel in extension_sidebars() %}
+        <button type="button" class="sidebar-tab ext"
+            :class="{ 'active': sidebarTab === '{{ panel.module }}/{{ panel.name }}' }"
+            :disabled="$store.stream.state !== 'idle'"
+            title="{{ panel.label }}"
+            @click="sidebarTab = '{{ panel.module }}/{{ panel.name }}'">
+            {{ panel.icon }}
+        </button>
+        {% endfor %}
+    </nav>
+
 <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-26)
      tagPanel: local state for the tag filter panel toggle below -->
-<div id="chat-list" x-ref="chat-list" x-cloak x-data="{ tagPanel: false }">
+<div id="chat-list" x-ref="chat-list" x-cloak x-show="sidebarTab === ''" x-data="{ tagPanel: false }">
     <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
          category picker dropdown, replaces the old category sidebar -->
     <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16)
@@ -18,6 +47,8 @@
          shows the active category's icon + name, menu is teleported to
          body like the chat action menu. 'general' gets home.svg, every
          other category gets folder.svg. -->
+    {{ extension_slot("top") }}
+
     <div class="category-select" x-data="{ open: false, top: 0, left: 0, width: 0 }">
         <button
             type="button"
@@ -146,7 +177,11 @@
         </button>
     </div>
 
+    {{ extension_slot("above_chat_list") }}
+
     <div class="chats">
+        {{ extension_slot("top_of_chat_list") }}
+
         <!-- search loading state -->
         <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-02)
              spinner next to the 'searching..' label -->
@@ -326,11 +361,40 @@
                 </template>
             </div>
         </template>
+
     </div>
 
-    <button class="sidebar-btn" @click="$store.chat.newChat()" :disabled="$store.stream.state !== 'idle'">
-        {% include 'svg/add.svg' %}
-        New Chat
-    </button>
+    {# -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-03)
+       footer wrapper: bottom_of_chat_list moved out of the scrollable
+       .chats area, and buttons + New Chat grouped with it, so the whole
+       block is pinned to the bottom of the sidebar (margin-top:auto in
+       sidebar.css) no matter how many extension buttons there are #}
+    <div class="sidebar-footer">
+        {{ extension_slot("bottom_of_chat_list") }}
+        {{ extension_slot("buttons") }}
+        {# -- AI GENERATED CODE (Qwen3.8-Flash-Next-Q4) :: (2026-10-04)
+           on mobile the sidebar is a full-screen overlay: dismiss it after
+           creating the chat so the fresh chat is revealed (matches the
+           characters panel's new-chat behavior) #}
+        <button class="sidebar-btn" :disabled="$store.stream.state !== 'idle'"
+            @click="
+                $store.chat.newChat();
+                if ($store.ui.isMobile) { $store.ui.showSidebar = false; }
+            ">
+            {% include 'svg/add.svg' %}
+            New Chat
+        </button>
+    </div>
+</div>
 
+    <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-04)
+         extension sidebar panels: each module template in sidebars/ is a
+         self-contained panel body (it toggles itself via the shared
+         sidebarTab state above, same trick modals use with currentModal).
+         panels are expected to be a flex-column like #chat-list. -->
+    {% for panel in extension_sidebars() %}
+    <div class="sidebar-panel" x-show="sidebarTab === '{{ panel.module }}/{{ panel.name }}'" x-cloak>
+        {% include panel.template %}
+    </div>
+    {% endfor %}
 </div>

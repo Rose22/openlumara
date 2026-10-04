@@ -1,0 +1,147 @@
+/* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-04)
+   characters sidebar panel. .item / .category-trigger styles in the core
+   sidebar.css are nested under #chat-list, so this panel carries its own
+   compact versions (menu itself is the shared top-level .category-menu). */
+.characters-panel {
+    padding: 7px;
+    flex: 1;
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    gap: var(--gap);
+}
+
+.characters-panel .char-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 2px 4px;
+}
+
+.characters-panel .char-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary, #999);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.characters-panel .char-new {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border: none;
+    border-radius: 6px;
+    background: none;
+    color: var(--text-secondary, #999);
+    cursor: pointer;
+}
+
+.characters-panel .char-new:hover {
+    background: var(--bg-secondary, rgba(255, 255, 255, 0.06));
+    color: var(--text-primary, #eee);
+}
+
+.characters-panel .char-new svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* trigger mirrors the core .category-trigger look */
+.characters-panel .char-select .category-trigger {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 36px;
+    padding: 0 12px 0 10px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--text-primary);
+    font-size: 14px;
+    font-family: var(--font-primary);
+    cursor: pointer;
+}
+
+.characters-panel .char-select .category-trigger .cat-icon,
+.characters-panel .char-select .category-trigger .cat-label {
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
+}
+
+.characters-panel .char-select .category-trigger .cat-icon svg {
+    width: 16px;
+    height: 16px;
+}
+
+.characters-panel .char-select .category-trigger .cat-label {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+}
+
+/* chat list */
+.characters-panel .char-chats {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+.characters-panel .item {
+    display: flex;
+    flex-direction: column;
+    padding: 8px 10px;
+    border-radius: var(--radius-sm, 8px);
+    border: 1px solid transparent;
+    cursor: pointer;
+    color: var(--text-primary);
+}
+
+.characters-panel .item:hover {
+    background: var(--bg-secondary, rgba(255, 255, 255, 0.05));
+}
+
+.characters-panel .item.active {
+    background: var(--bg-secondary, rgba(255, 255, 255, 0.08));
+    border-color: var(--accent, #00d4ff);
+}
+
+.characters-panel .item.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.characters-panel .title-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+}
+
+.characters-panel .title {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 14px;
+}
+
+/* chat count chip inside the dropdown menu (shared .category-menu) */
+.category-menu .char-count {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--text-secondary, #999);
+}

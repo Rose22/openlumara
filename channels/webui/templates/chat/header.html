@@ -8,8 +8,14 @@
         {% if config.get("enable_title") %}
             <h1>{{ config.get("title") }}</h1>
         {% endif %}
+
+        <!-- extension slot: modules fill this via a left() macro in <module>/chat/header.html -->
+        {{ extension_slot("left") }}
     </div>
     <div class="right">
+        <!-- extension slot: modules fill this via a right() macro in <module>/chat/header.html -->
+        {{ extension_slot("right") }}
+
         {% if config.get("enable_streaming_state_display") %}
             <span x-text="$store.stream.state.replace('_', ' ')" class="stream-state" x-show="!$store.ui.isMobile" x-cloak></span>
         {% endif %}

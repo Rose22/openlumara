@@ -1,0 +1,24 @@
+{# -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-03)
+   extension_test: sidebar canaries (all five sidebar slots). #}
+
+{% macro top() %}
+<div class="ext-test-canary">ext-test · sidebar top</div>
+{% endmacro %}
+
+{% macro above_chat_list() %}
+<div class="ext-test-canary ghost">ext-test · above chat list</div>
+{% endmacro %}
+
+{% macro top_of_chat_list() %}
+<div class="ext-test-canary ghost">ext-test · top of list</div>
+{% endmacro %}
+
+{% macro bottom_of_chat_list() %}
+<div class="ext-test-canary ghost">ext-test · bottom of list</div>
+{% endmacro %}
+
+{% macro buttons() %}
+<button type="button" class="sidebar-btn ext-test-canary" @click="$store.ui.openModal('extension_test')">
+    🧪 ext-test modal
+</button>
+{% endmacro %}

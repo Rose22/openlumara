@@ -18,6 +18,7 @@ import os
 import copy
 import json
 import asyncio
+import importlib
 import calendar
 import datetime
 import re
@@ -28,6 +29,8 @@ import html as html_lib
 import fastapi, fastapi.templating, fastapi.staticfiles
 import starlette, starlette.middleware.sessions
 import uvicorn
+import jinja2
+import markupsafe
 import base64
 
 # security libraries
@@ -153,6 +156,204 @@ class Webui(core.channel.Channel):
             return False
         return secrets.compare_digest(password, correct_password)
 
+    # -- AI GENERATED CODE (qwen/Qwen3.8-Flash-Next-Q4) :: 2026-10-03
+    # webui extension system: modules ship UI by placing templates in
+    # <module>/webui/templates/. the jinja loader becomes a ChoiceLoader where the
+    # core webui templates always win, plus a PrefixLoader exposing each enabled
+    # module's templates under "<module_name>/..". core templates call
+    # `extension_slot("name")` for named regions, and the modal area auto-includes
+    # everything under each module's templates/modals/ via `extension_modals()`.
+    def _ui_extension_dirs(self):
+        """collect webui template folders from all enabled modules, as {module_name: path}"""
+        dirs = {}
+        for package_name in ("modules", "user_modules"):
+            try:
+                package = importlib.import_module(package_name)
+            except ImportError:
+                continue
+
+            for module_name in core.config.get(package_name, "enabled", []):
+                for sub_path in getattr(package, "__path__", []):
+                    candidate = os.path.join(sub_path, module_name, "webui", "templates")
+                    if os.path.isdir(candidate):
+                        dirs[module_name] = candidate
+        return dirs
+
+    # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-03)
+    # phase 3 of the extension system: modules can ship static assets
+    # (css/js/...) in <module>/webui/assets/, served under /ext-assets/.
+    def _ui_asset_dirs(self):
+        """collect webui asset folders from all enabled modules, as {module_name: path}"""
+        dirs = {}
+        for package_name in ("modules", "user_modules"):
+            try:
+                package = importlib.import_module(package_name)
+            except ImportError:
+                continue
+
+            for module_name in core.config.get(package_name, "enabled", []):
+                for sub_path in getattr(package, "__path__", []):
+                    candidate = os.path.join(sub_path, module_name, "webui", "assets")
+                    if os.path.isdir(candidate):
+                        dirs[module_name] = candidate
+        return dirs
+
+    def _ui_asset_urls(self, ext):
+        """urls for css/js files shipped by enabled modules, as
+        /ext-assets/<module>/<relpath> entries meant to be appended to
+        the css_files/js_files template variables."""
+        urls = []
+        for module_name, assets_dir in sorted(self._ui_asset_dirs().items()):
+            ext_dir = os.path.join(assets_dir, ext)
+            if not os.path.isdir(ext_dir):
+                continue
+            for root, _sub, files in os.walk(ext_dir):
+                for filename in sorted(files):
+                    if not filename.endswith(f".{ext}"):
+                        continue
+                    rel = os.path.relpath(os.path.join(root, filename), assets_dir).replace(os.sep, "/")
+                    urls.append(f"/ext-assets/{module_name}/{rel}")
+        return urls
+
+    def setup_ui_extensions(self):
+        """(re)build the jinja loader so module-provided templates become available.
+        called at startup and after settings saves (module reloads)."""
+        dirs = self._ui_extension_dirs()
+
+        loaders = [jinja2.FileSystemLoader(self.template_path)]
+        if dirs:
+            loaders.append(jinja2.PrefixLoader(
+                {name: jinja2.FileSystemLoader(path) for name, path in dirs.items()},
+                delimiter="/"
+            ))
+
+        env = self.templates.env
+        env.loader = jinja2.ChoiceLoader(loaders)
+
+        def _extension_templates(relative_path):
+            """all module templates that mirror the given template path, sorted by module name.
+            each is compiled once here, so a broken extension is skipped and logged
+            instead of breaking the page."""
+            found = []
+            for module_name in sorted(dirs):
+                template_name = f"{module_name}/{relative_path}"
+                if not os.path.isfile(os.path.join(dirs[module_name], relative_path)):
+                    continue
+                try:
+                    env.get_template(template_name)
+                except Exception as e:
+                    self.log("webui", f"skipping UI extension '{template_name}': {core.detail_error(e)}")
+                    continue
+                found.append(template_name)
+            return found
+
+        def extension_modals():
+            """auto-discovers modal templates: every .html file directly in
+            <module>/webui/templates/modals/ is included by the core modal area.
+            index.html inside modals/ is skipped (legacy manual-hook file).
+            -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-03)
+            top level only: subdirs of modals/ mirror core slot template paths
+            (e.g. modals/settings/sidebar.html) and must not be auto-included."""
+            found = []
+            for module_name in sorted(dirs):
+                modal_root = os.path.join(dirs[module_name], "modals")
+                if not os.path.isdir(modal_root):
+                    continue
+                for filename in sorted(os.listdir(modal_root)):
+                    filepath = os.path.join(modal_root, filename)
+                    if not os.path.isfile(filepath):
+                        continue
+                    if not filename.endswith(".html") or filename == "index.html":
+                        continue
+                    rel = os.path.relpath(filepath, dirs[module_name]).replace(os.sep, "/")
+                    template_name = f"{module_name}/{rel}"
+                    try:
+                        env.get_template(template_name)
+                    except Exception as e:
+                        self.log("webui", f"skipping UI modal '{template_name}': {core.detail_error(e)}")
+                        continue
+                    found.append(template_name)
+            return found
+
+        def extension_sidebars():
+            """auto-discovers sidebar tab panels: every .html file directly in
+            <module>/webui/templates/sidebars/ renders as its own tab in the
+            core sidebar. a same-named .svg next to it becomes the tab icon
+            (inlined raw, so it inherits currentColor and themes for free).
+            the tab label is derived from the filename (underscores/hyphens
+            become spaces, title-cased) - zero config, just drop files in.
+            -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-04)"""
+            found = []
+            for module_name in sorted(dirs):
+                sidebar_root = os.path.join(dirs[module_name], "sidebars")
+                if not os.path.isdir(sidebar_root):
+                    continue
+                for filename in sorted(os.listdir(sidebar_root)):
+                    filepath = os.path.join(sidebar_root, filename)
+                    if not os.path.isfile(filepath):
+                        continue
+                    if not filename.endswith(".html"):
+                        continue
+                    name = filename[:-5]
+                    template_name = f"{module_name}/sidebars/{filename}"
+                    try:
+                        env.get_template(template_name)
+                    except Exception as e:
+                        self.log("webui", f"skipping UI sidebar '{template_name}': {core.detail_error(e)}")
+                        continue
+                    icon = markupsafe.Markup("")
+                    icon_path = os.path.join(sidebar_root, f"{name}.svg")
+                    if os.path.isfile(icon_path):
+                        try:
+                            with open(icon_path, encoding="utf-8") as f:
+                                icon = markupsafe.Markup(f.read())
+                        except Exception as e:
+                            self.log("webui", f"skipping sidebar icon '{icon_path}': {core.detail_error(e)}")
+                    label = name.replace("_", " ").replace("-", " ").title()
+                    found.append({
+                        "module": module_name,
+                        "name": name,
+                        "label": label,
+                        "template": template_name,
+                        "icon": icon,
+                    })
+            return found
+
+        @jinja2.pass_context
+        def extension_slot(ctx, slot_name, relative_path=None):
+            """renders the macro `slot_name` from every module template mirroring the
+            calling template's path (or the explicit one). lets a single module file
+            fill multiple named regions of a core component:
+            {% macro left() %}...{% endmacro %} -> {{ extension_slot("left") }}.
+            slot templates should contain macro definitions only - importing runs
+            the template body, so stray markup outside macros is executed and discarded.
+            the caller's context is passed to a macro as the `ctx` kwarg only if the
+            macro declares it, so slots needing scoped data (turn/message in chat
+            templates) declare `{% macro below_message(ctx) %}` and read
+            `ctx['message']`. zero-arg macros are called plain, untouched.
+            modules that don't define the slot are silently skipped."""
+            relative_path = relative_path or ctx.name
+            if not relative_path:
+                return markupsafe.Markup("")
+            parts = []
+            for template_name in _extension_templates(relative_path):
+                try:
+                    macro = getattr(env.get_template(template_name).module, slot_name, None)
+                    if macro is not None:
+                        if "ctx" in getattr(macro, "arguments", ()):
+                            parts.append(str(macro(ctx=ctx.get_all())))
+                        else:
+                            parts.append(str(macro()))
+                except Exception as e:
+                    self.log("webui", f"skipping extension slot '{slot_name}' in '{template_name}': {core.detail_error(e)}")
+                    continue
+            return markupsafe.Markup("\n".join(parts))
+
+        env.globals["extension_modals"] = extension_modals
+        env.globals["extension_sidebars"] = extension_sidebars
+        env.globals["extension_slot"] = extension_slot
+        env.cache.clear()
+
     async def on_ready(self):
         # paths
         self.path = core.get_path(os.path.join("channels", "webui"))
@@ -161,6 +362,7 @@ class Webui(core.channel.Channel):
 
         # fastapi-specific instances
         self.templates = fastapi.templating.Jinja2Templates(self.template_path)
+        self.setup_ui_extensions()
 
         # aaand create it
         self.app = await create_fastapi(self)
@@ -922,6 +1124,75 @@ async def create_fastapi(channel):
     # serve asset files (formerly /static) using fastAPI's mount()
     app.mount("/assets", fastapi.staticfiles.StaticFiles(directory=channel.assets_path), name="assets")
 
+    # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-03)
+    # serve module-provided assets (<module>/webui/assets/) under /ext-assets/.
+    # auth is already handled by the middleware (path isn't /assets/* or /login).
+    @app.get("/ext-assets/{module_name}/{asset_path:path}")
+    async def ext_module_assets(module_name: str, asset_path: str):
+        module_dir = channel._ui_asset_dirs().get(module_name)
+        if module_dir is None:
+            raise fastapi.HTTPException(status_code=404, detail="Unknown module or no assets")
+        module_root = os.path.realpath(module_dir)
+        full_path = os.path.realpath(os.path.join(module_dir, asset_path))
+        if not full_path.startswith(module_root + os.sep) or not os.path.isfile(full_path):
+            raise fastapi.HTTPException(status_code=404, detail="Asset not found")
+        return fastapi.responses.FileResponse(full_path)
+
+    # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-03)
+    # phase 4 of the extension system: modules expose API endpoints via the
+    # zero-dependency marker in channels/webui/api.py (@webui.route). the
+    # lookup scans live module classes on every request, so module reloads
+    # (enable/disable/edit) are picked up with no rebuild hook. routes are
+    # exact-match against module-declared paths, so no traversal concerns.
+    def _ui_api_lookup(module_name, route_path, method):
+        """resolve /api/ext/<module>/<path> to a bound handler.
+        returns (handler, None) on success or (None, reason) on miss."""
+        module = channel.manager.modules.get(module_name)
+        if module is None:
+            return None, "unknown module"
+        wanted_path = str(route_path).strip("/").lower()
+        route_exists = False
+        for klass in type(module).__mro__:
+            for attr_name, attr in vars(klass).items():
+                meta = getattr(attr, "_ui_route", None)
+                if not meta or meta["path"] != wanted_path:
+                    continue
+                route_exists = True
+                if meta["method"] != method:
+                    continue
+                return getattr(module, attr_name), None
+        if not route_exists:
+            return None, "route not found"
+        return None, f"route only accepts {'GET' if method != 'GET' else 'POST'}"
+
+    @app.api_route("/api/ext/{module_name}/{route_path:path}", methods=["GET", "POST", "PUT", "DELETE"])
+    async def ext_api(module_name: str, route_path: str, request: fastapi.Request):
+        """forwards to a module handler marked with @webui.route. handlers
+        take (body=None, query=None) and return raw data (wrapped in the
+        standard api envelope) or the self.result() dict (unwrapped)."""
+        handler, reason = _ui_api_lookup(module_name, route_path, request.method)
+        if handler is None:
+            status = 405 if "accepts" in reason else 404
+            return fastapi.responses.JSONResponse(api_result(reason, success=False), status_code=status)
+
+        body = None
+        if request.method != "GET":
+            try:
+                body = await request.json()
+            except Exception:
+                body = None
+
+        try:
+            outcome = await handler(body=body, query=dict(request.query_params))
+        except Exception as e:
+            channel.log("webui", f"ext api error {module_name}/{route_path}: {core.detail_error(e)}")
+            return api_result(core.detail_error(e), success=False)
+
+        # unwrap the module-side self.result() convention into the api envelope
+        if isinstance(outcome, dict) and "status" in outcome and "content" in outcome:
+            return api_result(outcome["content"], outcome["status"] == "success")
+        return api_result(outcome, True)
+
     # ------------------
     # Web pages
     # ------------------
@@ -942,6 +1213,8 @@ async def create_fastapi(channel):
             "alpine_stores": alpine_stores,
             "js_utils": js_utils,
             "js_files": js_files,
+            "ext_css_files": channel._ui_asset_urls("css"),
+            "ext_js_files": channel._ui_asset_urls("js"),
             "login_enabled": channel.config.get("require_login"),
             "core_config": core.config
         })
@@ -952,7 +1225,10 @@ async def create_fastapi(channel):
     async def login_page(request: fastapi.Request):
         """Shows the login form."""
         if channel.config.get("require_login"):
-            return channel.templates.TemplateResponse(request, "login.html", {"error": None})
+            return channel.templates.TemplateResponse(request, "login.html", {
+                "error": None,
+                "ext_css_files": channel._ui_asset_urls("css"),
+            })
         else:
             return fastapi.responses.RedirectResponse(url="/", status_code=303)
 
@@ -993,7 +1269,10 @@ async def create_fastapi(channel):
             channel.login_attempts[client_ip] = []
         channel.login_attempts[client_ip].append(now)
         
-        return channel.templates.TemplateResponse(request, "login.html", {"error": "Invalid credentials"})
+        return channel.templates.TemplateResponse(request, "login.html", {
+            "error": "Invalid credentials",
+            "ext_css_files": channel._ui_asset_urls("css"),
+        })
 
     # ---- logout
     @app.get("/logout")
@@ -1528,6 +1807,11 @@ async def create_fastapi(channel):
                     # which turned any module reload error into a NameError
                     channel.log(channel.name, f"Error reloading module {module_name}: {core.detail_error(e)}")
 
+        # -- AI GENERATED CODE (qwen/Qwen3.8-Flash-Next-Q4) :: 2026-10-03
+        # rebuild the UI extension loader: modules may have gained or lost
+        # their webui/templates folder, and cached templates must be dropped
+        channel.setup_ui_extensions()
+
         return api_result({
             "requires_restart": requires_restart,
             "requires_reconnect": requires_reconnect,
@@ -1626,6 +1910,20 @@ async def create_fastapi(channel):
         except Exception as e:
             channel.log(channel.name, f"failed to load theme {filepath}: {e}")
             return api_result(f"Failed to load theme: {str(e)}", success=False)
+
+    # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-04)
+    # serve theme sidecar CSS: a .css file sitting next to a theme JSON with
+    # the same name is auto-loaded by theming.js when that theme is active.
+    # only .css files are served (no JS), and only from the themes dir.
+    @app.get("/themes/{file_name}")
+    async def theme_sidecar_css(file_name: str):
+        if not file_name.endswith(".css"):
+            raise fastapi.HTTPException(status_code=404, detail="Only CSS files are served")
+        themes_dir = os.path.realpath(os.path.join(channel.path, "themes"))
+        full_path = os.path.realpath(os.path.join(themes_dir, file_name))
+        if not full_path.startswith(themes_dir + os.sep) or not os.path.isfile(full_path):
+            raise fastapi.HTTPException(status_code=404, detail="Theme CSS not found")
+        return fastapi.responses.FileResponse(full_path, media_type="text/css")
 
     def generate_cache_version():
         # generate an sw.js cache version based on this file's last modified time

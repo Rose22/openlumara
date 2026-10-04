@@ -1,0 +1,96 @@
+{# -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-04)
+   characters sidebar tab: discovered via the sidebars/ convention
+   (extension_sidebars() in the webui channel). body logic lives in
+   assets/js/characters.js (CHARACTERS_PANEL global - ext scripts load
+   before alpine, same pattern as the core stores). #}
+<!-- x-intersect fires whenever x-show flips the panel visible (the tab
+     switch), which is our lazy-load + refresh trigger -->
+<div class="characters-panel" x-data="CHARACTERS_PANEL" x-intersect.enter="refresh()">
+
+    <div class="char-header">
+        <span class="char-title">Characters</span>
+        <button type="button" class="char-new" title="New chat with this character"
+            :disabled="!selected || $store.stream.state !== 'idle'"
+            @click="newChat()">
+            {% include 'svg/add.svg' %}
+        </button>
+    </div>
+
+    <!-- character picker: custom dropdown mirroring the category one -->
+    <div class="char-select" x-data="{ open: false, top: 0, left: 0, width: 0 }">
+        <button type="button" class="category-trigger"
+            :class="{ 'open': open }"
+            :disabled="$store.stream.state !== 'idle'"
+            title="Pick a character"
+            @click="
+                const r = $el.getBoundingClientRect();
+                top = r.bottom - 1;
+                left = r.left;
+                width = r.width;
+                open = !open;
+            ">
+            <span class="cat-icon">{% include 'svg/user.svg' %}</span>
+            <span class="cat-label" x-text="selectedLabel()"></span>
+            <svg class="cat-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" width="12" height="12"><path fill="currentColor" d="M6 8L1 3h10z"/></svg>
+        </button>
+        <template x-teleport="body">
+            <div class="category-menu" x-show="open" x-transition.opacity.duration.120ms
+                :style="`top: ${top}px; left: ${left}px; width: ${width}px`"
+                @click.stop @click.away="open = false"
+                @keydown.escape.window="open = false">
+                {# -- AI GENERATED CODE (Qwen3.8-Flash-Next-Q4) :: (2026-10-04)
+                   'no character' became the neutral 'select a character'
+                   placeholder; untagged chats are no longer listed there #}
+                <button type="button" class="category-option"
+                    @click="select(''); open = false">
+                    <span class="cat-icon">{% include 'svg/user.svg' %}</span>
+                    <span>select a character</span>
+                </button>
+                <template x-for="entry in names" :key="entry.key">
+                    <button type="button" class="category-option"
+                        @click="select(entry.key); open = false">
+                        <span class="cat-icon">{% include 'svg/user.svg' %}</span>
+                        <span x-text="entry.name"></span>
+                        <span class="char-count" x-show="counts[entry.key]" x-text="counts[entry.key]"></span>
+                    </button>
+                </template>
+            </div>
+        </template>
+    </div>
+
+    <!-- chats of the selected character -->
+    <div class="char-chats">
+        <template x-if="loading">
+            <div class="item">loading..</div>
+        </template>
+        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next-Q4) :: (2026-10-04)
+             nothing is listed until a character is picked, so the old
+             'no untagged chats' state is gone -->
+        <template x-if="!loading && selected && chats.length === 0">
+            <div class="item">no chats with this character yet</div>
+        </template>
+        <template x-for="chat in chats" :key="chat.id">
+            <div class="item"
+                :class="{
+                    'active': chat.id === $store.chat.selectedChat,
+                    'disabled': $store.stream.state !== 'idle' && chat.id !== $store.chat.selectedChat
+                }"
+                @click="
+                    $store.chat.loadChat(chat.id);
+                    if ($store.ui.isMobile) { $store.ui.showSidebar = false; }
+                ">
+                <div class="title-row">
+                    <span class="title" x-text="chat.title"></span>
+                </div>
+            </div>
+        </template>
+    </div>
+
+    <div class="sidebar-footer">
+        <button class="sidebar-btn" @click="newChat()"
+            :disabled="!selected || $store.stream.state !== 'idle'">
+            {% include 'svg/add.svg' %}
+            New Chat
+        </button>
+    </div>
+</div>

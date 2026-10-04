@@ -64,6 +64,8 @@
 
                         <!-- SYSTEM LOGS -->
                         {% include 'modals/settings/logs.html' %}
+
+                        {{ extension_slot("settings_page") }}
                         
                         <!-- ALL OTHER $store.settings.categories (core and so on) -->
                         <template x-if="!activeModule && !activeChannel && 

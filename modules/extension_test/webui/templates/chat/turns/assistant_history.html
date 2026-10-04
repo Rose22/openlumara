@@ -1,0 +1,12 @@
+{# -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-03)
+   extension_test: assistant history canary. Proves server-side ctx dispatch
+   (ctx.get('message')) works; self-removes when no timestamp is present. #}
+
+{% macro below_message(ctx) %}
+{% set msg = ctx.get('message') %}
+{% set ts = msg._metadata.timestamp if msg is mapping and msg.get('_metadata') else None %}
+<span class="ext-test-assistant-stamp"
+    {% if not ts %}x-init="$el.remove()"{% endif %}>
+    🧪 ctx server-side · replied <span x-text="new Date({{ ts | default(0, true) | int }} * 1000).toLocaleTimeString()"></span>
+</span>
+{% endmacro %}

@@ -26,6 +26,8 @@
             </div>
         </template>
 
+        {{ extension_slot("above_message") }}
+
         <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-15)
              switched from x-html+renderMarkdown to the x-md directive: uses the
              per-message cache, skips Alpine's initTree walk on the injected
@@ -33,6 +35,8 @@
         <template x-if="typeof message.content === 'string'">
             <div x-md="{ message: message, live: false, raw: message._metadata?.is_cmd }" :class="{'command': message._metadata?.is_cmd}"></div>
         </template>
+
+        {{ extension_slot("below_message") }}
     </div>
 </template>
 
@@ -61,3 +65,4 @@
         </template>
     </div>
 </template>
+

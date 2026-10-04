@@ -28,9 +28,13 @@
         height: -webkit-fill-available;
     }
 
-    /* main-wrapper was using 100vh, which clips on mobile */
-    #main-wrapper {
+    /* main-wrapper was using 100vh, which clips on mobile. now that #main
+       is the page column, the viewport height lives there */
+    #main {
         height: 100dvh;
+    }
+
+    #main-wrapper {
         gap: 0;
     }
 

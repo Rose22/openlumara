@@ -1,18 +1,17 @@
 import os
-import yaml
 import copy
 import core
 import modules
 import user_modules
 import channels
 import user_channels
-import pkgutil
 import hashlib
 import json
 import inspect
 
 config = None
 _registry_cache = None
+_cache_refresh_in_progress = False
 
 SCHEMA_CACHE_FILE = ".module_cache.json"
 
@@ -250,11 +249,11 @@ class ConfigManager:
             return default
 
         keys = list(args)
-        # If the last argument is not a string, or is empty, treat it as an explicit default
-        if keys and not isinstance(keys[-1], str) or not keys[-1]:
+        # if the last argument is not a string (or is an empty string), treat it as an explicit default
+        if keys and (not isinstance(keys[-1], str) or not keys[-1]):
             default = keys.pop()
 
-        # Start from the root config and traverse through the base path
+        # start from the root config and traverse through the base path
         current = self.root_config
         for k in self.base_path:
             if isinstance(current, dict) and k in current:
@@ -320,10 +319,9 @@ def _discover_available_names(package):
     """
     Discover module names from filesystem WITHOUT importing them.
     This allows the config to know what modules exist without loading them.
+    Folder-only layout: a folder counts only if it contains module.py or channel.py.
     """
-    if not hasattr(package, '__path__'):
-        return []
-    return [modname for _, modname, _ in pkgutil.iter_modules(package.__path__)]
+    return core.modules.discover_module_names(package)
 
 def _get_registry_data(enabled_channels=None, enabled_user_channels=None, enabled_modules=None, enabled_user_modules=None):
     """
@@ -402,19 +400,6 @@ def _get_registry_data(enabled_channels=None, enabled_user_channels=None, enable
     _registry_cache = {'key': cache_key, 'data': result}
     return result
 
-def _inject_settings_into_dict(target_dict, instances, section_key):
-    """Helper to build the schema by injecting class settings defaults."""
-    section = target_dict.setdefault(section_key, {})
-    settings = section.setdefault("settings", {})
-    for inst in instances:
-        name = core.modules.get_name(inst)
-        defaults = getattr(inst, 'settings', {})
-        if isinstance(defaults, dict) and defaults:
-            # We inject the full dict (including descriptions) into the schema.
-            # sync_config will later replace these dicts with flat values
-            # if the user has provided them in the config file.
-            settings[name] = defaults.copy()
-
 def _get_module_schema_cache():
     """
     Returns a dictionary containing the cached schemas and checksums for all modules/channels.
@@ -427,12 +412,31 @@ def _get_module_schema_cache():
     if os.path.exists(cache_path):
         try:
             with open(cache_path, 'r') as f:
-                cache = json.load(f)
+                loaded = json.load(f)
+            # merge per-section so a cache file missing a section doesn't silently disable scanning for it
+            for section_key in cache:
+                cache[section_key] = loaded.get(section_key, {})
         except Exception as e:
             print(f"[CORE] error while loading module cache {core.detail_error(e)}")
     else:
         print(f"[CORE] creating module cache at {cache_path}")
 
+    # re-entrancy guard: modules may call get_schema/get_module_structure at import time (during class-body evaluation),
+    # which would re-enter this function while a refresh is loading them. that causes an infinite reload loop. Break it by returning as-is.
+    global _cache_refresh_in_progress
+    if _cache_refresh_in_progress:
+        return cache
+    _cache_refresh_in_progress = True
+    try:
+        cache = _refresh_module_schema_cache(cache, cache_path)
+    finally:
+        # always release the guard, even if something unexpected blows up mid-refresh
+        _cache_refresh_in_progress = False
+
+    return cache
+
+def _refresh_module_schema_cache(cache, cache_path):
+    """Scan the filesystem for new/changed/deleted modules and rebuild the cache dict accordingly."""
     package_map = {
         "channels": (channels, core.channel.Channel),
         "user_channels": (user_channels, core.channel.Channel),
@@ -455,19 +459,8 @@ def _get_module_schema_cache():
                 sections_to_refresh.add(section_key)
                 continue
 
-            # Find the file path to check checksum
-            found_file = None
-            for sub_path in package.__path__:
-                # Try module.py
-                f1 = os.path.join(sub_path, f"{name}.py")
-                if os.path.exists(f1):
-                    found_file = f1
-                    break
-                # Try module/__init__.py
-                f2 = os.path.join(sub_path, name, "__init__.py")
-                if os.path.exists(f2):
-                    found_file = f2
-                    break
+            # Find the entry file path to check checksum (folder layout: name/module.py or name/channel.py)
+            found_file = core.modules._get_module_file_path(package, name)
 
             if found_file:
                 if cache[section_key][name].get("checksum") != _get_file_checksum(found_file):
@@ -560,24 +553,7 @@ def _merge_core_settings(user_config, schema):
             new_config[k] = _flatten_settings(v)
     return new_config
 
-def apply_core_settings_schema(user_config, schema):
-    """
-    Applies the core_settings_schema to user_config, merging defaults.
-    Returns a new dict with all schema keys present and defaults filled in.
-    """
-    if not isinstance(user_config, dict):
-        user_config = {}
-
-    result = {}
-    for section_key, section_schema in schema.items():
-        user_section = user_config.get(section_key, {})
-        if isinstance(section_schema, dict) and isinstance(user_section, dict):
-            result[section_key] = _merge_core_settings(user_section, section_schema)
-        else:
-            result[section_key] = _flatten_settings(section_schema)
-    return result
-
-def get_schema(*args, **kwargs):
+def get_schema():
     """
     Returns the config schema using the on-disk cache.
     Contains all possible module settings to allow persistence for disabled modules.
@@ -863,18 +839,16 @@ def get(*args, **kwargs):
     """Shorthand for accessing nested config values.
     Usage: config.get("api", "url") or config.get("api", "url", default_value)
     """
-    global config, default_config
-
     default = kwargs.get("default", None)
     if not args:
         return default
 
     keys = list(args)
-    # If the last argument is not a string, or is empty, treat it as an explicit default
-    if keys and not isinstance(keys[-1], str) or not keys[-1]:
+    # if the last argument is not a string (or is an empty string), treat it as an explicit default
+    if keys and (not isinstance(keys[-1], str) or not keys[-1]):
         default = keys.pop()
 
-    # Safely resolve to a dictionary
+    # safely resolve to a dictionary
     try:
         value = dict(config) if config else dict(default_config)
     except (TypeError, ValueError):

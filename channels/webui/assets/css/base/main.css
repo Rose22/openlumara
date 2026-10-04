@@ -1,11 +1,25 @@
+/* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-03)
+   #main is the page column so page-level extension slots (above_page/
+   below_page) sandwich the app row in normal flow instead of becoming
+   stretched flex children of the sidebar/chat row. */
+#main {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
 #main-wrapper {
     display: flex;
     flex-direction: row;
-    height: 100vh;
+    flex: 1;
+    min-height: 0;
     background-color: var(--bg-primary);
 }
 
+/* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-03)
+   modal children are position:fixed; take the wrapper out of the flex
+   column so it can't steal height from the app row */
 #modals {
-    flex: 1;
+    display: contents;
 }
 

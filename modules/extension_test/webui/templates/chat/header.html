@@ -1,0 +1,12 @@
+{# -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-03)
+   extension_test: chat header canaries. Left one doubles as modal opener. #}
+
+{% macro left() %}
+<button type="button" class="ext-test-canary" @click="$store.ui.openModal('extension_test')">
+    🧪 header
+</button>
+{% endmacro %}
+
+{% macro right() %}
+<span class="ext-test-canary ghost">ext-test · header right</span>
+{% endmacro %}

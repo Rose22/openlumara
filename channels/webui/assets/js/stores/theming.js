@@ -3,6 +3,10 @@ THEME_STORE = {
     mode: localStorage.getItem('themeMode') || 'dark',
     themeCache: {},  // Cache for loaded theme data
     themeList: [],   // List of available theme families
+    // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-04)
+    // family -> whether themes/<family>.css exists (undefined = unknown,
+    // false = 404'd already, don't request again this session)
+    themeCssStatus: {},
 
     init() {
         // Load theme list (just names and modes) - async, doesn't block
@@ -109,6 +113,10 @@ THEME_STORE = {
                 : '/assets/css/code-themes/github-light.css';
         }
 
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-04)
+        // apply this theme's sidecar css (themes/<family>.css), if it exists
+        this.applyThemeCss(family);
+
         // Update state
         this.family = family;
         this.mode = effectiveMode;
@@ -125,6 +133,41 @@ THEME_STORE = {
         window.dispatchEvent(new CustomEvent('theme-changed', {
             detail: { family, mode: effectiveMode }
         }));
+    },
+
+    // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-04)
+    // Apply a theme's sidecar CSS: if themes/<family>.css exists, it is
+    // injected as a stylesheet when the family becomes active and removed
+    // when switching to another theme. CSS only (no JS sidecars) by design.
+    // The backend 404s anything that isn't a .css file in the themes dir.
+    applyThemeCss(family) {
+        const existing = document.getElementById('theme-css');
+
+        // known to have no sidecar css: just make sure nothing is left over
+        if (this.themeCssStatus[family] === false) {
+            if (existing) existing.remove();
+            return;
+        }
+
+        if (existing && existing.dataset.themeFamily === family) {
+            return; // already applied (e.g. dark/light toggle)
+        }
+        if (existing) {
+            existing.remove();
+        }
+
+        const link = document.createElement('link');
+        link.id = 'theme-css';
+        link.rel = 'stylesheet';
+        link.dataset.themeFamily = family;
+        link.onload = () => { this.themeCssStatus[family] = true; };
+        link.onerror = () => {
+            // no sidecar css for this theme: remove tag, don't retry
+            this.themeCssStatus[family] = false;
+            link.remove();
+        };
+        link.href = `/themes/${encodeURIComponent(family)}.css`;
+        document.head.appendChild(link);
     },
 
     // Toggle mode (dark/light)

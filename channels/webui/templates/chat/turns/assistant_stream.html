@@ -16,4 +16,7 @@
     <template x-if="message.type === 'tool_calls' || message.type === 'tool_call_delta'">
         {% include 'chat/toolcalls.html' %}
     </template>
+
+    <!-- extension injection point: modules can annotate streaming assistant messages via macro in <module>/chat/turns/assistant_stream.html -->
+    {{ extension_slot("below_message") }}
 </div>

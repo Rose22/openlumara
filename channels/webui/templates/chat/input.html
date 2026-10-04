@@ -5,7 +5,11 @@
     </svg>
 </button>
 <input type="file" x-ref="file-input" @change="$store.upload.addFile($event)" x-show="false" x-cloak aria-hidden="true" multiple>
+{{ extension_slot("after_upload_btn") }}
+
 {% endif %}
+
+{{ extension_slot("before_input") }}
 
 <textarea 
     id="user-input" 
@@ -37,6 +41,8 @@
     @focus="$autosize($el)"
     @blur="$el.style.height = '48px'"
 ></textarea>
+
+{{ extension_slot("after_input") }}
 
 <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-21)
      context pill sits inline in the input row, left of the send button -->

@@ -67,6 +67,11 @@
         {% for file in css_files %}
         <link rel="stylesheet" href="{{ url_for('assets', path='css/'+file) }}" />
         {% endfor %}
+        {# -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-03)
+           module-shipped stylesheets, already full urls #}
+        {% for url in ext_css_files %}
+        <link rel="stylesheet" href="{{ url }}" />
+        {% endfor %}
 
         <link rel="stylesheet" id="code-theme" href="{{ url_for('assets', path='css/code-themes/github-dark.css') }}">
 
@@ -76,6 +81,8 @@
         {% if not config.get("enable_admin_settings") %}
         <script>window.ADMIN_SETTINGS_DISABLED = true;</script>
         {% endif %}
+
+        {{ extension_slot("head") }}
     </head>
     <body>
         <!-- 
@@ -97,6 +104,11 @@
                 $store.ui.showSidebar = !$store.ui.isMobile;
             }
         ">
+            {# -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-03)
+               above_page moved out of #main-wrapper (a flex ROW) into the
+               #main column, so page-level slots sandwich the app symmetrically #}
+            {{ extension_slot("above_page") }}
+
             <section id="main-wrapper">
                 {% if config.get("enable_sidebar") %}
                     <section id="sidebar" 
@@ -121,6 +133,8 @@
             <section id="modals">
                 {% include 'modals/index.html' %}
             </section>
+
+            {{ extension_slot("below_page") }}
         </div>
 
         <!-- utility functions used by everything else -->
@@ -131,6 +145,11 @@
         <!-- javascript files -->
         {% for file in js_files %}
         <script src="{{ url_for('assets', path='js/'+file) }}"></script>
+        {% endfor %}
+        {# -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-03)
+           module-shipped scripts, already full urls #}
+        {% for url in ext_js_files %}
+        <script src="{{ url }}"></script>
         {% endfor %}
 
         <!--

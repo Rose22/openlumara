@@ -31,4 +31,7 @@
     <template x-if="Object.hasOwn(message, 'tool_calls') || message.type === 'tool_calls'">
         {% include 'chat/toolcalls.html' %}
     </template>
+
+    <!-- extension injection point: modules can annotate assistant messages via macro in <module>/chat/turns/assistant_history.html -->
+    {{ extension_slot("below_message") }}
 </div>
