@@ -372,7 +372,15 @@
     <div class="sidebar-footer">
         {{ extension_slot("bottom_of_chat_list") }}
         {{ extension_slot("buttons") }}
-        <button class="sidebar-btn" @click="$store.chat.newChat()" :disabled="$store.stream.state !== 'idle'">
+        {# -- AI GENERATED CODE (Qwen3.8-Flash-Next-Q4) :: (2026-10-04)
+           on mobile the sidebar is a full-screen overlay: dismiss it after
+           creating the chat so the fresh chat is revealed (matches the
+           characters panel's new-chat behavior) #}
+        <button class="sidebar-btn" :disabled="$store.stream.state !== 'idle'"
+            @click="
+                $store.chat.newChat();
+                if ($store.ui.isMobile) { $store.ui.showSidebar = false; }
+            ">
             {% include 'svg/add.svg' %}
             New Chat
         </button>

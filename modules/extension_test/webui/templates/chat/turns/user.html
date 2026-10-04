@@ -1,0 +1,13 @@
+{# -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-03)
+   extension_test: user turn canaries. Uses client-side `message` scope var. #}
+
+{% macro above_message() %}
+<div class="ext-test-user-stamp">🧪 above user msg</div>
+{% endmacro %}
+
+{% macro below_message() %}
+<div class="ext-test-user-stamp"
+    x-show="message._metadata?.timestamp">
+    🧪 below user msg · sent <span x-text="new Date((message._metadata?.timestamp ?? 0) * 1000).toLocaleTimeString()"></span>
+</div>
+{% endmacro %}

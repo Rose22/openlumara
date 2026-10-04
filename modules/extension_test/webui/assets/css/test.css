@@ -1,0 +1,79 @@
+/* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-03)
+   Styles for the extension_test canary widgets (served via /ext-assets). */
+
+.ext-test-canary {
+    background: #ff2fb3;
+    color: #fff;
+    font-weight: 700;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+}
+
+.ext-test-canary.ghost {
+    background: transparent;
+    border: 2px dashed #ff2fb3;
+    color: #ff2fb3;
+}
+
+.ext-test-page-top {
+    background: linear-gradient(90deg, #ff2fb3, #7b2fff);
+    color: #fff;
+    text-align: center;
+    padding: 6px;
+    font-weight: 700;
+}
+
+.ext-test-page-bottom {
+    text-align: center;
+    color: #ff2fb3;
+    font-size: 0.75rem;
+    padding: 8px;
+}
+
+.ext-test-user-stamp {
+    display: inline-block;
+    font-size: 0.7rem;
+    color: #ff2fb3;
+    margin-top: 2px;
+}
+
+.ext-test-assistant-stamp {
+    display: inline-block;
+    font-size: 0.7rem;
+    color: #7b2fff;
+    margin-top: 2px;
+}
+
+.ext-test-modal .ext-test-modal-body {
+    padding: 16px;
+}
+
+.ext-test-modal .ext-test-big {
+    font-size: 2rem;
+    text-align: center;
+}
+
+/* -- module-side layout hygiene --------------------------------------- */
+
+/* input-wrapper is intentionally align-items:stretch (core, for the
+   buttons); chips in flex rows still center themselves and refuse to
+   grow — good citizenship for any module rendering into unknown rows */
+.ext-test-canary.ghost {
+    display: inline-flex;
+    align-items: center;
+    align-self: center;
+    flex: 0 0 auto;
+    padding: 2px 6px;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+/* banner-style canaries for the chat-page slots */
+.ext-test-banner {
+    display: flex;
+    justify-content: center;
+    box-sizing: border-box;
+    width: 100%;
+    padding: 2px 8px;
+}

@@ -38,10 +38,13 @@
                 :style="`top: ${top}px; left: ${left}px; width: ${width}px`"
                 @click.stop @click.away="open = false"
                 @keydown.escape.window="open = false">
+                {# -- AI GENERATED CODE (Qwen3.8-Flash-Next-Q4) :: (2026-10-04)
+                   'no character' became the neutral 'select a character'
+                   placeholder; untagged chats are no longer listed there #}
                 <button type="button" class="category-option"
                     @click="select(''); open = false">
-                    <span class="cat-icon">{% include 'svg/home.svg' %}</span>
-                    <span>no character</span>
+                    <span class="cat-icon">{% include 'svg/user.svg' %}</span>
+                    <span>select a character</span>
                 </button>
                 <template x-for="entry in names" :key="entry.key">
                     <button type="button" class="category-option"
@@ -60,11 +63,11 @@
         <template x-if="loading">
             <div class="item">loading..</div>
         </template>
+        <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next-Q4) :: (2026-10-04)
+             nothing is listed until a character is picked, so the old
+             'no untagged chats' state is gone -->
         <template x-if="!loading && selected && chats.length === 0">
             <div class="item">no chats with this character yet</div>
-        </template>
-        <template x-if="!loading && !selected && chats.length === 0">
-            <div class="item">no untagged chats</div>
         </template>
         <template x-for="chat in chats" :key="chat.id">
             <div class="item"

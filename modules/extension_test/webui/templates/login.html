@@ -1,0 +1,14 @@
+{# -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-03)
+   extension_test: login page canaries (top / before_signin_button / bottom). #}
+
+{% macro top() %}
+<div class="ext-test-canary">ext-test · login top</div>
+{% endmacro %}
+
+{% macro before_signin_button() %}
+<div class="ext-test-canary ghost">ext-test · before sign-in</div>
+{% endmacro %}
+
+{% macro bottom() %}
+<div class="ext-test-canary">ext-test · login bottom</div>
+{% endmacro %}

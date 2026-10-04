@@ -28,6 +28,12 @@ class Characters(core.module.Module):
         "use_writing_style": {
             "description": "Whether to use the writing style defined by the `writing style` module for characters. This will add that module's prompt to the character prompt even if agent prompts are disabled, making all your characters use your preferred writing style setup",
             "default": True
+        },
+        # -- AI GENERATED CODE (Qwen3.8-Flash-Next-Q4) :: (2026-10-04)
+        # Category that chats created from the characters sidebar land in.
+        "category": {
+            "description": "Category that new chats created from the characters sidebar get placed in",
+            "default": "general"
         }
     }
 
@@ -780,15 +786,10 @@ class Characters(core.module.Module):
     async def _route_chats(self, body=None, query=None):
         """flat, updated-desc chat list for one character (the sidebar
         panel keeps its own simple list - no day-group machinery here).
-        pass character=__none__ to list untagged chats."""
+        the old __none__ untagged-chats mode was dropped: the panel shows
+        nothing until a character is picked."""
         character = (query or {}).get("character", "")
-        if character == "__none__":
-            chats = [
-                c for c in self.channel.context.chat.get_all()
-                if not self._chat_character(c)
-            ]
-        else:
-            chats = self._chats_for_character(character)
+        chats = self._chats_for_character(character)
         return [
             {
                 "id": c.get("id"),
@@ -810,7 +811,10 @@ class Characters(core.module.Module):
             return self.result("character not found", success=False)
 
         char_key = self._find_char_name(name) or char.get("name")
+        # -- AI GENERATED CODE (Qwen3.8-Flash-Next-Q4) :: (2026-10-04)
+        # New chats go into the category configured in the module settings.
         chat_id = await self.channel.context.chat.new(
+            category=self.config.get("category") or "general",
             title="New chat", metadata={"character": char_key}
         )
         return {"id": chat_id}

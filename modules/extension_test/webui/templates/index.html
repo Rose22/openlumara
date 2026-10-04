@@ -1,0 +1,15 @@
+{# -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-03)
+   extension_test: head slot canary. Proves <head> injection works; the
+   meta tag is invisible but verifiable in view-source. #}
+
+{% macro head() %}
+<meta name="ext-test-head" content="head-slot-ok">
+{% endmacro %}
+
+{% macro above_page() %}
+<div class="ext-test-page-top">🧪 ext-test · above_page</div>
+{% endmacro %}
+
+{% macro below_page() %}
+<div class="ext-test-page-bottom">🧪 ext-test · below_page · assets loaded from /ext-assets/extension_test/ 🧪</div>
+{% endmacro %}

@@ -6,7 +6,7 @@
 const CHARACTERS_PANEL = {
     names: [],      // [{key, name}]
     counts: {},     // {character key: chat count}
-    selected: "",   // character key, "" = untagged chats
+    selected: "",   // character key, "" = none picked yet (shows no chats)
     chats: [],      // [{id, title, updated}]
     loading: false,
     loaded: false,
@@ -23,7 +23,10 @@ const CHARACTERS_PANEL = {
     },
 
     selectedLabel() {
-        if (!this.selected) { return "no character"; }
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next-Q4) :: (2026-10-04)
+        // an empty selection means nothing has been picked yet (not
+        // "untagged chats"), so prompt the user to pick one.
+        if (!this.selected) { return "select a character"; }
         const entry = this.names.find(n => n.key === this.selected);
         return entry ? entry.name : this.selected;
     },
@@ -47,9 +50,12 @@ const CHARACTERS_PANEL = {
     },
 
     async loadChats() {
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next-Q4) :: (2026-10-04)
+        // with no character selected the panel shows no chats at all -
+        // the untagged-chats view is gone along with the old label.
+        if (!this.selected) { this.chats = []; return; }
         try {
-            const key = this.selected || "__none__";
-            this.chats = await simpleApiFetch(`/api/ext/characters/chats?character=${encodeURIComponent(key)}`);
+            this.chats = await simpleApiFetch(`/api/ext/characters/chats?character=${encodeURIComponent(this.selected)}`);
         } catch (e) {
             console.error("characters panel:", e);
             this.chats = [];
@@ -71,7 +77,17 @@ const CHARACTERS_PANEL = {
             // in the chats tab too.
             if (result && result.id) {
                 await Alpine.store('chat').loadChat(result.id);
-                await this.load();
+                // same mobile behavior as the chats tab: the sidebar is a
+                // full-screen overlay, so dismiss it to reveal the new chat
+                if (Alpine.store('ui').isMobile) {
+                    Alpine.store('ui').showSidebar = false;
+                }
+                // -- AI GENERATED CODE (Qwen3.8-Flash-Next-Q4) :: (2026-10-04)
+                // refresh just the chat list (and its count) instead of a
+                // full panel reload - names haven't changed.
+                await this.loadChats();
+                simpleApiFetch('/api/ext/characters/chats_count')
+                    .then(c => { this.counts = c; }).catch(() => {});
             }
         } catch (e) {
             console.error("characters panel:", e);
