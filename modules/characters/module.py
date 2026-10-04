@@ -42,7 +42,6 @@ class Characters(core.module.Module):
     async def on_ready(self):
         self.characters = core.storage.StorageDict("characters", type="json_folder")
         self.user_profile = core.storage.StorageDict("character_user", "json")
-        self.active = False
 
         self._migrate_if_needed()
         self._ingest_pngs()
@@ -322,7 +321,6 @@ class Characters(core.module.Module):
                 return "please provide a character name."
         elif name in("reset", "default"):
                 self.channel.context.chat.get("metadata")["character"] = ""
-                self.active = False
                 return "character has been reset to default"
 
         character = self._find_character(name)
@@ -358,7 +356,6 @@ class Characters(core.module.Module):
         # value), clean it up so the rest of the prompt isn't broken
         if not char:
             self.channel.context.chat.get("metadata")["character"] = ""
-            self.active = False
             return tool_text or None
 
         char_name = char.get("name", curr_char)
@@ -427,7 +424,6 @@ class Characters(core.module.Module):
         char_name = self._find_char_name(name) or char.get("name")
 
         self.channel.context.chat.get("metadata")["character"] = char_name
-        self.active = True
 
         first_msg = char.get("first_message", "")
         if first_msg and self.config.get("use_first_messages"):
@@ -447,7 +443,6 @@ class Characters(core.module.Module):
         """Switches you back to your default identity."""
         self.channel.context.chat.get("metadata")["character"] = ""
 
-        self.active = False
         return "success"
 
     def _case_insensitive_replace(self, text, old, new):
@@ -770,7 +765,6 @@ class Characters(core.module.Module):
         name = str((body or {}).get("name", "")).strip()
         if not name:
             self.channel.context.chat.get("metadata")["character"] = ""
-            self.active = False
             return self.result("character cleared")
 
         char = self._find_character(name)
@@ -779,7 +773,6 @@ class Characters(core.module.Module):
 
         char_name = self._find_char_name(name) or char.get("name")
         self.channel.context.chat.get("metadata")["character"] = char_name
-        self.active = True
         return self.result(char_name)
 
     @webui.route("chats")

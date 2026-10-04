@@ -1175,6 +1175,13 @@ async def create_fastapi(channel):
             status = 405 if "accepts" in reason else 404
             return fastapi.responses.JSONResponse(api_result(reason, success=False), status_code=status)
 
+        # -- AI GENERATED CODE (Qwen3.8-Flash-Next-Q4) :: (2026-10-04)
+        # ext routes bypass send()/send_stream(), the only other caller of
+        # _set_as_active_channel(); without this, modules reading self.channel
+        # operate on whichever channel last handled a chat message instead of
+        # the webui this request actually came from (cross-channel leaks).
+        await channel._set_as_active_channel()
+
         body = None
         if request.method != "GET":
             try:
