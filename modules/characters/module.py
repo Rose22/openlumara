@@ -5,10 +5,6 @@ import shutil
 import sys
 import channels.webui.api as webui
 
-# -- AI GENERATED CODE (Qwen3.8-Flash-Next-Q4) :: (2026-10-03)
-# Full rewrite: characters live in one flat internal format (name + profile + optional scenario/first_message/post_history/category/tags),
-# stored as a folder of json files. Character card specs (V1/V2) are only understood at the import boundary.
-
 class Characters(core.module.Module):
     """Lets your AI embody different characters! inspired by characterAI, janitorAI, sillytavern, etc."""
 
@@ -116,8 +112,6 @@ class Characters(core.module.Module):
         os.remove(old_file)
         print(f"[MIGRATE] migrated {len(migrated)} characters to folder storage")
 
-    # -- AI GENERATED CODE (Qwen3.8-Flash-Next-Q4) :: (2026-10-03)
-    # Converts any supported card format (internal / legacy openlumara / char card V1 / V2) into the flat internal format.
     def _normalize_character(self, stored_key, char):
         """converts a character of any supported format into openlumara's flat internal format"""
         if not isinstance(char, dict):
@@ -620,8 +614,6 @@ class Characters(core.module.Module):
 
         return self.result("user persona set")
 
-    # -- AI GENERATED CODE (Qwen3.8-Flash-Next-Q4) :: (2026-10-03)
-    # Import is now the only place that understands the character card spec; cards are flattened into the internal format on the way in.
     async def import_json(self, json_code: str):
         """imports a character card (spec V1 or V2) into your character storage"""
         try:
@@ -719,3 +711,106 @@ class Characters(core.module.Module):
         if isinstance(json_code, (dict, list)):
             json_code = json.dumps(json_code)
         return await self.import_json(json_code)
+
+    # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-04)
+    # chat helpers for the characters sidebar panel. the earlier attempt at
+    # character-scoped twins of /api/chats/days|day|tags|search was dropped:
+    # the tabbed-sidebar design makes them pointless (the panel keeps its
+    # own flat chat list, no need to mirror core's day-group machinery),
+    # and they referenced helpers nested inside create_fastapi() anyway.
+
+    def _chat_character(self, chat):
+        """the character key stored in a chat's metadata, '' when none"""
+        return (chat.get("metadata") or {}).get("character") or ""
+
+    def _chats_for_character(self, character, category=None, tags=None):
+        chats = [
+            c for c in self.channel.context.chat.get_all()
+            if self._chat_character(c) == character
+        ]
+        if category:
+            chats = [c for c in chats if c.get("category") == category]
+        if tags:
+            chats = [c for c in chats if all(t in (c.get("tags") or []) for t in tags)]
+        return chats
+
+    @webui.route("names")
+    async def _route_names(self, body=None, query=None):
+        """dropdown entries: stored key (what chats reference) + display name"""
+        entries = {
+            key: char.get("name") or key
+            for key, char in self.characters.items()
+        }
+        return sorted(
+            ({"key": k, "name": n} for k, n in entries.items()),
+            key=lambda e: e["name"].lower()
+        )
+
+    @webui.route("chats_count")
+    async def _route_chats_count(self, body=None, query=None):
+        """how many chats each character has, keyed by the stored character value"""
+        counts = {}
+        for chat in self.channel.context.chat.get_all():
+            char = self._chat_character(chat)
+            if char:
+                counts[char] = counts.get(char, 0) + 1
+        return counts
+
+    @webui.route("apply", method="POST")
+    async def _route_apply(self, body=None, query=None):
+        """sets (or clears, with an empty name) the character on the current
+        chat without any switch side effects - meant for tagging freshly
+        created chats from the sidebar"""
+        name = str((body or {}).get("name", "")).strip()
+        if not name:
+            self.channel.context.chat.get("metadata")["character"] = ""
+            self.active = False
+            return self.result("character cleared")
+
+        char = self._find_character(name)
+        if not char:
+            return self.result("character not found", success=False)
+
+        char_name = self._find_char_name(name) or char.get("name")
+        self.channel.context.chat.get("metadata")["character"] = char_name
+        self.active = True
+        return self.result(char_name)
+
+    @webui.route("chats")
+    async def _route_chats(self, body=None, query=None):
+        """flat, updated-desc chat list for one character (the sidebar
+        panel keeps its own simple list - no day-group machinery here).
+        pass character=__none__ to list untagged chats."""
+        character = (query or {}).get("character", "")
+        if character == "__none__":
+            chats = [
+                c for c in self.channel.context.chat.get_all()
+                if not self._chat_character(c)
+            ]
+        else:
+            chats = self._chats_for_character(character)
+        return [
+            {
+                "id": c.get("id"),
+                "title": c.get("title") or "New chat",
+                "updated": c.get("updated") or "",
+            }
+            for c in chats
+        ]
+
+    @webui.route("create_chat", method="POST")
+    async def _route_create_chat(self, body=None, query=None):
+        """create a fresh chat already stamped with the character (passed
+        straight into chat.new()'s metadata, so there's no window where
+        the chat exists untagged). returns the new id; the panel then
+        loads it via the core loadChat()."""
+        name = str((body or {}).get("name", "")).strip()
+        char = self._find_character(name)
+        if not char:
+            return self.result("character not found", success=False)
+
+        char_key = self._find_char_name(name) or char.get("name")
+        chat_id = await self.channel.context.chat.new(
+            title="New chat", metadata={"character": char_key}
+        )
+        return {"id": chat_id}
