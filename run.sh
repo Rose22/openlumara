@@ -20,4 +20,4 @@ fi
 
 # aaand run!
 source venv/bin/activate
-$PYTHON_BIN main.py "$@"
+python main.py "$@"
