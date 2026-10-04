@@ -275,6 +275,50 @@ class Webui(core.channel.Channel):
                     found.append(template_name)
             return found
 
+        def extension_sidebars():
+            """auto-discovers sidebar tab panels: every .html file directly in
+            <module>/webui/templates/sidebars/ renders as its own tab in the
+            core sidebar. a same-named .svg next to it becomes the tab icon
+            (inlined raw, so it inherits currentColor and themes for free).
+            the tab label is derived from the filename (underscores/hyphens
+            become spaces, title-cased) - zero config, just drop files in.
+            -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-04)"""
+            found = []
+            for module_name in sorted(dirs):
+                sidebar_root = os.path.join(dirs[module_name], "sidebars")
+                if not os.path.isdir(sidebar_root):
+                    continue
+                for filename in sorted(os.listdir(sidebar_root)):
+                    filepath = os.path.join(sidebar_root, filename)
+                    if not os.path.isfile(filepath):
+                        continue
+                    if not filename.endswith(".html"):
+                        continue
+                    name = filename[:-5]
+                    template_name = f"{module_name}/sidebars/{filename}"
+                    try:
+                        env.get_template(template_name)
+                    except Exception as e:
+                        self.log("webui", f"skipping UI sidebar '{template_name}': {core.detail_error(e)}")
+                        continue
+                    icon = markupsafe.Markup("")
+                    icon_path = os.path.join(sidebar_root, f"{name}.svg")
+                    if os.path.isfile(icon_path):
+                        try:
+                            with open(icon_path, encoding="utf-8") as f:
+                                icon = markupsafe.Markup(f.read())
+                        except Exception as e:
+                            self.log("webui", f"skipping sidebar icon '{icon_path}': {core.detail_error(e)}")
+                    label = name.replace("_", " ").replace("-", " ").title()
+                    found.append({
+                        "module": module_name,
+                        "name": name,
+                        "label": label,
+                        "template": template_name,
+                        "icon": icon,
+                    })
+            return found
+
         @jinja2.pass_context
         def extension_slot(ctx, slot_name, relative_path=None):
             """renders the macro `slot_name` from every module template mirroring the
@@ -306,6 +350,7 @@ class Webui(core.channel.Channel):
             return markupsafe.Markup("\n".join(parts))
 
         env.globals["extension_modals"] = extension_modals
+        env.globals["extension_sidebars"] = extension_sidebars
         env.globals["extension_slot"] = extension_slot
         env.cache.clear()
 

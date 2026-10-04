@@ -14,6 +14,85 @@
     border-right: 1px solid var(--border-color);
 }
 
+/* -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-04)
+   sidebar tab shell: flex row holding the (optional) tab bar plus exactly
+   one visible panel (chat list or an extension panel). takes over the
+   layout job from #sidebar itself so #sidebar keeps its fixed width. */
+.sidebar-shell {
+    display: flex;
+    flex-direction: row;
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    overflow: hidden;
+}
+
+/* vertical tab strip. hidden by default; :has() reveals it the moment any
+   extension contributes a .sidebar-tab.ext - no extension, no tab bar,
+   sidebar behaves exactly like it always did */
+.sidebar-tabbar {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    flex: 0 0 46px;
+    width: 46px;
+    padding: 7px 4px;
+    box-sizing: border-box;
+    border-right: 1px solid var(--border-color);
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.sidebar-tabbar:has(.sidebar-tab.ext) {
+    display: flex;
+}
+
+.sidebar-tab {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    border: none;
+    border-radius: 8px;
+    background: none;
+    color: var(--text-secondary, #999);
+    cursor: pointer;
+    transition: background 0.12s ease, color 0.12s ease;
+}
+
+.sidebar-tab svg {
+    width: 20px;
+    height: 20px;
+}
+
+.sidebar-tab:hover {
+    background: var(--bg-secondary, rgba(255, 255, 255, 0.06));
+    color: var(--text-primary, #eee);
+}
+
+.sidebar-tab.active {
+    background: var(--bg-secondary, rgba(255, 255, 255, 0.08));
+    color: var(--accent, #00d4ff);
+}
+
+.sidebar-tab:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+/* extension panel body: same footprint as #chat-list */
+.sidebar-panel {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--bg-primary);
+}
+
 /* list of chats */
 #chat-list {
     padding: 7px;
