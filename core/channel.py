@@ -649,10 +649,14 @@ class Channel:
         # this also adds the user's message to context, so we don't need to do that in this function
         processed = await self._send_preprocess(message, files, commands_authorized)
 
+        # cmd/error early-returns yield `message` directly; on regenerate it's
+        # a full message dict, so unwrap to its content for frontends
+        user_message = message.get("content", "") if isinstance(message, dict) else message
+
         match processed["type"]:
             case "cmd_response":
                 # immediately yield both the user message and the command response, so that they both display
-                yield {"type": "user_message", "content": message, "is_cmd": True}
+                yield {"type": "user_message", "content": user_message, "is_cmd": True}
                 yield {"type": "content", "content": processed["content"], "is_cmd": True}
                 return
             case "blank":
@@ -664,7 +668,7 @@ class Channel:
                 return
             case "error":
                 # immediately yield the user message
-                yield {"type": "user_message", "content": message, "is_cmd": True}
+                yield {"type": "user_message", "content": user_message, "is_cmd": True}
                 yield await self.throw_stream_error(processed["content"])
                 return
 
