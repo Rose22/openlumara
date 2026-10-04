@@ -1911,6 +1911,20 @@ async def create_fastapi(channel):
             channel.log(channel.name, f"failed to load theme {filepath}: {e}")
             return api_result(f"Failed to load theme: {str(e)}", success=False)
 
+    # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-04)
+    # serve theme sidecar CSS: a .css file sitting next to a theme JSON with
+    # the same name is auto-loaded by theming.js when that theme is active.
+    # only .css files are served (no JS), and only from the themes dir.
+    @app.get("/themes/{file_name}")
+    async def theme_sidecar_css(file_name: str):
+        if not file_name.endswith(".css"):
+            raise fastapi.HTTPException(status_code=404, detail="Only CSS files are served")
+        themes_dir = os.path.realpath(os.path.join(channel.path, "themes"))
+        full_path = os.path.realpath(os.path.join(themes_dir, file_name))
+        if not full_path.startswith(themes_dir + os.sep) or not os.path.isfile(full_path):
+            raise fastapi.HTTPException(status_code=404, detail="Theme CSS not found")
+        return fastapi.responses.FileResponse(full_path, media_type="text/css")
+
     def generate_cache_version():
         # generate an sw.js cache version based on this file's last modified time
         # because bumping sw.js's version manually each time i update the webui
