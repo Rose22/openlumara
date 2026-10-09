@@ -1077,6 +1077,15 @@ def api_result(obj = None, success: bool = True):
 async def create_fastapi(channel):
     app = fastapi.FastAPI()
 
+    # -- AI GENERATED CODE (Qwen3.8-Flash-Next-Q4) :: (2026-10-09)
+    # cross-origin isolation: COOP + COEP on every response
+    @app.middleware("http")
+    async def coi_middleware(request: fastapi.Request, call_next):
+        response = await call_next(request)
+        response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+        response.headers["Cross-Origin-Embedder-Policy"] = "credentialless"
+        return response
+
     # add authorization, cookies, and so on (middleware)
     # auth middleware for all routes
     @app.middleware("http")
