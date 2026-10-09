@@ -5,7 +5,8 @@
                 <template x-for="(block, blockIndex) in message.content" :key="'block-' + blockIndex">
                     <div>
                         <template x-if="blockIndex === 0">
-                            <span x-html="block.text"></span>
+                            <!-- render through markdown like plain messages -->
+                            <div x-md="{ message: { content: block.text }, live: false, raw: message._metadata?.is_cmd }"></div>
                         </template>
 
                         <template x-if="blockIndex > 0 && message._metadata?.filenames">
@@ -43,9 +44,25 @@
     <div class="flex fullwidth editing">
         <textarea x-model="$store.chat.editContent" rows="3"></textarea>
         <div class="edit-actions">
+            <button class="edit-add-file" title="Attach file" @click="$refs['edit-file-input'].click()">
+                {% include 'svg/paperclip.svg' %}
+            </button>
             <button @click="$store.chat.saveEdit($store.chat.editingMessageIndex)">Save</button>
             <button @click="$store.chat.cancelEdit()">Cancel</button>
         </div>
+        <input type="file" x-ref="edit-file-input" @change="$store.chat.addEditFile($event)" x-show="false" x-cloak aria-hidden="true" multiple>
+        <template x-if="$store.chat.editAttached.length > 0">
+            <div class="edit-files">
+                <template x-for="entry in $store.chat.editAttached" :key="entry.name">
+                    <div class="edit-file-row">
+                        <button class="edit-file-remove" title="Remove file" @click="$store.chat.removeEditFile(entry.name)">
+                            {% include 'svg/cross.svg' %}
+                        </button>
+                        <span class="edit-file-name" x-text="entry.name"></span>
+                    </div>
+                </template>
+            </div>
+        </template>
     </div>
 </template>
 

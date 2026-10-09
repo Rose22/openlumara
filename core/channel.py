@@ -281,7 +281,7 @@ class Channel:
     # ---------------------
     # Content Processors
     # ---------------------
-    async def _process_multimodal(self, message: str = None, files: list = None) -> list:
+    async def _process_multimodal(self, message: str = None, files: list = None, metadata: dict = None) -> list:
         """
         Converts a list of file handler objects into an openAI API multimodal message object,
         allowing the AI to process images, audio, etc.
@@ -299,7 +299,10 @@ class Channel:
 
         # if the message was a list... this was already multimodal, so dont modify
         if isinstance(message, list):
-            return {"role": "user", "content": message}
+            result = {"role": "user", "content": message}
+            if metadata:
+                result["_metadata"] = dict(metadata)
+            return result
 
         if not message and not files:
             # wtf why would you do that
@@ -316,70 +319,14 @@ class Channel:
             content_blocks.append({"type": "text", "text": message})
             filenames.append("") # so that indexes match
 
-        format_map = {
-            "audio/wav": "wav", "audio/mp3": "mp3", "audio/mpeg": "mp3",
-            "audio/ogg": "ogg", "audio/flac": "flac",
-            "audio/webm": "webm", "audio/mp4": "mp4", "audio/aac": "mp4",
-        }
-
         message_dict = {"role": "user"}
 
         for filename, file_data in files.items():
-            if not file_data:
+            block = self._file_to_block(filename, file_data)
+            if block is None:
                 continue
 
-            kind = filetype.guess(file_data)
-            mime_type = kind.mime if kind else "application/octet-stream"
-
-            if mime_type.startswith("image/"):
-                b64 = base64.b64encode(file_data).decode("utf-8")
-                content_blocks.append({
-                    "type": "image_url",
-                    "image_url": {"url": f"data:{mime_type};base64,{b64}"}
-                })
-
-            elif mime_type.startswith("audio/"):
-                b64 = base64.b64encode(file_data).decode("utf-8")
-                content_blocks.append({
-                    "type": "input_audio",
-                    "input_audio": {
-                        "data": b64,
-                        "format": format_map.get(mime_type, "wav")
-                    }
-                })
-
-            elif mime_type == "application/pdf":
-                try:
-                    from PyPDF2 import PdfReader
-                    reader = PdfReader(io.BytesIO(file_data))
-                    text_parts = []
-                    for page in reader.pages:
-                        page_text = page.extract_text()
-                        if page_text:
-                            text_parts.append(page_text)
-                    combined = "\n\n".join(text_parts)
-                    content_blocks.append({
-                        "type": "text",
-                        "text": f"File: {filename}\n\n```pdf\n{combined}\n```"
-                    })
-                except Exception as e:
-                    content_blocks.append({
-                        "type": "text",
-                        "text": f"[Error extracting PDF '{filename}': {e}]"
-                    })
-
-            else:
-                try:
-                    content_blocks.append({
-                        "type": "text",
-                        "text": f"File: {filename}\n\n```{file_data.decode('utf-8')}```"
-                    })
-                except UnicodeDecodeError:
-                    content_blocks.append({
-                        "type": "text",
-                        "text": f"[Binary file: {filename}]"
-                    })
-
+            content_blocks.append(block)
             filenames.append(filename)
 
         if content_blocks:
@@ -388,6 +335,71 @@ class Channel:
             return message_dict
 
         return {"role": "user", "content": message}
+
+    def _file_to_block(self, filename: str, file_data: bytes):
+        """
+        Builds a single openAI API content block for one uploaded file.
+        Returns None if the file data is empty.
+        """
+        if not file_data:
+            return None
+
+        kind = filetype.guess(file_data)
+        mime_type = kind.mime if kind else "application/octet-stream"
+
+        format_map = {
+            "audio/wav": "wav", "audio/mp3": "mp3", "audio/mpeg": "mp3",
+            "audio/ogg": "ogg", "audio/flac": "flac",
+            "audio/webm": "webm", "audio/mp4": "mp4", "audio/aac": "mp4",
+        }
+
+        if mime_type.startswith("image/"):
+            b64 = base64.b64encode(file_data).decode("utf-8")
+            return {
+                "type": "image_url",
+                "image_url": {"url": f"data:{mime_type};base64,{b64}"}
+            }
+
+        if mime_type.startswith("audio/"):
+            b64 = base64.b64encode(file_data).decode("utf-8")
+            return {
+                "type": "input_audio",
+                "input_audio": {
+                    "data": b64,
+                    "format": format_map.get(mime_type, "wav")
+                }
+            }
+
+        if mime_type == "application/pdf":
+            try:
+                from PyPDF2 import PdfReader
+                reader = PdfReader(io.BytesIO(file_data))
+                text_parts = []
+                for page in reader.pages:
+                    page_text = page.extract_text()
+                    if page_text:
+                        text_parts.append(page_text)
+                combined = "\n\n".join(text_parts)
+                return {
+                    "type": "text",
+                    "text": f"File: {filename}\n\n```pdf\n{combined}\n```"
+                }
+            except Exception as e:
+                return {
+                    "type": "text",
+                    "text": f"[Error extracting PDF '{filename}': {e}]"
+                }
+
+        try:
+            return {
+                "type": "text",
+                "text": f"File: {filename}\n\n```{file_data.decode('utf-8')}```"
+            }
+        except UnicodeDecodeError:
+            return {
+                "type": "text",
+                "text": f"[Binary file: {filename}]"
+            }
 
     def format_message(self, orig_message: dict):
         formatted = ""
@@ -471,11 +483,11 @@ class Channel:
         await self._set_as_active_channel()
         user_message = message
 
-        # sometimes legacy parts of the openlumara framework still send dicts.
-        # that is not supposed to happen, and i need to find the code that does it
-        # so, TODO: find the legacy code that calls channel.send()/send_stream() with dicts
-        # but for now.. to avoid breaking everything, i'll convert
+        # dicts arrive from custom channels (template) and regenerate; keep
+        # their metadata so attachments survive re-sending
+        metadata = None
         if isinstance(user_message, dict):
+            metadata = user_message.get("_metadata")
             user_message = user_message.get("content", "")
 
         if isinstance(user_message, str):
@@ -516,7 +528,7 @@ class Channel:
                         user_message = usr_msg_result
 
         # apply multimodal content if applicable
-        user_message_processed = await self._process_multimodal(message=user_message, files=files)
+        user_message_processed = await self._process_multimodal(message=user_message, files=files, metadata=metadata)
 
         # and add the user's message to context
         add_success = await self.context.chat.messages.add(user_message_processed)
@@ -637,10 +649,14 @@ class Channel:
         # this also adds the user's message to context, so we don't need to do that in this function
         processed = await self._send_preprocess(message, files, commands_authorized)
 
+        # cmd/error early-returns yield `message` directly; on regenerate it's
+        # a full message dict, so unwrap to its content for frontends
+        user_message = message.get("content", "") if isinstance(message, dict) else message
+
         match processed["type"]:
             case "cmd_response":
                 # immediately yield both the user message and the command response, so that they both display
-                yield {"type": "user_message", "content": message, "is_cmd": True}
+                yield {"type": "user_message", "content": user_message, "is_cmd": True}
                 yield {"type": "content", "content": processed["content"], "is_cmd": True}
                 return
             case "blank":
@@ -652,7 +668,7 @@ class Channel:
                 return
             case "error":
                 # immediately yield the user message
-                yield {"type": "user_message", "content": message, "is_cmd": True}
+                yield {"type": "user_message", "content": user_message, "is_cmd": True}
                 yield await self.throw_stream_error(processed["content"])
                 return
 
