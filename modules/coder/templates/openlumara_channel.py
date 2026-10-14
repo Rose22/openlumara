@@ -115,7 +115,7 @@ class MyChannel(core.channel.Channel):
             # send the stream request to the AI. supports simple text content and multimodal
             # returns an async generator that can be looped through, the content being yielded is raw token dicts
             try:
-                stream_object = await self.send_stream({"role": "user", "content": user_input}, commands_authorized=True)
+                stream_object = await self.send_stream(user_input, commands_authorized=True)
             except Exception as e:
                 # use self.log to trigger a cross-channel log message.
                 # it will be sent to all channels!
