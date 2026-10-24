@@ -105,8 +105,33 @@ class Context:
                 ]
 
             # Apply max_messages limit to history first
+            # -- prompt-cache optimization: evict in BLOCK-sized chunks instead of one
+            # message per append. With a sliding -max_messages: window, every new
+            # message (every tool result during an agent loop) shifts every retained
+            # message by one slot, which breaks vLLM's automatic prefix caching at the
+            # very first message and forces full re-prefill of the whole context on
+            # every step. Chunked eviction keeps the retained prefix byte-identical
+            # between evictions: the start index only advances once per BLOCK appends.
+            #
+            # The chunk size is derived deterministically from the history length
+            # (no extra state needed): while len(messages) stays inside the same
+            # BLOCK-wide band past the limit, the drop count - and therefore the
+            # whole sent prefix - is constant.
+            EVICT_BLOCK = 32
             if len(messages) > max_messages:
-                messages = messages[-max_messages:]
+                overflow = len(messages) - max_messages
+                drop = ((overflow - 1) // EVICT_BLOCK + 1) * EVICT_BLOCK
+                # never cut inside an assistant(tool_calls) -> tool(...) group:
+                # leading orphan tool messages are rejected by strict providers,
+                # so slide the cut forward past them (drop only grows).
+                while drop < len(messages) and messages[drop].get("role") == "tool":
+                    drop += 1
+                if summary_ref is not None:
+                    # keep the pinned summary at the front (same rule the token
+                    # trimming below applies - trimming must never cut past it)
+                    messages = [summary_ref] + messages[drop:]
+                else:
+                    messages = messages[drop:]
 
         end_msg = []
         if end_prompt:
