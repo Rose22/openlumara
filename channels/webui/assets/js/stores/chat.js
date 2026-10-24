@@ -93,36 +93,34 @@ CHAT_STORE = {
     last_user_input: '',
 
     // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-26)
-    // shell-style input history (global across chats).
-    // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
-    // persisted backend-side now (/api/input_history); localStorage stays
-    // as an instant-display cache while the server copy loads.
-    inputHistory: JSON.parse(localStorage.getItem('input_history') || '[]'),
+    // shell-style input history.
+    // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-24)
+    // derived from the CURRENT chat instead of a global list: the user
+    // turns of turnHistory, oldest first. switching chats swaps the list
+    // under the cursor, so up-arrow only ever recalls the messages of the
+    // chat on screen (including ones that arrived from other channels).
+    get inputHistory() {
+        const msgs = [];
+        for (const turn of this.turnHistory) {
+            if (turn.role !== 'user') continue;
+            // multimodal turns (image/audio blocks) carry array content,
+            // same string guard the user turn template uses
+            const content = turn.messages?.[0]?.content;
+            if (typeof content !== 'string') continue;
+            const text = content.trim();
+            if (!text) continue;
+            // like a terminal, consecutive duplicates collapse into one
+            if (msgs[msgs.length - 1] !== text) msgs.push(text);
+            if (msgs.length > 100) msgs.shift();
+        }
+        return msgs;
+    },
     historyIndex: -1,
     draftValue: '',
 
-    async loadInputHistory() {
-        try {
-            const saved = await simpleApiFetch('/api/input_history');
-            if (Array.isArray(saved)) {
-                this.inputHistory = saved;
-                localStorage.setItem('input_history', JSON.stringify(saved));
-            }
-        } catch (err) {
-            console.warn('loading input history failed:', err);
-        }
-    },
-
-    pushInputHistory(msg) {
-        msg = (msg || '').trim();
-        if (!msg) return;
-        if (this.inputHistory[this.inputHistory.length - 1] !== msg) {
-            this.inputHistory.push(msg);
-            if (this.inputHistory.length > 100) this.inputHistory.shift();
-            localStorage.setItem('input_history', JSON.stringify(this.inputHistory));
-            // fire-and-forget: the backend is the source of truth now
-            simpleApiPost('/api/input_history', { message: msg }).catch(() => {});
-        }
+    // the derived list changes shape whenever a different chat is loaded;
+    // drop any in-progress recall so the cursor can't dangle past the end
+    resetHistoryCursor() {
         this.historyIndex = -1;
         this.draftValue = '';
     },
@@ -134,6 +132,11 @@ CHAT_STORE = {
             this.historyIndex = this.inputHistory.length - 1;
         } else if (this.historyIndex > 0) {
             this.historyIndex--;
+        }
+        // the derived list can shrink under the cursor (chat reload, edit,
+        // undo) - clamp instead of recalling undefined
+        if (this.historyIndex >= this.inputHistory.length) {
+            this.historyIndex = this.inputHistory.length - 1;
         }
         this.user_input = this.inputHistory[this.historyIndex];
     },
@@ -155,7 +158,6 @@ CHAT_STORE = {
     async load() {
         // called by Alpine.init
         await this.reloadCategories();
-        this.loadInputHistory();
 
         const result = await simpleApiFetch(`/api/chat/current`);
         if (!result) { return }
@@ -225,6 +227,7 @@ CHAT_STORE = {
         // assistant bubbles, same as reloadChat()
         (result.turn_history || []).forEach(resplitHistoryTurn);
         this.turnHistory = result.turn_history;
+        this.resetHistoryCursor();
         this.currentTokenUsage = result.token_usage;
 
         // bottom-up: mount the tail of the chat before scrolling to it
@@ -622,6 +625,7 @@ CHAT_STORE = {
         // assistant bubbles, same as reloadChat()
         (result.turn_history || []).forEach(resplitHistoryTurn);
         this.turnHistory = result.turn_history;
+        this.resetHistoryCursor();
 
         // the new chat may live in a category the dropdown doesn't list yet
         await this.reloadCategories();
@@ -799,9 +803,10 @@ CHAT_STORE = {
             return;
         }
 
-        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-26)
-        // record the sent text in the input history before clearing the box
-        this.pushInputHistory(text);
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-24)
+        // the sent message joins the derived input history via turnHistory;
+        // just drop any in-progress recall so the next Up starts fresh
+        this.resetHistoryCursor();
 
         // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-12)
         // no optimistic state write: the backend announces message_sending

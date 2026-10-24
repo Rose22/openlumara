@@ -553,15 +553,6 @@ class Webui(core.channel.Channel):
         # initialize the websocket manager
         self.websocket_manager = WebSocketManager(self)
 
-        # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
-        # shell-style input history, persisted server-side so it follows
-        # the user across browsers/devices instead of living in localStorage
-        self.input_history = core.storage.StorageList(
-            name="webui_input_history",
-            type="json",
-            manager=self
-        )
-
     async def run(self):
         self.log("webui", f"Starting WebUI on {self.url}")
 
@@ -2104,36 +2095,6 @@ async def create_fastapi(channel):
             return api_result(success=True)
         except Exception as e:
             return api_result(str(e), success=False)
-
-    # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
-    # shell-style input history, persisted server-side (used to be
-    # localStorage-only, so it didn't follow the user between browsers).
-    @app.get("/api/input_history")
-    async def input_history_get():
-        """Returns the saved input history, oldest first"""
-        return api_result(list(channel.input_history), True)
-
-    @app.post("/api/input_history")
-    async def input_history_add(request: fastapi.Request):
-        """Appends a message to the input history (dedupes against the last entry)"""
-        data = await request.json()
-        message = (data.get("message") or "").strip()
-
-        if not message:
-            return api_result(success=True)
-
-        history = channel.input_history
-        history.load()
-
-        if history and history[-1] == message:
-            return api_result(list(history), True)
-
-        history.append(message)
-        while len(history) > 100:
-            history.pop(0)
-        history.save()
-
-        return api_result(list(history), True)
 
     # --- Settings
     # -- GET
