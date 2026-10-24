@@ -27,8 +27,8 @@
     {% if config.get('enable_file_upload') %}
     @paste="$store.upload.pasteImage($event)"
     {% endif %}
-    @keydown.ctrl.up.prevent="$store.chat.historyPrev(); $autosize($el)"
-    @keydown.ctrl.down.prevent="$store.chat.historyNext(); $autosize($el)"
+    @keydown.ctrl.up.prevent="$store.chat.historyPrev(); autosizeAfterUpdate($el)"
+    @keydown.ctrl.down.prevent="$store.chat.historyNext(); autosizeAfterUpdate($el)"
     @keydown.up="inputHistoryNav($event, $el, 'up')"
     @keydown.down="inputHistoryNav($event, $el, 'down')"
     @keydown.enter="

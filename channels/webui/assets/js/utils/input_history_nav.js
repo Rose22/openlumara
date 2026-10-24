@@ -62,6 +62,27 @@ function textareaCaretLineBounds(textarea) {
 }
 
 /*
+ * fire the autosize plugin (same event its $autosize magic dispatches) on
+ * the next microtask, which lands after alpine has written the current
+ * user_input value into the textarea.
+ *
+ * the transition shuffling matters: the input's CSS animates `all`, and the
+ * autosize plugin measures scrollHeight synchronously right after clearing
+ * the height. mid-transition the box is still at its old height, so
+ * scrollHeight reports that old (taller) value and recalling a short message
+ * over a long one would never shrink the box. killing the transition for the
+ * synchronous resize sidesteps the lie, then it gets handed back.
+ */
+function autosizeAfterUpdate(textarea) {
+    queueMicrotask(() => {
+        const transition = textarea.style.transition;
+        textarea.style.transition = 'none';
+        textarea.dispatchEvent(new Event('autosize'));
+        textarea.style.transition = transition;
+    });
+}
+
+/*
  * keydown handler for plain up/down arrows on the chat input. returns true
  * when history was recalled (the browser's cursor move was prevented).
  * modified arrows (ctrl+up etc. keep their own bindings), IME composition
@@ -90,11 +111,12 @@ function inputHistoryNav(event, textarea, direction) {
         chat.historyNext();
     }
 
+    // park the caret at the end of the recalled text like readline does,
+    // once x-model has written it (next microtask), and resize the box
     queueMicrotask(() => {
         const len = textarea.value.length;
         textarea.setSelectionRange(len, len);
-        textarea.dispatchEvent(new Event('autosize'));
     });
-
+    autosizeAfterUpdate(textarea);
     return true;
 }
