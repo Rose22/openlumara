@@ -1,6 +1,7 @@
 import core
 import os
 import sys
+import asyncio
 import subprocess
 import tempfile
 
@@ -13,7 +14,14 @@ class HostShell(core.module.Module):
 
     async def exec(self, cmd: str):
         """Executes commands in an unsandboxed shell. Be extremely careful! ONLY use if the user explicitly asks. NEVER run autonomously. Prefer sandboxed shell if available."""
-        result = subprocess.run(cmd, capture_output=True, shell=True, text=True)
+        # availability fix: subprocess.run is a blocking call - running it directly
+        # inside an async def froze the ENTIRE event loop (webui stopped accepting
+        # connections) until the command finished. Worse: a command that spawns a
+        # detached daemon (cmd & ) keeps the capture pipes open forever, so the
+        # hang became permanent. to_thread isolates the wait in a worker thread;
+        # stdin=DEVNULL prevents interactive hangs; start_new_session detaches the
+        # child from the app's process group so it cannot be signalled by app teardown.
+        result = await asyncio.to_thread(subprocess.run, cmd, capture_output=True, shell=True, text=True, stdin=subprocess.DEVNULL, start_new_session=True)
         return self.result({
             "stdout": result.stdout.strip(),
             "stderr": result.stderr.strip(),
