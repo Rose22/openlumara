@@ -62,6 +62,10 @@ class APIClient():
         # guards session lifecycle against concurrent connect/disconnect calls
         self._connect_lock = asyncio.Lock()
 
+        # active streamed HTTP response, so cancel() can sever the SSE
+        # connection immediately instead of waiting for the next token
+        self._stream_response = None
+
         # the aiohttp session is the one HTTP client for everything
         self._session = None
         self._ssl_ctx = None # only set when TLS verification is disabled
@@ -667,6 +671,10 @@ class APIClient():
 
         try:
             self.is_streaming = True
+            # expose the live SSE response so cancel() can abort the blocked
+            # read immediately (per-event flag checks alone only notice a
+            # cancel when the next token arrives)
+            self._stream_response = response
 
             async for token in self._recv_stream(response):
                 if self.cancel_request:
@@ -682,9 +690,16 @@ class APIClient():
             self.cancel_request = False
             raise  # let callers handle cancellation
         except Exception as e:
+            if self.cancel_request:
+                # this is almost certainly the read aborting because cancel()
+                # force-closed the response: that IS the requested cancellation,
+                # not an error - surface it as such instead of an error bubble
+                self.cancel_request = False
+                raise asyncio.CancelledError("Request cancelled")
             yield {"type": "error", "content": f"While sending request to AI: {core.detail_error(e)}"}
         finally:
             self.is_streaming = False
+            self._stream_response = None
 
             # make sure the SSE connection is always released
             if response is not None and not isinstance(response, APIError) and hasattr(response, "close"):
@@ -701,6 +716,18 @@ class APIClient():
         if request_task and not request_task.done():
             # request is in-flight but not streaming yet
             request_task.cancel()
+
+        if self._stream_response is not None:
+            # streaming: the per-event checks in send_stream/_recv_stream only
+            # run when the next SSE event arrives, so during a token gap a stop
+            # could hang until generation resumes. sever the connection now -
+            # the blocked read wakes with a connection error, which send_stream
+            # translates back into a clean cancellation while cancel_request
+            # is still set.
+            try:
+                self._stream_response.close()
+            except Exception:
+                pass
 
         if not self.is_streaming and not (request_task and not request_task.done()):
             # nothing was active, so clear the flag

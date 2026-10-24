@@ -123,6 +123,12 @@ class ToolcallManager:
 
         # execute each tool and add their responses
         for tool_call_dict in repaired_tool_calls:
+            # stop-button fix: check between individual tool calls, not only
+            # after the whole batch - a cancel that arrives mid-batch must not
+            # fire the remaining tools first.
+            if self.channel.manager.API.cancel_request:
+                await self.channel.push("toolcalling chain cancelled", defer=False)
+                return
             tool_name = tool_call_dict['function']['name']
             tool_args = json_repair.loads(tool_call_dict['function']['arguments'])
 
