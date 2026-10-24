@@ -29,6 +29,8 @@
     {% endif %}
     @keydown.ctrl.up.prevent="$store.chat.historyPrev(); $autosize($el)"
     @keydown.ctrl.down.prevent="$store.chat.historyNext(); $autosize($el)"
+    @keydown.up="inputHistoryNav($event, $el, 'up')"
+    @keydown.down="inputHistoryNav($event, $el, 'down')"
     @keydown.enter="
         if (!$event.shiftKey && !$store.ui.isMobile) {
             $event.preventDefault();
