@@ -1,0 +1,11 @@
+# development-only dependencies. openlumara itself stays dependency-lean;
+# nothing here is needed to run the app.
+pytest
+pytest-asyncio
+pytest-cov
+pytest-html>=4.1
+
+# optional dependencies needed to run the full test suite without skips:
+# - simpleeval powers modules/calculator
+# (PySide6-Essentials was dropped with the Qt GUI channel, removed upstream in b88e90f)
+simpleeval
