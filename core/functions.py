@@ -2,6 +2,7 @@ import core
 import os
 import sys
 import errno
+import shutil
 import time
 import traceback
 import urllib.parse
@@ -80,6 +81,32 @@ def get_home_path(path: str = "", sandbox=True):
         return path
 
     return sandbox_path(home, path) if sandbox else os.path.join(home, path)
+
+LEGACY_STATE_ENTRIES = (
+    "config.yml",
+    "data",
+    "user_modules",
+    "user_channels",
+    "skills",
+    "user_webui_themes",
+    "data_backups",
+)
+
+def migrate_legacy_state():
+    """move state left in the install dir by pre-home versions of the app into the home directory"""
+    home = get_home()
+    root = get_path()
+
+    for name in LEGACY_STATE_ENTRIES:
+        src = os.path.join(root, name)
+        dst = os.path.join(home, name)
+        if not os.path.exists(src) or os.path.exists(dst):
+            continue
+        try:
+            shutil.move(src, dst)
+            log("core", f"moved {src} to {dst}")
+        except OSError as e:
+            log("core", f"could not move {src} to {dst}: {e}")
 
 def get_data_path(subpath=None):
     """get path to the data directory. contains all persistent data used by the framework"""
