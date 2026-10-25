@@ -63,9 +63,12 @@ def get_path(path: str = "", sandbox=True):
         else:
             return os.path.join(project_root, path)
 
+# a leading dot is a unix convention, so windows gets a plain folder
+DEFAULT_HOME = "~/openlumara" if sys.platform == "win32" else "~/.openlumara"
+
 def get_home():
-    """get the writable root used for config, data and user content. defaults to ~/.openlumara."""
-    home = os.environ.get("OPENLUMARA_HOME") or "~/.openlumara"
+    """get the writable root used for config, data and user content. defaults to ~/.openlumara (~/openlumara on windows)."""
+    home = os.environ.get("OPENLUMARA_HOME") or DEFAULT_HOME
 
     # realpath so sandbox_path() accepts state dirs reached through symlinks
     return os.path.realpath(os.path.abspath(os.path.expanduser(home)))
