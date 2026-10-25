@@ -1472,10 +1472,12 @@ dependencies = [
     { name = "json-repair" },
     { name = "msgpack" },
     { name = "partial-json-parser" },
+    { name = "prompt-toolkit" },
     { name = "pypdf" },
     { name = "python-ulid" },
     { name = "pyyaml" },
     { name = "regex" },
+    { name = "rich" },
 ]
 
 [package.optional-dependencies]
@@ -1485,10 +1487,6 @@ channels = [
     { name = "matrix-nio", extra = ["e2e"] },
     { name = "python-telegram-bot" },
     { name = "werkzeug" },
-]
-cli = [
-    { name = "prompt-toolkit" },
-    { name = "rich" },
 ]
 gui = [
     { name = "pyside6" },
@@ -1528,7 +1526,7 @@ requires-dist = [
     { name = "mcp", marker = "extra == 'modules'", specifier = ">=2" },
     { name = "msgpack" },
     { name = "partial-json-parser" },
-    { name = "prompt-toolkit", marker = "extra == 'cli'" },
+    { name = "prompt-toolkit" },
     { name = "pypdf" },
     { name = "pyside6", marker = "extra == 'gui'" },
     { name = "python-multipart", marker = "extra == 'webui'" },
@@ -1536,7 +1534,7 @@ requires-dist = [
     { name = "python-ulid" },
     { name = "pyyaml" },
     { name = "regex" },
-    { name = "rich", marker = "extra == 'cli'" },
+    { name = "rich" },
     { name = "simpleeval", marker = "extra == 'modules'" },
     { name = "starlette", marker = "extra == 'webui'", specifier = ">=1.0.1" },
     { name = "tree-sitter", marker = "extra == 'modules'" },
@@ -1545,7 +1543,7 @@ requires-dist = [
     { name = "websockets", marker = "extra == 'webui'" },
     { name = "werkzeug", marker = "extra == 'channels'" },
 ]
-provides-extras = ["webui", "cli", "channels", "modules", "gui"]
+provides-extras = ["webui", "channels", "modules", "gui"]
 
 [[package]]
 name = "opentelemetry-api"

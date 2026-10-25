@@ -8,8 +8,8 @@ import tomllib
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 PYPROJECT = ROOT / "pyproject.toml"
-DEFAULT_OUTPUT = ROOT / "requirements_termux.txt"
-EXTRAS = ("webui", "channels", "modules", "cli")
+DEFAULT_OUTPUT = ROOT / "requirements.txt"
+EXTRAS = ("webui", "channels", "modules")
 HEADER = "# generated from pyproject.toml by tools/dump_requirements.py; do not edit\n"
 
 

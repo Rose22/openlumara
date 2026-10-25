@@ -12,6 +12,8 @@ dependencies = [
   "regex",
   "pypdf",
   "python-ulid",
+  "prompt-toolkit",
+  "rich",
 ]
 
 [project.optional-dependencies]
@@ -25,7 +27,6 @@ webui = [
   "python-multipart",
   "markupsafe",
 ]
-cli = ["prompt-toolkit", "rich"]
 channels = [
   "flask",
   "werkzeug",
@@ -45,3 +46,7 @@ gui = ["PySide6"]
 
 [tool.uv]
 package = false
+
+# no wheel on pypi, and its setup.py predates pyproject build deps
+[tool.uv.extra-build-dependencies]
+"atomicwrites" = ["setuptools"]
