@@ -9,6 +9,12 @@ let
   inherit (lib) mkIf mkOption types;
 
   settingsToArgs = import ./settings.nix { inherit lib; };
+
+  # the install dir is read-only, so the docs module's user folder goes to the
+  # state dir; `openlumara_docs` is the bundled guide and stays in the package
+  defaultSettings = {
+    modules.settings.docs.folders = [ "openlumara_docs" "~/.openlumara/docs" ];
+  };
 in
 {
   options.services.openlumara = {
@@ -65,7 +71,9 @@ in
 
       Service = {
         ExecStart = lib.escapeShellArgs (
-          [ "${cfg.package}/bin/openlumara" ] ++ settingsToArgs "" cfg.settings ++ cfg.extraArgs
+          [ "${cfg.package}/bin/openlumara" ]
+          ++ settingsToArgs "" (lib.recursiveUpdate defaultSettings cfg.settings)
+          ++ cfg.extraArgs
         );
         Restart = "on-failure";
         RestartSec = 5;

@@ -22,6 +22,8 @@ OpenLumara keeps `config.yml`, `data/`, `user_modules/`, `user_channels/` and th
 
 `nix run` and the package use the app default, `~/.openlumara`. The NixOS module sets it to `/var/lib/openlumara`.
 
+Both modules also default `modules.settings.docs.folders` to the bundled `openlumara_docs` guide plus a writable `docs` folder in the state directory (`/var/lib/openlumara/docs`, or `~/.openlumara/docs` under home-manager). Override it with `services.openlumara.settings.modules.settings.docs.folders`, and point extra docs folders at absolute paths (or `~` ones), since the package directory is read-only.
+
 ## NixOS
 
 The module runs the app as an `openlumara` system user with `/var/lib/openlumara` as its state directory. Options:
