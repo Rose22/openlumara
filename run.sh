@@ -10,11 +10,12 @@ while [ -L "$target" ]; do
 done
 cd "$(dirname "$target")" || exit 1
 
-# first run? set up the venv via install.sh, then continue
-if [ ! -x "venv/bin/python" ]; then
-    sh ./install.sh || exit 1
+if ! command -v uv >/dev/null 2>&1; then
+    echo "error: uv is required. install it from https://docs.astral.sh/uv/getting-started/installation/"
+    exit 1
 fi
 
-# aaand run!
-source venv/bin/activate
-exec python main.py "$@"
+# --inexact: keep module dependencies the app installed at runtime
+uv sync --frozen --inexact || exit 1
+
+exec uv run --frozen --no-sync main.py "$@"

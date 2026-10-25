@@ -1,4 +1,6 @@
 __pycache__/
+.venv/
+/result
 venv/
 data/
 data

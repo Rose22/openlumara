@@ -27,34 +27,16 @@ if %errorlevel% equ 0 (
     echo warning: git fetch failed. skipping update check.
 )
 
-if not exist "venv" (
-    echo setting up virtual environment with %PYTHON_BIN%...
-    %PYTHON_BIN% -m venv venv
+where uv >nul 2>nul
+if %errorlevel% neq 0 (
+    echo error: uv is required. install it from https://docs.astral.sh/uv/getting-started/installation/
+    pause
+    exit /b 1
 )
 
 :: 2. Ensure dependencies are up to date
 echo ensuring dependencies are up to date...
-venv\Scripts\python -m pip install -q --upgrade pip
-
-:: Check if requirements.txt has changed before installing
-if exist ".requirements_hash" (
-    set /p OLD_HASH=<.requirements_hash
-    for /f "delims=" %%a in ('powershell -Command "(Get-FileHash requirements.txt).Hash" 2^>nul') do set NEW_HASH=%%a
-    if "!NEW_HASH!"=="!OLD_HASH!" (
-        echo requirements.txt unchanged, skipping pip install.
-    ) else (
-        echo requirements.txt changed, updating dependencies...
-        venv\Scripts\python -m pip install -r requirements.txt
-        echo !NEW_HASH! > .requirements_hash
-    )
-) else (
-    echo requirements.txt changed (or first run), updating dependencies...
-    venv\Scripts\python -m pip install -r requirements.txt
-    for /f "delims=" %%a in ('powershell -Command "(Get-FileHash requirements.txt).Hash" 2^>nul') do set NEW_HASH=%%a
-    if defined NEW_HASH (
-        echo !NEW_HASH! > .requirements_hash
-    )
-)
+uv sync --frozen --inexact
 
 echo.
 echo done!

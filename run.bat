@@ -4,30 +4,18 @@ setlocal enabledelayedexpansion
 :: Switch to the directory where this .bat file is located
 cd /d "%~dp0"
 
-:: 1. Detect Python binary
-where python >nul 2>nul
-if %errorlevel% equ 0 (
-    set PYTHON_BIN=python
-) else (
-    echo error: no python binary found. please make sure python is installed and in your PATH.
+where uv >nul 2>nul
+if %errorlevel% neq 0 (
+    echo error: uv is required. install it from https://docs.astral.sh/uv/getting-started/installation/
     pause
     exit /b 1
 )
 
-:: 2. Set up/Update virtual environment
-if not exist "venv" (
-    echo setting up virtual environment with %PYTHON_BIN%...
-    %PYTHON_BIN% -m venv venv
+:: --inexact: keep module dependencies the app installed at runtime
+uv sync --frozen --inexact || exit /b 1
 
-    :: since this is the first run, install all requirements
-    echo installing requirements...
-    venv\Scripts\python -m pip install -q --upgrade pip
-    venv\Scripts\python -m pip install -r requirements.txt
-)
-
-:: 3. Run the app
 echo starting openlumara...
-venv\Scripts\python main.py %*
+uv run --frozen --no-sync main.py %*
 
 if %errorlevel% neq 0 (
     echo.
