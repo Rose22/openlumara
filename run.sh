@@ -13,7 +13,7 @@ cd "$(dirname "$target")" || exit 1
 # uv manages the environment when available, plain venv + pip otherwise
 if command -v uv >/dev/null 2>&1; then
     # --inexact keeps module dependencies the app installed at runtime
-    uv sync --frozen --inexact || exit 1
+    uv sync --frozen --inexact --extra webui --extra channels --extra modules || exit 1
     exec uv run --frozen --no-sync main.py "$@"
 fi
 

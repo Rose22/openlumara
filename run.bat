@@ -8,7 +8,7 @@ cd /d "%~dp0"
 where uv >nul 2>nul
 if %errorlevel% equ 0 (
     :: --inexact keeps module dependencies the app installed at runtime
-    uv sync --frozen --inexact || exit /b 1
+    uv sync --frozen --inexact --extra webui --extra channels --extra modules || exit /b 1
     echo starting openlumara...
     uv run --frozen --no-sync main.py %*
     goto :check

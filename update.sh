@@ -21,11 +21,20 @@ fi
 
 echo "ensuring dependencies are up to date..."
 if command -v uv >/dev/null 2>&1; then
-    uv sync --frozen --inexact
+    uv sync --frozen --inexact --extra webui --extra channels --extra modules
 else
     if [ ! -d "venv" ]; then
-        echo "uv not found, setting up virtual environment with python3..."
-        python3 -m venv venv || exit 1
+        if command -v python3 >/dev/null 2>&1; then
+            PYTHON_BIN="python3"
+        elif command -v python >/dev/null 2>&1; then
+            PYTHON_BIN="python"
+        else
+            echo "error: no python binary found (checked python3 and python)"
+            exit 1
+        fi
+
+        echo "uv not found, setting up virtual environment with $PYTHON_BIN..."
+        $PYTHON_BIN -m venv venv || exit 1
     fi
 
     venv/bin/pip install -r requirements.txt || exit 1
