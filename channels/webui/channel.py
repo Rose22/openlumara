@@ -39,6 +39,45 @@ import base64
 # security libraries
 import secrets
 
+# -- AI GENERATED CODE (Qwen3.8 Flash Next) :: (2026-10-25) harness:openlumara
+def migrate_legacy_input_history(log = None):
+    """one-time migration for the per-chat input history.
+
+    the input history used to be one global json array under
+    webui_input_history.json, which cannot load as the per-chat dict the
+    endpoints use now. the check must be content-based, not existence-based:
+    the per-chat dict lives under that same filename, and an existence
+    check renamed (and so wiped) the live history on every restart instead
+    of only on the upgrade.
+    """
+    if log is None:
+        log = lambda *a: None
+
+    legacy_file = core.get_data_path("webui_input_history.json")
+    if not os.path.exists(legacy_file):
+        return
+
+    try:
+        with open(legacy_file, "r", encoding="utf-8") as f:
+            is_global_list = isinstance(json.load(f), list)
+    except Exception:
+        # unreadable/corrupt: treat it like the legacy format so the fresh
+        # per-chat store can be created instead of crashing on startup
+        is_global_list = True
+
+    if not is_global_list:
+        # already the per-chat dict: leave the live history alone
+        return
+
+    backup_file = legacy_file + ".global.bak"
+    if os.path.exists(backup_file):
+        # a previous migration already kept the backup; never clobber it
+        os.remove(legacy_file)
+    else:
+        os.replace(legacy_file, backup_file)
+    log("webui", "input history is per-chat now; the old global history was moved to webui_input_history.json.global.bak")
+
+
 # --------------------
 # Channel class
 # --------------------
@@ -556,7 +595,13 @@ class Webui(core.channel.Channel):
         # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
         # shell-style input history, persisted server-side so it follows
         # the user across browsers/devices instead of living in localStorage
-        self.input_history = core.storage.StorageList(
+        # -- AI GENERATED CODE (Qwen3.8 Flash Next) :: (2026-10-25) harness:openlumara
+        # keyed by chat id now: ctrl+up/down only walks the messages sent in
+        # the open chat, instead of every message ever typed in any chat.
+        # a leftover global-array history file from before the switch is
+        # migrated (moved aside) first, once, based on its content.
+        migrate_legacy_input_history(self.log)
+        self.input_history = core.storage.StorageDict(
             name="webui_input_history",
             type="json",
             manager=self
@@ -1293,6 +1338,15 @@ async def op_chat_new(channel, category="general"):
 async def op_chat_delete(channel, chat_id):
     """deletes a chat and points all clients at whatever is loaded now"""
     await channel.context.chat.delete(chat_id)
+
+    # -- AI GENERATED CODE (Qwen3.8 Flash Next) :: (2026-10-25) harness:openlumara
+    # the deleted chat's input history goes with it, so the per-chat
+    # history store doesn't accumulate entries for chats that no longer exist
+    channel.input_history.load()
+    if chat_id in channel.input_history:
+        del channel.input_history[chat_id]
+        channel.input_history.save()
+
     await channel.websocket_manager.broadcast({
         "type": "chat_switched",
         "id": channel.context.chat.get("id"),
@@ -2140,32 +2194,46 @@ async def create_fastapi(channel):
     # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
     # shell-style input history, persisted server-side (used to be
     # localStorage-only, so it didn't follow the user between browsers).
+    # -- AI GENERATED CODE (Qwen3.8 Flash Next) :: (2026-10-25) harness:openlumara
+    # per-chat now: every chat keeps its own history (keyed by chat id), so
+    # ctrl+up/down never walks messages typed in a different chat. chat_id
+    # is optional and falls back to the currently loaded chat, matching the
+    # other chat endpoints.
     @app.get("/api/input_history")
-    async def input_history_get():
-        """Returns the saved input history, oldest first"""
-        return api_result(list(channel.input_history), True)
+    async def input_history_get(chat_id: str = None):
+        """Returns the saved input history for one chat (current chat if no id is given), oldest first"""
+        chat_id = chat_id or channel.context.chat.get("id")
+
+        history = channel.input_history
+        history.load()
+
+        return api_result(list(history.get(chat_id, [])), True)
 
     @app.post("/api/input_history")
     async def input_history_add(request: fastapi.Request):
-        """Appends a message to the input history (dedupes against the last entry)"""
+        """Appends a message to the input history of one chat (dedupes against the last entry)"""
         data = await request.json()
         message = (data.get("message") or "").strip()
+        chat_id = data.get("chat_id") or channel.context.chat.get("id")
 
-        if not message:
+        if not message or not chat_id:
             return api_result(success=True)
 
         history = channel.input_history
         history.load()
 
-        if history and history[-1] == message:
-            return api_result(list(history), True)
+        entries = list(history.get(chat_id, []))
 
-        history.append(message)
-        while len(history) > 100:
-            history.pop(0)
+        if entries and entries[-1] == message:
+            return api_result(entries, True)
+
+        entries.append(message)
+        while len(entries) > 100:
+            entries.pop(0)
+        history[chat_id] = entries
         history.save()
 
-        return api_result(list(history), True)
+        return api_result(entries, True)
 
     # --- Settings
     # -- GET
