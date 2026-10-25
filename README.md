@@ -90,6 +90,8 @@ Once it's started up, open your browser and go to the url it displays. Then in t
 
 Whenever you want to update openlumara, just run `update.sh` if you're on linux, or `update.bat` if you're on windows.
 
+On NixOS (or anywhere with Nix), there's a flake with a package and a NixOS module. See [NIX.md](NIX.md).
+
 ## ⛔⛔⛔ THIS IS A LOBSTER-FREE ZONE ⛔⛔⛔
 OpenLumara does not have an associated emoji. You can add it to it's identity if you want, but it doesn't force it on you. Also, cats have claws too, where is the love for the cats?
 
