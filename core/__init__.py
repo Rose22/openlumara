@@ -15,6 +15,9 @@ import core.exceptions
 home = core.get_home()
 os.makedirs(home, exist_ok=True)
 
+# move state left behind by pre-home versions of the app
+core.migrate_legacy_state()
+
 # user_modules/user_channels are imported as namespace packages, so home must be importable
 if home not in sys.path:
     sys.path.insert(0, home)
