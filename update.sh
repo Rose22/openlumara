@@ -19,13 +19,17 @@ else
     echo "warning: git fetch failed. skipping update check."
 fi
 
-if ! command -v uv >/dev/null 2>&1; then
-    echo "error: uv is required. install it from https://docs.astral.sh/uv/getting-started/installation/"
-    exit 1
-fi
-
 echo "ensuring dependencies are up to date..."
-uv sync --frozen --inexact
+if command -v uv >/dev/null 2>&1; then
+    uv sync --frozen --inexact
+else
+    if [ ! -d "venv" ]; then
+        echo "uv not found, setting up virtual environment with python3..."
+        python3 -m venv venv || exit 1
+    fi
+
+    venv/bin/pip install -r requirements.txt || exit 1
+fi
 
 echo
 echo "done!"

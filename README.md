@@ -84,7 +84,7 @@ git clone https://github.com/Rose22/openlumara
 
 You can also choose to download the zip, but the update scripts won't work that way, because they use git.
 
-Once you have openlumara, run `run.sh` if you're on linux, `run.bat` if you're on windows! Both need [uv](https://docs.astral.sh/uv/) to manage dependencies (`update.sh`/`update.bat` need it too). On Termux, use `run_termux.sh` instead, it installs from `requirements_termux.txt` with plain pip.
+Once you have openlumara, run `run.sh` if you're on linux, `run.bat` if you're on windows! Both use [uv](https://docs.astral.sh/uv/) when it's installed and fall back to a plain `venv` + `pip` install (from the generated `requirements.txt`) when it isn't. `run_termux.sh` always uses pip.
 
 Once it's started up, open your browser and go to the url it displays. Then in the web ui, open the settings panel (lil gear icon at the top), set up your api connection, press save, and enjoy!
 

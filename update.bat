@@ -27,16 +27,26 @@ if %errorlevel% equ 0 (
     echo warning: git fetch failed. skipping update check.
 )
 
-where uv >nul 2>nul
-if %errorlevel% neq 0 (
-    echo error: uv is required. install it from https://docs.astral.sh/uv/getting-started/installation/
-    pause
-    exit /b 1
-)
-
 :: 2. Ensure dependencies are up to date
 echo ensuring dependencies are up to date...
-uv sync --frozen --inexact
+where uv >nul 2>nul
+if %errorlevel% equ 0 (
+    uv sync --frozen --inexact
+) else (
+    echo uv not found, using venv + pip...
+    where python >nul 2>nul
+    if !errorlevel! neq 0 (
+        echo error: no python binary found. please make sure python is installed and in your PATH.
+        pause
+        exit /b 1
+    )
+
+    if not exist "venv" (
+        python -m venv venv || exit /b 1
+    )
+
+    venv\Scripts\python -m pip install -r requirements.txt || exit /b 1
+)
 
 echo.
 echo done!
