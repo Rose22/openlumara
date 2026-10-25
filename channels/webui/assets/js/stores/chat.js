@@ -93,35 +93,53 @@ CHAT_STORE = {
     last_user_input: '',
 
     // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-26)
-    // shell-style input history (global across chats).
+    // shell-style input history.
     // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-01)
     // persisted backend-side now (/api/input_history); localStorage stays
     // as an instant-display cache while the server copy loads.
-    inputHistory: JSON.parse(localStorage.getItem('input_history') || '[]'),
+    // -- AI GENERATED CODE (Qwen3.8 Flash Next) :: (2026-10-25) harness:openlumara
+    // per-chat now: the backend keys one history per chat id, so ctrl+up/
+    // down only walks the messages sent in the open chat. inputHistory is
+    // the open chat's list; inputHistoryCache mirrors all chats. The old
+    // 'input_history' key held one global array and is retired.
+    inputHistory: [],
+    inputHistoryCache: JSON.parse(localStorage.getItem('input_history_by_chat') || '{}'),
     historyIndex: -1,
     draftValue: '',
 
-    async loadInputHistory() {
-        try {
-            const saved = await simpleApiFetch('/api/input_history');
+    loadInputHistory(chatId) {
+        // switching chats always restarts the walk from the input box,
+        // starting from the cached copy of that chat's history
+        this.inputHistory = this.inputHistoryCache[chatId] ?? [];
+        this.historyIndex = -1;
+        this.draftValue = '';
+
+        if (!chatId) { return; }
+        simpleApiFetch(`/api/input_history?chat_id=${encodeURIComponent(chatId)}`).then((saved) => {
+            // the chat may have changed again while this was in flight
+            if (this.selectedChat !== chatId) { return; }
             if (Array.isArray(saved)) {
                 this.inputHistory = saved;
-                localStorage.setItem('input_history', JSON.stringify(saved));
+                this.inputHistoryCache[chatId] = saved;
+                localStorage.setItem('input_history_by_chat', JSON.stringify(this.inputHistoryCache));
             }
-        } catch (err) {
+        }).catch((err) => {
             console.warn('loading input history failed:', err);
-        }
+        });
     },
 
     pushInputHistory(msg) {
         msg = (msg || '').trim();
         if (!msg) return;
+        const chatId = this.selectedChat;
+        if (!chatId) return;
         if (this.inputHistory[this.inputHistory.length - 1] !== msg) {
             this.inputHistory.push(msg);
             if (this.inputHistory.length > 100) this.inputHistory.shift();
-            localStorage.setItem('input_history', JSON.stringify(this.inputHistory));
+            this.inputHistoryCache[chatId] = this.inputHistory;
+            localStorage.setItem('input_history_by_chat', JSON.stringify(this.inputHistoryCache));
             // fire-and-forget: the backend is the source of truth now
-            simpleApiPost('/api/input_history', { message: msg }).catch(() => {});
+            simpleApiPost('/api/input_history', { message: msg, chat_id: chatId }).catch(() => {});
         }
         this.historyIndex = -1;
         this.draftValue = '';
@@ -162,7 +180,9 @@ CHAT_STORE = {
     async load() {
         // called by Alpine.init
         await this.reloadCategories();
-        this.loadInputHistory();
+        // the input history cache used to be one global array under this
+        // key; per-chat history lives under 'input_history_by_chat' now
+        localStorage.removeItem('input_history');
 
         const result = await simpleApiFetch(`/api/chat/current`);
         if (!result) { return }
@@ -172,6 +192,9 @@ CHAT_STORE = {
         this.selectedCategory = result.category;
         // (2026-10-25: resplitHistoryTurn() here and its siblings are gone -
         // the trailing content run is split final-side in build_steps now)
+        // -- AI GENERATED CODE (Qwen3.8 Flash Next) :: (2026-10-25) harness:openlumara
+        // per-chat input history: only possible once the open chat is known
+        this.loadInputHistory(result.id);
 
         // -- AI GENERATED CODE (Qwen3.8 Flash Next) :: (2026-10-22) harness:openlumara
         // merge, never blanket-assign: init connects the websocket BEFORE
@@ -225,6 +248,8 @@ CHAT_STORE = {
         this.chat = result;
         this.selectedChat = chatId;
         this.selectedCategory = result.category;
+        // swap to the newly opened chat's input history
+        this.loadInputHistory(chatId);
         this.turnHistory = result.turn_history;
         this.currentTokenUsage = result.token_usage;
 
@@ -618,6 +643,8 @@ CHAT_STORE = {
         this.selectedChat = result.id;
         this.selectedCategory = result.category;
         this.currentTokenUsage = result.token_usage;
+        // a fresh chat starts with a clean input history
+        this.loadInputHistory(result.id);
         this.turnHistory = result.turn_history;
 
         // the new chat may live in a category the dropdown doesn't list yet
@@ -704,10 +731,19 @@ CHAT_STORE = {
         if (!result) { return }
 
         const prevCategory = this.selectedCategory;
+        const prevChat = this.selectedChat;
 
         this.chat = result;
         this.selectedChat = result.id;
         this.selectedCategory = result.category;
+
+        // -- AI GENERATED CODE (Qwen3.8 Flash Next) :: (2026-10-25) harness:openlumara
+        // the backend may have pointed us at a different chat (e.g. the open
+        // one was deleted from another tab) - swap the input history along
+        // with it, so ctrl+up/down never walks the wrong chat
+        if (result.id !== prevChat) {
+            this.loadInputHistory(result.id);
+        }
 
         // reuse the existing turn objects for every turn that didn't actually
         // change, so alpine doesn't re-render (and re-parse the markdown of)
