@@ -1,0 +1,47 @@
+[project]
+name = "openlumara"
+version = "1.0"
+description = "Modular, token-efficient, local-first AI agent framework"
+requires-python = ">=3.11"
+dependencies = [
+  "aiohttp",
+  "msgpack",
+  "pyyaml",
+  "json-repair",
+  "partial-json-parser",
+  "regex",
+  "pypdf",
+  "python-ulid",
+]
+
+[project.optional-dependencies]
+webui = [
+  "fastapi",
+  "starlette>=1.0.1",
+  "itsdangerous",
+  "websockets",
+  "jinja2",
+  "uvicorn",
+  "python-multipart",
+  "markupsafe",
+]
+cli = ["prompt-toolkit", "rich"]
+channels = [
+  "flask",
+  "werkzeug",
+  "discord.py",
+  "python-telegram-bot",
+  "matrix-nio[e2e]",
+]
+modules = [
+  "tree-sitter",
+  "tree-sitter-language-pack",
+  "mcp>=2",
+  "beautifulsoup4",
+  "ddgs",
+  "simpleeval",
+]
+gui = ["PySide6"]
+
+[tool.uv]
+package = false
