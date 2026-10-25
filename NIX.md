@@ -1,6 +1,6 @@
 # Nix
 
-OpenLumara ships a flake with the app package, a NixOS module and a dev shell. Everything is pinned to a stable nixpkgs (`nixos-26.05`), and the Python environment is built from `uv.lock` with [uv2nix](https://github.com/pyproject-nix/uv2nix).
+OpenLumara ships a flake with the app package, a NixOS module, a home-manager module and a dev shell. Everything is pinned to a stable nixpkgs (`nixos-26.05`), and the Python environment is built from `uv.lock` with [uv2nix](https://github.com/pyproject-nix/uv2nix).
 
 ## Running it
 
@@ -75,3 +75,54 @@ journalctl -u openlumara -f
 ```
 
 If you don't use flakes for your system config, the package is also available as `overlays.default`, which adds `pkgs.openlumara`.
+
+## home-manager
+
+`homeModules.default` (also exposed as `homeManagerModules.default`) runs OpenLumara as a systemd user service. It takes the same `enable`, `package`, `settings`, `environmentFile` and `extraArgs` options as the NixOS module, adds the package to `home.packages`, and installs the unit into `default.target`. State goes to `~/.openlumara`.
+
+```nix
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
+    home-manager = {
+      url = "github:nix-community/home-manager/release-26.05";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    openlumara.url = "github:Rose22/openlumara";
+  };
+
+  outputs = { nixpkgs, home-manager, openlumara, ... }: {
+    nixosConfigurations.myhost = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        home-manager.nixosModules.home-manager
+        {
+          home-manager.useGlobalPkgs = true;
+          home-manager.useUserPackages = true;
+
+          home-manager.users.me = {
+            imports = [ openlumara.homeModules.default ];
+
+            home.stateVersion = "26.05";
+            services.openlumara = {
+              enable = true;
+              settings.channels.settings.webui.port = 3000;
+            };
+          };
+        }
+      ];
+    };
+  };
+}
+```
+
+```sh
+systemctl --user status openlumara
+journalctl --user -u openlumara -f
+```
+
+The WebUI stays on localhost with the default `network_mode`; to reach it from another machine, set `network_mode = "internet"` and open the port in the system firewall (`networking.firewall.allowedTCPPorts`), which home-manager cannot do for you.
+
+A user service only starts at boot with lingering enabled: `users.users.me.linger = true;` in the system config, or `loginctl enable-linger me`.
+
+Don't enable both the NixOS and the home-manager module — you'd get two instances fighting over the same WebUI port. Pick one.
