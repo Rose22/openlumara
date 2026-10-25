@@ -19,6 +19,11 @@
       inputs.uv2nix.follows = "uv2nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    home-manager = {
+      url = "github:nix-community/home-manager/release-26.05";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -28,6 +33,7 @@
       pyproject-nix,
       uv2nix,
       pyproject-build-systems,
+      home-manager,
       ...
     }:
     let
@@ -64,6 +70,16 @@
         );
 
       venvFor = pkgs: (pythonSetFor pkgs).mkVirtualEnv "openlumara-env" { openlumara = packageExtras; };
+      # both names are in the wild: homeModules is the newer convention
+      homeModuleSet = rec {
+        openlumara =
+          { lib, pkgs, ... }:
+          {
+            imports = [ ./nix/home.nix ];
+            services.openlumara.package = lib.mkDefault self.packages.${pkgs.stdenv.hostPlatform.system}.default;
+          };
+        default = openlumara;
+      };
     in
     {
       packages = forAllSystems (
@@ -142,6 +158,29 @@
           overrides = "--channels.settings.webui.network_mode internet --channels.settings.webui.port 3000";
           serviceHome = service.environment.OPENLUMARA_HOME;
           userHome = nixosEval.config.users.users.openlumara.home;
+
+          homeEval = home-manager.lib.homeManagerConfiguration {
+            pkgs = nixpkgs.legacyPackages.${system};
+            modules = [
+              self.homeModules.default
+              {
+                home.username = "openlumara";
+                home.homeDirectory = "/home/openlumara";
+                home.stateVersion = "26.05";
+                services.openlumara = {
+                  enable = true;
+                  settings.channels.settings.webui = {
+                    network_mode = "internet";
+                    port = 3000;
+                  };
+                };
+              }
+            ];
+          };
+
+          userService = homeEval.config.systemd.user.services.openlumara;
+          userExecStart = userService.Service.ExecStart;
+          userExecStartText = if lib.isList userExecStart then lib.concatStringsSep " " userExecStart else userExecStart;
         in
         {
           openlumara = package;
@@ -184,6 +223,15 @@
                 throw "services.openlumara: unexpected user home ${userHome}"
             else
               throw "services.openlumara: ExecStart is missing the settings overrides: ${execStartText}";
+
+          home-manager =
+            if lib.hasInfix overrides userExecStartText then
+              if lib.elem "default.target" (userService.Install.WantedBy or [ ]) then
+                pkgs.runCommand "openlumara-home-manager" { } "touch $out"
+              else
+                throw "homeModules.openlumara: the user service is not wanted by default.target"
+            else
+              throw "homeModules.openlumara: ExecStart is missing the settings overrides: ${userExecStartText}";
         }
       );
 
@@ -196,6 +244,9 @@
           };
         default = openlumara;
       };
+
+      homeModules = homeModuleSet;
+      homeManagerModules = homeModuleSet;
 
       overlays.default = final: _prev: {
         openlumara = final.callPackage ./nix/package.nix {

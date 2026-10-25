@@ -9,37 +9,7 @@ let
   cfg = config.services.openlumara;
   inherit (lib) mkIf mkOption types;
 
-  # flatten `settings` into dotted CLI overrides:
-  # { channels.settings.webui = { port = 3000; }; } -> --channels.settings.webui.port 3000
-  settingsToArgs =
-    prefix: attrs:
-    lib.concatLists (
-      lib.mapAttrsToList (
-        name: value:
-        let
-          key = if prefix == "" then name else "${prefix}.${name}";
-        in
-        if lib.isAttrs value then
-          settingsToArgs key value
-        else if value == null then
-          [ ]
-        else if lib.isBool value then
-          [
-            "--${key}"
-            (lib.boolToString value)
-          ]
-        else if lib.isList value then
-          lib.optional (value != [ ]) [
-            "--${key}"
-            (lib.concatMapStringsSep "," toString value)
-          ]
-        else
-          [
-            "--${key}"
-            (toString value)
-          ]
-      ) attrs
-    );
+  settingsToArgs = import ./settings.nix { inherit lib; };
 in
 {
   options.services.openlumara = {
