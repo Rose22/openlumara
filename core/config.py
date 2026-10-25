@@ -434,7 +434,7 @@ def _get_module_schema_cache():
     Returns a dictionary containing the cached schemas and checksums for all modules/channels.
     If the cache is missing or outdated, it performs a refresh.
     """
-    cache_path = os.path.abspath(os.path.join(core.get_path(), SCHEMA_CACHE_FILE))
+    cache_path = os.path.abspath(os.path.join(core.get_home(), SCHEMA_CACHE_FILE))
     cache = {section_key: {} for section_key in CACHE_SECTIONS}
     cache["_version"] = SCHEMA_CACHE_VERSION
 
@@ -1089,7 +1089,7 @@ def load(file_path=None):
         dirname = os.path.dirname(file_path)
     else:
         filename = "config"
-        dirname = core.get_path()
+        dirname = core.get_home()
 
     new_config = False
 

@@ -62,14 +62,35 @@ def get_path(path: str = "", sandbox=True):
         else:
             return os.path.join(project_root, path)
 
+def get_home():
+    """get the writable root used for config, data and user content. defaults to the project root."""
+    home = os.environ.get("OPENLUMARA_HOME")
+    if not home:
+        return get_path()
+
+    # realpath so sandbox_path() accepts state dirs reached through symlinks
+    return os.path.realpath(os.path.abspath(os.path.expanduser(home)))
+
+def get_home_path(path: str = "", sandbox=True):
+    """get path relative to the home directory. returns the home path if no path is specified."""
+    home = get_home()
+
+    if not path:
+        return home
+
+    if os.path.isabs(path):
+        return path
+
+    return sandbox_path(home, path) if sandbox else os.path.join(home, path)
+
 def get_data_path(subpath=None):
     """get path to the data directory. contains all persistent data used by the framework"""
 
     data_path = core.config.get("core", {}).get("data_folder", "data")
 
-    # if it's a relative path, resolve it from the project root
+    # if it's a relative path, resolve it from the home directory
     if not os.path.isabs(data_path):
-        data_path = core.get_path(data_path)
+        data_path = core.get_home_path(data_path)
 
     # create it if it doesn't exist
     if not os.path.exists(data_path):

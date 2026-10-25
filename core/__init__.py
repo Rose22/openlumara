@@ -1,4 +1,5 @@
 import os
+import sys
 
 version = 1.0
 
@@ -11,11 +12,18 @@ proceed_migration = False
 from core.functions import *
 import core.exceptions
 
-user_module_path = core.get_path("user_modules", sandbox=False)
+home = core.get_home()
+os.makedirs(home, exist_ok=True)
+
+# user_modules/user_channels are imported as namespace packages, so home must be importable
+if home not in sys.path:
+    sys.path.insert(0, home)
+
+user_module_path = core.get_home_path("user_modules", sandbox=False)
 if not os.path.exists(user_module_path):
     os.makedirs(user_module_path, exist_ok=True)
 
-user_channel_path = core.get_path("user_channels", sandbox=False)
+user_channel_path = core.get_home_path("user_channels", sandbox=False)
 if not os.path.exists(user_channel_path):
     os.makedirs(user_channel_path, exist_ok=True)
 
