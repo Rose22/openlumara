@@ -3,10 +3,12 @@ import ast
 import core
 import inspect
 import sys
+import shutil
 import subprocess
 import asyncio
 import importlib
 import importlib.util
+import tomllib
 
 try:
     from importlib.metadata import version, PackageNotFoundError
@@ -50,18 +52,28 @@ def _extract_deps_from_file(file_path):
         log("core", f"could not parse dependencies from {file_path}: {e}")
     return []
 
+def _pip_prefix():
+    """use uv's pip interface when available, plain pip otherwise"""
+    uv = shutil.which("uv")
+    if uv:
+        return [uv, "pip"], True
+    return [sys.executable, "-m", "pip"], False
+
 def _install_deps(module_name, packages, manager):
     """install pip packages"""
     if not packages:
         return
-    manager.log("core", f"installing dependencies for {module_name}: {', '.join(packages)}")
+
+    prefix, using_uv = _pip_prefix()
+    manager.log("core", f"installing dependencies for {module_name} with {'uv' if using_uv else 'pip'}: {', '.join(packages)}")
+
+    cmd = [*prefix, "install", "--quiet"]
+    if using_uv:
+        cmd += ["--python", sys.executable]
+    cmd += packages
 
     try:
-        subprocess.check_call(
-            [sys.executable, "-m", "pip", "install", "--quiet"] + packages,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
-        )
+        subprocess.check_call(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except subprocess.CalledProcessError as e:
         manager.log(module_name, f"dependency install failed: {core.detail_error(e)}")
 
@@ -69,14 +81,19 @@ def _uninstall_deps(module_name, packages, manager):
     """uninstall pip packages"""
     if not packages:
         return
-    manager.log("core", f"uninstalling dependencies for {module_name}: {', '.join(packages)}")
+
+    prefix, using_uv = _pip_prefix()
+    manager.log("core", f"uninstalling dependencies for {module_name} with {'uv' if using_uv else 'pip'}: {', '.join(packages)}")
+
+    cmd = [*prefix, "uninstall", "--quiet"]
+    if using_uv:
+        cmd += ["--python", sys.executable]
+    else:
+        cmd += ["-y"]
+    cmd += packages
 
     try:
-        subprocess.check_call(
-            [sys.executable, "-m", "pip", "uninstall", "-y", "--quiet"] + packages,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
-        )
+        subprocess.check_call(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except subprocess.CalledProcessError as e:
         manager.log(module_name, f"dependency uninstall failed: {core.detail_error(e)}")
 
@@ -208,6 +225,14 @@ class _EntryFileFinder:
 if not any(isinstance(f, _EntryFileFinder) for f in sys.meta_path):
     sys.meta_path.insert(len(sys.path_hooks), _EntryFileFinder())
 
+def _get_base_dependencies():
+    """dependencies openlumara always needs, from pyproject.toml"""
+    try:
+        with open(core.get_path("pyproject.toml"), "rb") as f:
+            return tomllib.load(f).get("project", {}).get("dependencies", [])
+    except Exception:
+        return []
+
 def _check_missing_deps(deps):
     """return list of dependencies that are not installed (using pip package names)"""
     missing = []
@@ -278,12 +303,8 @@ async def uninstall_module_deps(package, module_name, manager, exclude=None):
     # keep deps that other enabled modules still need
     installed = [dep for dep in installed if dep not in exclude]
 
-    # keep deps from requirements.txt (dependencies that openlumara ALWAYS needs)
-    base_deps = []
-    requirementstxt = core.get_path("requirements.txt")
-    if os.path.exists(requirementstxt):
-        with open(requirementstxt, 'r', encoding="utf-8") as f:
-            base_deps = [dep.strip() for dep in f.read().split("\n") if dep.strip()]
+    # keep deps from pyproject.toml (dependencies that openlumara ALWAYS needs)
+    base_deps = _get_base_dependencies()
 
     installed = [dep for dep in installed if dep not in base_deps]
 
