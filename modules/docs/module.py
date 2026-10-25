@@ -2,6 +2,19 @@ import core
 import channels.webui.api as webui
 import os
 
+def _resolve_folder(folder: str) -> str:
+    """a folder that ships with the app (or already lives in the install dir) is read from there;
+    anything else is user content and lives in the home directory"""
+    folder = os.path.expanduser(folder)
+    if not folder:
+        return ""
+    if os.path.isabs(folder):
+        return folder.rstrip(os.path.sep)
+    for base in (core.get_path(folder), core.get_home_path(folder)):
+        if os.path.isdir(base):
+            return base.rstrip(os.path.sep)
+    return core.get_home_path(folder).rstrip(os.path.sep)
+
 class Docs(core.module.Module):
     """Allows your AI to grab documentation about anything you want. Has OpenLumara documentation included!"""
 
@@ -22,7 +35,13 @@ class Docs(core.module.Module):
         folders = self.config.get("folders")
         if folders:
             for folder in folders:
-                os.makedirs(core.get_path(os.path.expanduser(folder)).rstrip(os.path.sep), exist_ok=True)
+                target = _resolve_folder(folder)
+                if not target:
+                    continue
+                try:
+                    os.makedirs(target, exist_ok=True)
+                except OSError as e:
+                    core.log("docs", f"could not create docs folder {target}: {e}")
 
         if self.config.get("insert_system_prompt"):
             self.disabled_tools.append("get_topics")
@@ -44,7 +63,7 @@ class Docs(core.module.Module):
 
         for f in folders:
             if os.path.basename(f.rstrip(os.path.sep)) == folder.rstrip(os.path.sep):
-                return core.get_path(os.path.expanduser(f)).rstrip(os.path.sep)
+                return _resolve_folder(f)
 
     async def on_system_prompt(self):
         folders = await self._get_folder_names()
