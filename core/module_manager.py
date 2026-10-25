@@ -151,11 +151,11 @@ class ModuleManager:
         if not isinstance(folder, str) or not folder.strip():
             folder = "skills"
 
-        return core.get_path(folder.strip(), sandbox=False)
+        return core.get_home_path(folder.strip(), sandbox=False)
 
     def themes_root(self):
         """the folder user/installed themes live in (WebUI built-in themes are separate)"""
-        return core.get_path("user_webui_themes", sandbox=False)
+        return core.get_home_path("user_webui_themes", sandbox=False)
 
     def builtin_themes_root(self):
         """the WebUI's own bundled themes folder"""
@@ -164,9 +164,9 @@ class ModuleManager:
     def _local_target(self, kind, name):
         """the path an installed entry of this kind lives at (folders for folder kinds, the themes dir for themes)"""
         if kind == "module":
-            return os.path.join(core.get_path("user_modules", sandbox=False), name)
+            return os.path.join(core.get_home_path("user_modules", sandbox=False), name)
         if kind == "channel":
-            return os.path.join(core.get_path("user_channels", sandbox=False), name)
+            return os.path.join(core.get_home_path("user_channels", sandbox=False), name)
         if kind == "skill":
             return os.path.join(self.skills_root(), name)
         if kind == "theme":

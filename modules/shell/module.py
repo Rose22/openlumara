@@ -503,7 +503,7 @@ class Shell(core.module.Module):
             self.log("sandbox_shell", "Neither docker nor podman are available!")
             return
 
-        self.host_workspace = core.get_path(
+        self.host_workspace = core.get_home_path(
             os.path.expanduser(self.config.get("sandbox_path", default="~/sandbox"))
         )
         os.makedirs(self.host_workspace, exist_ok=True)

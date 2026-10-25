@@ -34,7 +34,7 @@ class Skills(core.module.Module):
     # -------------------------
 
     def _root_path(self):
-        return core.get_path(os.path.expanduser(self.config.get("folder"))).rstrip(os.path.sep)
+        return core.get_home_path(os.path.expanduser(self.config.get("folder"))).rstrip(os.path.sep)
 
     def _parse_frontmatter(self, text):
         """splits a SKILL.md into (frontmatter dict or None, body). frontmatter is a yaml block between the first pair of --- lines."""
