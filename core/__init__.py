@@ -20,7 +20,7 @@ core.migrate_legacy_state()
 
 # user_modules/user_channels are imported as namespace packages, so home must be importable
 if home not in sys.path:
-    sys.path.insert(0, home)
+    sys.path.append(home)
 
 user_module_path = core.get_home_path("user_modules", sandbox=False)
 if not os.path.exists(user_module_path):
