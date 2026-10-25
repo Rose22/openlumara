@@ -20,7 +20,7 @@ The package includes the WebUI, CLI, Telegram, Discord, Matrix and module depend
 
 OpenLumara keeps `config.yml`, `data/`, `user_modules/`, `user_channels/` and the module cache in `OPENLUMARA_HOME`. Bundled files (WebUI assets, docs, templates, built-in themes) are read from the package and never written to.
 
-`nix run` and the package default to `${XDG_DATA_HOME:-$HOME/.local/share}/openlumara`. The NixOS module sets it to `/var/lib/openlumara`.
+`nix run` and the package use the app default, `~/.openlumara`. The NixOS module sets it to `/var/lib/openlumara`.
 
 ## NixOS
 

@@ -20,8 +20,7 @@ stdenv.mkDerivation {
     makeWrapper ${venv}/bin/python $out/bin/openlumara \
       --prefix PYTHONPATH : "$out/share/openlumara" \
       --add-flags "$out/share/openlumara/main.py" \
-      --add-flags "--disable_auto_installer" \
-      --run 'export OPENLUMARA_HOME="''${OPENLUMARA_HOME:-''${XDG_DATA_HOME:-$HOME/.local/share}/openlumara}"'
+      --add-flags "--disable_auto_installer"
 
     runHook postInstall
   '';
