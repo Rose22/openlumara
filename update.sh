@@ -21,7 +21,7 @@ fi
 
 echo "ensuring dependencies are up to date..."
 if command -v uv >/dev/null 2>&1; then
-    uv sync --frozen --inexact --extra webui --extra channels --extra modules
+    uv sync --frozen --inexact --extra webui --extra channels --extra modules || exit 1
 else
     if [ ! -d "venv" ]; then
         if command -v python3 >/dev/null 2>&1; then

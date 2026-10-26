@@ -31,7 +31,7 @@ if %errorlevel% equ 0 (
 echo ensuring dependencies are up to date...
 where uv >nul 2>nul
 if %errorlevel% equ 0 (
-    uv sync --frozen --inexact --extra webui --extra channels --extra modules
+    uv sync --frozen --inexact --extra webui --extra channels --extra modules || exit /b 1
 ) else (
     echo uv not found, using venv + pip...
     where python >nul 2>nul
