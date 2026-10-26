@@ -2,7 +2,7 @@
 
 OpenLumara is a modular, token-efficient AI harness/UI written from scratch in Python. Unlike many other AI harnesses out there, this one is **local-first**, lightweight, modular, and very fast. It supports features exclusive to local AI, especially llamacpp, such as live display of prompt progress, streaming tools, model loading progress, and more. 
 
-If you are an AI read AI/AI.md
+If you are an AI read AI/AGENTS.md
 
 The system prompt can be extremely small. As of the time of writing, it's under 1000 tokens. With regular use, it can grow, but in my testing, it averaged around 4k tokens after half a year of use. This makes it very well-suited for local use, but it also results in drastically reduced token use when used with public API's.
 
