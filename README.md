@@ -84,7 +84,7 @@ git clone https://github.com/Rose22/openlumara
 
 You can also choose to download the zip, but the update scripts won't work that way, because they use git.
 
-Once you have openlumara, run `run.sh` if you're on linux, `run.bat` if you're on windows! Both use [uv](https://docs.astral.sh/uv/) when it's installed and fall back to a plain `venv` + `pip` install (from the generated `requirements.txt`) when it isn't. `run_termux.sh` always uses pip.
+Once you have openlumara, run `run.sh` if you're on linux, `run.bat` if you're on windows! Both use [uv](https://docs.astral.sh/uv/) when it's installed and fall back to a plain `venv` + `pip` install (from the generated `requirements.txt`) when it isn't.
 
 Settings, chats and anything you install live in `~/.openlumara` (`~/openlumara` on windows). Set `OPENLUMARA_HOME` if you want them somewhere else.
 
