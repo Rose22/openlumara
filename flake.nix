@@ -300,6 +300,40 @@
                 throw "homeModules.openlumara: the user service is not wanted by default.target"
             else
               throw "homeModules.openlumara: ExecStart is missing the settings overrides: ${userExecStartText}";
+
+          home-manager-service = pkgs.testers.nixosTest {
+            name = "openlumara-home-manager";
+            nodes.machine = {
+              imports = [ home-manager.nixosModules.home-manager ];
+              home-manager.useGlobalPkgs = true;
+              home-manager.useUserPackages = true;
+              home-manager.users.tester = {
+                imports = [ self.homeModules.default ];
+                home.stateVersion = "26.05";
+                xdg.enable = true;
+                services.openlumara = {
+                  enable = true;
+                  settings.channels.settings.webui.port = 3000;
+                };
+              };
+              users.users.tester = {
+                isNormalUser = true;
+                linger = true;
+              };
+              environment.systemPackages = [ pkgs.curl ];
+              system.stateVersion = "26.05";
+            };
+            testScript = ''
+              machine.wait_for_file("/home/tester/.config/systemd/user/openlumara.service")
+              machine.wait_until_succeeds("test -S /run/user/$(id -u tester)/bus")
+              status, out = machine.systemctl("start openlumara.service", user="tester")
+              assert status == 0, out
+              machine.wait_for_unit("openlumara.service", user="tester")
+              machine.wait_until_succeeds("curl -fsS http://127.0.0.1:3000/ >/dev/null", timeout=120)
+              machine.wait_until_succeeds("test -f /home/tester/.openlumara/config.yml")
+              machine.wait_until_succeeds("test -d /home/tester/.openlumara/docs")
+            '';
+          };
         }
       );
 
