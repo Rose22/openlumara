@@ -21,7 +21,7 @@ let
             (lib.boolToString value)
           ]
         else if lib.isList value then
-          lib.optional (value != [ ]) [
+          lib.optionals (value != [ ]) [
             "--${key}"
             (lib.concatMapStringsSep "," toString value)
           ]
