@@ -267,6 +267,31 @@
             else
               throw "services.openlumara: ExecStart is missing the settings overrides: ${execStartText}";
 
+          nixos-service = pkgs.testers.nixosTest {
+            name = "openlumara-nixos-service";
+            nodes.machine = {
+              imports = [ self.nixosModules.default ];
+              services.openlumara = {
+                enable = true;
+                settings.channels.settings.webui.port = 3000;
+              };
+              environment.systemPackages = [ pkgs.curl ];
+              system.stateVersion = "26.05";
+            };
+            testScript = ''
+              machine.wait_for_unit("openlumara.service")
+              machine.wait_until_succeeds("curl -fsS http://127.0.0.1:3000/ >/dev/null", timeout=120)
+              machine.wait_until_succeeds("test -f /var/lib/openlumara/config.yml")
+              machine.wait_until_succeeds("test -d /var/lib/openlumara/data")
+              machine.wait_until_succeeds("test -d /var/lib/openlumara/docs")
+              machine.wait_until_succeeds("test -e /var/lib/openlumara/.module_cache.json")
+
+              machine.succeed("mkdir -p /var/lib/openlumara/user_webui_themes")
+              machine.succeed("echo '{\"dark\": {}}' > /var/lib/openlumara/user_webui_themes/e2e-theme.json")
+              machine.wait_until_succeeds("curl -fsS http://127.0.0.1:3000/api/themes | grep -q e2e-theme")
+            '';
+          };
+
           home-manager =
             if lib.hasInfix overrides userExecStartText then
               if lib.elem "default.target" (userService.Install.WantedBy or [ ]) then
