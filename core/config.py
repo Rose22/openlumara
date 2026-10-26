@@ -663,12 +663,13 @@ def _module_file_for_dotted(dotted_path):
     if len(parts) < 2 or parts[0] not in ("modules", "user_modules", "channels", "user_channels"):
         return None
 
-    folder = os.path.join(core.get_path(), *parts)
-    for entry in ("module.py", "channel.py"):
-        candidate = os.path.join(folder, entry)
-        if os.path.isfile(candidate):
-            return candidate
-    return None
+    package = {
+        "modules": modules,
+        "user_modules": user_modules,
+        "channels": channels,
+        "user_channels": user_channels,
+    }[parts[0]]
+    return core.modules._get_module_file_path(package, parts[1])
 
 
 def _resolve_ast_category(tree, filepath, class_node, visited, depth=0):
