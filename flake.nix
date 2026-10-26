@@ -214,6 +214,47 @@
             touch $out
           '';
 
+          state-dir = pkgs.runCommand "openlumara-state-dir" {
+            nativeBuildInputs = [ venv ];
+          } ''
+            export HOME=$TMPDIR
+            export OPENLUMARA_HOME=$TMPDIR/state
+
+            mkdir -p $TMPDIR/legacy
+            cp -r ${self}/core $TMPDIR/legacy/core
+            mkdir -p $TMPDIR/legacy/data $TMPDIR/legacy/user_modules/old_mod \
+              $TMPDIR/legacy/user_channels/old_chan $TMPDIR/legacy/skills/old_skill \
+              $TMPDIR/legacy/user_webui_themes $TMPDIR/legacy/data_backups
+            echo marker > $TMPDIR/legacy/data/marker
+            printf 'core: {}\n' > $TMPDIR/legacy/config.yml
+
+            PYTHONPATH=$TMPDIR/legacy:${self} python - <<'PY'
+            import os
+            import core
+
+            home = core.get_home()
+            legacy = core.get_path()
+            for entry in ("config.yml", "data", "user_modules", "user_channels", "skills", "user_webui_themes", "data_backups"):
+                assert os.path.exists(os.path.join(home, entry)), f"{entry} was not migrated"
+                assert not os.path.exists(os.path.join(legacy, entry)), f"{entry} was not removed from {legacy}"
+            assert os.path.exists(os.path.join(home, "data", "marker"))
+            PY
+
+            mkdir -p $OPENLUMARA_HOME/user_modules/home_mod
+            : > $OPENLUMARA_HOME/user_modules/home_mod/module.py
+            PYTHONPATH=${self} python - <<'PY'
+            import os
+            import core
+            import core.config
+
+            actual = core.config._module_file_for_dotted("user_modules.home_mod")
+            expected = os.path.join(core.get_home(), "user_modules", "home_mod", "module.py")
+            assert actual == expected, f"{actual} != {expected}"
+            PY
+
+            touch $out
+          '';
+
           nixos-module =
             if lib.hasInfix overrides execStartText then
               if userHome == "/var/lib/openlumara" then
