@@ -203,6 +203,8 @@
 
             python -c 'import os, core, core.config; core.config.load(); assert core.get_home() == os.path.realpath(os.environ["OPENLUMARA_HOME"]); assert core.get_path() != core.get_home()'
 
+            env -u OPENLUMARA_HOME HOME=$TMPDIR/default-home python -c 'import os, core; assert core.get_home() == os.path.realpath(os.path.join(os.environ["HOME"], ".openlumara"))'
+
             for entry in config.yml data user_modules user_channels .module_cache.json; do
               test -e "$OPENLUMARA_HOME/$entry"
             done
