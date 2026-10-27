@@ -45,7 +45,8 @@ if %errorlevel% equ 0 (
         python -m venv venv || exit /b 1
     )
 
-    venv\Scripts\python -m pip install -r requirements.txt || exit /b 1
+    venv\Scripts\python tools\dump_requirements.py --groups webui,channels,modules --output venv\requirements.txt || exit /b 1
+    venv\Scripts\python -m pip install -r venv\requirements.txt || exit /b 1
 )
 
 echo.

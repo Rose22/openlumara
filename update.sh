@@ -37,7 +37,8 @@ else
         $PYTHON_BIN -m venv venv || exit 1
     fi
 
-    venv/bin/pip install -r requirements.txt || exit 1
+    venv/bin/python tools/dump_requirements.py --groups webui,channels,modules --output venv/requirements.txt || exit 1
+    venv/bin/pip install -r venv/requirements.txt || exit 1
 fi
 
 echo

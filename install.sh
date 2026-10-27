@@ -79,6 +79,7 @@ fi
 echo "setting up virtual environment with $PYTHON_BIN ($($PYTHON_BIN -c 'import platform; print(platform.python_version())'))..."
 "$PYTHON_BIN" -m venv venv
 venv/bin/pip install --upgrade pip
-venv/bin/pip install -r requirements.txt
+venv/bin/python tools/dump_requirements.py --groups webui,channels,modules --output venv/requirements.txt
+venv/bin/pip install -r venv/requirements.txt
 
 echo "done! start OpenLumara with: openlumara   (or ./run.sh)"
