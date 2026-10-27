@@ -84,7 +84,7 @@ git clone https://github.com/Rose22/openlumara
 
 You can also choose to download the zip, but the update scripts won't work that way, because they use git.
 
-Once you have openlumara, run `run.sh` if you're on linux, `run.bat` if you're on windows! Both use [uv](https://docs.astral.sh/uv/) when it's installed and fall back to a plain `venv` + `pip` install (from the generated `requirements.txt`) when it isn't.
+Once you have openlumara, run `run.sh` if you're on linux, `run.bat` if you're on windows! Both use [uv](https://docs.astral.sh/uv/) when it's installed and fall back to a plain `venv` + `pip` install (from a `requirements.txt` generated for the bundled extras by `tools/dump_requirements.py`) when it isn't.
 
 Settings, chats and anything you install live in `~/.openlumara` (`~/openlumara` on windows). Set `OPENLUMARA_HOME` if you want them somewhere else.
 
@@ -93,6 +93,18 @@ Once it's started up, open your browser and go to the url it displays. Then in t
 Whenever you want to update openlumara, just run `update.sh` if you're on linux, or `update.bat` if you're on windows.
 
 On NixOS (or anywhere with Nix), there's a flake with a package and a NixOS module. See [NIX.md](NIX.md).
+
+## Updating dependencies
+
+Every dependency in `pyproject.toml` is pinned to an exact version, in order to keep OpenLumara stable, and to reduce the possibility of supply chain attack.
+Updates are manual **and updated package versions should be reviewed**. Change the pinned version by hand, then run:
+
+```
+uv lock
+python3 tools/dump_requirements.py
+```
+
+`uv lock` refreshes `uv.lock`, and the second command regenerates the committed `requirements.txt`, which contains only the required dependencies. `python3 tools/dump_requirements.py --check` verifies that file is up to date; pass `--groups webui,channels,modules --output <path>` when you need a list that includes optional groups, like the one the run scripts generate.
 
 ## ⛔⛔⛔ THIS IS A LOBSTER-FREE ZONE ⛔⛔⛔
 OpenLumara does not have an associated emoji. You can add it to it's identity if you want, but it doesn't force it on you. Also, cats have claws too, where is the love for the cats?
