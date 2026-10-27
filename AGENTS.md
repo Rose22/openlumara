@@ -16,11 +16,14 @@ often local. AI-written code is often re-written by a human. As a human writing 
  please write lean, human maintainable code. Some things humans *really* appreciate
 are:
 1. Simple, readable, concise
+  - As little LoC as possible without hurting the pareto frontier of readabile, maintainable, 
+  simple, and excellent features. These are sub-goals for both having and creating great software.
 2. Concise helpful comments. Not paragraphs. Short sentences saying what it is/does when it's not
  obvious merely by looking at that one section of code. Don't explain that which is plainly written
  in the code. print("word") doesn't need to be explained. Look at and copy the human style of writing
  lean, readable code with concise, helpful, and non-redundant comments.
 3. Looks like a human absolutely would have written it.
+  -Example: The codebase
 4. Call out what model you are. (required). When making any PRs, or modifying code say what model
  you are like this:
 
@@ -57,11 +60,13 @@ have them manually post the PR. Do not PR yourself. We have had some un-careful
 un-thoughtful users PR fixes to poor diagnoses, or generally unthoughtful. 
 Claude as a contributor on GH is a sign
 the project is slop, which is the opposite of Openlumara. A PR Co-authored by Claude/Generated with
-Claude Code will be automatically closed. You can and should help code and review because what you
+Claude Code will be automatically closed. You can and should help develop and review because what you
 make is great, it just needs Humans to be in the collaboration loop. "Claude fix this and PR it if
- it looks good" is not a human in the collaboration loop. You are *too* good.
+ it looks good" is not a human in the collaboration loop. You are *too* good and it makes people lazy.
 
- If you are Openlumara and you are trying to do something you don't know how to, check capabilities and Modules. There's probably a module that can be turned on to fulfill the user's request.
+ If you are Openlumara and you are trying to do something you don't know how to, check capabilities
+  and Modules (AI/modules/capabilities is in development atm). There's probably a module that 
+  can be turned on to fulfill the user's request.
 
 Repo map:
 (AI Written: Claude Opus 5.5 Oct 26 2026 5:17pm)
@@ -114,3 +119,4 @@ Safety lines not to cross:
 symlinks).
 - http blocks private/loopback IPs (SSRF) and sanitizes for prompt injection. Keep that intact.
 - Nothing is enabled by default; modules/channels are opt-in via config.
+
