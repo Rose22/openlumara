@@ -181,6 +181,38 @@
           userService = homeEval.config.systemd.user.services.openlumara;
           userExecStart = userService.Service.ExecStart;
           userExecStartText = if lib.isList userExecStart then lib.concatStringsSep " " userExecStart else userExecStart;
+
+          nixosEvalDynamic = lib.nixosSystem {
+            inherit system;
+            modules = [
+              self.nixosModules.default
+              {
+                system.stateVersion = "26.05";
+                services.openlumara = {
+                  enable = true;
+                  enableDynamicDeps = true;
+                };
+              }
+            ];
+          };
+          dynamicExecStartText =
+            let e = nixosEvalDynamic.config.systemd.services.openlumara.serviceConfig.ExecStart;
+            in if lib.isList e then lib.concatStringsSep " " e else e;
+
+          nixosEvalExtra = lib.nixosSystem {
+            inherit system;
+            modules = [
+              self.nixosModules.default
+              {
+                system.stateVersion = "26.05";
+                services.openlumara = {
+                  enable = true;
+                  extraPackages = ps: [ ps.requests ];
+                };
+              }
+            ];
+          };
+          extraService = nixosEvalExtra.config.systemd.services.openlumara;
         in
         {
           openlumara = package;
@@ -257,13 +289,16 @@
 
           nixos-module =
             if lib.hasInfix overrides execStartText then
-              if userHome == "/var/lib/openlumara" then
-                if serviceHome == "/var/lib/openlumara" then
-                  pkgs.runCommand "openlumara-nixos-module" { } "touch $out"
+              if lib.hasInfix "--disable_auto_installer" execStartText then
+                if userHome == "/var/lib/openlumara" then
+                  if serviceHome == "/var/lib/openlumara" then
+                    pkgs.runCommand "openlumara-nixos-module" { } "touch $out"
+                  else
+                    throw "services.openlumara: unexpected OPENLUMARA_HOME ${toString serviceHome}"
                 else
-                  throw "services.openlumara: unexpected OPENLUMARA_HOME ${toString serviceHome}"
+                  throw "services.openlumara: unexpected user home ${userHome}"
               else
-                throw "services.openlumara: unexpected user home ${userHome}"
+                throw "services.openlumara: ExecStart is missing --disable_auto_installer: ${execStartText}"
             else
               throw "services.openlumara: ExecStart is missing the settings overrides: ${execStartText}";
 
@@ -294,12 +329,64 @@
 
           home-manager =
             if lib.hasInfix overrides userExecStartText then
-              if lib.elem "default.target" (userService.Install.WantedBy or [ ]) then
-                pkgs.runCommand "openlumara-home-manager" { } "touch $out"
+              if lib.hasInfix "--disable_auto_installer" userExecStartText then
+                if lib.elem "default.target" (userService.Install.WantedBy or [ ]) then
+                  pkgs.runCommand "openlumara-home-manager" { } "touch $out"
+                else
+                  throw "homeModules.openlumara: the user service is not wanted by default.target"
               else
-                throw "homeModules.openlumara: the user service is not wanted by default.target"
+                throw "homeModules.openlumara: ExecStart is missing --disable_auto_installer: ${userExecStartText}"
             else
               throw "homeModules.openlumara: ExecStart is missing the settings overrides: ${userExecStartText}";
+
+          nixos-module-dynamic =
+            if lib.hasInfix "--disable_auto_installer" dynamicExecStartText then
+              throw "services.openlumara: --disable_auto_installer is present despite enableDynamicDeps = true"
+            else
+              pkgs.runCommand "openlumara-nixos-module-dynamic" { } "touch $out";
+
+          nixos-module-extra =
+            if extraService.environment.OPENLUMARA_EXTRA_SITE_PACKAGES != "" then
+              pkgs.runCommand "openlumara-nixos-module-extra" { } "touch $out"
+            else
+              throw "services.openlumara: OPENLUMARA_EXTRA_SITE_PACKAGES is empty";
+
+          extra-site = pkgs.runCommand "openlumara-extra-site" {
+            nativeBuildInputs = [ venv ];
+          } ''
+            export HOME=$TMPDIR
+            export OPENLUMARA_HOME=$TMPDIR/state
+            mkdir -p $TMPDIR/extra/hello
+            printf 'VALUE = 1\n' > $TMPDIR/extra/hello/__init__.py
+            OPENLUMARA_EXTRA_SITE_PACKAGES=$TMPDIR/extra PYTHONPATH=${self} \
+              python -c 'import core; import hello; assert hello.VALUE == 1'
+            touch $out
+          '';
+
+          frozen-vendored = pkgs.runCommand "openlumara-frozen-vendored" {
+            nativeBuildInputs = [ venv ];
+          } ''
+            export HOME=$TMPDIR
+            export OPENLUMARA_HOME=$TMPDIR/state
+            mkdir -p $OPENLUMARA_HOME/user_modules/probe/site-packages/hello \
+              $OPENLUMARA_HOME/user_modules/probe/site-packages/hello-1.0.dist-info
+            printf 'VALUE = 2\n' > $OPENLUMARA_HOME/user_modules/probe/site-packages/hello/__init__.py
+            printf 'Metadata-Version: 2.1\nName: hello\nVersion: 1.0\n' \
+              > $OPENLUMARA_HOME/user_modules/probe/site-packages/hello-1.0.dist-info/METADATA
+            cat > $OPENLUMARA_HOME/user_modules/probe/module.py <<'PY'
+import core
+class Probe(core.module.Module):
+    dependencies = ["hello"]
+PY
+            PYTHONPATH=${self} python - <<'PY'
+import sys
+sys.frozen = True
+import core, core.modules, user_modules
+loaded = core.modules.load(user_modules, core.module.Module, filter=["probe"])
+assert loaded, "vendored dependency was not loaded"
+PY
+            touch $out
+          '';
 
           home-manager-service = pkgs.testers.nixosTest {
             name = "openlumara-home-manager";

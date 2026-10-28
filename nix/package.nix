@@ -1,4 +1,4 @@
-{ lib, stdenv, makeWrapper, src, venv }:
+{ lib, stdenv, makeWrapper, uv, src, venv }:
 
 stdenv.mkDerivation {
   pname = "openlumara";
@@ -6,7 +6,7 @@ stdenv.mkDerivation {
 
   inherit src;
 
-  nativeBuildInputs = [ makeWrapper ];
+  nativeBuildInputs = [ makeWrapper uv ];
 
   dontConfigure = true;
   dontBuild = true;
@@ -18,9 +18,11 @@ stdenv.mkDerivation {
     cp -r core modules channels openlumara_docs main.py pyproject.toml $out/share/openlumara/
 
     makeWrapper ${venv}/bin/python $out/bin/openlumara \
+      --prefix PATH : ${lib.makeBinPath [ uv ]} \
+      --set UV_PYTHON_DOWNLOADS never \
+      --set VIRTUAL_ENV ${venv} \
       --prefix PYTHONPATH : "$out/share/openlumara" \
-      --add-flags "$out/share/openlumara/main.py" \
-      --add-flags "--disable_auto_installer"
+      --add-flags "$out/share/openlumara/main.py"
 
     runHook postInstall
   '';

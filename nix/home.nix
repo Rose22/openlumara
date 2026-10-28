@@ -1,6 +1,7 @@
 {
   config,
   lib,
+  pkgs,
   ...
 }:
 
@@ -15,6 +16,10 @@ let
   defaultSettings = {
     modules.settings.docs.folders = [ "openlumara_docs" "~/.openlumara/docs" ];
   };
+
+  extraPackagesList = cfg.extraPackages pkgs.python313.pkgs;
+  extraPython = pkgs.python313.withPackages cfg.extraPackages;
+  extraSitePackages = "${extraPython}/${pkgs.python313.sitePackages}";
 in
 {
   options.services.openlumara = {
@@ -61,6 +66,28 @@ in
       default = [ ];
       description = "Extra command line arguments for openlumara.";
     };
+
+    enableDynamicDeps = mkOption {
+      type = types.bool;
+      default = false;
+      description = ''
+        Allow OpenLumara to install module/channel dependencies at runtime into
+        `OPENLUMARA_HOME/module_deps`. Runtime installs are not reproducible and
+        binary wheels need nix-ld or an FHS environment; pure-Python packages work.
+        Prefer `extraPackages` for reproducible dependencies.
+      '';
+    };
+
+    extraPackages = mkOption {
+      type = types.functionTo (types.listOf types.package);
+      default = _: [ ];
+      description = ''
+        Python packages from nixpkgs made available to modules and channels.
+        Receives the nixpkgs Python package set, e.g. `ps: [ ps.discordpy ]`.
+        They are appended after the bundled environment, so bundled versions win.
+      '';
+      example = lib.literalExpression "ps: [ ps.discordpy ps.beautifulsoup4 ]";
+    };
   };
 
   config = mkIf cfg.enable {
@@ -72,6 +99,7 @@ in
       Service = {
         ExecStart = lib.escapeShellArgs (
           [ "${cfg.package}/bin/openlumara" ]
+          ++ lib.optional (!cfg.enableDynamicDeps) "--disable_auto_installer"
           ++ settingsToArgs "" (lib.recursiveUpdate defaultSettings cfg.settings)
           ++ cfg.extraArgs
         );
@@ -80,6 +108,9 @@ in
       }
       // lib.optionalAttrs (cfg.environmentFile != null) {
         EnvironmentFile = cfg.environmentFile;
+      }
+      // lib.optionalAttrs (extraPackagesList != [ ]) {
+        Environment = [ "OPENLUMARA_EXTRA_SITE_PACKAGES=${extraSitePackages}" ];
       };
 
       Install.WantedBy = [ "default.target" ];
