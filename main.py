@@ -12,10 +12,23 @@
  # You should have received a copy of the GNU General Public License along with this program. If not, see <https://www.gnu.org/licenses/>. 
 
 import os
+import sys
+import argparse
+
+def _apply_home_dir_from_argv(argv):
+    """let --home-dir override OPENLUMARA_HOME before core initializes the home directory"""
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--home-dir")
+    args, _ = parser.parse_known_args(argv)
+    if args.home_dir:
+        os.environ["OPENLUMARA_HOME"] = args.home_dir
+
+if __name__ == "__main__":
+    _apply_home_dir_from_argv(sys.argv[1:])
+
 import asyncio
 import core
 import subprocess
-import argparse
 
 async def main_loop(arg_list):
     # parse the --config arg
@@ -37,6 +50,7 @@ async def main_loop(arg_list):
     # custom arguments
     args_main = arg_parser.add_argument_group("main")
     args_main.add_argument("--config", help="specify a specific config file to load", metavar="<path>")
+    args_main.add_argument("--home-dir", help="set the writable home directory (overrides OPENLUMARA_HOME)", metavar="<path>")
     args_main.add_argument("--pure", help="disables all non-essential modules so that system prompt is blank and you're talking to the bare model", action="store_true")
     args_main.add_argument("--tmp", help="temporary session, discards all data after shutdown", action="store_true")
     args_main.add_argument("--cli", help="CLI-only mode", action="store_true")
@@ -219,5 +233,4 @@ def override_config_with_args(live_config, args_namespace):
             continue
 
 if __name__ == "__main__":
-    import sys
     run_from_args(sys.argv[1:])

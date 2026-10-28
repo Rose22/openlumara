@@ -67,7 +67,8 @@ def get_path(path: str = "", sandbox=True):
 DEFAULT_HOME = "~/openlumara" if sys.platform == "win32" else "~/.openlumara"
 
 def get_home():
-    """get the writable root used for config, data and user content. defaults to ~/.openlumara (~/openlumara on windows)."""
+    """get the writable root used for config, data and user content. defaults to ~/.openlumara (~/openlumara on windows).
+    OPENLUMARA_HOME overrides it; main.py maps --home-dir to that variable before startup."""
     home = os.environ.get("OPENLUMARA_HOME") or DEFAULT_HOME
 
     # realpath so sandbox_path() accepts state dirs reached through symlinks
