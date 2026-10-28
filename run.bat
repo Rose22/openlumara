@@ -7,7 +7,7 @@ cd /d "%~dp0"
 :: uv manages the environment when available, plain venv + pip otherwise
 where uv >nul 2>nul
 if %errorlevel% equ 0 (
-    :: --inexact keeps module dependencies the app installed at runtime
+    :: --inexact keeps packages installed manually into the venv
     uv sync --frozen --inexact --extra webui --extra channels --extra modules || exit /b 1
     echo starting openlumara...
     uv run --frozen --no-sync main.py %*

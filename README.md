@@ -86,7 +86,7 @@ You can also choose to download the zip, but the update scripts won't work that 
 
 Once you have openlumara, run `run.sh` if you're on linux, `run.bat` if you're on windows! Both use [uv](https://docs.astral.sh/uv/) when it's installed and fall back to a plain `venv` + `pip` install (from a `requirements.txt` generated for the bundled extras by `tools/dump_requirements.py`) when it isn't.
 
-Settings, chats and anything you install live in `~/.openlumara` (`~/openlumara` on windows). Set `OPENLUMARA_HOME` if you want them somewhere else.
+Settings, chats and anything you install live in `~/.openlumara` (`~/openlumara` on windows). Set `OPENLUMARA_HOME` if you want them somewhere else. Runtime-installed module dependencies live in `module_deps/` inside it.
 
 Once it's started up, open your browser and go to the url it displays. Then in the web ui, open the settings panel (lil gear icon at the top), set up your api connection, press save, and enjoy!
 
