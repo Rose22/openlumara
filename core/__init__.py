@@ -1,4 +1,5 @@
 import os
+import site
 import sys
 
 version = 1.0
@@ -21,6 +22,11 @@ core.migrate_legacy_state()
 # user_modules/user_channels are imported as namespace packages, so home must be importable
 if home not in sys.path:
     sys.path.append(home)
+
+# extra site-packages supplied by the packager (e.g. the NixOS module's extraPackages)
+for extra in os.environ.get("OPENLUMARA_EXTRA_SITE_PACKAGES", "").split(os.pathsep):
+    if extra and os.path.isdir(extra) and extra not in sys.path:
+        site.addsitedir(extra)
 
 user_module_path = core.get_home_path("user_modules", sandbox=False)
 if not os.path.exists(user_module_path):
