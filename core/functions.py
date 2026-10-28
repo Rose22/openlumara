@@ -85,6 +85,10 @@ def get_home_path(path: str = "", sandbox=True):
 
     return sandbox_path(home, path) if sandbox else os.path.join(home, path)
 
+def get_module_deps_path(package_name: str, module_name: str):
+    """writable directory holding runtime-installed dependencies for one module/channel"""
+    return get_home_path(os.path.join("module_deps", package_name, module_name))
+
 LEGACY_STATE_ENTRIES = (
     "config.yml",
     "data",

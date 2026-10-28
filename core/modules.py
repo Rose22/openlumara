@@ -4,12 +4,12 @@ import ast
 import core
 import inspect
 import sys
+import site
 import shutil
 import subprocess
 import asyncio
 import importlib
 import importlib.util
-import tomllib
 
 # get the correct importlib stuff
 try:
@@ -66,18 +66,39 @@ def _pip_prefix():
 def _install_deps(module_name, packages, manager):
     """install packages using uv (or pip as fallback)"""
     if not packages:
-        return
+        return False
+
+    if not target:
+        manager.log(module_name, "no writable dependency directory is available; skipping install")
+        return False
+
+    if getattr(sys, "frozen", False):
+        manager.log(
+            module_name,
+            "runtime dependency installation is unavailable in this build; "
+            "vendor the dependencies in the module's site-packages/ folder"
+        )
+        return False
 
     prefix, using_uv = _pip_prefix()
-    manager.log("core", f"installing dependencies for {module_name} with {'uv' if using_uv else 'pip'}: {', '.join(packages)}")
+    manager.log(
+        "core",
+        f"installing dependencies for {module_name} with {'uv' if using_uv else 'pip'} "
+        f"into {target}: {', '.join(packages)}"
+    )
 
-    cmd = [*prefix, "install", "--quiet"]
+    cmd = [*prefix, "install", "--quiet", "--upgrade", "--target", target]
+    env = os.environ.copy()
     if using_uv:
-        cmd += ["--python", sys.executable]
+        cmd += ["--python", sys.executable, "--no-python-downloads"]
+        if sys.prefix != sys.base_prefix:
+            env.setdefault("VIRTUAL_ENV", sys.prefix)
     cmd += packages
 
+    os.makedirs(target, exist_ok=True)
     try:
-        subprocess.check_call(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.check_call(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)
+        return True
     except subprocess.CalledProcessError as e:
         manager.log(module_name, f"dependency install failed: {core.detail_error(e)}")
 
@@ -155,7 +176,7 @@ def discover_module_names(package):
 
 def import_entry(package, module_name, reload=False):
     """import a module/channel folder as a real package using its entry file, so relative imports work inside it"""
-    module_file = _get_module_file_path(package, module_name)
+    module_file, _ = _prepare_module_paths(package, module_name)
     if not module_file:
         raise ImportError(f"no entry file ({' or '.join(ENTRY_FILENAMES)}) found for {package.__name__}.{module_name}")
 
@@ -203,6 +224,38 @@ def import_entry(package, module_name, reload=False):
     setattr(package, module_name, module)
     return module
 
+_added_site_dirs = set()
+
+def _module_site_packages(module_file):
+    return os.path.join(os.path.dirname(module_file), "site-packages")
+
+def _add_site_dir(path):
+    if not path or path in _added_site_dirs or not os.path.isdir(path):
+        return
+    site.addsitedir(path)
+    _added_site_dirs.add(path)
+    importlib.invalidate_caches()
+
+def _prepare_module_paths(package, module_name):
+    """return (entry file, writable target dir) and add the module's vendored and
+    installed dependency dirs to sys.path before any dependency check or import"""
+    module_file = _get_module_file_path(package, module_name)
+    if not module_file:
+        return None, None
+
+    _add_site_dir(_module_site_packages(module_file))
+
+    try:
+        target = core.get_module_deps_path(package.__name__, module_name)
+    except ValueError as e:
+        log("core", f"invalid dependency path for {package.__name__}.{module_name}: {e}")
+        target = None
+
+    if target:
+        _add_site_dir(target)
+
+    return module_file, target
+
 class _EntryFileFinder:
     """meta path finder that resolves `import modules.<name>` / `import channels.<name>` etc to folder entry files (module.py/channel.py),
     since those folders intentionally have no __init__.py and are invisible to python's default finders"""
@@ -218,7 +271,7 @@ class _EntryFileFinder:
         except ImportError:
             return None
 
-        module_file = _get_module_file_path(package, parts[1])
+        module_file, _ = _prepare_module_paths(package, parts[1])
         if not module_file:
             return None
 
@@ -249,7 +302,7 @@ def _dep_name(dep):
     return re.split(r"[<>=!~;\[\s]", dep, maxsplit=1)[0].strip().lower().replace("_", "-")
 
 def _check_missing_deps(deps):
-    """return list of dependencies that are not installed (using pip package names)"""
+    """return list of dependencies missing from the base env and module dependency dirs already on sys.path"""
     missing = []
     for dep in deps:
         try:
@@ -281,7 +334,7 @@ def _requirement_closure(roots, requires):
 
 async def install_module_deps(package, module_name, manager):
     """install dependencies for a module if missing"""
-    file_path = _get_module_file_path(package, module_name)
+    file_path, target = _prepare_module_paths(package, module_name)
     if not file_path:
         return False
 
@@ -328,8 +381,8 @@ async def uninstall_module_deps(package, module_name, manager, exclude=None):
     if not file_path:
         return False
 
-    deps = _extract_deps_from_file(file_path)
-    if not deps:
+    installed = await asyncio.to_thread(_install_deps, module_name, missing, manager, target)
+    if not installed:
         return False
 
     # recursively walk to uninstall any transient dependencies (dependencies of dependencies)
@@ -349,40 +402,29 @@ async def uninstall_module_deps(package, module_name, manager, exclude=None):
             # If the module can't be imported (e.g., missing dependencies), skip the uninstall hook
             mod = None
 
-        if mod:
-            # find the module/channel class defined in this folder
-            module_class = None
-            for attr in dir(mod):
-                obj = getattr(mod, attr)
-                if not inspect.isclass(obj):
-                    continue
+            origin = getattr(obj, "__module__", "")
+            if origin != mod.__name__ and not origin.startswith(f"{mod.__name__}."):
+                continue
 
-                if issubclass(obj, core.module.Module):
-                    is_channel = False
-                elif issubclass(obj, core.channel.Channel):
-                    is_channel = True
-                else:
-                    continue
+            module_class = obj
+            break
 
-                # only classes defined within this module folder count
-                origin = getattr(obj, "__module__", "")
-                if origin != mod.__name__ and not origin.startswith(f"{mod.__name__}."):
-                    continue
-
-                module_class = obj
-                break
-
-            if module_class:
-                # create a temporary instance
+        if module_class:
+            try:
                 if is_channel:
                     instance = module_class(manager)
                 else:
-                    is_user = package.__name__ == 'user_modules'
+                    is_user = package.__name__ == "user_modules"
                     instance = module_class(manager, is_user_module=is_user)
+                await instance.on_uninstall()
+            except Exception as e:
+                manager.log(module_name, f"dependency uninstall hook failed: {core.detail_error(e)}")
 
-                # run the uninstall hook
-                if hasattr(instance, 'on_uninstall'):
-                    await instance.on_uninstall()
+    try:
+        await asyncio.to_thread(shutil.rmtree, target)
+    except OSError as e:
+        manager.log(module_name, f"could not remove dependencies at {target}: {e}")
+        return False
 
         await asyncio.to_thread(_uninstall_deps, module_name, sorted(removable), manager)
         return True
@@ -472,7 +514,7 @@ def load(package, base_class = None, filter: list = None, reload: bool = False, 
             continue
 
         # check if dependencies are installed before trying to import
-        module_file_path = _get_module_file_path(package, modname)
+        module_file_path, _ = _prepare_module_paths(package, modname)
         if module_file_path:
             deps = _extract_deps_from_file(module_file_path)
             if deps:
