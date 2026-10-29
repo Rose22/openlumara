@@ -49,6 +49,7 @@ class ExampleModule(core.module.Module):
 
     # list of dependencies that the module needs in order to work.
     # this is an example, leave empty if no dependencies are needed
+    # frozen builds (PyInstaller) cannot install these; vendor them in ./site-packages/
     dependencies = ["pytest"]
 
     # -------------------------
