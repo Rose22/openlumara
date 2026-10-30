@@ -37,6 +37,7 @@
     "--button-text": "#fafafa",
     "--button-hover": "linear-gradient(135deg, #3f3f46 0%, #27272a 100%)",
     "--button-stop": "linear-gradient(135deg, #3b1a1a 0%, #2a1010 100%)",
+    "--button-stop-hover": "linear-gradient(135deg, #5a2020 0%, #4a1818 100%)",
 
     "--scrollbar": "#1e1e24",
     "--scrollbar-hover": "#2a2a35",
