@@ -222,7 +222,8 @@ def register(app, channel):
 
     @app.post("/api/libraries/uninstall")
     async def libraries_uninstall(request: fastapi.Request):
-        """Removes an installed user module/channel and cleans up dependencies nothing else needs anymore"""
+        # -- AI GENERATED CODE (glm-5.3-flash) :: 2026-10-31 12:03 harness:omp
+        """Removes an installed user module/channel and its runtime dependencies"""
         data = await request.json()
         name = (data.get("name") or "").strip()
 

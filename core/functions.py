@@ -87,7 +87,7 @@ def get_home_path(path: str = "", sandbox=True):
     return sandbox_path(home, path) if sandbox else os.path.join(home, path)
 
 def get_module_deps_path(package_name: str, module_name: str):
-    """writable directory holding runtime-installed dependencies for one module/channel"""
+    """writable directory holding runtime-installed dependencies for a module/channel"""
     return get_home_path(os.path.join("module_deps", package_name, module_name))
 
 LEGACY_STATE_ENTRIES = (
@@ -100,21 +100,52 @@ LEGACY_STATE_ENTRIES = (
     "data_backups",
 )
 
+# -- AI GENERATED CODE (glm-5.3-flash) :: 2026-10-31 12:03 harness:omp
+def _legacy_state_entries(root, home):
+    """state entries to migrate, plus a custom data folder named in the legacy config"""
+    entries = list(LEGACY_STATE_ENTRIES)
+    config_file = os.path.join(root, "config.yml")
+
+    # only needed on the first run, while the legacy config is still the live one
+    if not os.path.exists(config_file) or os.path.exists(os.path.join(home, "config.yml")):
+        return entries
+
+    try:
+        import yaml
+        with open(config_file, "r", encoding="utf-8") as f:
+            folder = (yaml.safe_load(f) or {}).get("core", {}).get("data_folder")
+    except Exception:
+        folder = None
+
+    if isinstance(folder, str) and folder and not os.path.isabs(folder) and ".." not in folder and folder not in entries:
+        entries.append(folder)
+
+    return entries
+
 def migrate_legacy_state():
-    """move state left in the install dir by pre-home versions of the app into the home directory"""
+    """copy state left in the install dir by pre-home versions of the app into the home directory"""
     home = get_home()
     root = get_path()
 
-    for name in LEGACY_STATE_ENTRIES:
+    for name in _legacy_state_entries(root, home):
         src = os.path.join(root, name)
         dst = os.path.join(home, name)
         if not os.path.exists(src) or os.path.exists(dst):
             continue
+
         try:
-            shutil.move(src, dst)
-            log("core", f"moved {src} to {dst}")
-        except OSError as e:
-            log("core", f"could not move {src} to {dst}: {e}")
+            if os.path.isdir(src):
+                shutil.copytree(src, dst)
+            else:
+                shutil.copy2(src, dst)
+            log("core", f"copied {src} to {dst}")
+        except (OSError, shutil.Error) as e:
+            # never leave a half-copied destination behind, or the next run would skip it
+            if os.path.isdir(dst):
+                shutil.rmtree(dst, ignore_errors=True)
+            elif os.path.exists(dst):
+                os.remove(dst)
+            log("core", f"could not copy {src} to {dst}: {e}")
 
 def get_data_path(subpath=None):
     """get path to the data directory. contains all persistent data used by the framework"""

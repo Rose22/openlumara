@@ -13,9 +13,9 @@ import importlib.util
 
 # get the correct importlib stuff
 try:
-    from importlib.metadata import version, distributions, PackageNotFoundError
+    from importlib.metadata import version, PackageNotFoundError
 except ImportError:
-    from importlib_metadata import version, distributions, PackageNotFoundError
+    from importlib_metadata import version, PackageNotFoundError
 
 # modules that should have their prompts inserted even when tools are off
 nonagentic = ("characters", "writing_style", "time")
@@ -63,7 +63,7 @@ def _pip_prefix():
         return [uv, "pip"], True
     return [sys.executable, "-m", "pip"], False
 
-def _install_deps(module_name, packages, manager):
+def _install_deps(module_name, packages, manager, target):
     """install packages using uv (or pip as fallback)"""
     if not packages:
         return False
@@ -101,26 +101,7 @@ def _install_deps(module_name, packages, manager):
         return True
     except subprocess.CalledProcessError as e:
         manager.log(module_name, f"dependency install failed: {core.detail_error(e)}")
-
-def _uninstall_deps(module_name, packages, manager):
-    """uninstall packages using uv (or pip as fallback)"""
-    if not packages:
-        return
-
-    prefix, using_uv = _pip_prefix()
-    manager.log("core", f"uninstalling dependencies for {module_name} with {'uv' if using_uv else 'pip'}: {', '.join(packages)}")
-
-    cmd = [*prefix, "uninstall", "--quiet"]
-    if using_uv:
-        cmd += ["--python", sys.executable]
-    else:
-        cmd += ["-y"]
-    cmd += packages
-
-    try:
-        subprocess.check_call(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except subprocess.CalledProcessError as e:
-        manager.log(module_name, f"dependency uninstall failed: {core.detail_error(e)}")
+        return False
 
 ENTRY_FILENAMES = ("module.py", "channel.py")
 reported_init = []
@@ -289,14 +270,6 @@ class _EntryFileFinder:
 if not any(isinstance(f, _EntryFileFinder) for f in sys.meta_path):
     sys.meta_path.insert(len(sys.path_hooks), _EntryFileFinder())
 
-def _get_base_dependencies():
-    """dependencies openlumara's core always needs, from pyproject.toml"""
-    try:
-        with open(core.get_path("pyproject.toml"), "rb") as f:
-            return tomllib.load(f).get("project", {}).get("dependencies", [])
-    except Exception:
-        return []
-
 def _dep_name(dep):
     """package name from a requirement string, e.g. 'python-telegram-bot>=1.0[e2e]' -> 'python-telegram-bot'"""
     return re.split(r"[<>=!~;\[\s]", dep, maxsplit=1)[0].strip().lower().replace("_", "-")
@@ -311,27 +284,6 @@ def _check_missing_deps(deps):
             missing.append(dep)
     return missing
 
-def _installed_requirements():
-    """map of installed package name -> the names it requires (extras and markers included)"""
-    requires = {}
-    for dist in distributions():
-        name = dist.metadata["Name"]
-        if name:
-            requires[_dep_name(name)] = [_dep_name(req) for req in (dist.requires or [])]
-    return requires
-
-def _requirement_closure(roots, requires):
-    """every installed package reachable from roots through their requirements"""
-    reached = set()
-    stack = [root for root in roots if root in requires]
-    while stack:
-        name = stack.pop()
-        if name in reached:
-            continue
-        reached.add(name)
-        stack.extend(dep for dep in requires.get(name, ()) if dep in requires)
-    return reached
-
 async def install_module_deps(package, module_name, manager):
     """install dependencies for a module if missing"""
     file_path, target = _prepare_module_paths(package, module_name)
@@ -343,64 +295,45 @@ async def install_module_deps(package, module_name, manager):
         return False
 
     missing = _check_missing_deps(deps)
-    if missing:
-        # run pip in a thread so that it doesn't block the rest of the harness
-        await asyncio.to_thread(_install_deps, module_name, missing, manager)
-        return True
-
-    return False
-
-def _deps_of_enabled(section, package_name):
-    """gather declared dependencies from every enabled module/channel in a config section"""
-    try:
-        package = importlib.import_module(package_name)
-        enabled = core.config.get(section, "enabled", [])
-    except Exception:
-        # a missing or broken package only costs us this section's protections
-        return []
-
-    deps = []
-    for mod_name in enabled:
-        file_path = _get_module_file_path(package, mod_name)
-        if file_path:
-            deps.extend(_extract_deps_from_file(file_path))
-    return deps
-
-async def uninstall_module_deps(package, module_name, manager, exclude=None):
-    """uninstall dependencies for a module together with the packages they pulled in,
-    but only those that no enabled module and no base dependency still needs"""
-    # figure out which dependencies are still required by other enabled modules
-    if exclude is None:
-        exclude = set()
-        exclude.update(_deps_of_enabled("modules", "modules"))
-        exclude.update(_deps_of_enabled("user_modules", "user_modules"))
-        exclude.update(_deps_of_enabled("channels", "channels"))
-        exclude.update(_deps_of_enabled("user_channels", "user_channels"))
-
-    file_path = _get_module_file_path(package, module_name)
-    if not file_path:
+    if not missing:
         return False
 
     installed = await asyncio.to_thread(_install_deps, module_name, missing, manager, target)
     if not installed:
         return False
 
-    # recursively walk to uninstall any transient dependencies (dependencies of dependencies)
-    # for dependencies that are marked for uninstall
-    installed = _installed_requirements()
-    keep = _requirement_closure(
-        {_dep_name(dep) for dep in exclude} | {_dep_name(dep) for dep in _get_base_dependencies()},
-        installed,
-    )
-    removable = _requirement_closure({_dep_name(dep) for dep in deps}, installed) - keep
+    # the target may have been created by this install: pick up its packages now
+    if target:
+        _add_site_dir(target)
+    return True
 
-    if removable:
-        try:
-            # import via the folder loader so we can find the uninstall hook
-            mod = import_entry(package, module_name)
-        except Exception:
-            # If the module can't be imported (e.g., missing dependencies), skip the uninstall hook
-            mod = None
+# -- AI GENERATED CODE (glm-5.3-flash) :: 2026-10-31 12:03 harness:omp
+async def uninstall_module_deps(package, module_name, manager):
+    """remove a module's runtime-installed dependency directory"""
+    file_path, target = _prepare_module_paths(package, module_name)
+    if not file_path or not target or not os.path.isdir(target):
+        return False
+
+    # run the uninstall hook while the module and its deps are still importable
+    try:
+        mod = import_entry(package, module_name)
+    except Exception:
+        mod = None
+
+    if mod:
+        module_class = None
+        is_channel = False
+        for attr in dir(mod):
+            obj = getattr(mod, attr)
+            if not inspect.isclass(obj):
+                continue
+
+            if issubclass(obj, core.module.Module):
+                is_channel = False
+            elif issubclass(obj, core.channel.Channel):
+                is_channel = True
+            else:
+                continue
 
             origin = getattr(obj, "__module__", "")
             if origin != mod.__name__ and not origin.startswith(f"{mod.__name__}."):
@@ -426,8 +359,12 @@ async def uninstall_module_deps(package, module_name, manager, exclude=None):
         manager.log(module_name, f"could not remove dependencies at {target}: {e}")
         return False
 
-        await asyncio.to_thread(_uninstall_deps, module_name, sorted(removable), manager)
-        return True
+    while target in sys.path:
+        sys.path.remove(target)
+    _added_site_dirs.discard(target)
+    importlib.invalidate_caches()
+    manager.log("core", f"removed dependencies for {module_name} from {target}")
+    return True
 
 
 # --------------------------
