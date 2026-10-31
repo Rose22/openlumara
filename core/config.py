@@ -164,10 +164,6 @@ When disabled, it will instead remove your old messages from context to make spa
         }
     },
     "user_channels": {
-        "path": {
-            "default": "user_channels",
-            "description": "Directory path for user-defined channels."
-        },
         "enabled": {
             "default": [],
             "description": "List of enabled user channel names.",
@@ -200,10 +196,6 @@ When disabled, it will instead remove your old messages from context to make spa
         }
     },
     "user_modules": {
-        "path": {
-            "default": "user_modules",
-            "description": "Directory path for user-defined modules."
-        },
         "enabled": {
             "default": [],
             "description": "List of enabled user module names.",

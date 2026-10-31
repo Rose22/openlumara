@@ -12,6 +12,7 @@ proceed_migration = False
 from core.functions import *
 import core.exceptions
 
+# set up the openlumara home dir (default: ~/.openlumara)
 home = core.get_home()
 os.makedirs(home, exist_ok=True)
 
@@ -20,6 +21,7 @@ core.migrate_legacy_state()
 if home not in sys.path:
     sys.path.append(home)
 
+# set up user modules/channels dirs if necessary
 user_module_path = core.get_home_path("user_modules", sandbox=False)
 if not os.path.exists(user_module_path):
     os.makedirs(user_module_path, exist_ok=True)

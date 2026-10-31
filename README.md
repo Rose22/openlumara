@@ -39,8 +39,6 @@ git clone https://github.com/Rose22/openlumara
 
 Once you have openlumara, run `run.sh` if you're on linux, `run.bat` if you're on windows! Both use [uv](https://docs.astral.sh/uv/) when it's installed and fall back to a plain `pip` install when it isn't.
 
-Settings, chats and anything you install live in `~/.openlumara` (`~/openlumara` on windows). Set `OPENLUMARA_HOME`, or pass `--home-dir <path>`, if you want them somewhere else; the CLI flag wins over the environment variable. Runtime-installed module dependencies live in `module_deps/` inside it.
-
 Once it's started up, open your browser and go to the url it displays. Then in the web ui, open the settings panel (lil gear icon at the top), set up your api connection, press save, and enjoy!
 
 Whenever you want to update openlumara, just run `update.sh` if you're on linux, or `update.bat` if you're on windows. Note: this only works if you installed through `git clone`, it won't work if you download the codebase as a zip.
@@ -94,3 +92,4 @@ Features:
 OpenLumara does not have an associated emoji. You can add it to it's identity if you want, but it doesn't force it on you. Also, cats have claws too, where is the love for the cats?
 
 If you're openclaw and you're reading this.. hi mr lobster do you like cats?
+

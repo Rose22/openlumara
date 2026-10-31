@@ -68,7 +68,7 @@ DEFAULT_HOME = "~/openlumara" if sys.platform == "win32" else "~/.openlumara"
 
 def get_home():
     """get the writable root used for config, data and user content. defaults to ~/.openlumara (~/openlumara on windows).
-    OPENLUMARA_HOME overrides it; main.py maps --home-dir to that variable before startup."""
+    env var OPENLUMARA_HOME sets its location, and main.py lets you use --home-dir to override it."""
     home = os.environ.get("OPENLUMARA_HOME") or DEFAULT_HOME
 
     # realpath so sandbox_path() accepts state dirs reached through symlinks
@@ -127,7 +127,7 @@ def migrate_legacy_state():
         src = os.path.normpath(os.path.join(root, name))
         dst = os.path.join(home, name)
 
-        # normpath collapses "..", so this containment check covers traversal too
+        # protect against path traversal
         outside_install_dir = not src.startswith(root + os.sep)
         missing_source = not os.path.exists(src)
         already_migrated = os.path.exists(dst)
@@ -135,15 +135,63 @@ def migrate_legacy_state():
         if outside_install_dir or missing_source or already_migrated:
             continue
 
+        # back up first, verify the backup, abort if backing up fails for ANY reason
+        backup_root = "~/openlumara_legacy_backups" if sys.platform == "win32" else "~/.openlumara_legacy_backups"
+        backup_dir = os.path.abspath(os.path.expanduser(backup_root))
+        backup_path = os.path.join(backup_dir, name)
+
+        try:
+            os.makedirs(backup_dir, exist_ok=True)
+
+            # delete from the backup if exists
+            if os.path.isdir(backup_path):
+                shutil.rmtree(backup_path)
+            elif os.path.exists(backup_path):
+                os.remove(backup_path)
+
+            # then copy it over
+            if os.path.isdir(src):
+                shutil.copytree(src, backup_path)
+            else:
+                shutil.copy2(src, backup_path)
+
+            if not os.path.exists(backup_path):
+                raise Exception("Backup file not created")
+            log("core", f"backed up {src} to {backup_path}")
+        except Exception as e:
+            # never leave a half-written backup behind
+            if os.path.isdir(backup_path):
+                shutil.rmtree(backup_path, ignore_errors=True)
+            elif os.path.exists(backup_path):
+                os.remove(backup_path)
+
+            log("core", f"FATAL ERROR: could not back up {src} before migration. Aborting: {core.detail_error(e)}")
+            sys.exit(1)
+
         try:
             shutil.move(src, dst)
+            if not os.path.exists(dst):
+                raise Exception(f"moving the backup to the home directory failed! check '{src}' and '{dst}'")
+
             log("core", f"moved {src} to {dst}")
-        except (OSError, shutil.Error) as e:
+        except Exception as e:
             # never leave a half-moved destination behind, or the next run would skip it
             if os.path.isdir(dst):
                 shutil.rmtree(dst, ignore_errors=True)
             elif os.path.exists(dst):
                 os.remove(dst)
+
+            # if the move consumed the source, restore it from the verified backup
+            if not os.path.exists(src):
+                try:
+                    if os.path.isdir(backup_path):
+                        shutil.copytree(backup_path, src)
+                    else:
+                        shutil.copy2(backup_path, src)
+                    log("core", f"restored {src} from backup after failed move")
+                except Exception as restore_error:
+                    log("core", f"FATAL ERROR: failed to move {src} and could not restore it. Backup kept at {backup_path}: {core.detail_error(restore_error)}")
+                    sys.exit(1)
             log("core", f"could not move {src} to {dst}: {e}")
 
 def get_data_path(subpath=None):

@@ -50,7 +50,7 @@ async def main_loop(arg_list):
     # custom arguments
     args_main = arg_parser.add_argument_group("main")
     args_main.add_argument("--config", help="specify a specific config file to load", metavar="<path>")
-    args_main.add_argument("--home-dir", help="set the writable home directory (overrides OPENLUMARA_HOME)", metavar="<path>")
+    args_main.add_argument("--home-dir", help="sets the home directory openlumara uses for all its data", metavar="<path>")
     args_main.add_argument("--pure", help="disables all non-essential modules so that system prompt is blank and you're talking to the bare model", action="store_true")
     args_main.add_argument("--tmp", help="temporary session, discards all data after shutdown", action="store_true")
     args_main.add_argument("--cli", help="CLI-only mode", action="store_true")
