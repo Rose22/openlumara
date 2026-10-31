@@ -64,13 +64,15 @@ def get_path(path: str = "", sandbox=True):
             return os.path.join(project_root, path)
 
 def get_home():
-    """get the writable root used for config, data and user content. defaults to ~/.openlumara (~/openlumara on windows).
-    env var OPENLUMARA_HOME sets its location, and main.py lets you use --home-dir to override it."""
+    """
+    get the path to the home dir used for config, data and user content. defaults to ~/.openlumara (~/openlumara on windows).
+    env var OPENLUMARA_HOME sets its location, and main.py lets you use --home-dir to override it.
+    """
     home = os.environ.get("OPENLUMARA_HOME") or (
         "~/openlumara" if sys.platform == "win32" else "~/.openlumara"
     )
 
-    # realpath so sandbox_path() accepts state dirs reached through symlinks
+    # realpath so sandbox_path() lets this work with symlinks
     return os.path.realpath(os.path.abspath(os.path.expanduser(home)))
 
 def get_home_path(path: str = "", sandbox=True):
@@ -90,7 +92,12 @@ def get_module_deps_path(package_name: str, module_name: str):
     return get_home_path(os.path.join("module_deps", package_name, module_name))
 
 def migrate_legacy_state():
-    """move state left in the install dir by pre-home versions of the app into the home directory"""
+    """
+    migrate pre-home installs of openlumara to the new structure that uses a homedir.
+    in order to prevent data loss,
+    it does a safe copy first, and only if the copy fully succeeds, the move is performed
+    """
+
     home = get_home()
     root = get_path()
     entries = [
