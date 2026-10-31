@@ -1,6 +1,6 @@
 # OpenLumara webui themes
 
-Each `.json` file in this folder is one theme family. The filename (minus `.json`) is the family name shown in **Settings → Appearance → Theme**. `base.json` is special — it provides the full set of default CSS variables that every theme can override.
+Each `.json` file in this folder is one theme family. The filename (minus `.json`) is the family name shown in **Settings → Appearance → Theme**. `base.json` is special — it provides the defaults that every theme can override.
 
 ## Format
 
@@ -13,6 +13,23 @@ Each `.json` file in this folder is one theme family. The filename (minus `.json
 
 - Only `dark` and `light` are needed; whichever mode a theme lacks falls back to the other.
 - Keys inside `dark`/`light` are applied as CSS custom properties on `<html>`.
+
+## base.json
+
+`base.json` uses the same shape, but its three groups are always present:
+
+```json
+{
+  "common": { "--gap": "7px", "--radius-md": "10px" },
+  "dark":   { "--bg-primary": "#09090b", "--accent": "#d4d4d8" },
+  "light":  { "--bg-primary": "#fafafa", "--accent": "#3f3f46" }
+}
+```
+
+- `common` holds mode-independent values (fonts, radii, layout, decorations) and is applied in both modes.
+- `dark` and `light` hold the mode-specific defaults. The engine applies `common`, then the group for the active mode, then the theme family on top.
+- This is why a theme only needs to define what makes its look: anything it leaves out in a mode keeps that mode's base default instead of inheriting the opposite mode's color.
+- A flat, ungrouped `base.json` (all keys at the top level) is still accepted and applied as-is in both modes.
 
 ## Sidecar CSS (theme effects)
 

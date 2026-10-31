@@ -61,11 +61,19 @@ THEME_STORE = {
         const finalTheme = themeData[effectiveMode];
         const root = document.documentElement;
 
-        // Apply base theme vars first
+        // Apply base theme vars first. base.json is a small theme family
+        // ({common, dark, light}): common holds the mode-independent values,
+        // then the group for the mode in play. A legacy flat base.json is
+        // still applied as-is in both modes.
         const baseTheme = this.themeCache['base'];
         if (baseTheme) {
-            for (const [varName, value] of Object.entries(baseTheme)) {
-                root.style.setProperty(varName, value);
+            const baseGroups = ('common' in baseTheme)
+                ? [baseTheme.common, baseTheme[effectiveMode]]
+                : [baseTheme];
+            for (const group of baseGroups) {
+                for (const [varName, value] of Object.entries(group || {})) {
+                    root.style.setProperty(varName, value);
+                }
             }
         }
 
@@ -100,6 +108,14 @@ THEME_STORE = {
             }
         }
 
+        // Button label: when the theme names its fill but not the label, derive
+        // the label from the fill. Same rule in both modes, so no theme has to
+        // repeat it and light themes with a saturated button keep a light label.
+        if (!(finalTheme && '--button-text' in finalTheme)) {
+            const label = this.buttonLabel();
+            if (label) root.style.setProperty('--button-text', label);
+        }
+
         // Switch code syntax highlighting theme based on mode
         const codeThemeLink = document.getElementById('code-theme');
         if (codeThemeLink) {
@@ -123,6 +139,32 @@ THEME_STORE = {
         window.dispatchEvent(new CustomEvent('theme-changed', {
             detail: { family, mode: effectiveMode }
         }));
+    },
+
+    // Readable label for --button-bg: light text on saturated/dark fills, dark
+    // text on pale ones. Uses the AVERAGE luminance of the fill's colour stops
+    // so a gradient counts as a whole. Null when the value carries no colour
+    // (then base's --button-text stays as the fallback).
+    buttonLabel() {
+        const raw = getComputedStyle(document.documentElement).getPropertyValue('--button-bg').trim();
+        const stops = [];
+        for (const m of raw.matchAll(/#([0-9a-f]{3,8})\b|rgba?\(([^)]+)\)/gi)) {
+            if (m[1]) {
+                let h = m[1];
+                if (h.length === 3) h = h.split('').map(c => c + c).join('');
+                if (h.length === 8) h = h.slice(0, 6);
+                stops.push([0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16) / 255));
+            } else {
+                const parts = m[2].split(',').map(v => parseFloat(v));
+                if (parts.length >= 3) stops.push(parts.slice(0, 3).map(v => v / 255));
+            }
+        }
+        if (!stops.length) return null;
+        const lin = (c) => c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+        const avg = stops
+            .map(([r, g, b]) => 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b))
+            .reduce((a, b) => a + b, 0) / stops.length;
+        return avg < 0.40 ? '#fafafa' : '#18181b';
     },
 
     // Apply a theme's sidecar CSS
