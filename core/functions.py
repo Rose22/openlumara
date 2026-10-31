@@ -193,12 +193,7 @@ def migrate_legacy_state():
 
 def get_data_path(subpath=None):
     """get path to the data directory. contains all persistent data used by the framework"""
-
-    data_path = core.config.get("core", {}).get("data_folder", "data")
-
-    # if it's a relative path, resolve it from the home directory
-    if not os.path.isabs(data_path):
-        data_path = core.get_home_path(data_path)
+    data_path = core.get_home_path("data")
 
     # create it if it doesn't exist
     if not os.path.exists(data_path):

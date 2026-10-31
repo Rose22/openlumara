@@ -26,10 +26,6 @@ CACHE_SECTIONS = ("channels", "user_channels", "modules", "user_modules")
 
 core_settings_schema = {
     "core": {
-        "data_folder": {
-            "default": "data",
-            "description": "The folder where openlumara stores its data files (chats, memories, etc.)."
-        },
         "auto_resume_chats": {
             "default": True,
             "description": "Whether to automatically resume the last active chat on startup."
