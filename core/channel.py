@@ -492,6 +492,12 @@ class Channel:
             if not file_data:
                 continue
 
+            block = await self._module_file_to_block(filename, file_data)
+            if block is not None:
+                content_blocks.append(block)
+                filenames.append(filename)
+                continue
+
             mime_type = self._sniff_mime(file_data)
 
             if mime_type.startswith("image/"):
@@ -551,6 +557,24 @@ class Channel:
             return message_dict
 
         return {"role": "user", "content": message}
+
+    async def _module_file_to_block(self, filename: str, file_data: bytes):
+        """ask modules whether one of them wants to turn an uploaded file into a content block.
+        the first block returned wins, None (the default) lets the built-in handlers do their thing."""
+        for module_name, module in self.manager.modules.items():
+            try:
+                if asyncio.iscoroutinefunction(module.on_file_to_block):
+                    block = await module.on_file_to_block(filename, file_data)
+                else:
+                    block = module.on_file_to_block(filename, file_data)
+            except Exception as e:
+                self.log("module error", f"{module_name}: in on_file_to_block(): {core.detail_error(e)}")
+                continue
+
+            if block:
+                return block
+
+        return None
 
     def format_message(self, orig_message: dict):
         formatted = ""
