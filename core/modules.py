@@ -277,7 +277,6 @@ def _dep_name(dep):
     """package name from a requirement string, e.g. 'python-telegram-bot>=1.0[e2e]' -> 'python-telegram-bot'"""
     return re.split(r"[<>=!~;\[\s]", dep, maxsplit=1)[0].strip().lower().replace("_", "-")
 
-# -- AI GENERATED CODE (deepseek-v4.1-flash) :: 2026-10-31 harness:omp
 def _dep_names_in(paths):
     """installed distribution names found in the given paths"""
     names = set()
@@ -330,7 +329,6 @@ async def install_module_deps(package, module_name, manager):
         _add_site_dir(target)
     return True
 
-# -- AI GENERATED CODE (glm-5.3-flash) :: 2026-10-31 12:03 harness:omp
 async def uninstall_module_deps(package, module_name, manager):
     """remove a module's runtime-installed dependency directory"""
     file_path, target = _prepare_module_paths(package, module_name)
