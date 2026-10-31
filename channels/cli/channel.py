@@ -577,6 +577,9 @@ class Cli(core.channel.Channel):
 
         self._token_usage = await self.context.get_total_tokens()
 
+    async def on_system_prompt(self):
+        return "This channel does not support markdown."
+
     async def _get_input(self):
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, input, "user> ")

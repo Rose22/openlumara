@@ -236,6 +236,19 @@ class Webui(core.channel.Channel, ui_extensions.UiExtensionsMixin):
             return False
         return secrets.compare_digest(password, correct_password)
 
+    async def on_system_prompt(self):
+        return """
+WebUI layout:
+- Sidebar: chat search box, tag filter button, chat list grouped by date modified, new chat button
+- Chat window:
+    - header: title | blank space | model dropdown | settings button (gear icon, opens settings dialog) | chat history export button (download icon) | clear chat button (trashcan icon)
+    - messages area, contains current chat's messages
+    - input bar: upload button | input field | send/stop button
+
+The WebUI has support for an extra feature:
+- You can render HTML and SVG's directly in the user's browser by outputting the code without fencing it in ```code blocks```
+""".strip()
+
     async def on_ready(self):
         # ---- security stuff
         self.session_secret_value = ""

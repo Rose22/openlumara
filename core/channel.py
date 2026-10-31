@@ -105,6 +105,10 @@ class Channel:
         """
         pass
 
+    async def on_system_prompt(self):
+        """called when building the system prompt. return a string from this to set a channel-specific system prompt"""
+        pass
+
     async def _shutdown(self):
         """internal shutdown function. gets called by the manager before on_shutdown()"""
 

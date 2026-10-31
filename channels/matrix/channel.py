@@ -93,6 +93,9 @@ class Matrix(core.channel.Channel):
         "device_name": "OpenLumara"
     }
 
+    async def on_system_prompt(self):
+        return "You are talking to the user through the Matrix chat network."
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 

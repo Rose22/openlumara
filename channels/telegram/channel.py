@@ -23,6 +23,9 @@ class Telegram(core.channel.Channel):
         "announce_shutdown": False
     }
 
+    async def on_system_prompt(self):
+        return "You are talking to the user through the Telegram chat network."
+
     async def run(self):
         self.token = os.getenv("TELEGRAM_BOT_TOKEN")
         if not self.token:

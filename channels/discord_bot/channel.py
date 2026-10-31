@@ -382,6 +382,9 @@ class DiscordBot(core.channel.Channel):
         }
     }
 
+    async def on_system_prompt(self):
+        return "You are talking to the user through the Discord chat network."
+
     async def run(self):
         # set up discord intents (ugh)
         intents = discord.Intents.default()

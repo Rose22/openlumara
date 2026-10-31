@@ -68,6 +68,10 @@ class Chat:
         sysprompt_middle = []
         sysprompt_bottom = []
 
+        chan_prompt = await self.channel.on_system_prompt()
+        if chan_prompt:
+            sysprompt_top.append(f"# Current channel: {self.channel.name}\n{chan_prompt}")
+
         for module_name, module in self.channel.manager.modules.items():
             if not core.config.get("model").get("use_tools", False) and module_name not in core.modules.nonagentic:
                 # skip most prompts if tools are turned off
