@@ -102,7 +102,7 @@ LEGACY_STATE_ENTRIES = (
 
 # -- AI GENERATED CODE (glm-5.3-flash) :: 2026-10-31 12:03 harness:omp
 def migrate_legacy_state():
-    """copy state left in the install dir by pre-home versions of the app into the home directory"""
+    """move state left in the install dir by pre-home versions of the app into the home directory"""
     home = get_home()
     root = get_path()
     entries = list(LEGACY_STATE_ENTRIES)
@@ -137,18 +137,15 @@ def migrate_legacy_state():
             continue
 
         try:
-            if os.path.isdir(src):
-                shutil.copytree(src, dst)
-            else:
-                shutil.copy2(src, dst)
-            log("core", f"copied {src} to {dst}")
+            shutil.move(src, dst)
+            log("core", f"moved {src} to {dst}")
         except (OSError, shutil.Error) as e:
-            # never leave a half-copied destination behind, or the next run would skip it
+            # never leave a half-moved destination behind, or the next run would skip it
             if os.path.isdir(dst):
                 shutil.rmtree(dst, ignore_errors=True)
             elif os.path.exists(dst):
                 os.remove(dst)
-            log("core", f"could not copy {src} to {dst}: {e}")
+            log("core", f"could not move {src} to {dst}: {e}")
 
 def get_data_path(subpath=None):
     """get path to the data directory. contains all persistent data used by the framework"""
