@@ -19,6 +19,7 @@ skills/*
 user_webui_themes/*
 !user_webui_themes/README.md
 config.yaml
+run.sh
 *.1
 *~
 *.swp
