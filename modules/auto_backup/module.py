@@ -42,7 +42,7 @@ class AutoBackup(core.module.Module):
         self._backup_task = None
         self._interval_seconds = None
         self._last_backup = core.storage.StorageText("last_backup")
-        self.backup_path = core.get_path(os.path.expanduser(self.config.get("backup_path")))
+        self.backup_path = core.get_home_path(os.path.expanduser(self.config.get("backup_path")))
 
         await self._setup_backup()
 

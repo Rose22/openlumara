@@ -16,7 +16,7 @@ import channels.webui.utils as utils
 
 def themes_dirs(channel):
     return [
-        core.get_path("user_webui_themes", sandbox=False),
+        core.get_home_path("user_webui_themes", sandbox=False),
         os.path.join(channel.path, "themes")
     ]
 

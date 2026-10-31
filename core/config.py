@@ -26,10 +26,6 @@ CACHE_SECTIONS = ("channels", "user_channels", "modules", "user_modules")
 
 core_settings_schema = {
     "core": {
-        "data_folder": {
-            "default": "data",
-            "description": "The folder where openlumara stores its data files (chats, memories, etc.)."
-        },
         "auto_resume_chats": {
             "default": True,
             "description": "Whether to automatically resume the last active chat on startup."
@@ -164,10 +160,6 @@ When disabled, it will instead remove your old messages from context to make spa
         }
     },
     "user_channels": {
-        "path": {
-            "default": "user_channels",
-            "description": "Directory path for user-defined channels."
-        },
         "enabled": {
             "default": [],
             "description": "List of enabled user channel names.",
@@ -200,10 +192,6 @@ When disabled, it will instead remove your old messages from context to make spa
         }
     },
     "user_modules": {
-        "path": {
-            "default": "user_modules",
-            "description": "Directory path for user-defined modules."
-        },
         "enabled": {
             "default": [],
             "description": "List of enabled user module names.",
@@ -434,7 +422,7 @@ def _get_module_schema_cache():
     Returns a dictionary containing the cached schemas and checksums for all modules/channels.
     If the cache is missing or outdated, it performs a refresh.
     """
-    cache_path = os.path.abspath(os.path.join(core.get_path(), SCHEMA_CACHE_FILE))
+    cache_path = os.path.abspath(os.path.join(core.get_home(), SCHEMA_CACHE_FILE))
     cache = {section_key: {} for section_key in CACHE_SECTIONS}
     cache["_version"] = SCHEMA_CACHE_VERSION
 
@@ -663,12 +651,13 @@ def _module_file_for_dotted(dotted_path):
     if len(parts) < 2 or parts[0] not in ("modules", "user_modules", "channels", "user_channels"):
         return None
 
-    folder = os.path.join(core.get_path(), *parts)
-    for entry in ("module.py", "channel.py"):
-        candidate = os.path.join(folder, entry)
-        if os.path.isfile(candidate):
-            return candidate
-    return None
+    package = {
+        "modules": modules,
+        "user_modules": user_modules,
+        "channels": channels,
+        "user_channels": user_channels,
+    }[parts[0]]
+    return core.modules._get_module_file_path(package, parts[1])
 
 
 def _resolve_ast_category(tree, filepath, class_node, visited, depth=0):
@@ -1089,7 +1078,7 @@ def load(file_path=None):
         dirname = os.path.dirname(file_path)
     else:
         filename = "config"
-        dirname = core.get_path()
+        dirname = core.get_home()
 
     new_config = False
 

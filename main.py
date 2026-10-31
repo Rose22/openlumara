@@ -12,17 +12,24 @@
  # You should have received a copy of the GNU General Public License along with this program. If not, see <https://www.gnu.org/licenses/>. 
 
 import os
+import sys
+import argparse
 import asyncio
 import core
 import subprocess
-import argparse
 
 async def main_loop(arg_list):
-    # parse the --config arg
+    # parse flags like --config and --home
     arg_pre_parser = argparse.ArgumentParser(add_help=False)
     arg_pre_parser.add_argument("--config")
     arg_pre_parser.add_argument("--quiet", help="surpress logs", action="store_true")
+    arg_pre_parser.add_argument("--home")
+
     pre_args, _ = arg_pre_parser.parse_known_args(arg_list)
+
+    # allow setting the home dir via a --home argument rather than the ENV variable
+    if pre_args.home:
+        os.environ["OPENLUMARA_HOME"] = pre_args.home
 
     # load config file, allowing the path to be overridden
     config_display_str = "config.yaml" if not pre_args.config else pre_args.config
@@ -37,6 +44,7 @@ async def main_loop(arg_list):
     # custom arguments
     args_main = arg_parser.add_argument_group("main")
     args_main.add_argument("--config", help="specify a specific config file to load", metavar="<path>")
+    args_main.add_argument("--home", help="sets the home directory openlumara uses for all its data", metavar="<path>")
     args_main.add_argument("--pure", help="disables all non-essential modules so that system prompt is blank and you're talking to the bare model", action="store_true")
     args_main.add_argument("--tmp", help="temporary session, discards all data after shutdown", action="store_true")
     args_main.add_argument("--cli", help="CLI-only mode", action="store_true")
@@ -219,5 +227,4 @@ def override_config_with_args(live_config, args_namespace):
             continue
 
 if __name__ == "__main__":
-    import sys
     run_from_args(sys.argv[1:])

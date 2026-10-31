@@ -2,6 +2,7 @@ import core
 import os
 import sys
 import errno
+import shutil
 import time
 import traceback
 import urllib.parse
@@ -62,14 +63,144 @@ def get_path(path: str = "", sandbox=True):
         else:
             return os.path.join(project_root, path)
 
+def get_home():
+    """
+    get the path to the home dir used for config, data and user content. defaults to ~/.openlumara (~/openlumara on windows).
+    env var OPENLUMARA_HOME sets its location, and main.py lets you use --home-dir to override it.
+    """
+    home = os.environ.get("OPENLUMARA_HOME") or (
+        "~/openlumara" if sys.platform == "win32" else "~/.openlumara"
+    )
+
+    # realpath so sandbox_path() lets this work with symlinks
+    return os.path.realpath(os.path.abspath(os.path.expanduser(home)))
+
+def get_home_path(path: str = "", sandbox=True):
+    """get path relative to the home directory. returns the home path if no path is specified."""
+    home = get_home()
+
+    if not path:
+        return home
+
+    if os.path.isabs(path):
+        return path
+
+    return sandbox_path(home, path) if sandbox else os.path.join(home, path)
+
+def get_module_deps_path(package_name: str, module_name: str):
+    """writable directory holding runtime-installed dependencies for a module/channel"""
+    return get_home_path(os.path.join("module_deps", package_name, module_name))
+
+def migrate_legacy_state():
+    """
+    migrate pre-home installs of openlumara to the new structure that uses a homedir.
+    in order to prevent data loss,
+    it does a safe copy first, and only if the copy fully succeeds, the move is performed
+    """
+
+    home = get_home()
+    root = get_path()
+    entries = [
+        "config.yml",
+        "data",
+        "user_modules",
+        "user_channels",
+        "skills",
+        "user_webui_themes",
+        "data_backups"
+    ]
+
+    # a custom data folder from the legacy config is migrated too, on the first run only
+    config_file = os.path.join(root, "config.yml")
+    legacy_config_still_live = os.path.exists(config_file) and not os.path.exists(os.path.join(home, "config.yml"))
+
+    if legacy_config_still_live:
+        try:
+            import yaml
+            with open(config_file, "r", encoding="utf-8") as f:
+                folder = (yaml.safe_load(f) or {}).get("core", {}).get("data_folder")
+        except Exception:
+            folder = None
+
+        usable_name = isinstance(folder, str) and folder
+        not_already_listed = folder not in entries
+        if usable_name and not_already_listed:
+            entries.append(folder)
+
+    for name in entries:
+        src = os.path.normpath(os.path.join(root, name))
+        dst = os.path.join(home, name)
+
+        # protect against path traversal
+        outside_install_dir = not src.startswith(root + os.sep)
+        missing_source = not os.path.exists(src)
+        already_migrated = os.path.exists(dst)
+
+        if outside_install_dir or missing_source or already_migrated:
+            continue
+
+        # back up first, verify the backup, abort if backing up fails for ANY reason
+        backup_root = "~/openlumara_legacy_backups" if sys.platform == "win32" else "~/.openlumara_legacy_backups"
+        backup_dir = os.path.abspath(os.path.expanduser(backup_root))
+        backup_path = os.path.join(backup_dir, name)
+
+        try:
+            os.makedirs(backup_dir, exist_ok=True)
+
+            # delete from the backup if exists
+            if os.path.isdir(backup_path):
+                shutil.rmtree(backup_path)
+            elif os.path.exists(backup_path):
+                os.remove(backup_path)
+
+            # then copy it over
+            if os.path.isdir(src):
+                shutil.copytree(src, backup_path)
+            else:
+                shutil.copy2(src, backup_path)
+
+            if not os.path.exists(backup_path):
+                raise Exception("Backup file not created")
+            log("core", f"backed up {src} to {backup_path}")
+        except Exception as e:
+            # never leave a half-written backup behind
+            if os.path.isdir(backup_path):
+                shutil.rmtree(backup_path, ignore_errors=True)
+            elif os.path.exists(backup_path):
+                os.remove(backup_path)
+
+            log("core", f"FATAL ERROR: could not back up {src} before migration. Aborting: {core.detail_error(e)}")
+            sys.exit(1)
+
+        try:
+            shutil.move(src, dst)
+            if not os.path.exists(dst):
+                raise Exception(f"moving the backup to the home directory failed! check '{src}' and '{dst}'")
+
+            log("core", f"moved {src} to {dst}")
+        except Exception as e:
+            # never leave a half-moved destination behind, or the next run would skip it
+            if os.path.isdir(dst):
+                shutil.rmtree(dst, ignore_errors=True)
+            elif os.path.exists(dst):
+                os.remove(dst)
+
+            # if the move consumed the source, restore it from the verified backup
+            if not os.path.exists(src):
+                try:
+                    if os.path.isdir(backup_path):
+                        shutil.copytree(backup_path, src)
+                    else:
+                        shutil.copy2(backup_path, src)
+                    log("core", f"restored {src} from backup after failed move")
+                except Exception as restore_error:
+                    log("core", f"FATAL ERROR: failed to move {src} and could not restore it. Backup kept at {backup_path}: {core.detail_error(restore_error)}")
+                    sys.exit(1)
+            log("core", f"could not move {src} to {dst}: {e}")
+
 def get_data_path(subpath=None):
     """get path to the data directory. contains all persistent data used by the framework"""
-
-    data_path = core.config.get("core", {}).get("data_folder", "data")
-
-    # if it's a relative path, resolve it from the project root
-    if not os.path.isabs(data_path):
-        data_path = core.get_path(data_path)
+    data_path = core.get_home_path("data")
 
     # create it if it doesn't exist
     if not os.path.exists(data_path):
