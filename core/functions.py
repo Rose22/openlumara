@@ -100,7 +100,6 @@ LEGACY_STATE_ENTRIES = (
     "data_backups",
 )
 
-# -- AI GENERATED CODE (glm-5.3-flash) :: 2026-10-31 12:03 harness:omp
 def migrate_legacy_state():
     """move state left in the install dir by pre-home versions of the app into the home directory"""
     home = get_home()
