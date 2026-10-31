@@ -563,7 +563,10 @@ class Channel:
         the first block returned wins, None (the default) lets the built-in handlers do their thing."""
         for module_name, module in self.manager.modules.items():
             try:
-                block = await module.on_file_to_block(filename, file_data)
+                if asyncio.iscoroutinefunction(module.on_file_to_block):
+                    block = await module.on_file_to_block(filename, file_data)
+                else:
+                    block = module.on_file_to_block(filename, file_data)
             except Exception as e:
                 self.log("module error", f"{module_name}: in on_file_to_block(): {core.detail_error(e)}")
                 continue
