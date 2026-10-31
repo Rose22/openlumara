@@ -101,36 +101,39 @@ LEGACY_STATE_ENTRIES = (
 )
 
 # -- AI GENERATED CODE (glm-5.3-flash) :: 2026-10-31 12:03 harness:omp
-def _legacy_state_entries(root, home):
-    """state entries to migrate, plus a custom data folder named in the legacy config"""
-    entries = list(LEGACY_STATE_ENTRIES)
-    config_file = os.path.join(root, "config.yml")
-
-    # only needed on the first run, while the legacy config is still the live one
-    if not os.path.exists(config_file) or os.path.exists(os.path.join(home, "config.yml")):
-        return entries
-
-    try:
-        import yaml
-        with open(config_file, "r", encoding="utf-8") as f:
-            folder = (yaml.safe_load(f) or {}).get("core", {}).get("data_folder")
-    except Exception:
-        folder = None
-
-    if isinstance(folder, str) and folder and not os.path.isabs(folder) and ".." not in folder and folder not in entries:
-        entries.append(folder)
-
-    return entries
-
 def migrate_legacy_state():
     """copy state left in the install dir by pre-home versions of the app into the home directory"""
     home = get_home()
     root = get_path()
+    entries = list(LEGACY_STATE_ENTRIES)
 
-    for name in _legacy_state_entries(root, home):
-        src = os.path.join(root, name)
+    # a custom data folder from the legacy config is migrated too, on the first run only
+    config_file = os.path.join(root, "config.yml")
+    legacy_config_still_live = os.path.exists(config_file) and not os.path.exists(os.path.join(home, "config.yml"))
+
+    if legacy_config_still_live:
+        try:
+            import yaml
+            with open(config_file, "r", encoding="utf-8") as f:
+                folder = (yaml.safe_load(f) or {}).get("core", {}).get("data_folder")
+        except Exception:
+            folder = None
+
+        usable_name = isinstance(folder, str) and folder
+        not_already_listed = folder not in entries
+        if usable_name and not_already_listed:
+            entries.append(folder)
+
+    for name in entries:
+        src = os.path.normpath(os.path.join(root, name))
         dst = os.path.join(home, name)
-        if not os.path.exists(src) or os.path.exists(dst):
+
+        # normpath collapses "..", so this containment check covers traversal too
+        outside_install_dir = not src.startswith(root + os.sep)
+        missing_source = not os.path.exists(src)
+        already_migrated = os.path.exists(dst)
+
+        if outside_install_dir or missing_source or already_migrated:
             continue
 
         try:
