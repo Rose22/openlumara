@@ -61,11 +61,19 @@ THEME_STORE = {
         const finalTheme = themeData[effectiveMode];
         const root = document.documentElement;
 
-        // Apply base theme vars first
+        // Apply base theme vars first. base.json is a small theme family
+        // ({common, dark, light}): common holds the mode-independent values,
+        // then the group for the mode in play. A legacy flat base.json is
+        // still applied as-is in both modes.
         const baseTheme = this.themeCache['base'];
         if (baseTheme) {
-            for (const [varName, value] of Object.entries(baseTheme)) {
-                root.style.setProperty(varName, value);
+            const baseGroups = ('common' in baseTheme)
+                ? [baseTheme.common, baseTheme[effectiveMode]]
+                : [baseTheme];
+            for (const group of baseGroups) {
+                for (const [varName, value] of Object.entries(group || {})) {
+                    root.style.setProperty(varName, value);
+                }
             }
         }
 
