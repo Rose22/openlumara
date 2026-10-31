@@ -90,21 +90,19 @@ def get_module_deps_path(package_name: str, module_name: str):
     """writable directory holding runtime-installed dependencies for a module/channel"""
     return get_home_path(os.path.join("module_deps", package_name, module_name))
 
-LEGACY_STATE_ENTRIES = (
-    "config.yml",
-    "data",
-    "user_modules",
-    "user_channels",
-    "skills",
-    "user_webui_themes",
-    "data_backups",
-)
-
 def migrate_legacy_state():
     """move state left in the install dir by pre-home versions of the app into the home directory"""
     home = get_home()
     root = get_path()
-    entries = list(LEGACY_STATE_ENTRIES)
+    entries = [
+        "config.yml",
+        "data",
+        "user_modules",
+        "user_channels",
+        "skills",
+        "user_webui_themes",
+        "data_backups"
+    ]
 
     # a custom data folder from the legacy config is migrated too, on the first run only
     config_file = os.path.join(root, "config.yml")
