@@ -14,28 +14,22 @@
 import os
 import sys
 import argparse
-
-def _apply_home_dir_from_argv(argv):
-    """let --home-dir override OPENLUMARA_HOME before core initializes the home directory"""
-    parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument("--home-dir")
-    args, _ = parser.parse_known_args(argv)
-    if args.home_dir:
-        os.environ["OPENLUMARA_HOME"] = args.home_dir
-
-if __name__ == "__main__":
-    _apply_home_dir_from_argv(sys.argv[1:])
-
 import asyncio
 import core
 import subprocess
 
 async def main_loop(arg_list):
-    # parse the --config arg
+    # parse flags like --config and --home
     arg_pre_parser = argparse.ArgumentParser(add_help=False)
     arg_pre_parser.add_argument("--config")
     arg_pre_parser.add_argument("--quiet", help="surpress logs", action="store_true")
+    arg_pre_parser.add_argument("--home")
+
     pre_args, _ = arg_pre_parser.parse_known_args(arg_list)
+
+    # allow setting the home dir via a --home argument rather than the ENV variable
+    if pre_args.home:
+        os.environ["OPENLUMARA_HOME"] = pre_args.home
 
     # load config file, allowing the path to be overridden
     config_display_str = "config.yaml" if not pre_args.config else pre_args.config
@@ -50,7 +44,7 @@ async def main_loop(arg_list):
     # custom arguments
     args_main = arg_parser.add_argument_group("main")
     args_main.add_argument("--config", help="specify a specific config file to load", metavar="<path>")
-    args_main.add_argument("--home-dir", help="sets the home directory openlumara uses for all its data", metavar="<path>")
+    args_main.add_argument("--home", help="sets the home directory openlumara uses for all its data", metavar="<path>")
     args_main.add_argument("--pure", help="disables all non-essential modules so that system prompt is blank and you're talking to the bare model", action="store_true")
     args_main.add_argument("--tmp", help="temporary session, discards all data after shutdown", action="store_true")
     args_main.add_argument("--cli", help="CLI-only mode", action="store_true")
