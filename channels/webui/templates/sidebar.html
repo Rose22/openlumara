@@ -47,6 +47,7 @@
             {{ panel.icon }}
         </button>
         {% endfor %}
+        {{ extension_slot("bottom_of_tabbar") }}
     </nav>
 
 <div id="chat-list" x-ref="chat-list" x-cloak x-show="sidebarTab === '' && ($store.ui.isMobile || !$store.ui.sidebarCollapsed)" x-data="{ tagPanel: false }">
