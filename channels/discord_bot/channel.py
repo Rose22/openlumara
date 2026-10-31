@@ -100,7 +100,7 @@ class DiscordClient(discord.Client):
             return
 
         # determine whether non-public commands may be ran by the user
-        authorized = (message.author.id == int(self._chan.config.get("authorized_user_id")))
+        authorized = (message.author.id in self._chan.config.get("authorized_user_ids"))
 
         content = message.content
 
@@ -319,9 +319,10 @@ class DiscordBot(core.channel.Channel):
             "description": "Your discord token. Get it in the [Discord Developer Portal](https://discord.com/developers/applications)",
             "default": None
         },
-        "authorized_user_id": {
-            "description": "Your personal user ID. Get it by enabling *Developer Mode* in Discord (open Settings, then go to Developer, then toggle on Developer Mode), then right clicking your name and clicking/tapping *Copy ID*",
-            "default": None
+        "authorized_user_ids": {
+            "type": "list",
+            "description": "the IDs of the users that may administrate the bot. Get it by enabling *Developer Mode* in Discord (open Settings, then go to Developer, then toggle on Developer Mode), then right clicking your name and clicking/tapping *Copy ID*",
+            "default": []
         },
         "target_channel_id": {
             "description": "The channel to target for communication with your discord bot. Get this by right clicking your channel and clicking/tapping *Copy ID*",
