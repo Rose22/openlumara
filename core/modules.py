@@ -13,9 +13,9 @@ import importlib.util
 
 # get the correct importlib stuff
 try:
-    from importlib.metadata import version, PackageNotFoundError
+    from importlib.metadata import distributions
 except ImportError:
-    from importlib_metadata import version, PackageNotFoundError
+    from importlib_metadata import distributions
 
 # modules that should have their prompts inserted even when tools are off
 nonagentic = ("characters", "writing_style", "time")
@@ -214,8 +214,10 @@ def _module_site_packages(module_file):
 def _add_site_dir(path):
     if not path or path in _added_site_dirs or not os.path.isdir(path):
         return
+    known_paths = set(sys.path)
     site.addsitedir(path)
-    _added_site_dirs.add(path)
+    # addsitedir also appends .pth entries, which must not count as base-environment paths
+    _added_site_dirs.update(set(sys.path) - known_paths)
     importlib.invalidate_caches()
 
 def _prepare_module_paths(package, module_name):
@@ -253,7 +255,7 @@ class _EntryFileFinder:
         except ImportError:
             return None
 
-        module_file, _ = _prepare_module_paths(package, parts[1])
+        module_file, target = _prepare_module_paths(package, parts[1])
         if not module_file:
             return None
 
@@ -261,7 +263,7 @@ class _EntryFileFinder:
         # but let things still import from other files in the module's folder
         # used for webui/api.py, among other things
         deps = _extract_deps_from_file(module_file)
-        if deps and _check_missing_deps(deps):
+        if deps and _check_missing_deps(deps, _own_dep_paths(module_file, target)):
             return None
 
         return importlib.util.spec_from_file_location(
@@ -275,15 +277,35 @@ def _dep_name(dep):
     """package name from a requirement string, e.g. 'python-telegram-bot>=1.0[e2e]' -> 'python-telegram-bot'"""
     return re.split(r"[<>=!~;\[\s]", dep, maxsplit=1)[0].strip().lower().replace("_", "-")
 
-def _check_missing_deps(deps):
-    """return list of dependencies missing from the base env and module dependency dirs already on sys.path"""
-    missing = []
-    for dep in deps:
-        try:
-            version(_dep_name(dep))
-        except PackageNotFoundError:
-            missing.append(dep)
-    return missing
+# -- AI GENERATED CODE (deepseek-v4.1-flash) :: 2026-10-31 harness:omp
+def _dep_names_in(paths):
+    """installed distribution names found in the given paths"""
+    names = set()
+    for dist in distributions(path=paths):
+        name = dist.metadata["Name"]
+        if name:
+            names.add(_dep_name(name))
+    return names
+
+_base_dep_names_cache = None
+
+def _base_dep_names():
+    """dependency names provided outside module dependency dirs, so every module can rely on them"""
+    global _base_dep_names_cache
+    if _base_dep_names_cache is None:
+        base_paths = [path for path in sys.path if path and path not in _added_site_dirs]
+        _base_dep_names_cache = _dep_names_in(base_paths)
+    return _base_dep_names_cache
+
+def _own_dep_paths(module_file, target):
+    """dependency dirs owned by a single module: its vendored site-packages and its install target"""
+    return [path for path in (_module_site_packages(module_file), target) if path]
+
+def _check_missing_deps(deps, own_paths=()):
+    """return dependencies missing from the base env and the module's own dependency dirs.
+    other modules' dependency dirs intentionally don't count, so no module can borrow another's packages"""
+    present = _base_dep_names() | _dep_names_in(list(own_paths))
+    return [dep for dep in deps if _dep_name(dep) not in present]
 
 async def install_module_deps(package, module_name, manager):
     """install dependencies for a module if missing"""
@@ -295,7 +317,7 @@ async def install_module_deps(package, module_name, manager):
     if not deps:
         return False
 
-    missing = _check_missing_deps(deps)
+    missing = _check_missing_deps(deps, _own_dep_paths(file_path, target))
     if not missing:
         return False
 
@@ -452,11 +474,11 @@ def load(package, base_class = None, filter: list = None, reload: bool = False, 
             continue
 
         # check if dependencies are installed before trying to import
-        module_file_path, _ = _prepare_module_paths(package, modname)
+        module_file_path, target = _prepare_module_paths(package, modname)
         if module_file_path:
             deps = _extract_deps_from_file(module_file_path)
             if deps:
-                missing = _check_missing_deps(deps)
+                missing = _check_missing_deps(deps, _own_dep_paths(module_file_path, target))
                 if missing:
                     if modname not in reported_missing and not loading_config:
                         log(modname, "Warning: loading skipped because of missing dependencies")
