@@ -72,6 +72,7 @@ def _install_deps(module_name, packages, manager, target):
         manager.log(module_name, "no writable dependency directory is available; skipping install")
         return False
 
+    # pyinstaller sets sys.frozen when the app is packaged by it
     if getattr(sys, "frozen", False):
         manager.log(
             module_name,
