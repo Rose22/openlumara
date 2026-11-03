@@ -249,9 +249,13 @@ def register(app, channel):
 
     @app.get("/api/chat/prompt")
     async def get_prompt():
-        sysprompt = await channel.context.get(system_prompt=True, end_prompt=False, history=False)
-        if isinstance(sysprompt, core.api.APIError):
-            return utils.api_result(sysprompt, success=False)
+        try:
+            sysprompt = await channel.context.get(system_prompt=True, end_prompt=False, history=False)
+        except Exception as e:
+            return utils.api_result(str(e), success=False)
+
+        if not sysprompt:
+            return utils.api_result("blank context", success=False)
 
         return utils.api_result(sysprompt[-1].get("content"))
 

@@ -34,9 +34,10 @@ def register(app, channel):
     @app.get("/api/models")
     async def models_get():
         """Returns a list of all available AI models"""
-        result = await channel.manager.API.list_models()
-        if isinstance(result, core.api.APIError):
-            return utils.api_result(str(result), success=False)
+        try:
+            result = await channel.manager.API.list_models()
+        except core.api.APIError as e:
+            return utils.api_result(str(e), success=False)
 
         return utils.api_result(result)
 
@@ -108,9 +109,10 @@ def register(app, channel):
     @app.post("/api/reconnect")
     async def reconnect():
         """Disconnects and then reconnects the API."""
-        result = await channel.manager.API.reconnect()
-        if isinstance(result, core.api.APIError):
-            return utils.api_result(str(result), success=False)
+        try:
+            await channel.manager.API.reconnect()
+        except core.api.APIError as e:
+            return utils.api_result(str(e), success=False)
 
         await channel.websocket_manager.push_context_update()
 

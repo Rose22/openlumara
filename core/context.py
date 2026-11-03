@@ -28,13 +28,6 @@ class Context:
         without the system prompt and without the modifications we do to it such as the endprompt.
         context must ALWAYS follow this strict turn order: system->user->assistant->user->assistant->user->...
         """
-        if not self.channel.manager.API.connected:
-            # attempt to connect
-            result = await self.channel.manager.API.connect()
-            if result is not True:
-                self.channel.log("api", str(result))
-                return result
-
         # Configuration
         max_messages = int(core.config.get("api").get("max_messages", 200))
         max_tokens = int(core.config.get("api").get("max_context", 16768))
@@ -399,6 +392,9 @@ Hard rules:
                 self.using_api_token_data = False
 
             return response
+        except Exception as e:
+            self.channel.log_error("Compression failed", e)
+            return False
         finally:
             self.compressing = False
 

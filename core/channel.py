@@ -692,9 +692,10 @@ class Channel:
         self.agentic_loop_start = len(await self.context.chat.messages.get()) - 1
 
         # reconnect if needed
-        result = await self.manager.API.attempt_connect()
-        if result is not True:
-            return {"type": "error", "content": str(result)}
+        try:
+            await self.manager.API.attempt_connect()
+        except core.api.APIError as e:
+            return {"type": "error", "content": str(e)}
 
         # build the context window
         context = await self.context.get(system_prompt=True, end_prompt=True)
@@ -796,12 +797,12 @@ class Channel:
                 return {"role": "assistant", "content": processed["content"]}
 
         # request the AI response and add it to context
-        response = await self.manager.API.send(processed["context"], **kwargs)
-
+        try:
+            response = await self.manager.API.send(processed["context"], **kwargs)
         # handle any errors
-        if isinstance(response, core.api.APIError):
-            self.log("api", response)
-            return {"role": "assistant", "content": str(response)}
+        except core.api.APIError as e:
+            self.log("api", e)
+            return {"role": "assistant", "content": str(e)}
 
         # make a copy of the response message and edit it
         assistant_message = dict(response)

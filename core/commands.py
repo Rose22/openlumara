@@ -407,15 +407,17 @@ class Commands:
         if self.channel.manager.API.connected:
             return "Already connected."
         
-        result = await self.channel.manager.API.connect()
-        if isinstance(result, core.api.APIError):
-            return f"Error while connecting: {result}"
+        try:
+            await self.channel.manager.API.connect()
+        except core.api.APIError as e:
+            return f"Error while connecting: {e}"
         return "Connected!"
     
     async def cmd_reconnect(self, args: list):
-        result = await self.channel.manager.API.reconnect()
-        if isinstance(result, core.api.APIError):
-            return f"Error while reconnecting: {result}"
+        try:
+            await self.channel.manager.API.reconnect()
+        except core.api.APIError as e:
+            return f"Error while reconnecting: {e}"
         return "Reconnected"
     
     async def cmd_disconnect(self, args: list):
