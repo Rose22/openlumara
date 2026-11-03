@@ -24,10 +24,23 @@ ENV TZ=UTC
 
 # install base tools
 RUN apt-get install -y --no-install-recommends \
-    curl \
-    wget \
-    git \
-    cron \
+# -------------------------------------------------------------------------------
+#    enable these if you want more network connectivity,
+#    but note that some of these (especially curl) make the shell more insecure
+#    due to the risk of prompt injection
+# -------------------------------------------------------------------------------
+#    curl \
+#    wget \
+#    git \
+#    cron \
+#    procps \
+#    ssh \
+#    iputils-ping \
+#    iproute2 \
+#    net-tools \
+#    lsof \
+#    dnsutils \
+# -------------------------------------------------------------------------------
     zip \
     unzip \
     7zip \
@@ -35,16 +48,8 @@ RUN apt-get install -y --no-install-recommends \
     jq \
     file \
     tree \
-    procps \
-    cron \
-    ssh \
-    iputils-ping \
-    iproute2 \
-    net-tools \
-    lsof \
-    dnsutils \
     python3 python3-venv python3-pip \
-    nodejs npm
+    nodejs npm 
 RUN apt-get clean
 
 # create user and set up virtual environment
