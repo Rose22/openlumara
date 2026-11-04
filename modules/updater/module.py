@@ -9,9 +9,14 @@ class Updater(core.module.Module):
     async def update(self, args: list):
         proc = subprocess.Popen(
             ["git", "pull"],
-            stdout=None,
-            stderr=None,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
         )
-        proc.wait()
+        out, err = proc.communicate()
 
+        output = str(out)
+        if err:
+            output += f"\nErrors:\n{err}"
+
+        await self.channel.push(output, defer=False)
         await self.manager.restart(hard=True)
