@@ -100,6 +100,8 @@ def run_from_args(arg_list: list = []):
             # run the loop again
             print("-" * 40, flush=True)
             pass
+        elif result == "hard_restart":
+            os.execve(sys.executable, list(sys.orig_argv), os.environ)
         else:
             exit()
 

@@ -1006,8 +1006,13 @@ class Commands:
         return f"chat exported to {file_path}"
     
     async def cmd_restart(self, args: list):
-        await self.channel.manager.restart()
-        return "restarting server"
+        hard = False
+        if len(args) > 0:
+            if args[0] == "hard":
+                hard = True
+
+        await self.channel.manager.restart(hard=hard)
+        return ("hard " if hard else "") + "restarting server"
     
     async def cmd_stop(self, args: list):
         await self.channel.manager.API.cancel()

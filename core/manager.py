@@ -34,6 +34,7 @@ class Manager:
         self.coding_mode = False
 
         self._restart_requested = False
+        self._hard_restart_requested = False
         self._prevent_double_shutdown = False
 
         self.log_buffer = []
@@ -350,12 +351,19 @@ class Manager:
 
         if self._restart_requested:
             return "restart"
+        elif self._hard_restart_requested:
+            return "hard_restart"
 
         return None
 
-    async def restart(self):
-        self.log("core", "Restarting server..")
-        self._restart_requested = True
+    async def restart(self, hard=False):
+        hard_str = "Hard " if hard else ""
+        self.log("core", f"{hard_str}Restarting server..")
+        if not hard:
+            self._restart_requested = True
+        else:
+            self._hard_restart_requested = True
+
         await self.shutdown()
 
     async def shutdown(self):
