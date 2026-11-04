@@ -484,6 +484,9 @@ class APIClient():
             # request token usage from the API
             req["stream_options"] = {"include_usage": True}
 
+        #import rich
+        #rich.print(req)
+
         if core.debug:
             message_summary = []
             api_config = core.config.get("api", {})

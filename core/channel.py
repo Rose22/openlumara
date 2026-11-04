@@ -60,6 +60,8 @@ class Channel:
         self.turncollector = core.turns.TurnCollector(self)
         self.tool_loader = core.tool_loader.ToolLoader(self)
         self.tool_loader.register_meta_tools()
+        self.force_disable_tools = True
+        self.override_tools = None
 
         # used to track whether to preserve reasoning
         # for only the current "agentic turn"
@@ -773,6 +775,7 @@ class Channel:
                     files=None,
                     commands_authorized=commands_authorized,
                     add_to_context=add_to_context,
+                    tools=self.override_tools,
                     **kwargs
                 )
 
@@ -798,7 +801,7 @@ class Channel:
 
         # request the AI response and add it to context
         try:
-            response = await self.manager.API.send(processed["context"], **kwargs)
+            response = await self.manager.API.send(processed["context"], use_tools=(not self.force_disable_tools), tools=self.override_tools, **kwargs)
         # handle any errors
         except core.api.APIError as e:
             self.log("api", e)
@@ -844,7 +847,7 @@ class Channel:
         self.sending_message = True
         
         try:
-            async for token in self._send_stream_inner(message, files=files, commands_authorized=commands_authorized, add_to_context=add_to_context, **kwargs):
+            async for token in self._send_stream_inner(message, files=files, commands_authorized=commands_authorized, add_to_context=add_to_context, use_tools=(not self.force_disable_tools), tools=self.override_tools, **kwargs):
                 yield token
 
             while self.queued_message is not None:

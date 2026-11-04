@@ -90,7 +90,7 @@ class Chat:
 
             if active_character and module_name not in char_modules_exempt and "characters" in self.channel.manager.modules.keys():
                 # if a character is currently active, display ONLY the character system prompt
-                char_disable_agent_prompts = self.channel.manager.modules["characters"].config.get("disable_agent_prompts_when_character_active")
+                char_disable_agent_prompts = self.channel.manager.modules["characters"].config.get("pure_mode")
 
                 if char_disable_agent_prompts:
                     continue

@@ -11,13 +11,18 @@ class Characters(core.module.Module):
     category = "creative"
 
     settings = {
-        "insert_system_prompt": {
+        "enable_character_awareness": {
             "default": True,
             "description": "Put the list of stored characters into the system prompt so that the AI always knows what characters it can switch to"
         },
-        "disable_agent_prompts_when_character_active": {
+        "system_prompt": {
+            "type": "long_text",
+            "description": "An optional prompt that gets inserted before the character prompt, to instruct the AI on how to behave in character mode. Use for jailbreaking and so on. Leave blank to disable.",
+            "default": ""
+        },
+        "pure_mode": {
             "default": True,
-            "description": "Automatically disables all prompts from other modules when a character is active, so that the only thing in the system prompt is the character definition. This can help a lot with making characters behave purely like characters, and less like, well, personal assistants."
+            "description": "Automatically disables all prompts and tools from other modules when a character is active, so that the only thing in the system prompt is the character definition. This can help a lot with making characters behave purely like characters, and less like, well, personal assistants."
         },
         "use_first_messages": {
             "description": "Whether a character's first message gets sent automatically when switching to that character in an empty chat",
@@ -42,8 +47,8 @@ class Characters(core.module.Module):
         self._migrate_if_needed()
         self._ingest_pngs()
         self._normalize_all()
-
-        if self.config.get("insert_system_prompt"):
+        
+        if self.config.get("enable_character_awareness"):
             # disable character listing tool
             self.disabled_tools.append("get_all")
 
@@ -337,9 +342,12 @@ class Characters(core.module.Module):
     async def on_system_prompt(self):
         curr_char = self.channel.context.chat.get("metadata").get("character")
 
+        if self.config.get("pure_mode"):
+            self.channel.force_disable_tools = (True if curr_char else False)
+
         tool_text = f"Characters available to switch yourself to:\n{await self._list_characters()}" if (
             core.config.get("model", {}).get("use_tools") and
-            self.config.get("insert_system_prompt") and
+            self.config.get("enable_character_awareness") and
             not curr_char
         ) else ""
 
@@ -393,7 +401,8 @@ class Characters(core.module.Module):
                 first_msg = self._replace_tags(char_name, first_msg)
                 await self.channel.push({"role": "assistant", "content": first_msg})
 
-        return char_text
+        system_prompt = self.config.get("system_prompt", "")
+        return system_prompt+char_text
 
     async def on_message_inject(self, user_message: str):
         curr_char_name = self.channel.context.chat.get("metadata").get("character")
@@ -422,6 +431,12 @@ class Characters(core.module.Module):
 
         self.channel.context.chat.get("metadata")["character"] = char_name
 
+        # allow system prompt to be regenerated
+        self.channel.context.chat._cached_system_prompt = None
+
+        if self.config.get("pure_mode"):
+            self.channel.force_disable_tools = True
+
         first_msg = char.get("first_message", "")
         if first_msg and self.config.get("use_first_messages"):
             # -- AI GENERATED CODE (Qwen3.8-Flash-Next-Q4) :: (2026-10-03)
@@ -440,6 +455,9 @@ class Characters(core.module.Module):
     async def switch_to_default(self):
         """Switches you back to your default identity."""
         self.channel.context.chat.get("metadata")["character"] = ""
+
+        # allow system prompt to be regenerated
+        self.channel.context.chat._cached_system_prompt = None
 
         return "success"
 
