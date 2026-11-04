@@ -20,6 +20,15 @@ class Characters(core.module.Module):
             "description": "An optional prompt that gets inserted before the character prompt, to instruct the AI on how to behave in character mode. Use for jailbreaking and so on. Leave blank to disable.",
             "default": ""
         },
+        "your_name": {
+            "description": "The name characters will use to refer to you",
+            "default": "User"
+        },
+        "your_profile": {
+            "type": "long_text",
+            "description": "Describe yourself here. Stuff like your appearance, what you like and dislike, hobbies, etc. Just an overall profile of yourself. The AI will see this so that every character knows who you are!",
+            "default": ""
+        },
         "pure_mode": {
             "default": True,
             "description": "Automatically disables all prompts and tools from other modules when a character is active, so that the only thing in the system prompt is the character definition. This can help a lot with making characters behave purely like characters, and less like, well, personal assistants."
@@ -42,7 +51,6 @@ class Characters(core.module.Module):
 
     async def on_ready(self):
         self.characters = core.storage.StorageDict("characters", type="json_folder")
-        self.user_profile = core.storage.StorageDict("character_user", "json")
 
         self._migrate_if_needed()
         self._ingest_pngs()
@@ -386,11 +394,10 @@ class Characters(core.module.Module):
         if char_scenario:
             character_text_build.append(f"## Scenario\n{char_scenario}")
 
-        user_profile = self.user_profile.get("profile")
+        user_profile = self.config.get("your_profile").strip()
         if user_profile:
-            user_name = self.user_profile.get("name")
-            character_text_build.append(f"## The user: {user_name}")
-            character_text_build.append(user_profile)
+            user_name = self.config.get("your_name").strip()
+            character_text_build.append(f"## The user: {user_name}\n{user_profile}")
 
         char_text = "\n\n".join(character_text_build)
 
@@ -402,6 +409,7 @@ class Characters(core.module.Module):
                 await self.channel.push({"role": "assistant", "content": first_msg})
 
         system_prompt = self.config.get("system_prompt", "")
+        if system_prompt: system_prompt = system_prompt+"\n\n"
         return system_prompt+char_text
 
     async def on_message_inject(self, user_message: str):
@@ -509,7 +517,7 @@ class Characters(core.module.Module):
 
     def _replace_tags(self, name: str, character: str):
         """replaces the magic words defined in the character card spec with their appropriate replacements"""
-        user_name = self.user_profile.get("name", "user")
+        user_name = self.config.get("your_name")
         replacement_map = {
             "{{char}}": name,
             "{char}": name,
@@ -617,14 +625,6 @@ class Characters(core.module.Module):
         return self.result("character doesn't exist!", False)
 
     @core.module.tool
-    async def set_user_persona(self, name: str, profile: str):
-        self.user_profile["name"] = name
-        self.user_profile["profile"] = profile
-        self.user_profile.save()
-
-        return self.result("user persona set")
-
-    @core.module.tool
     async def import_json(self, json_code: str):
         """imports a character card (spec V1 or V2) into your character storage"""
         try:
@@ -647,13 +647,6 @@ class Characters(core.module.Module):
         self.characters.save()
 
         return self.result("character successfully imported")
-
-    @core.module.command("username")
-    async def cmd_set_user_name(self, args: list):
-        name = " ".join(args)
-        self.user_profile["name"] = name
-        self.user_profile.save()
-        return "Your name has been set!"
 
     # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-10-03)
     # webui extension routes (reference implementation for the @webui.route
