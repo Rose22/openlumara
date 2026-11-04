@@ -138,7 +138,10 @@ class Commands:
         "__SPACER__4": "",
         # system
         "config": "explore, view, and set config settings",
-        "restart": "restarts the server",
+        "restart": {
+            "": "restarts the server",
+            "hard": "completely exits and then restarts openlumara, bypassing the usual careful module reloading flow. useful for debugging and updates"
+        },
         "stop": "stops the AI in it's tracks",
         "__SPACER__5": "",
         # utilities
