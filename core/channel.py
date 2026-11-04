@@ -60,7 +60,7 @@ class Channel:
         self.turncollector = core.turns.TurnCollector(self)
         self.tool_loader = core.tool_loader.ToolLoader(self)
         self.tool_loader.register_meta_tools()
-        self.force_disable_tools = True
+        self.force_disable_tools = False
         self.override_tools = None
 
         # used to track whether to preserve reasoning
