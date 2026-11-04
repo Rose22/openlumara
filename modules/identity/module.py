@@ -20,6 +20,7 @@ class Identity(core.module.Module):
     async def on_ready(self):
         if not self.config.get("allow_ai_to_change_identity"):
             self.disabled_tools.append("set")
+            self.disabled_tools.append("clear")
 
     async def on_system_prompt(self):
         # dont use identity if the characters module is enabled and a character is currently active
