@@ -619,6 +619,9 @@ class APIClient():
         except Exception as e:
             raise APIError("While sending request to AI", e) from e
 
+        if isinstance(response, APIError):
+            raise response
+
         try:
             result = await self._recv(response)
             return result
