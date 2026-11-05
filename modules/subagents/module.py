@@ -9,24 +9,29 @@ class Subagents(core.module.Module):
     category = "core"
 
     settings = {
-        "run_in_background": {
-            "description": "Run subagents in the background, instead of having the main session wait for the subagent to finish. Only works well if you have support for concurrent requests configured in your chosen AI inference server.",
+        "allow_running_in_background": {
+            "description": "Allow running subagents in the background, instead of having the main session wait for the subagent to finish. Only works well if you have support for concurrent requests configured in your chosen AI inference server. AI can still choose to run a subagent in the foreground.",
             "default": False
         },
         "max_background_subagents": {
             "type": "number",
             "description": "Maximum amount of subagents that should be allowed to run at once",
             "default": 2,
-            "depends": "run_in_background"
+            "depends": "allow_running_in_background"
         },
     }
 
     async def _process_substream(self, stream, ctx):
+        final_content = []
+        tool_calls_occurred = False
         async for token in stream:
             yield token
 
             token_type = token.get("type")
-            if token_type == "tool_calls":
+            if token_type == "content":
+                final_content.append(token.get("content"))
+            elif token_type == "tool_calls":
+                tool_calls_occurred = True
                 toolcall_request = await self.channel.tc_manager._build_recursive_request(token, [], [])
                 async for sub_token in self.channel.tc_manager.process(toolcall_request, context=ctx):
                     sub_type = sub_token.get("type")
@@ -36,6 +41,9 @@ class Subagents(core.module.Module):
                         ctx.append(sub_token.get("content"))
 
                     yield sub_token
+
+        if final_content and not tool_calls_occurred:
+            ctx.append({"role": "assistant", "content": "".join(final_content)})
 
     async def on_ready(self):
         self.subagent_jobs = {}
@@ -76,7 +84,7 @@ class Subagents(core.module.Module):
             }
         ]
 
-        if run_in_background and self.config.get("run_in_background"):
+        if run_in_background and self.config.get("allow_running_in_background"):
             job_id = f"subagent-{int(time.time())}"
             job = { "task": None, "ctx": None, "done": False, "result": None, "error": None }
             self.subagent_jobs[job_id] = job
@@ -104,7 +112,7 @@ class Subagents(core.module.Module):
             except Exception as e:
                 return self.result(core.detail_error(e), success=False)
 
-            return self.result(results)
+            return self.result({"status": "done", "results": results})
 
     @core.module.tool
     async def check(self, job_id: str):
