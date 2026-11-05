@@ -4,7 +4,9 @@ import copy
 import time
 
 class Subagents(core.module.Module):
-    """lets your AI spin up subagents (chat sessions with a seperate context) to perform a request"""
+    """Lets your AI spin up subagents (chat sessions with a seperate context) to perform a request"""
+
+    category = "core"
 
     settings = {
         "run_in_background": {
@@ -14,7 +16,8 @@ class Subagents(core.module.Module):
         "max_background_subagents": {
             "type": "number",
             "description": "Maximum amount of subagents that should be allowed to run at once",
-            "default": 2
+            "default": 2,
+            "depends": "run_in_background"
         },
     }
 
