@@ -9,21 +9,22 @@ class Subagents(core.module.Module):
     category = "core"
 
     settings = {
-        "allow_running_in_background": {
-            "description": "Allow running subagents in the background, instead of having the main session wait for the subagent to finish. Only works well if you have support for concurrent requests configured in your chosen AI inference server. AI can still choose to run a subagent in the foreground.",
+        "run_in_background": {
+            "description": "Run subagents in the background, instead of having the main session wait for the subagent to finish. Only works well if you have support for concurrent requests configured in your chosen AI inference server.",
             "default": False
         },
         "max_background_subagents": {
             "type": "number",
             "description": "Maximum amount of subagents that should be allowed to run at once",
             "default": 2,
-            "depends": "allow_running_in_background"
+            "depends": "run_in_background"
         },
     }
 
     async def _process_substream(self, stream, ctx):
         final_content = []
         tool_calls_occurred = False
+
         async for token in stream:
             yield token
 
@@ -48,8 +49,11 @@ class Subagents(core.module.Module):
     async def on_ready(self):
         self.subagent_jobs = {}
 
+        if not self.config.get("run_in_background"):
+            self.disabled_tools.append("check")
+
     async def _run_job(self, job_id, subagent_request):
-        ctx = copy.deepcopy(subagent_request)
+        ctx = list(subagent_request)
         job = self.subagent_jobs[job_id]
         job["ctx"] = ctx
         
@@ -72,7 +76,7 @@ class Subagents(core.module.Module):
             job["error"] = core.detail_error(e)
 
     @core.module.tool(bypass_timeout=True)
-    async def spawn(self, prompt: str, run_in_background: bool = False):
+    async def spawn(self, prompt: str):
         subagent_request = [
             {
                 "role": "system",
@@ -84,7 +88,7 @@ class Subagents(core.module.Module):
             }
         ]
 
-        if run_in_background and self.config.get("allow_running_in_background"):
+        if self.config.get("run_in_background"):
             job_id = f"subagent-{int(time.time())}"
             job = { "task": None, "ctx": None, "done": False, "result": None, "error": None }
             self.subagent_jobs[job_id] = job
@@ -97,7 +101,7 @@ class Subagents(core.module.Module):
             })
         else:
             # hold a temporary context for this call
-            ctx = copy.deepcopy(subagent_request)
+            ctx = list(subagent_request)
 
             try:
                 await self.channel.on_stream(
@@ -107,12 +111,15 @@ class Subagents(core.module.Module):
                     )
                 )
 
-                final_msg = ctx[-1] if ctx else {}
-                results = final_msg.get("content") or ""
+                if len(ctx) <= 1:
+                    return self.result("subagent returned a blank response", success=False)
+
+                last_msg = (ctx[-1] if len(ctx) else {})
+                results = last_msg.get("content") or ""
+
+                return self.result({"status": "done", "results": results})
             except Exception as e:
                 return self.result(core.detail_error(e), success=False)
-
-            return self.result({"status": "done", "results": results})
 
     @core.module.tool
     async def check(self, job_id: str):

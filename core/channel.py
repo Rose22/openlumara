@@ -241,7 +241,8 @@ class Channel:
         that display the streamed tokens directly to the user,
         so that the user doesn't have to wait for a request to finish
         """
-        pass
+        async for token in stream:
+            pass
 
     async def push(self, message, defer=True):
         """push a message to the push queue, which will instantly display it in all channels"""
