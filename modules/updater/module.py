@@ -8,7 +8,7 @@ class Updater(core.module.Module):
     @core.module.command("update")
     async def update(self, args: list):
         proc = subprocess.Popen(
-            ["git", "pull"],
+            ["sh", "update.sh"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
