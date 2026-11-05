@@ -241,7 +241,7 @@ class ToolcallManager:
                     return await func_callable(**tool_args)
 
                 tool_task = asyncio.create_task(_run_tool())
-                if not getattr(func_callable, "_bypass_timeout"):
+                if not getattr(func_callable, "_bypass_timeout", False):
                     func_response = await asyncio.wait_for(tool_task, timeout=timeout_val)
                 else:
                     func_response = await tool_task
