@@ -139,7 +139,6 @@ class ToolcallManager:
             # a cancel that arrives mid-batch must not
             # fire the remaining tools first.
             if self.channel.manager.API.cancel_request:
-                await self.channel.push("toolcalling chain cancelled", defer=False)
                 return
 
             tool_name = tool_call_dict['function']['name']
@@ -242,7 +241,11 @@ class ToolcallManager:
                     return await func_callable(**tool_args)
 
                 tool_task = asyncio.create_task(_run_tool())
-                func_response = await asyncio.wait_for(tool_task, timeout=timeout_val)
+                if not getattr(func_callable, "_bypass_timeout"):
+                    func_response = await asyncio.wait_for(tool_task, timeout=timeout_val)
+                else:
+                    self.channel.log("toolcalls", f"bypassing timeout for {tool_name}")
+                    func_response = await tool_task
 
             except asyncio.TimeoutError as e:
                 # actually cancel the running task so it doesn't continue in the background

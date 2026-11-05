@@ -166,10 +166,17 @@ class Module:
 
 # --------------
 # tool decorator (@core.module.tool)
-def tool(func):
+def tool(func=None, bypass_timeout=False):
     """Decorator that marks a method as a tool callable by the AI."""
-    func._is_tool = True
-    return func
+    def decorator(func):
+        func._is_tool = True
+        func._bypass_timeout = bypass_timeout
+        return func
+
+    if func is not None:
+        return decorator(func)
+
+    return decorator
 
 # --------------
 # command decorator (@core.module.command)

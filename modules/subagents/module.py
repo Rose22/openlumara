@@ -18,15 +18,13 @@ class Subagents(core.module.Module):
         },
     }
 
-    async def _process_substream(self, stream, ctx, final_content):
+    async def _process_substream(self, stream, ctx):
         async for token in stream:
             yield token
 
             token_type = token.get("type")
-            if token_type == "content":
-                final_content.append(token.get("content"))
-            elif token_type == "tool_calls":
-                toolcall_request = await self.channel.tc_manager._build_recursive_request(token, [], final_content)
+            if token_type == "tool_calls":
+                toolcall_request = await self.channel.tc_manager._build_recursive_request(token, [], [])
                 async for sub_token in self.channel.tc_manager.process(toolcall_request, context=ctx):
                     sub_type = sub_token.get("type")
 
@@ -44,12 +42,10 @@ class Subagents(core.module.Module):
         job = self.subagent_jobs[job_id]
         job["ctx"] = ctx
         
-        final_content = []
         try:
             async for token in self._process_substream(
                 self.manager.API.send_stream(subagent_request),
-                ctx,
-                final_content
+                ctx
             ):
                 # only needs to accumulate into 'ctx', lol
                 pass
@@ -64,7 +60,7 @@ class Subagents(core.module.Module):
             job["done"] = True
             job["error"] = core.detail_error(e)
 
-    @core.module.tool
+    @core.module.tool(bypass_timeout=True)
     async def spawn(self, prompt: str, run_in_background: bool = False):
         subagent_request = [
             {
@@ -88,26 +84,24 @@ class Subagents(core.module.Module):
                 "status": "running",
                 "note": "subagent running in background. will push its results into current channel when done. use check_subagent with this job_id to retrieve its results at any time."
             })
+        else:
+            # hold a temporary context for this call
+            ctx = copy.deepcopy(subagent_request)
 
-        # hold a temporary context for this call
-        ctx = copy.deepcopy(subagent_request)
-        final_content = []
-
-        try:
-            await self.channel.on_stream(
-                self._process_substream(
-                    self.manager.API.send_stream(subagent_request),
-                    ctx,
-                    final_content
+            try:
+                await self.channel.on_stream(
+                    self._process_substream(
+                        self.manager.API.send_stream(subagent_request),
+                        ctx
+                    )
                 )
-            )
 
-            final_msg = ctx[-1] if len(ctx) else {}
-            results = final_msg.get("content") or ""
-        except Exception as e:
-            return self.result(core.detail_error(e), success=False)
+                final_msg = ctx[-1] if ctx else {}
+                results = final_msg.get("content") or ""
+            except Exception as e:
+                return self.result(core.detail_error(e), success=False)
 
-        return self.result(results)
+            return self.result(results)
 
     @core.module.tool
     async def check(self, job_id: str):
