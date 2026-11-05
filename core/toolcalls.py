@@ -244,7 +244,6 @@ class ToolcallManager:
                 if not getattr(func_callable, "_bypass_timeout"):
                     func_response = await asyncio.wait_for(tool_task, timeout=timeout_val)
                 else:
-                    self.channel.log("toolcalls", f"bypassing timeout for {tool_name}")
                     func_response = await tool_task
 
             except asyncio.TimeoutError as e:
