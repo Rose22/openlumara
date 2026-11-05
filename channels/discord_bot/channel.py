@@ -100,7 +100,7 @@ class DiscordClient(discord.Client):
             return
 
         # determine whether non-public commands may be ran by the user
-        authorized = (message.author.id in self._chan.config.get("authorized_user_ids"))
+        authorized = (str(message.author.id).strip() in self._chan.config.get("authorized_user_ids"))
 
         content = message.content
 
