@@ -49,7 +49,7 @@ class Subagents(core.module.Module):
     async def on_ready(self):
         self.subagent_jobs = {}
 
-        if not self.config.get("run_in_background"):
+        if self.config.get("run_in_background"):
             self.disabled_tools.append("check")
 
     async def _run_job(self, job_id, subagent_request):
