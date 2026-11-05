@@ -13,14 +13,21 @@ class Models(core.module.Module):
         "insert_available_models_into_system_prompt": {
             "description": "Whether to make the AI aware of what models are available for it to switch to. Allows you to simply ask the AI to switch to whatever model you want (example: `switch to Qwen3.5-9B`) and it'll just do it ",
             "default": False
+        },
+        "allow_ai_to_switch": {
+            "description": "Whether to allow the AI to switch its model",
+            "default": True
         }
     }
 
     async def on_ready(self):
         self.models = None
 
-        if self.config.get("insert_available_models_into_system_prompt"):
+        if self.config.get("insert_available_models_into_system_prompt") or not self.config.get("allow_ai_to_switch"):
             self.disabled_tools.append("get_available")
+
+        if not self.config.get("allow_ai_to_switch"):
+            self.disabled_tools.append("switch")
 
     async def on_system_prompt(self):
         output = ""
