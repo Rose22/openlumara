@@ -49,7 +49,7 @@ class Subagents(core.module.Module):
     async def on_ready(self):
         self.subagent_jobs = {}
 
-        if self.config.get("run_in_background"):
+        if not self.config.get("run_in_background"):
             self.disabled_tools.append("check")
 
     async def _run_job(self, job_id, subagent_request):
@@ -69,14 +69,33 @@ class Subagents(core.module.Module):
             job["result"] = last_msg.get("content") or ""
             job["done"] = True
 
-            if job.get("result"):
-                await self.channel.push({"role": "assistant", "content": job["result"] or f"Subagent {job_id} found no results!"})
+            # don't push when the job's results have already been checked with subagents_check()
+            if not self.channel._chain_idle.is_set():
+                await self.channel._chain_idle.wait()
+
+            claimed = self.subagent_jobs.pop(job_id, None)
+            if claimed is not None:
+                await self.channel.push(
+                    {"role": "assistant", "content": job["result"] or f"Subagent {job_id} found no results!"},
+                    defer=True
+                )
         except Exception as e:
             job["done"] = True
             job["error"] = core.detail_error(e)
 
+            # push the failure too so the main agent learns without polling
+            if not self.channel._chain_idle.is_set():
+                await self.channel._chain_idle.wait()
+
+            claimed = self.subagent_jobs.pop(job_id, None)
+            if claimed is not None:
+                await self.channel.push(
+                    {"role": "assistant", "content": f"Subagent {job_id} errored: {job['error']}"},
+                    defer=True
+                )
+
     @core.module.tool(bypass_timeout=True)
-    async def spawn(self, prompt: str):
+    async def spawn(self, title: str, prompt: str):
         subagent_request = [
             {
                 "role": "system",
@@ -90,7 +109,7 @@ class Subagents(core.module.Module):
 
         if self.config.get("run_in_background"):
             job_id = f"subagent-{int(time.time())}"
-            job = { "task": None, "ctx": None, "done": False, "result": None, "error": None }
+            job = { "task": None, "title": title, "ctx": None, "done": False, "result": None, "error": None }
             self.subagent_jobs[job_id] = job
             job["task"] = asyncio.create_task(self._run_job(job_id, subagent_request))
 
@@ -112,7 +131,7 @@ class Subagents(core.module.Module):
                 )
 
                 if len(ctx) <= 1:
-                    return self.result("subagent returned a blank response", success=False)
+                    return self.result(f"subagent for task '{title}' returned a blank response", success=False)
 
                 last_msg = (ctx[-1] if len(ctx) else {})
                 results = last_msg.get("content") or ""
@@ -138,7 +157,7 @@ class Subagents(core.module.Module):
                         latest_message = ctx[index]
                         break
 
-            return self.result({"status": "still running", "current_last_message": latest_message})
+            return self.result({"title": job["title"], "status": "still running", "current_last_message": latest_message})
 
         if job["error"]:
             del self.subagent_jobs[job_id]
@@ -147,4 +166,4 @@ class Subagents(core.module.Module):
         # prune after reading so the dict doesn't grow forever
         del self.subagent_jobs[job_id]
 
-        return self.result({"status": "done", "result": job["result"]})
+        return self.result({"title": job["title"], "status": "done", "result": job["result"]})
