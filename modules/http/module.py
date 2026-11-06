@@ -17,6 +17,7 @@ import html as html_module
 import threading
 import asyncio
 import aiohttp
+import aiohttp.resolver
 from datetime import datetime
 from urllib.parse import urlparse, unquote
 import urllib.parse
@@ -727,6 +728,59 @@ def _ip_is_blocked(ip_str: str) -> bool:
     return any(ip in net for net in _BLOCKED_NETWORKS)
 
 
+class BlockedURLError(aiohttp.ClientConnectionError):
+    """Raised by ValidatingResolver when a hostname resolves (only) to
+    blocked addresses. Subclassing ClientConnectionError keeps the generic
+    'Connection error' handling in _make_request from leaking the block
+    reason to the model; _make_request catches this type explicitly first."""
+
+
+class ValidatingResolver(aiohttp.resolver.AbstractResolver):
+    """
+    DNS-rebinding (TOCTOU) fix
+    """
+
+    def __init__(self, blocked_check, log=None):
+        # held as callables so the resolver always sees live config/module
+        self._is_blocked = blocked_check
+        self._log = log
+        self._real = aiohttp.resolver.DefaultResolver()
+
+    async def resolve(self, hostname, port=0, family=socket.AF_INET):
+        # IP literal: no DNS involved -- validate the address itself.
+        try:
+            ipaddress.ip_address(hostname)
+        except ValueError:
+            pass
+        else:
+            if self._is_blocked(hostname):
+                raise BlockedURLError(
+                    f"blocked address literal: {hostname}")
+            return await self._real.resolve(hostname, port=port, family=family)
+
+        try:
+            infos = await self._real.resolve(hostname, port=port,
+                                             family=socket.AF_UNSPEC)
+        except socket.gaierror as e:
+            raise BlockedURLError(f"DNS resolution failed for {hostname}: {e}")
+
+        safe = []
+        for info in infos:
+            ip = info["host"]
+            if not self._is_blocked(ip):
+                safe.append(info)
+
+        if not safe:
+            if self._log:
+                self._log(f"Blocked resolved internal IP(s) for {hostname}")
+            raise BlockedURLError(
+                f"{hostname} resolves to a blocked (internal) address")
+        return safe
+
+    async def close(self):
+        await self._real.close()
+
+
 class Http(core.module.Module):
     """
     Lets the AI send/receive raw HTTP requests
@@ -815,15 +869,33 @@ class Http(core.module.Module):
             self.server_ipv6 = None
 
     def _get_session(self):
-        """lazily create the shared aiohttp session (must happen inside the event loop)"""
+        """lazily create the shared aiohttp session (must happen inside the event loop)
+
+        The connector uses ValidatingResolver so the DNS answer that is
+        IP-validated is the SAME answer aiohttp connects to (F-1 fix:
+        closes the validate->connect rebinding TOCTOU at the single
+        resolution point aiohttp performs per connection).
+        """
         if getattr(self, "_session", None) is None or self._session.closed:
-            self._session = aiohttp.ClientSession()
+            # fail closed: missing config key -> blocking stays ON
+            self._resolver = ValidatingResolver(
+                blocked_check=lambda ip: (
+                    self.config.get("block_local_network_access", True)
+                    and _ip_is_blocked(ip)
+                ),
+                log=self._log,
+            )
+            connector = aiohttp.TCPConnector(resolver=self._resolver)
+            self._session = aiohttp.ClientSession(connector=connector)
         return self._session
 
     async def on_shutdown(self):
         if self._session is not None and not self._session.closed:
             await self._session.close()
         self._session = None
+        if getattr(self, "_resolver", None) is not None:
+            await self._resolver.close()
+        self._resolver = None
 
     # ==================== Untrusted-content wrapper ====================
     # Based on Digital Applied's 12-layer framework: untrusted fencing + provenance
@@ -1301,6 +1373,11 @@ class Http(core.module.Module):
         except asyncio.TimeoutError:
             self._log(f"Request timeout: {url}")
             return self.result(f"Request timed out after {timeout} seconds", False)
+        except BlockedURLError as e:
+            # raised by ValidatingResolver: hostname resolved only to
+            # blocked (internal) addresses -- DNS-rebinding/SSRF attempt
+            self._log(f"Blocked by resolver for {url}: {e}")
+            return self.result("URL blocked by security policy", False)
         except aiohttp.ClientSSLError as e:
             self._log(f"SSL error for {url}: {e}")
             return self.result("SSL verification failed", False)
