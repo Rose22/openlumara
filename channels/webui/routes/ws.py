@@ -21,8 +21,9 @@ def register(app, channel):
             await websocket.close(code=4003, reason="Foreign origin")
             return
 
-        # WebSocket auth check
-        if channel.config.get("require_login", False):
+        # WebSocket auth check (only when login is enforceable -- see
+        # channel.auth_enforced)
+        if channel.auth_enforced:
             ws_session = websocket.scope.get("session") or {}
             if not ws_session.get("authenticated", False):
                 # check if rate limited

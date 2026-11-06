@@ -134,11 +134,11 @@ class Webui(core.channel.Channel, ui_extensions.UiExtensionsMixin):
             "default": False
         },
         "username": {
-            "default": "admin",
+            "default": "",
             "depends": "require_login"
         },
         "password": {
-            "default": "admin",
+            "default": "",
             "depends": "require_login"
         },
         "login_lifetime": {
@@ -225,10 +225,29 @@ class Webui(core.channel.Channel, ui_extensions.UiExtensionsMixin):
             return False
         return origin_port in (None, self.port)
 
+    @property
+    def auth_enforced(self) -> bool:
+        """Login is only enforced when require_login is on AND both the
+        username and password are set. Empty credentials disable the gate
+        entirely: a login form nobody can ever pass would only lock out
+        the operator, so an unset login is treated as no login.
+        (Defaults are empty, so a default config never has working creds.)"""
+        if not self.config.get("require_login", False):
+            return False
+        return bool(self.config.get("username")) and bool(self.config.get("password"))
+
     async def _verify_credentials(self, username: str, password: str) -> bool:
-        """Verify credentials securely using timing-safe comparison."""
-        correct_username = self.config.get("username")
-        correct_password = self.config.get("password")
+        """Verify credentials securely using timing-safe comparison.
+
+        Unusable config (either expected credential empty) always fails --
+        this specifically stops compare_digest("", "") from succeeding if
+        only one of the two fields were ever filled in."""
+        correct_username = self.config.get("username") or ""
+        correct_password = self.config.get("password") or ""
+        if not correct_username or not correct_password:
+            return False
+        username = username or ""
+        password = password or ""
 
         if not secrets.compare_digest(username, correct_username):
             # Dummy comparison to prevent timing attacks
@@ -302,8 +321,6 @@ The WebUI has support for an extra feature:
         # stores logs from channel.log()
         self.logs = []
 
-        self.username = self.config.get("username", "admin")
-        self.password = self.config.get("password", "admin")
         self.login_attempts = {}
 
         # initialize the websocket manager

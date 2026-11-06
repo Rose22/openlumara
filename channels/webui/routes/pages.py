@@ -34,7 +34,7 @@ def register(app, channel):
             "js_files": js_files,
             "ext_css_files": channel._ui_asset_urls("css"),
             "ext_js_files": channel._ui_asset_urls("js"),
-            "login_enabled": channel.config.get("require_login"),
+            "login_enabled": channel.auth_enforced,
             "core_config": core.config
         })
 
@@ -43,7 +43,7 @@ def register(app, channel):
     @app.get("/login")
     async def login_page(request: fastapi.Request):
         """Shows the login form."""
-        if channel.config.get("require_login"):
+        if channel.auth_enforced:
             return channel.templates.TemplateResponse(request, "login.html", {
                 "error": None,
                 "ext_css_files": channel._ui_asset_urls("css"),

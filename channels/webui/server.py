@@ -62,8 +62,10 @@ async def create_fastapi(channel):
                     content={"data": "Admin settings are disabled", "success": False}
                 )
 
-        # Skip auth check if login isn't required
-        if not channel.config.get("require_login", False):
+        # Skip auth check if login isn't required. Note that login is only
+        # ENFORCEABLE when both credentials are actually set (auth_enforced):
+        # with empty credentials nobody can log in, so nobody gets locked out.
+        if not channel.auth_enforced:
             return await call_next(request)
         
         # Skip auth for login page and assets
