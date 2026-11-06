@@ -39,13 +39,18 @@ class ApiBridge(core.channel.Channel):
         },
         "api_key_required": {
             "type": "boolean",
-            "description": "Whether to require an API key to use this api endpoint. Recommended for public instances, otherwise anyone can use your AI!",
-            "default": False
+            "description": "Whether to require an API key to use this api endpoint. Recommended! Without it, any device that can reach the port can use your AI!",
+            "default": True
         },
         "api_key": {
             "type": "string",
-            "description": "Your chosen API key. This acts like a password, so choose a good one!",
-            "default": "sk-openlumara-dummy-key"
+            "description": "Your chosen API key. This acts like a password, so choose a good one! If a key is required but none is set, the bridge refuses all requests.",
+            "default": None
+        },
+        "allow_admin_commands": {
+            "type": "boolean",
+            "description": "Whether to allow admin commands like `/restart` and `/prompt` to be used through the API bridge",
+            "default": False
         },
         "show_reasoning": {
             "description": "Whether to show the model's internal reasoning process within sent messages. Works in both streaming mode and non-streaming mode",
@@ -83,6 +88,11 @@ class ApiBridge(core.channel.Channel):
 
     async def run(self):
         """The main loop: Starts the FastAPI server."""
+        # never expose the bridge to the network without a required AND configured API key
+        if (self.config.get("network_mode") != "local" and (not self.config.get("api_key_required") or not self.config.get("api_key"))):
+            self.log("api bridge", "REFUSING TO START: exposing the bridge to the internet requires an API key to be configured. Set a strong api_key (and keep api_key_required on), or switch network_mode back to local.")
+            return
+
         app = fastapi.FastAPI(title="OpenLumara OpenAI Bridge")
 
         # allow requests from any origin
@@ -97,8 +107,15 @@ class ApiBridge(core.channel.Channel):
         @app.middleware("http")
         async def auth_middleware(request: fastapi.Request, call_next):
             if self.config.get("api_key_required"):
+                api_key = self.config.get("api_key")
+                if not api_key:
+                    # a required-but-unconfigured key means no one gets in
+                    return fastapi.responses.JSONResponse(
+                        status_code=503,
+                        content={"error": {"message": "API key required but none configured in the settings", "type": "server_error", "param": None, "code": "api_key_not_configured"}}
+                    )
                 auth_header = request.headers.get("Authorization")
-                if not auth_header or auth_header != f"Bearer {self.config.get('api_key')}":
+                if not auth_header or auth_header != f"Bearer {api_key}":
                     return fastapi.responses.JSONResponse(
                         status_code=401,
                         content={"error": {"message": "Invalid API key", "type": "invalid_request_error", "param": None, "code": "invalid_api_key"}}
@@ -168,6 +185,10 @@ class ApiBridge(core.channel.Channel):
             self.log("api bridge", f"Error while starting API bridge: {core.detail_error(e)}")
 
     async def on_shutdown(self):
+        if not self.server:
+            # the server never started (e.g. refused to expose itself without an API key)
+            return
+
         # this is a flag exposed by uvicorn itself, which causes it to start gracefully shutting down when set
         self.server.should_exit = True
 
@@ -183,7 +204,7 @@ class ApiBridge(core.channel.Channel):
     async def _completion_handler(self, message, model):
         try:
             # send the request to the framework and format it
-            response_dict = await self.send(message, commands_authorized=True)
+            response_dict = await self.send(message, commands_authorized=self.config.get("allow_admin_commands"))
             response_dict = self.format_message(response_dict)
             content = response_dict.get("content", "")
 
@@ -224,7 +245,7 @@ class ApiBridge(core.channel.Channel):
 
             try:
                 async for token in self.format_stream_for_text(
-                    self.send_stream(message, commands_authorized=True)
+                    self.send_stream(message, commands_authorized=self.config.get("allow_admin_commands"))
                 ):
                     token_type = token.get("type")
                     token_content = token.get("content")
