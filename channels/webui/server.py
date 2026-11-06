@@ -55,6 +55,14 @@ async def create_fastapi(channel):
     # add authorization, cookies, and so on (middleware)
     @app.middleware("http")
     async def auth_middleware(request: fastapi.Request, call_next):
+        # we use a custom header to protect against leaking data using simple GET requests coming from injected HTML
+        # for example <img src="http://localhost:3005/api/settings/load">
+        if request.url.path.startswith("/api") and request.headers.get("x-openlumara") != "1":
+            return fastapi.responses.JSONResponse(
+                status_code=403,
+                content={"data": "Missing request header", "success": False}
+            )
+
         if not channel.config.get("enable_admin_settings", True):
             if request.url.path in ADMIN_ONLY_ENDPOINTS:
                 return fastapi.responses.JSONResponse(

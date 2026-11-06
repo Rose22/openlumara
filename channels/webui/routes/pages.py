@@ -23,7 +23,7 @@ def register(app, channel):
         css_files = utils.get_recursive_assets(os.path.join(channel.assets_path, "css"), "css", skip=["code-themes"])
         alpine_stores = os.listdir(os.path.join(channel.assets_path, "js", "stores"))
         js_utils = os.listdir(os.path.join(channel.assets_path, "js", "utils"))
-        js_files = utils.get_recursive_assets(os.path.join(channel.assets_path, "js"), "js", skip=["init.js", "stores", "libs", "utils"])
+        js_files = utils.get_recursive_assets(os.path.join(channel.assets_path, "js"), "js", skip=["init.js", "stores", "libs", "utils", "fetch_gate.js"])
 
         return channel.templates.TemplateResponse(request, "index.html", {
             "version": channel.version,

@@ -32,6 +32,11 @@
     <head>
         <title>{{ config.get('title') }}</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <!-- wraps window.fetch() to attach the X-OpenLumara header to
+             same-origin /api requests. X-OpenLumara protects the API endpoints from being hit by simple GET requests using malicious injected markdown.
+ 			 must load before every other script. -->
+        <script src="{{ url_for('assets', path='js/services/fetch_gate.js') }}"></script>
         <link rel="manifest" href="/manifest.json" />
 
         <!-- 
