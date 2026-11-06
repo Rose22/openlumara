@@ -62,7 +62,10 @@ class ModuleManager:
             name = name[:-4]
 
         name = re.sub(r"[^A-Za-z0-9._-]", "_", name)
-        return name or "repo"
+        if not name or name.strip(".") == "":
+            # sanitize dot-only names (e.g. '..', '...')
+            name = "repo"
+        return name
 
     def list_repos(self):
         repos = core.config.get("core", "module_libraries")
@@ -93,7 +96,7 @@ class ModuleManager:
             return None
 
         url = url.strip()
-        dest = os.path.join(self.library_folder(), self.repo_name(url))
+        dest = core.sandbox_path(self.library_folder(), self.repo_name(url))
 
         if os.path.isdir(os.path.join(dest, ".git")):
             code, err = await self._run_git(git, ["-C", dest, "fetch", "--depth", "1", "origin"])
@@ -162,15 +165,19 @@ class ModuleManager:
         return core.get_path("channels/webui/themes", sandbox=False)
 
     def _local_target(self, kind, name):
-        """the path an installed entry of this kind lives at (folders for folder kinds, the themes dir for themes)"""
+        """
+        the path an installed entry of this kind lives at (folders for folder kinds, the themes dir for themes).
+        names are sandboxed into their destination folder: raises ValueError on anything
+        that would land outside it.
+        """
         if kind == "module":
-            return os.path.join(core.get_path("user_modules", sandbox=False), name)
+            return core.sandbox_path(core.get_path("user_modules", sandbox=False), name)
         if kind == "channel":
-            return os.path.join(core.get_path("user_channels", sandbox=False), name)
+            return core.sandbox_path(core.get_path("user_channels", sandbox=False), name)
         if kind == "skill":
-            return os.path.join(self.skills_root(), name)
+            return core.sandbox_path(self.skills_root(), name)
         if kind == "theme":
-            return os.path.join(self.themes_root(), f"{name}.json")
+            return core.sandbox_path(self.themes_root(), f"{name}.json")
         return None
 
     def _installed_names(self, kind):
@@ -331,19 +338,23 @@ class ModuleManager:
         returns (source, kind); for folder kinds source is the entry's folder, for
         themes it is the library's themes folder (flat files). (None, None) if absent.
         """
-        for kind, spec in KINDS.items():
-            root = os.path.join(lib_path, spec["folder"])
+        try:
+            for kind, spec in KINDS.items():
+                root = os.path.join(lib_path, spec["folder"])
 
-            if kind == "theme":
-                if module_name in RESERVED_THEMES:
-                    continue
-                candidate = os.path.join(root, f"{module_name}.json")
-                if os.path.isfile(candidate):
-                    return root, kind
-            else:
-                candidate = os.path.join(root, module_name, spec["entry"])
-                if os.path.isfile(candidate):
-                    return os.path.dirname(candidate), kind
+                if kind == "theme":
+                    if module_name in RESERVED_THEMES:
+                        continue
+                    candidate = core.sandbox_path(root, f"{module_name}.json")
+                    if os.path.isfile(candidate):
+                        return root, kind
+                else:
+                    candidate = core.sandbox_path(root, os.path.join(module_name, spec["entry"]))
+                    if os.path.isfile(candidate):
+                        return os.path.dirname(candidate), kind
+        except ValueError:
+            # invalid or escaping name: simply treat it as not present in the library
+            return None, None
 
         return None, None
 
@@ -354,13 +365,14 @@ class ModuleManager:
             if not os.path.exists(target_root):
                 os.makedirs(target_root, exist_ok=True)
 
-            shutil.copyfile(os.path.join(source, f"{name}.json"), os.path.join(target_root, f"{name}.json"))
+            json_target = core.sandbox_path(target_root, f"{name}.json")
+            shutil.copyfile(core.sandbox_path(source, f"{name}.json"), json_target)
 
             sidecar = os.path.join(source, f"{name}.css")
             if os.path.isfile(sidecar):
-                shutil.copyfile(sidecar, os.path.join(target_root, f"{name}.css"))
+                shutil.copyfile(sidecar, core.sandbox_path(target_root, f"{name}.css"))
 
-            return os.path.join(target_root, f"{name}.json")
+            return json_target
 
         target = self._local_target(kind, name)
         if os.path.exists(target) and not overwrite:
@@ -375,6 +387,10 @@ class ModuleManager:
         returns (success, message, kind). dependency installation is left to the caller
         via core.modules.install_module_deps(user_modules, name, manager) for module/channel kinds.
         """
+        # '.' and empty resolve to the destination folder itself -> never a valid module name
+        if not module_name or module_name.strip() == ".":
+            return False, "that is not a valid module name", None
+
         libs = self.list_libraries()
         lib_path = libs.get(library)
         if not lib_path:
@@ -403,6 +419,10 @@ class ModuleManager:
         re-sync a library repo and overwrite an installed entry with the latest
         version from it. returns (success, message, kind).
         """
+        # '.' and empty resolve to the destination folder itself -> never a valid module name
+        if not module_name or module_name.strip() == ".":
+            return False, "that is not a valid module name", None
+
         url = None
         for repo in self.list_repos():
             if self.repo_name(repo) == library:
@@ -435,23 +455,31 @@ class ModuleManager:
         """
         remove an installed user module/channel/skill/theme. returns (success, message, kind).
         only user-installed copies are ever removed: bundled built-ins stay untouched.
+        names are sandboxed: anything that would escape its destination folder is refused.
         """
-        for kind in ("module", "channel", "skill"):
-            target = self._local_target(kind, module_name)
-            if os.path.isdir(target):
-                shutil.rmtree(target)
-                self.log(f"removed {kind} '{module_name}' from {os.path.dirname(target)}")
-                return True, target, kind
+        # '.' and empty resolve to the destination folder itself -> never a valid module name
+        if not module_name or module_name.strip() == ".":
+            return False, "that is not a valid module name", None
 
-        # themes: flat files in the user themes folder (never the WebUI's built-ins)
-        themes_root = self.themes_root()
-        theme_json = os.path.join(themes_root, f"{module_name}.json")
-        theme_css = os.path.join(themes_root, f"{module_name}.css")
-        if os.path.isfile(theme_json) or os.path.isfile(theme_css):
-            for path in (theme_json, theme_css):
-                if os.path.isfile(path):
-                    os.remove(path)
-            self.log(f"removed theme '{module_name}' from {themes_root}")
-            return True, theme_json, "theme"
+        try:
+            for kind in ("module", "channel", "skill"):
+                target = self._local_target(kind, module_name)
+                if os.path.isdir(target):
+                    shutil.rmtree(target)
+                    self.log(f"removed {kind} '{module_name}' from {os.path.dirname(target)}")
+                    return True, target, kind
+
+            # themes: flat files in the user themes folder (never the WebUI's built-ins)
+            themes_root = self.themes_root()
+            theme_json = core.sandbox_path(themes_root, f"{module_name}.json")
+            theme_css = core.sandbox_path(themes_root, f"{module_name}.css")
+            if os.path.isfile(theme_json) or os.path.isfile(theme_css):
+                for path in (theme_json, theme_css):
+                    if os.path.isfile(path):
+                        os.remove(path)
+                self.log(f"removed theme '{module_name}' from {themes_root}")
+                return True, theme_json, "theme"
+        except ValueError as e:
+            return False, str(e), None
 
         return False, f"'{module_name}' is not installed as a user module/channel/skill/theme", None
