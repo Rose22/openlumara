@@ -72,8 +72,15 @@ async def create_fastapi(channel):
         if request.url.path in ["/login", "/logout"] or str(request.url.path).startswith("/assets/"):
             return await call_next(request)
         
-        # Check session for API and other routes
-        if not request.session.get("authenticated", False):
+        # Check session for API and other routes.
+        # -- AI GENERATED CODE (Qwen3-Coder Next) :: (11-06-2026) harness:openlumara
+        # A session only stays valid while its credential fingerprint matches
+        # the configured username/password: changing credentials instantly
+        # revokes every previously issued session, everywhere, no restart.
+        if (
+            not request.session.get("authenticated", False)
+            or request.session.get("creds_fp") != channel.credentials_fingerprint
+        ):
             # For API requests, return 401
             if str(request.url.path).startswith("/api"):
                 return fastapi.responses.JSONResponse(
@@ -99,6 +106,30 @@ async def create_fastapi(channel):
         # CSRF hardening
         same_site="strict"
     )
+
+    # -- AI GENERATED CODE (Qwen3-Coder Next) :: (11-06-2026) harness:openlumara
+    # Auto-Secure cookie flag: when the request arrived over https (uvicorn
+    # rewrites the scheme from X-Forwarded-Proto for proxies listed in
+    # forwarded_allow_ips), append Secure to any Set-Cookie on the way out.
+    # Plain http localhost keeps working without any extra setting.
+    # This middleware must be registered AFTER SessionMiddleware so that it
+    # runs outside it and sees the session cookie being set.
+    @app.middleware("http")
+    async def secure_cookie_middleware(request: fastapi.Request, call_next):
+        response = await call_next(request)
+        if request.url.scheme == "https":
+            cookies = response.headers.getlist("set-cookie")
+            if cookies:
+                updated = []
+                for cookie in cookies:
+                    attrs = [a.strip().lower() for a in cookie.split(";")]
+                    if "secure" not in attrs:
+                        cookie += "; Secure"
+                    updated.append(cookie)
+                del response.headers["set-cookie"]
+                for cookie in updated:
+                    response.headers.append("set-cookie", cookie)
+        return response
 
     # serve asset files (formerly /static) using fastAPI's mount()
     app.mount("/assets", fastapi.staticfiles.StaticFiles(directory=channel.assets_path), name="assets")

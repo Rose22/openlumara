@@ -80,6 +80,9 @@ def register(app, channel):
         if await channel._verify_credentials(username, password):
             channel.login_attempts[client_ip] = []
             request.session["authenticated"] = True
+            # -- AI GENERATED CODE (Qwen3-Coder Next) :: (11-06-2026) harness:openlumara
+            # bind this session to the current credentials (see auth_middleware)
+            request.session["creds_fp"] = channel.credentials_fingerprint
 
             return fastapi.responses.RedirectResponse(url="/", status_code=303)
         
@@ -98,4 +101,5 @@ def register(app, channel):
     async def logout(request: fastapi.Request):
         """Logs the user out by clearing their session."""
         request.session.pop("authenticated", None)
+        request.session.pop("creds_fp", None)
         return fastapi.responses.RedirectResponse(url="/login", status_code=303)

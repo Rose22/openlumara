@@ -26,6 +26,7 @@ import urllib.parse
 
 # security libraries
 import secrets
+import hashlib
 
 # webui stuff
 import fastapi
@@ -235,6 +236,22 @@ class Webui(core.channel.Channel, ui_extensions.UiExtensionsMixin):
         if not self.config.get("require_login", False):
             return False
         return bool(self.config.get("username")) and bool(self.config.get("password"))
+
+    # -- AI GENERATED CODE (Qwen3-Coder Next) :: (11-06-2026) harness:openlumara
+    @property
+    def credentials_fingerprint(self) -> str:
+        """SHA-256 over the configured username+password, mixed with the
+        per-install session secret. Embedded into the session at login and
+        checked on every request/ws-handshake: the moment the credentials
+        change, the fingerprint changes and all previously issued sessions
+        are dead immediately -- the 'change my password to kick them out'
+        incident response actually works now."""
+        creds = "|".join((
+            self.session_secret_value,
+            str(self.config.get("username") or ""),
+            str(self.config.get("password") or ""),
+        ))
+        return hashlib.sha256(f"webui-creds|{creds}".encode("utf-8")).hexdigest()
 
     async def _verify_credentials(self, username: str, password: str) -> bool:
         """Verify credentials securely using timing-safe comparison.

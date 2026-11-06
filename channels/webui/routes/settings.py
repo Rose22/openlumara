@@ -99,6 +99,12 @@ def register(app, channel):
         # reload all webui extensions
         channel.setup_ui_extensions()
 
+        # if the webui's own settings changed, tell every connected client to refresh the page
+        old_webui = (old_config.get("channels") or {}).get("settings" or {}).get("webui") or {}
+        new_webui = (flattened.get("channels") or {}).get("settings" or {}).get("webui") or {}
+        if old_webui != new_webui:
+            await channel.websocket_manager.broadcast({"type": "refresh_page"})
+
         await channel.websocket_manager.push_context_update()
 
         return utils.api_result({

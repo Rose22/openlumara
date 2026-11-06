@@ -375,6 +375,12 @@ async function handleWebSocketMessage(data) {
 
             break;
 
+        case "refresh_page":
+            // -- AI GENERATED CODE (Qwen3-Coder Next) :: (11-06-2026) harness:openlumara
+            // webui settings changed on the server: reload so they apply
+            window.location.reload();
+            break;
+
         case "chat_switched":
             // make sure we sync chat switches across instances
             await chat.loadChat(data.id);

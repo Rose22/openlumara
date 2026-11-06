@@ -25,7 +25,12 @@ def register(app, channel):
         # channel.auth_enforced)
         if channel.auth_enforced:
             ws_session = websocket.scope.get("session") or {}
-            if not ws_session.get("authenticated", False):
+            # -- AI GENERATED CODE (Qwen3-Coder Next) :: (11-06-2026) harness:openlumara
+            # credential fingerprint must match too (see server.auth_middleware)
+            if (
+                not ws_session.get("authenticated", False)
+                or ws_session.get("creds_fp") != channel.credentials_fingerprint
+            ):
                 # check if rate limited
                 client_ip = utils.trusted_client_ip(websocket)
                 now = time.time()
