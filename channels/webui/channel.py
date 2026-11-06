@@ -78,6 +78,12 @@ class Webui(core.channel.Channel, ui_extensions.UiExtensionsMixin):
             "description": "What port to run the WebUI on. Set this to 80 to be able to access it like a normal website, and anything else to access it on that port (for example http://yourdomain.org:3000)",
             "default": 3000
         },
+        "trusted_networks": {
+            # defaults include common local networks, and tailscale (100.64.0.0/10)
+            "default": ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10", "fc00::/7"],
+            "description": "Because logins are disabled, you need protection from outside intruders (think of this like a firewall). Specify a list of IP ranges that are allowed to request private data from the webui's API. Clients in these ranges get full access while those coming from outside your network are refused. Set it to just your LAN's range (such as `192.168.0.0/24`) to tighten it, or to [] to only ever allow the machine itself.",
+            "depends": {"require_login": False}
+        },
         "enable_chat_header": {
             "description": "Whether to enable the header at the top of a chat. Disabling this removes access to all graphical controls, and strips the interface down to a very basic chat. You might want this for public instances!",
             "default": True

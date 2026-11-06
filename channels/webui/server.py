@@ -3,6 +3,7 @@ FastAPI creator: middleware, sessions, asset mounts and the module extension API
 """
 import os
 import hashlib
+import ipaddress
 
 import fastapi
 import fastapi.staticfiles
@@ -52,6 +53,34 @@ async def create_fastapi(channel):
         response.headers["Cross-Origin-Embedder-Policy"] = "credentialless"
         return response
 
+    # -- AI GENERATED CODE (Qwen3.8 Flash Next) :: (11-06-2026) harness:openlumara
+    # who counts as "this machine" for the crucial-endpoint gate: loopback
+    # always (can never be removed), plus any CIDR in the trusted_networks
+    # setting (defaults to the private ranges). Unparseable entries are
+    # skipped; a non-list value trusts nothing beyond loopback.
+    def _client_is_trusted(request):
+        host = request.client.host if request.client else None
+        if not host:
+            return False
+        try:
+            ip = ipaddress.ip_address(host)
+        except ValueError:
+            return False
+        if ip.is_loopback:
+            return True
+        nets = channel.config.get("trusted_networks", None)
+        if nets is None:
+            nets = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "fc00::/7"]
+        if not isinstance(nets, (list, tuple)):
+            return False
+        for entry in nets:
+            try:
+                if ip in ipaddress.ip_network(str(entry), strict=False):
+                    return True
+            except ValueError:
+                continue
+        return False
+
     # add authorization, cookies, and so on (middleware)
     @app.middleware("http")
     async def auth_middleware(request: fastapi.Request, call_next):
@@ -61,6 +90,32 @@ async def create_fastapi(channel):
             return fastapi.responses.JSONResponse(
                 status_code=403,
                 content={"data": "Missing request header", "success": False}
+            )
+
+        # -- AI GENERATED CODE (Qwen3.8 Flash Next) :: (11-06-2026) harness:openlumara
+        # crucial endpoints are only for trusted callers unless they prove
+        # who they are with a real login: requests from outside loopback and
+        # the trusted_networks ranges are refused here even with auth
+        # disabled. uvicorn runs with proxy_headers=True +
+        # forwarded_allow_ips="127.0.0.1", so same-machine tunnels
+        # (cloudflared/Caddy/nginx) get their client IP rewritten from
+        # X-Forwarded-For and count as remote, while LAN hosts can never
+        # forge their way in through XFF. a local process can only ever
+        # forge itself INTO the trusted class, never a remote one out of it.
+        if (
+            request.url.path in ADMIN_ONLY_ENDPOINTS
+            and not _client_is_trusted(request)
+            and not (
+                request.session.get("authenticated", False)
+                and request.session.get("creds_fp") == channel.credentials_fingerprint
+            )
+        ):
+            return fastapi.responses.JSONResponse(
+                status_code=403,
+                content={
+                    "data": "These endpoints are only reachable from this machine, or after logging in",
+                    "success": False,
+                }
             )
 
         if not channel.config.get("enable_admin_settings", True):

@@ -32,7 +32,13 @@ SYSTEM_STORE = {
         // modal and the endpoint is blocked, so skip them. /api/system/data
         // stays open since the context pill needs max_context from it.
         if (!window.ADMIN_SETTINGS_DISABLED) {
-            this.logs = await simpleApiFetch("/api/system/logs");
+            // logs are best-effort: a refusal (403/401 for remote or
+            // unauthenticated callers) must never break the load chain
+            try {
+                this.logs = await simpleApiFetch("/api/system/logs");
+            } catch (e) {
+                this.logs = [];
+            }
         }
         this.data = await simpleApiFetch("/api/system/data");
     }
