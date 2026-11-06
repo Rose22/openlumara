@@ -163,9 +163,10 @@
                         </div>
 
                         <!-- -- AI GENERATED CODE (Qwen3.8-Flash-Next-Q4) :: (2026-10-23)
-                             world info: keyword -> info pairs. entries whose
-                             keyword appears in the user's message get injected
-                             into the prompt (see on_message_inject in module.py).
+                             world info: entries with a keyword list + info.
+                             entries whose keyword appears in the user's
+                             message get injected into the prompt (see
+                             on_message_inject in module.py).
                              collapsed behind a header toggle (wiOpen). -->
                         <div class="char-mgr-field char-mgr-worldinfo">
                             <button type="button" class="char-wi-toggle" :aria-expanded="wiOpen"
@@ -188,10 +189,10 @@
 
                             <template x-for="(entry, idx) in form.world_info" :key="entry.id">
                                 <div class="char-wi-row">
-                                    <input type="text" x-model="entry.keyword"
-                                        placeholder="keyword" aria-label="world info keyword">
+                                    <input type="text" x-model="entry.keywords"
+                                        placeholder="keywords, comma-separated" aria-label="world info keywords">
                                     <textarea x-model="entry.info" rows="2"
-                                        placeholder="info to inject when the keyword matches"
+                                        placeholder="info to inject when any keyword matches"
                                         aria-label="world info text" x-autosize></textarea>
                                     <button type="button" class="char-wi-remove" @click="removeWorldInfo(idx)"
                                         title="Remove entry">

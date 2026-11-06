@@ -126,6 +126,50 @@ class Characters(core.module.Module):
         os.remove(old_file)
         print(f"[MIGRATE] migrated {len(migrated)} characters to folder storage")
 
+    # -- AI GENERATED CODE (Qwen3.8 Flash Next) :: (2026-11-06) harness:openlumara
+    def _normalize_world_info(self, world_info):
+        """converts old dict-based world info into the list-of-dicts format"""
+        if isinstance(world_info, dict):
+            # sillytavern character books store their entries dict under 'entries'
+            if isinstance(world_info.get("entries"), (dict, list)):
+                raw_entries = world_info["entries"]
+                if isinstance(raw_entries, dict):
+                    raw_entries = list(raw_entries.values())
+            else:
+                # plain {keyword: info} dict
+                raw_entries = {k: {"key": k, "content": v} for k, v in world_info.items()}
+
+            entries = []
+            for entry in raw_entries:
+                if not isinstance(entry, dict):
+                    continue
+                info = entry.get("content") or entry.get("info")
+                keywords = entry.get("key") or entry.get("keywords")
+                if not info or not keywords:
+                    continue
+                if isinstance(keywords, str):
+                    keywords = [k.strip() for k in keywords.split(",") if k.strip()]
+                entries.append({"keywords": keywords, "info": str(info).strip()})
+            return entries
+
+        if isinstance(world_info, list):
+            # repair list entries that came in as plain strings or a string keyword
+            entries = []
+            for entry in world_info:
+                if not isinstance(entry, dict):
+                    continue
+                if not entry.get("info"):
+                    continue
+                keywords = entry.get("keywords")
+                if isinstance(keywords, str):
+                    entry["keywords"] = [k.strip() for k in keywords.split(",") if k.strip()]
+                elif not keywords:
+                    continue
+                entries.append(entry)
+            return entries
+
+        return []
+
     def _normalize_character(self, stored_key, char):
         """converts a character of any supported format into openlumara's flat internal format"""
         if not isinstance(char, dict):
@@ -138,7 +182,7 @@ class Characters(core.module.Module):
                 "category": char.get("category"),
                 "profile": char.get("profile", ""),
                 "first_message": char.get("first_message", ""),
-                "world_info": char.get("world_info", "")
+                "world_info": self._normalize_world_info(char.get("world_info"))
             }
 
         # character card V2 wraps everything in a data field, V1 is flat
@@ -173,7 +217,7 @@ class Characters(core.module.Module):
             "category": char.get("category"),
             "profile": profile,
             "first_message": card.get("first_mes", char.get("first_message", "")),
-            "world_info": card.get("world_info") or card.get("character_book") or {}
+            "world_info": self._normalize_world_info(card.get("world_info") or card.get("character_book") or [])
         }
 
     # -- AI GENERATED CODE (Qwen3.8-Flash-Next-Q4) :: (2026-10-03)
@@ -420,9 +464,13 @@ class Characters(core.module.Module):
         char = self._find_character(curr_char_name)
 
         output = ""
-        for keyword, info in char.get("world_info").items():
-            if keyword.lower().strip() in user_message.lower().strip():
-                output += f"{keyword}: {info}\n"
+        for entry in char.get("world_info") or []:
+            # multiple keywords per world info entry
+            for keyword in entry.get("keywords") or []:
+                if keyword.lower().strip() in user_message.lower().strip():
+                    info = entry.get("info")
+                    output += f"{keyword}: {info}\n"
+                    break
 
         return output or None
 
@@ -560,7 +608,7 @@ class Characters(core.module.Module):
             "category": category or None,
             "profile": profile,
             "first_message": "",
-            "world_info": {}
+            "world_info": []
         }
         self.characters.save()
         return self.result("character added")
@@ -594,7 +642,7 @@ class Characters(core.module.Module):
             "category": category if category is not None else char.get("category"),
             "profile": profile if profile is not None else char.get("profile", ""),
             "first_message": first_message if first_message is not None else char.get("first_message", ""),
-            "world_info": char.get("world_info", {})
+            "world_info": char.get("world_info", [])
         }
         self.characters.save()
         return self.result("character edited")
@@ -768,7 +816,7 @@ class Characters(core.module.Module):
             "category": str(body.get("category", "")).strip() or None,
             "profile": profile,
             "first_message": str(body.get("first_message", "")),
-            "world_info": body.get("world_info", {})
+            "world_info": self._normalize_world_info(body.get("world_info"))
         }
         self.characters.save()
         return self.result(f"character {name} added")
@@ -800,7 +848,7 @@ class Characters(core.module.Module):
             "category": str(body.get("category", "")).strip() or None,
             "profile": profile,
             "first_message": str(body.get("first_message", "")),
-            "world_info": body.get("world_info", {})
+            "world_info": self._normalize_world_info(body.get("world_info"))
         }
 
         # rename: re-key the storage entry. save() prunes the old key's

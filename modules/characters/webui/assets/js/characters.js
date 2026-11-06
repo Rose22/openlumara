@@ -238,32 +238,56 @@ function characterManager() {
             this.view = 'editor';
         },
 
-        /* -- AI GENERATED CODE (Qwen3.8-Flash-Next-Q4) :: (2026-10-23)
-           world info is stored as a {keyword: info} object but edited as
-           rows; these helpers bridge the two shapes. non-string values
-           (e.g. a raw imported character_book entry) are kept round-trip
-           safe by displaying them as JSON. */
-        _worldInfoToRows(obj) {
-            if (!obj || typeof obj !== 'object') { return []; }
-            return Object.entries(obj).map(([keyword, info]) => ({
-                id: ++_wi_uid,
-                keyword: keyword,
-                info: typeof info === 'string' ? info : JSON.stringify(info),
-            }));
+        /* -- AI GENERATED CODE (Qwen3.8 Flash Next) :: (2026-11-06)
+           world info is stored as a list of {keywords: [...], info} entries;
+           edited as rows with a comma-separated keyword string per row.
+           also still accepts the old {keyword: info} dict shape, so a
+           not-yet-migrated character edits cleanly. */
+        _worldInfoToRows(wi) {
+            if (!wi || typeof wi !== 'object') { return []; }
+
+            // old dict shape (or a raw character_book): one row per key
+            if (!Array.isArray(wi)) {
+                const entries = (wi.entries && typeof wi.entries === 'object') ? wi.entries : wi;
+                const pairs = Array.isArray(entries)
+                    ? entries.map(e => [e && (e.key || e.keywords), e && (e.content || e.info)])
+                    : Object.entries(entries);
+                return pairs
+                    .filter(([kw, info]) => kw && info)
+                    .map(([kw, info]) => ({
+                        id: ++_wi_uid,
+                        keywords: Array.isArray(kw) ? kw.join(', ') : String(kw),
+                        info: typeof info === 'string' ? info : JSON.stringify(info),
+                    }));
+            }
+
+            return wi
+                .filter(e => e && typeof e === 'object' && e.info)
+                .map(e => ({
+                    id: ++_wi_uid,
+                    keywords: Array.isArray(e.keywords)
+                        ? e.keywords.join(', ')
+                        : String(e.keywords || e.keyword || ''),
+                    info: typeof e.info === 'string' ? e.info : JSON.stringify(e.info),
+                }));
         },
 
         _rowsToWorldInfo(rows) {
-            const out = {};
+            const out = [];
             for (const row of rows) {
-                const keyword = (row.keyword || '').trim();
-                if (!keyword) { continue; }
-                out[keyword] = row.info || '';
+                const keywords = (row.keywords || '')
+                    .split(',')
+                    .map(k => k.trim())
+                    .filter(k => k);
+                const info = (row.info || '').trim();
+                if (!keywords.length || !info) { continue; }
+                out.push({ keywords: keywords, info: info });
             }
             return out;
         },
 
         addWorldInfo() {
-            this.form.world_info.push({ id: ++_wi_uid, keyword: '', info: '' });
+            this.form.world_info.push({ id: ++_wi_uid, keywords: '', info: '' });
         },
 
         removeWorldInfo(idx) {
