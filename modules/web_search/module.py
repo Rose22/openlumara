@@ -28,9 +28,10 @@ class WebSearch(modules.http.Http):
             "default": None,
             "description": "An optional proxy string (e.g., 'http://user:pass@host:port') for the HTTP client."
         },
-        "block_uncommon_ports": {
-            "default": True,
-            "description": "Block dangerous ports, such as FTP, SSH, Telnet, SMTP, and so on"
+        # -- AI GENERATED CODE (Qwen3.8 Flash Next) :: (11-06-2026) harness:openlumara
+        "allowed_ports": {
+            "default": [80, 443],
+            "description": "Only allow requests to these ports. URLs without an explicit port use the default of their scheme (http -> 80, https -> 443)"
         },
         "block_local_network_access": {
             "default": True,
@@ -94,8 +95,10 @@ class WebSearch(modules.http.Http):
         if not hostname:
             return False
 
-        # Block dangerous ports even at display time.
-        if parsed.port and parsed.port in self.DANGEROUS_PORTS:
+        # -- AI GENERATED CODE (Qwen3.8 Flash Next) :: (11-06-2026) harness:openlumara
+        # mirror the port allow-list even at display time.
+        effective_port = parsed.port or (443 if parsed.scheme.lower() == "https" else 80)
+        if effective_port not in self._allowed_ports():
             return False
 
         ok, _err = self._check_domain_policy(hostname)

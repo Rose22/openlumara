@@ -799,22 +799,9 @@ class Http(core.module.Module):
     DOWNLOAD_CHUNK = 64 * 1024            # 64KB streaming chunks
     MAX_CONTENT_FOR_PROMPT = 50000        # Characters
 
-    # Dangerous ports to block
-    DANGEROUS_PORTS = {
-        21,    # FTP
-        22,    # SSH
-        23,    # Telnet
-        25,    # SMTP
-        53,    # DNS
-        110,   # POP3
-        143,   # IMAP
-        445,   # SMB
-        993,   # IMAPS
-        995,   # POP3S
-        1433,  # MSSQL
-        3306,  # MySQL
-        5432,  # PostgreSQL
-    }
+    # -- AI GENERATED CODE (Qwen3.8 Flash Next) :: (11-06-2026) harness:openlumara
+    # port access is an allow-list now (see the 'allowed_ports' setting and
+    # _allowed_ports()); the old dangerous-port blocklist is gone.
 
     # ==================== Prompt-injection envelope ====================
     INJECTION_NOTICE = (
@@ -824,9 +811,9 @@ class Http(core.module.Module):
     )
 
     settings = {
-        "block_uncommon_ports": {
-            "default": True,
-            "description": "Block dangerous ports, such as FTP, SSH, Telnet, SMTP, and so on"
+        "allowed_ports": {
+            "default": [80, 443],
+            "description": "Only allow requests to these ports. URLs without an explicit port use the default of their scheme (http -> 80, https -> 443)"
         },
         "block_local_network_access": {
             "default": True,
@@ -886,7 +873,13 @@ class Http(core.module.Module):
                 log=self._log,
             )
             connector = aiohttp.TCPConnector(resolver=self._resolver)
-            self._session = aiohttp.ClientSession(connector=connector)
+            # -- AI GENERATED CODE (Qwen3.8 Flash Next) :: (11-06-2026) harness:openlumara
+            # no cookie persistence, ever: DummyCookieJar refuses to store or
+            # replay cookies, so no cross-chat / cross-host session state.
+            self._session = aiohttp.ClientSession(
+                connector=connector,
+                cookie_jar=aiohttp.DummyCookieJar(),
+            )
         return self._session
 
     async def on_shutdown(self):
@@ -1045,6 +1038,20 @@ class Http(core.module.Module):
 
     # ==================== SSRF Protection ====================
 
+    # -- AI GENERATED CODE (Qwen3.8 Flash Next) :: (11-06-2026) harness:openlumara
+    def _allowed_ports(self):
+        """port allow-list from config; fail closed on missing/garbage config"""
+        ports = self.config.get("allowed_ports", [80, 443])
+        if not isinstance(ports, (list, tuple)):
+            return set()
+        result = set()
+        for p in ports:
+            try:
+                result.add(int(p))
+            except (TypeError, ValueError):
+                continue
+        return result
+
     def _check_domain_policy(self, hostname: str):
         """
         Whitelist / blacklist / metadata-hostname checks (no DNS).
@@ -1074,7 +1081,7 @@ class Http(core.module.Module):
 
         return True, None
 
-    def _resolve_and_validate(self, hostname: str):
+    async def _resolve_and_validate(self, hostname: str):
         """
         Resolve a hostname to IP(s) and validate ALL of them against the
         blocked-network list. Returns (ok, error_message).
@@ -1083,11 +1090,14 @@ class Http(core.module.Module):
         hop) defeats the common 'hostname -> private IP' and single-record
         DNS-rebinding cases.
         """
-        if not self.config.get("block_local_network_access"):
+        # -- AI GENERATED CODE (Qwen3.8 Flash Next) :: (11-06-2026) harness:openlumara
+        # fail-closed default (matches ValidatingResolver); getaddrinfo moved
+        # off the event loop so slow DNS can't stall the whole app.
+        if not self.config.get("block_local_network_access", True):
             return True, None
 
         try:
-            infos = socket.getaddrinfo(hostname, None)
+            infos = await asyncio.to_thread(socket.getaddrinfo, hostname, None)
         except socket.gaierror as e:
             self._log(f"DNS resolution failed for {hostname}: {e}")
             return False, "DNS resolution failed"
@@ -1103,7 +1113,7 @@ class Http(core.module.Module):
 
         return True, None
 
-    def _is_safe_url(self, url: str):
+    async def _is_safe_url(self, url: str):
         """
         Full safety validation for a URL we are about to *connect to*.
 
@@ -1130,9 +1140,11 @@ class Http(core.module.Module):
             return False, "URL has no hostname"
         hostname = hostname.lower()
 
-        # Port
-        if parsed.port and parsed.port in self.DANGEROUS_PORTS:
-            return False, f"Port {parsed.port} is blocked"
+        # -- AI GENERATED CODE (Qwen3.8 Flash Next) :: (11-06-2026) harness:openlumara
+        # Port allow-list. No explicit port -> the scheme's default port.
+        effective_port = parsed.port or (443 if parsed.scheme.lower() == "https" else 80)
+        if effective_port not in self._allowed_ports():
+            return False, f"Port {effective_port} is not in the allowed ports list"
 
         # Domain policy (whitelist/blacklist/metadata names)
         ok, err = self._check_domain_policy(hostname)
@@ -1140,13 +1152,13 @@ class Http(core.module.Module):
             return False, err
 
         # Localhost shortcut (covered by IP check too, but cheap to short-circuit)
-        if self.config.get("block_local_network_access") and hostname in (
+        if self.config.get("block_local_network_access", True) and hostname in (
             'localhost', '0.0.0.0',
         ):
             return False, "Blocked localhost access"
 
         # DNS + resolved-IP validation
-        return self._resolve_and_validate(hostname)
+        return await self._resolve_and_validate(hostname)
 
     # ==================== URL Format Validation ====================
 
@@ -1179,8 +1191,10 @@ class Http(core.module.Module):
             if not parsed.hostname:
                 return False, "URL must include a valid hostname"
 
-            if parsed.port and parsed.port in self.DANGEROUS_PORTS:
-                return False, f"Port {parsed.port} is blocked for security reasons"
+            # -- AI GENERATED CODE (Qwen3.8 Flash Next) :: (11-06-2026) harness:openlumara
+            effective_port = parsed.port or (443 if parsed.scheme.lower() == "https" else 80)
+            if effective_port not in self._allowed_ports():
+                return False, f"Port {effective_port} is not in the allowed ports list"
 
             return True, None
 
@@ -1296,6 +1310,8 @@ class Http(core.module.Module):
         - Enforces rate limit.
         - Sanitizes headers/params/data.
         - Re-validates EVERY redirect hop (SSRF via 302 protection).
+        - Strips Authorization/Cookie headers on every redirect, and converts
+          301/302/303 follow-ups to a body-less GET.
         - Streams the body with a hard byte cap (does not trust Content-Length).
         - Returns generic error messages to the model; logs full detail.
         """
@@ -1330,10 +1346,15 @@ class Http(core.module.Module):
         }
 
         current_url = url
+        # -- AI GENERATED CODE (Qwen3.8 Flash Next) :: (11-06-2026) harness:openlumara
+        # per-hop request state: credentials never cross a redirect, and
+        # 301/302/303 convert the follow-up request to a body-less GET.
+        current_method = method
+        hop_passthrough = dict(passthrough)
         try:
             for _hop in range(self.MAX_REDIRECTS + 1):
                 # Re-validate (incl. DNS + IP) on the initial URL and every hop.
-                ok, err = self._is_safe_url(current_url)
+                ok, err = await self._is_safe_url(current_url)
                 if not ok:
                     self._log(f"Blocked URL ({current_url}): {err}")
                     return self.result("URL blocked by security policy", False)
@@ -1341,12 +1362,12 @@ class Http(core.module.Module):
                 # aiohttp doesn't have a per-call verify flag; the default
                 # connector always verifies TLS, which is what we want.
                 resp = await self._get_session().request(
-                    method,
+                    current_method,
                     current_url,
                     headers=headers,
                     allow_redirects=False,   # manual redirect handling
                     timeout=aiohttp.ClientTimeout(total=timeout),
-                    **passthrough,
+                    **hop_passthrough,
                 )
 
                 try:
@@ -1356,6 +1377,22 @@ class Http(core.module.Module):
                         resp.close()
                         if not location:
                             return self.result("Redirect with no Location header", False)
+
+                        # credentials never cross a redirect: strip auth and
+                        # cookie headers for every subsequent hop.
+                        for header_name in list(headers.keys()):
+                            if header_name.lower() in ("authorization", "cookie"):
+                                del headers[header_name]
+
+                        # 301/302/303: follow up with a body-less GET (RFC 9110);
+                        # 307/308 keep the original method and body.
+                        if resp.status in (301, 302, 303):
+                            current_method = "GET"
+                            hop_passthrough = {
+                                k: v for k, v in hop_passthrough.items()
+                                if k not in ("data", "json")
+                            }
+
                         current_url = urllib.parse.urljoin(current_url, location)
                         continue
 
