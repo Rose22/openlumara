@@ -8,14 +8,8 @@
             <button class="close" @click="close()" aria-label="Close settings">×</button>
         </div>
 
-        <!-- Error State -->
-        <div x-show="error" class="settings-error">
-            <span x-text="error"></span>
-            <button @click="load()">Retry</button>
-        </div>
-
         <!-- Settings Content -->
-        <div class="body" x-show="!error">
+        <div class="body" x-show="!$store.settings.error">
             <!-- SIDEBAR NAV -->
             {% include 'modals/settings/sidebar.html' %}
 
@@ -27,7 +21,7 @@
                 </div>
 
                 <template x-if="!$store.settings.loading">
-                    <div class="content">
+                    <div class="content">                        
                         <!-- Mobile: show category list when no category selected -->
                         <template x-if="mobile && !activeCategory">
                             <div class="mobile-category-list">
@@ -39,6 +33,16 @@
                             </div>
                         </template>
 
+                        <!-- Errors -->
+                        <div class="save-error" x-show="$store.settings.saveError" x-cloak>
+                            <span x-text="$store.settings.saveError"></span>
+                        </div>
+                        
+                        <div x-show="$store.settings.error" class="error">
+                            <span x-text="$store.settings.error"></span>
+                            <button @click="$store.settings.load()">Retry</button>
+                        </div>
+                        
                         <!-- MODULES CONTENT -->
                         {% include 'modals/settings/modules.html' %}
 

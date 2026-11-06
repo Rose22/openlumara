@@ -66,6 +66,33 @@ def register(app, channel):
         # the frontend sends the category tree it got from settings/load,
         # with edited values, rebuild the raw config dict from it
         flattened = settings_structure.flatten_categories(data.get("categories", {}))
+        new_webui = ((flattened.get("channels") or {}).get("settings") or {}).get("webui") or {}
+
+        if new_webui.get("require_login"):
+            blank = [f for f in ("username", "password") if not (new_webui.get(f) or "").strip()]
+            if blank:
+                if len(blank) == 2:
+                    detail = "both username and password are still blank. Please fill in both fields"
+                else:
+                    detail = f"{blank[0]} is still blank. Please fill it in"
+                return utils.api_result(
+                    f"Logins are enabled but {detail}, or turn logins off.",
+                    success=False,
+                )
+
+        new_mode = new_webui.get("network_mode", "local")
+        if new_mode in ("internet", "custom"):
+            login_ok = (
+                bool(new_webui.get("require_login"))
+                and bool((new_webui.get("username") or "").strip())
+                and bool(new_webui.get("password"))
+            )
+            if not login_ok:
+                return utils.api_result(
+                    f"network mode '{new_mode}' exposes the WebUI beyond this machine, so a login is required. "
+                    "Please enable 'Require login' and fill in a username and password, or switch the network mode back to local.",
+                    success=False,
+                )
 
         # snapshot the pre-save config so we can tell the frontend whether
         # the changes need a server restart or an API reconnect

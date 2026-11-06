@@ -10,6 +10,12 @@ SETTINGS_STORE = {
 
     activeCategory: null,
     loading: false,
+
+    // --- Error State ---
+    // error: full-page load failure | saveError: dismissible banner at the
+    // top of the settings page, fed by the server's refusal messages
+    error: null,
+    saveError: null,
     
     // --- Feature Flags ---
     showUnsafe: false,
@@ -75,6 +81,7 @@ SETTINGS_STORE = {
     async load() {
         this.loading = true;
         this.error = null;
+        this.saveError = null;
 
         try {
             const payload = await simpleApiFetch('/api/settings/load');
@@ -129,6 +136,7 @@ SETTINGS_STORE = {
     async saveSettings() {
         this.loading = true;
         this.error = null;
+        this.saveError = null;
 
         console.log("saving settings to server..");
 
@@ -171,7 +179,7 @@ SETTINGS_STORE = {
 
             this.changedModuleSettings.clear();
         } catch (err) {
-            this.error = err.message || 'Failed to save settings';
+            this.saveError = (err && err.message) ? err.message : (err || 'Failed to save settings');
         } finally {
             this.loading = false;
         }
@@ -196,6 +204,7 @@ SETTINGS_STORE = {
 
         this.changedModuleSettings.clear();
         this.error = null;
+        this.saveError = null;
         this.apiError = null;
     },
 

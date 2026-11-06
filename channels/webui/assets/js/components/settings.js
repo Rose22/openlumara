@@ -153,9 +153,9 @@ function settingsModal() {
 
         async saveAndClose() {
             await Alpine.store('settings').saveSettings();
-            // a failed save keeps the modal (and the prompt) open; the
-            // store error banner shows what went wrong
-            if (Alpine.store('settings').error) return;
+
+            const store = Alpine.store('settings');
+            if (store.error || store.saveError) return;
             await Alpine.store('ui').closeModal();
         },
 

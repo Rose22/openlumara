@@ -21,6 +21,7 @@ import core
 
 # system
 import os
+import sys
 import asyncio
 import urllib.parse
 
@@ -65,8 +66,8 @@ class Webui(core.channel.Channel, ui_extensions.UiExtensionsMixin):
             "type": "select",
             "options": {
                 "local": "Allows only the device OpenLumara is running on to access the WebUI (sets hostname to `localhost`)",
-                "internet": "Allows any device to access the WebUI (sets hostname to `0.0.0.0`)",
-                "custom": "Use the custom hostname defined below"
+                "internet": "Allows any device to access the WebUI (sets hostname to `0.0.0.0`). For safety, this can only be used with logins enabled!",
+                "custom": "Use the custom hostname defined below. For safety, this can only be used with logins enabled!"
             },
             "default": "local"
         },
@@ -357,6 +358,17 @@ The WebUI has support for an extra feature:
         )
 
     async def run(self):
+        if self.config.get("network_mode") == "internet" and not self.auth_enforced:
+            msg = """
+WebUI startup aborted! Setting are insecure:
+
+network mode is 'internet' but no login is configured.
+Set require_login to true with a username and password, or change network_mode back to 'local'
+Edit the config file for this, or use /config
+            """.strip()
+            self.log("webui", msg)
+            return
+
         self.log("webui", f"Starting WebUI on {self.url}")
 
         # serve the app using uvicorn

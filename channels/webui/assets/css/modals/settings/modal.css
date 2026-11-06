@@ -64,6 +64,20 @@
         }
     }
 
+    .save-error {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 10px 16px;
+        margin: 20px 12px;
+        color: var(--error);
+        font-size: 14px;
+        background: var(--error-bg);
+        border: 1px solid var(--error-border);
+        border-radius: var(--radius-sm);
+    }
+
     /* --- Body Layout --- */
     .body {
         display: flex;
