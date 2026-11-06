@@ -39,7 +39,7 @@ class ApiBridge(core.channel.Channel):
         },
         "api_key_required": {
             "type": "boolean",
-            "description": "Whether to require an API key to use this api endpoint. Recommended! Without it, any device that can reach the port can use your AI!",
+            "description": "Whether to require an API key to use this api endpoint. Recommended for public instances, otherwise anyone can use your AI!",
             "default": True
         },
         "api_key": {
