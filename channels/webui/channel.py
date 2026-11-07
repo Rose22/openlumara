@@ -288,8 +288,7 @@ WebUI layout:
     - messages area, contains current chat's messages
     - input bar: upload button | input field | send/stop button
 
-The WebUI has support for an extra feature:
-- You can render HTML and SVG's directly in the user's browser by outputting the code without fencing it in ```code blocks```
+You can render HTML and SVG directly in the user's browser by writing it raw, as plain text flowing between your paragraphs - markup written this way renders live. Reserve ``` fences exclusively for source code the user should read as text.
 """.strip()
 
     async def on_ready(self):
