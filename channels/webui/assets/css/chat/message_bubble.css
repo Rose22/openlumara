@@ -98,7 +98,7 @@
 
         a:hover {
             text-decoration: underline;
-            color: var(--accent-light);
+            color: var(--accent-light, color-mix(in srgb, var(--accent) 65%, var(--text-primary)));
         }
 
         hr {
