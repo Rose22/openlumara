@@ -90,10 +90,10 @@ class Chat:
 
             characters_mod = self.channel.manager.modules.get("characters")
             if characters_mod:
-                for kept_module in (characters_mod.config.get("kept_tool_modules") or []):
-                    kept_name = str(kept_module).strip().lower()
-                    if kept_name and kept_name not in char_modules_exempt:
-                        char_modules_exempt.append(kept_name)
+                for enabled_module in (characters_mod.config.get("enabled_modules") or []):
+                    enabled_name = str(enabled_module).strip().lower()
+                    if enabled_name and enabled_name not in char_modules_exempt:
+                        char_modules_exempt.append(enabled_name)
 
             if active_character and module_name not in char_modules_exempt and "characters" in self.channel.manager.modules.keys():
                 # if a character is currently active, display ONLY the character system prompt
