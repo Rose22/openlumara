@@ -483,7 +483,7 @@ class Characters(core.module.Module):
         user_profile = self.config.get("your_profile").strip()
         if user_profile:
             user_name = self.config.get("your_name").strip()
-            character_text_build.append(f"## The user: {user_name}\n{self._replace_tags(user_profile)}")
+            character_text_build.append(f"## The user: {user_name}\n{self._replace_tags(char_name, user_profile)}")
 
         char_text = "\n\n".join(character_text_build)
 
