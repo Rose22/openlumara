@@ -29,7 +29,7 @@ class Characters(core.module.Module):
             "description": "Describe yourself here. Stuff like your appearance, what you like and dislike, hobbies, etc. Just an overall profile of yourself. The AI will see this so that every character knows who you are!",
             "default": ""
         },
-        "kept_tool_modules": {
+        "enabled_modules": {
             "default": [],
             "type": "list",
             "description": "Module names whose tools and system prompts stay available while a character in Character mode is active. For example: web_search. Characters set to Assistant mode are never restricted",
@@ -73,28 +73,28 @@ class Characters(core.module.Module):
         """sets the channel's tool availability for the active character's mode.
         char is the resolved character dict, or None when no character is active.
         Assistant characters (and no character at all) keep everything; Character
-        mode keeps only the kept tool modules' tools"""
+        mode keeps only the enabled modules' tools"""
         if char is None or char.get("mode") == "Assistant":
             self.channel.force_disable_tools = False
             self.channel.override_tools = None
             return
 
-        kept = [
+        enabled = [
             str(m).strip().lower()
-            for m in (self.config.get("kept_tool_modules") or [])
+            for m in (self.config.get("enabled_modules") or [])
             if str(m).strip()
         ]
 
         tools = [
             entry["tool"]
             for entry in self.channel.tool_loader.catalog.values()
-            if entry["module"] in kept
+            if entry["module"] in enabled
         ]
 
         if not tools:
-            # nothing kept (or no kept name matched a loaded tool): full tool
-            # blackout. this has to go through force_disable_tools, because an
-            # empty override list is falsy and would fall back to the full set.
+            # nothing enabled (or no enabled name matched a loaded tool): full
+            # tool blackout. this has to go through force_disable_tools, because
+            # an empty override list is falsy and would fall back to the full set.
             self.channel.force_disable_tools = True
             self.channel.override_tools = None
         else:
@@ -635,7 +635,7 @@ class Characters(core.module.Module):
             name: The character's name
             profile: The main description of the character. Within it, use {{char}} to refer to the character and {{user}} to refer to the user.
             category: Category to organize the character under. Optional.
-            mode: Character (pure roleplay: only the character prompt stays, tools limited to the kept tool modules) or Assistant (full system prompt and all tools). Optional, defaults to Character.
+            mode: Character (pure roleplay: only the character prompt stays, tools limited to the enabled modules) or Assistant (full system prompt and all tools). Optional, defaults to Character.
         """
         if not name.strip():
             return self.result("character name cannot be empty", False)
