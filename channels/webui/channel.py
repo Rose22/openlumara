@@ -289,7 +289,7 @@ WebUI layout:
     - input bar: upload button | input field | send/stop button
 
 The WebUI has support for an extra feature:
-- Your response streams directly into the page's DOM, so raw HTML/SVG you write appears on screen as live elements. Text wrapped in ``` backticks renders verbatim in a code box instead.
+- You can render HTML and SVG's directly in the user's browser by outputting the code without fencing it in ```code blocks```
 """.strip()
 
     async def on_ready(self):
