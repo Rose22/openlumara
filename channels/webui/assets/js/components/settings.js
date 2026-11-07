@@ -233,7 +233,13 @@ function settingsModal() {
                         currentValue = currentValue[key]?.value;
                     }
                     
-                    if (currentValue !== expectedValue) return false;
+                    // -- AI GENERATED CODE (Qwen3.8 Flash Next) :: (2026-11-07) harness:openlumara status:reviewed
+                    // an array expected value means "any of these values" (e.g. {"mode": ["Pure", "Full System Prompt"]})
+                    if (Array.isArray(expectedValue)) {
+                        if (!expectedValue.includes(currentValue)) return false;
+                    } else if (currentValue !== expectedValue) {
+                        return false;
+                    }
                 }
                 return true;
             }

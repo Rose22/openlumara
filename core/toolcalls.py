@@ -147,6 +147,18 @@ class ToolcallManager:
             # check for meta tools (like tools_load) if dynamic tool loading is enabled
             dynamic_loading = core.config.get("model", "dynamic_tool_loading", default=True)
             if tool_name in tool_loader.meta_tool_names:
+                if self.channel.override_tools and dynamic_loading:
+                    rejected_msg = json.dumps({
+                        "content": "Tool loading is unavailable right now: only a fixed set of tools is accessible.",
+                        "status": "error"
+                    })
+                    await ctx_add({
+                        "role": "tool",
+                        "tool_call_id": tool_call_dict['id'],
+                        "content": rejected_msg
+                    })
+                    yield {"type": "tool", "tool_call_id": tool_call_dict['id'], "content": rejected_msg}
+                    continue
                 if not dynamic_loading:
                     rejected_msg = json.dumps({
                         "content": "Dynamic tool loading is disabled. The meta tool (tools_load) is not available. You have access to all available tools without needing to load them.",
@@ -208,7 +220,11 @@ class ToolcallManager:
                     continue
 
                 # check if tool is loaded
-                if tool_name not in self.channel.manager.tool_names:
+                if self.channel.override_tools:
+                    loaded_names = [t["function"]["name"] for t in self.channel.override_tools]
+                else:
+                    loaded_names = self.channel.manager.tool_names
+                if tool_name not in loaded_names:
                     if not dynamic_loading:
                         rejected_msg = json.dumps({
                             "content": f"Tool {tool_name} is not available. This tool may be disabled or unavailable.",

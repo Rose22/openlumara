@@ -480,7 +480,8 @@
 }
 
 .characters-modal .char-mgr-field input,
-.characters-modal .char-mgr-field textarea {
+.characters-modal .char-mgr-field textarea,
+.characters-modal .char-mgr-field select {
     padding: 8px 10px;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-sm);
@@ -499,7 +500,8 @@
 }
 
 .characters-modal .char-mgr-field input:focus,
-.characters-modal .char-mgr-field textarea:focus {
+.characters-modal .char-mgr-field textarea:focus,
+.characters-modal .char-mgr-field select:focus {
     outline: none;
     border-color: var(--accent);
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 15%, transparent);

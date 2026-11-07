@@ -193,6 +193,7 @@ function characterManager() {
             first_message: '',
             post_history: '',
             category: '',
+            mode: 'Character',  // Character (pure) | Assistant (full system prompt + tools)
             tags: '',      // comma-separated string in the form
             world_info: [],  // [{id, keyword, info}] rows
         },
@@ -232,6 +233,7 @@ function characterManager() {
                 first_message: '',
                 post_history: '',
                 category: '',
+                mode: 'Character',
                 tags: '',
                 world_info: [],
             };
@@ -320,6 +322,7 @@ function characterManager() {
                 first_message: char.first_message || '',
                 post_history: char.post_history || '',
                 category: char.category || '',
+                mode: char.mode === 'Assistant' ? 'Assistant' : 'Character',
                 tags: (char.tags || []).join(', '),
                 world_info: wiRows,
             };
@@ -347,6 +350,7 @@ function characterManager() {
                 first_message: this.form.first_message,
                 post_history: this.form.post_history,
                 category: this.form.category.trim(),
+                mode: this.form.mode,
                 tags: this.form.tags,
                 world_info: this._rowsToWorldInfo(this.form.world_info),
             };

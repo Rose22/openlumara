@@ -29,9 +29,10 @@ class Characters(core.module.Module):
             "description": "Describe yourself here. Stuff like your appearance, what you like and dislike, hobbies, etc. Just an overall profile of yourself. The AI will see this so that every character knows who you are!",
             "default": ""
         },
-        "pure_mode": {
-            "default": True,
-            "description": "Automatically disables all prompts and tools from other modules when a character is active, so that the only thing in the system prompt is the character definition. This can help a lot with making characters behave purely like characters, and less like, well, personal assistants."
+        "kept_tool_modules": {
+            "default": [],
+            "type": "list",
+            "description": "Module names whose tools and system prompts stay available while a character in Character mode is active. For example: web_search. Characters set to Assistant mode are never restricted",
         },
         "use_first_messages": {
             "description": "Whether a character's first message gets sent automatically when switching to that character in an empty chat",
@@ -59,6 +60,46 @@ class Characters(core.module.Module):
         if self.config.get("enable_character_awareness"):
             # disable character listing tool
             self.disabled_tools.append("get_all")
+
+    def character_mode(self, name):
+        """the mode of a stored character: Character (default) or Assistant.
+        used by core/chat.py to decide whether to suppress other modules' prompts"""
+        char = self._find_character(name)
+        if not char:
+            return "Character"
+        return char.get("mode") or "Character"
+
+    def _apply_tool_mode(self, char):
+        """sets the channel's tool availability for the active character's mode.
+        char is the resolved character dict, or None when no character is active.
+        Assistant characters (and no character at all) keep everything; Character
+        mode keeps only the kept tool modules' tools"""
+        if char is None or char.get("mode") == "Assistant":
+            self.channel.force_disable_tools = False
+            self.channel.override_tools = None
+            return
+
+        kept = [
+            str(m).strip().lower()
+            for m in (self.config.get("kept_tool_modules") or [])
+            if str(m).strip()
+        ]
+
+        tools = [
+            entry["tool"]
+            for entry in self.channel.tool_loader.catalog.values()
+            if entry["module"] in kept
+        ]
+
+        if not tools:
+            # nothing kept (or no kept name matched a loaded tool): full tool
+            # blackout. this has to go through force_disable_tools, because an
+            # empty override list is falsy and would fall back to the full set.
+            self.channel.force_disable_tools = True
+            self.channel.override_tools = None
+        else:
+            self.channel.force_disable_tools = False
+            self.channel.override_tools = tools
 
     # -- AI GENERATED CODE (Qwen3.8-Flash-Next-Q4) :: (2026-10-03)
     # Migration from the old single-file characters.json to folder storage, following the same safety protocol as core/chat.py:
@@ -182,7 +223,8 @@ class Characters(core.module.Module):
                 "category": char.get("category"),
                 "profile": char.get("profile", ""),
                 "first_message": char.get("first_message", ""),
-                "world_info": self._normalize_world_info(char.get("world_info"))
+                "world_info": self._normalize_world_info(char.get("world_info")),
+                "mode": char.get("mode") or "Character"
             }
 
         # character card V2 wraps everything in a data field, V1 is flat
@@ -217,7 +259,8 @@ class Characters(core.module.Module):
             "category": char.get("category"),
             "profile": profile,
             "first_message": card.get("first_mes", char.get("first_message", "")),
-            "world_info": self._normalize_world_info(card.get("world_info") or card.get("character_book") or [])
+            "world_info": self._normalize_world_info(card.get("world_info") or card.get("character_book") or []),
+            "mode": char.get("mode") or "Character"
         }
 
     # -- AI GENERATED CODE (Qwen3.8-Flash-Next-Q4) :: (2026-10-03)
@@ -374,6 +417,7 @@ class Characters(core.module.Module):
                 return "please provide a character name."
         elif name in("reset", "default"):
                 self.channel.context.chat.get("metadata")["character"] = ""
+                self._apply_tool_mode(None)
                 return "character has been reset to default"
 
         character = self._find_character(name)
@@ -393,9 +437,15 @@ class Characters(core.module.Module):
 
     async def on_system_prompt(self):
         curr_char = self.channel.context.chat.get("metadata").get("character")
+        char = self._find_character(curr_char) if curr_char else None
 
-        if self.config.get("pure_mode"):
-            self.channel.force_disable_tools = (True if curr_char else False)
+        # if the character was deleted (or the metadata holds a stale/invalid
+        # value), clean it up so the rest of the prompt isn't broken
+        if curr_char and not char:
+            self.channel.context.chat.get("metadata")["character"] = ""
+            curr_char = ""
+
+        self._apply_tool_mode(char if curr_char else None)
 
         tool_text = f"Characters available to switch yourself to:\n{await self._list_characters()}" if (
             core.config.get("model", {}).get("use_tools") and
@@ -404,14 +454,6 @@ class Characters(core.module.Module):
         ) else ""
 
         if not curr_char:
-            return tool_text or None
-
-        char = self._find_character(curr_char)
-
-        # if the character was deleted (or the metadata holds a stale/invalid
-        # value), clean it up so the rest of the prompt isn't broken
-        if not char:
-            self.channel.context.chat.get("metadata")["character"] = ""
             return tool_text or None
 
         char_name = char.get("name", curr_char)
@@ -490,8 +532,7 @@ class Characters(core.module.Module):
         # allow system prompt to be regenerated
         self.channel.context.chat._cached_system_prompt = None
 
-        if self.config.get("pure_mode"):
-            self.channel.force_disable_tools = True
+        self._apply_tool_mode(char)
 
         first_msg = char.get("first_message", "")
         if first_msg and self.config.get("use_first_messages"):
@@ -514,6 +555,8 @@ class Characters(core.module.Module):
 
         # allow system prompt to be regenerated
         self.channel.context.chat._cached_system_prompt = None
+
+        self._apply_tool_mode(None)
 
         return "success"
 
@@ -581,7 +624,7 @@ class Characters(core.module.Module):
         return character
 
     @core.module.tool
-    async def add(self, name: str, profile: str, category: str = ""):
+    async def add(self, name: str, profile: str, category: str = "", mode: str = "Character"):
         """
         Adds a new character to your character storage.
 
@@ -592,6 +635,7 @@ class Characters(core.module.Module):
             name: The character's name
             profile: The main description of the character. Within it, use {{char}} to refer to the character and {{user}} to refer to the user.
             category: Category to organize the character under. Optional.
+            mode: Character (pure roleplay: only the character prompt stays, tools limited to the kept tool modules) or Assistant (full system prompt and all tools). Optional, defaults to Character.
         """
         if not name.strip():
             return self.result("character name cannot be empty", False)
@@ -608,13 +652,14 @@ class Characters(core.module.Module):
             "category": category or None,
             "profile": profile,
             "first_message": "",
-            "world_info": []
+            "world_info": [],
+            "mode": mode or "Character"
         }
         self.characters.save()
         return self.result("character added")
 
     @core.module.tool
-    async def edit(self, name: str, profile: str = None, category: str = None, first_message: str = None):
+    async def edit(self, name: str, profile: str = None, category: str = None, first_message: str = None, mode: str = None):
         """
         Edits an existing character. All fields except name are optional.
 
@@ -623,6 +668,7 @@ class Characters(core.module.Module):
             profile: The main description of the character. Within it, use {{char}} to refer to the character and {{user}} to refer to the user.
             category: Category to organize the character under
             first_message: The first message the character will send when starting a new chat.
+            mode: Character (pure roleplay) or Assistant (full system prompt and all tools). Optional.
         """
         if not name.strip():
             return self.result("character name cannot be empty", False)
@@ -642,7 +688,8 @@ class Characters(core.module.Module):
             "category": category if category is not None else char.get("category"),
             "profile": profile if profile is not None else char.get("profile", ""),
             "first_message": first_message if first_message is not None else char.get("first_message", ""),
-            "world_info": char.get("world_info", [])
+            "world_info": char.get("world_info", []),
+            "mode": mode or char.get("mode") or "Character"
         }
         self.characters.save()
         return self.result("character edited")
@@ -783,7 +830,8 @@ class Characters(core.module.Module):
                 "category": char.get("category") or "",
                 "profile": char.get("profile", ""),
                 "first_message": char.get("first_message", ""),
-                "world_info": char.get("world_info")
+                "world_info": char.get("world_info"),
+                "mode": char.get("mode") or "Character"
             })
         chars.sort(key=lambda c: c["name"].lower())
         return chars
@@ -816,7 +864,8 @@ class Characters(core.module.Module):
             "category": str(body.get("category", "")).strip() or None,
             "profile": profile,
             "first_message": str(body.get("first_message", "")),
-            "world_info": self._normalize_world_info(body.get("world_info"))
+            "world_info": self._normalize_world_info(body.get("world_info")),
+            "mode": body.get("mode") or "Character"
         }
         self.characters.save()
         return self.result(f"character {name} added")
@@ -848,7 +897,8 @@ class Characters(core.module.Module):
             "category": str(body.get("category", "")).strip() or None,
             "profile": profile,
             "first_message": str(body.get("first_message", "")),
-            "world_info": self._normalize_world_info(body.get("world_info"))
+            "world_info": self._normalize_world_info(body.get("world_info")),
+            "mode": body.get("mode") or "Character"
         }
 
         # rename: re-key the storage entry. save() prunes the old key's

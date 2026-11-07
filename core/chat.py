@@ -88,11 +88,18 @@ class Chat:
             ):
                 char_modules_exempt.append("writing_style")
 
+            characters_mod = self.channel.manager.modules.get("characters")
+            if characters_mod:
+                for kept_module in (characters_mod.config.get("kept_tool_modules") or []):
+                    kept_name = str(kept_module).strip().lower()
+                    if kept_name and kept_name not in char_modules_exempt:
+                        char_modules_exempt.append(kept_name)
+
             if active_character and module_name not in char_modules_exempt and "characters" in self.channel.manager.modules.keys():
                 # if a character is currently active, display ONLY the character system prompt
-                char_disable_agent_prompts = self.channel.manager.modules["characters"].config.get("pure_mode")
+                char_mode = self.channel.manager.modules["characters"].character_mode(active_character)
 
-                if char_disable_agent_prompts:
+                if char_mode != "Assistant":
                     continue
 
             try:
