@@ -215,14 +215,7 @@ async def create_fastapi(channel):
                     full_path = os.path.realpath(os.path.join(root, rel))
                     if not full_path.startswith(root_real + os.sep) or not os.path.isfile(full_path):
                         raise fastapi.HTTPException(status_code=404, detail="Asset not found")
-                    # -- AI GENERATED CODE (Qwen3.8 Flash Next) :: (11-10-2026) harness:openlumara
-                    # no Cache-Control meant heuristic browser caching: an
-                    # edited asset could stay stale in the webview long past
-                    # a reload (the ?v= bump ritual). no-cache revalidates
-                    # every use; FileResponse's ETag/Last-Modified answer
-                    # with a cheap 304 while unchanged.
-                    return fastapi.responses.FileResponse(
-                        full_path, headers={"Cache-Control": "no-cache"})
+                    return fastapi.responses.FileResponse(full_path)
 
         # default: <module>/webui/assets/
         module_dir = channel._ui_asset_dirs().get(module_name)
@@ -235,10 +228,7 @@ async def create_fastapi(channel):
         if not full_path.startswith(module_root + os.sep) or not os.path.isfile(full_path):
             raise fastapi.HTTPException(status_code=404, detail="Asset not found")
 
-        # (see the asset_mounts branch above: no-cache forces revalidation,
-        # so module assets never serve stale after an edit)
-        return fastapi.responses.FileResponse(
-            full_path, headers={"Cache-Control": "no-cache"})
+        return fastapi.responses.FileResponse(full_path)
 
     def _ui_api_lookup(module_name, route_path, method):
         """resolve /api/ext/<module>/<path> to a bound handler.
