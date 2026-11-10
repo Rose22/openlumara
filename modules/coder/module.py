@@ -291,13 +291,14 @@ class Coder(core.module.Module):
         errors = []
 
         lang = tslp.detect_language_from_path(file_path)
-        if not lang or lang in ("vimdoc", "html", "htm"):
+        if not lang or lang in ("vimdoc", "html", "htm", "glsl"):
             # that means treesitter doesn't support the language,
             # or it's a plaintext file (labeled by treesitter as 'vimdoc'),
             # so to avoid blocking code editing for unsupported languages,
             # just pretend the syntax error check passed
 
             # also, html syntax is skipped because the checker is too aggressive and forbids & characters, causing tons of false positive rejections
+            # the syntax checker is too aggressive for GLSL (shaders) too
             return []
 
         result = tslp.process(code, tslp.ProcessConfig(language=lang, diagnostics=True, structure=False))
