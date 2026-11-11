@@ -10,6 +10,9 @@ import core
 import channels.webui.utils as utils
 
 class WebSocketManager:
+    # prevent the stream from stalling forever
+    SEND_TIMEOUT = 10
+
     def __init__(self, channel):
         self.channel = channel
         self.active_connections = []
@@ -109,12 +112,18 @@ class WebSocketManager:
         for connection in self.active_connections:
             try:
                 if connection.client_state == starlette.websockets.WebSocketState.CONNECTED:
-                    await connection.send_json(message)
+                    await asyncio.wait_for(
+                        connection.send_json(message), timeout=self.SEND_TIMEOUT
+                    )
             except Exception:
                 disconnected.append(connection)
 
         for conn in disconnected:
             self.disconnect(conn)
+            try:
+                await asyncio.wait_for(conn.close(), timeout=2)
+            except Exception:
+                pass
 
     async def _stream_task(self, message: str, index, files: list = None):
         self.channel._ws_stream_index = index

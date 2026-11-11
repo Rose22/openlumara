@@ -741,10 +741,12 @@ class APIClient():
             return False
 
         # wait for the cancellation to complete
-        while self.cancel_request:
+        waited = 0.0
+        while self.cancel_request and waited < 2.0:
             await asyncio.sleep(0.05)
+            waited += 0.05
 
-        return True
+        return not self.cancel_request
 
     async def _recv(self, response, use_tools=True):
         """takes a response dict and extracts the message from it, handling tool calls if needed"""
