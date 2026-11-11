@@ -14,6 +14,8 @@ let sendQueue = [];
 
 let streamFinalizing = false;
 
+
+
 async function connectWebSocket() {
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const token = window.apiToken || '';
@@ -234,6 +236,71 @@ async function handleWebSocketMessage(data) {
             }
 
             // scroll
+            await ui.scrollToBottom();
+            break;
+        }
+
+        case "turn_step_delta": {
+            // deltas are used for reasoning and content,
+            // but the stream frequently re-syncs by receiving the full step content so far
+            // in the turn_step event
+            // 
+            // we use deltas here so that the network isn't constantly sending
+            // huge objects that contain all step data..
+            // instead the full step data only gets sent every 128 tokens
+            // 
+            // this is required for the stream not to bog down,
+            // and it saves tremendously on network use
+            const delta = data.delta;
+            if (!delta || stream.turn.length <= 0) break;
+
+            const step = stream.turn.steps.find(s => s.step === delta.step);
+            if (!step) break;
+
+            for (const a of delta.append || []) {
+                if (a.field === "reasoning_content") {
+                    step.reasoning_content = (step.reasoning_content || "") + a.text;
+                } else if (a.field === "tool_response") {
+                    const tool = (step.tool_calls || []).find(t => t.id === a.id);
+                    if (tool) {
+                        const meta = tool._metadata || (tool._metadata = {});
+                        meta.response = (meta.response || "") + a.text;
+                    }
+                }
+            }
+
+            stream.processing = {};
+            stream.modelLoad = null;
+            AudioManager.stopProcessingSound();
+            AudioManager.play("token");
+            if (!responseSoundPlayed) {
+                AudioManager.play("response_start");
+                responseSoundPlayed = true;
+            }
+
+            await ui.scrollToBottom();
+            break;
+        }
+
+        case "turn_final_delta": {
+            const delta = data.delta;
+            if (!delta || stream.turn.length <= 0) break;
+
+            const finals = stream.turn.final_messages;
+            const last = finals && finals[finals.length - 1];
+            if (!last) break;
+
+            last.content = (last.content || "") + delta.text;
+
+            stream.processing = {};
+            stream.modelLoad = null;
+            AudioManager.stopProcessingSound();
+            AudioManager.play("token");
+            if (!responseSoundPlayed) {
+                AudioManager.play("response_start");
+                responseSoundPlayed = true;
+            }
+
             await ui.scrollToBottom();
             break;
         }

@@ -533,6 +533,30 @@ Edit the config file for this, or use /config
                     "messages": messages
                 })
 
+            elif event.get("type") == "step_delta":
+                delta = payload.get("content")
+                if delta is None:
+                    continue
+
+                self.websocket_manager.apply_step_delta(delta)
+
+                await self.websocket_manager.broadcast({
+                    "type": "turn_step_delta",
+                    "delta": delta
+                })
+
+            elif event.get("type") == "final_delta":
+                delta = payload.get("content")
+                if delta is None:
+                    continue
+
+                self.websocket_manager.apply_final_delta(delta)
+
+                await self.websocket_manager.broadcast({
+                    "type": "turn_final_delta",
+                    "delta": delta
+                })
+
     def on_log(self, category, message):
         if not hasattr(self, 'websocket_manager'):
             # not initialized yet

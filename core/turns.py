@@ -563,6 +563,12 @@ class TurnCollector:
         as step objects (dicts), shaped exactly like the steps
         build_steps() produces for history.
 
+        high-frequency continuations are tiny append events (step_delta /
+        final_delta). a full snapshot is emitted every 128 appends per step
+        (streamed tool arguments: every 8th), plus on run-starts and every
+        structural change, so any consumer can self-heal from a desync by
+        simply ignoring deltas until the next full snapshot arrives.
+
         events yielded:
           {"type": "token", "content": raw_token}
               unchanged passthrough of every raw token (user messages,
@@ -573,16 +579,19 @@ class TurnCollector:
               content, tool_calls, modules, label) plus two live-only flags:
                 reasoning_live: while the AI is still reasoning
                 is_tail:        while the step is the open end of the chain
+          {"type": "step_delta", "content": delta}
+              an append to a step:
+              {"step": n, "append": [{"field": "reasoning_content",
+              "text": chunk}, {"field": "tool_response",
+              "id": call_id, "text": chunk}]}
           {"type": "final", "content": [messages]}
               a turn's final message(s), decided at the very end of the stream.
               during the steam, there is no way to determine which message is final,
               because a `content` token can at any time be followed up with `reasoning`
               or `tool_calls`.
-
-        values accumulate: every event carries
-        the full current text of the object it updates, so a UI can render
-        by full replacement, and a reconnecting client only ever needs the
-        latest snapshot per step number.
+          {"type": "final_delta", "content": delta}
+              an append to the provisional final's content:
+              {"step": n, "text": chunk}
 
         this used to be exclusive to the webUI, handled in the frontend.
         but since this is now in the core, it can be used in *ANY* channel.
@@ -603,6 +612,10 @@ class TurnCollector:
         tools_owner = {}
         provisional_final = None
         last_token_type = None
+
+        delta_counts = {}
+        responses_seen = set()
+        pending_deltas = []
 
         # args_parsed cache keyed by tool call id
         args_cache = {}
@@ -822,13 +835,15 @@ class TurnCollector:
             emit_steps.clear()
             queued_ids.clear()
             emit_final = False
+            emit_final_delta = None
             retracted = None
+            pending_deltas.clear()
 
             # ----
             # per-token machine. every branch mirrors a build_steps()
             # folding rule; after the branch, the emit phase ships whatever
-            # this token touched (accumulated, never deltas - render by
-            # full replacement).
+            # this token touched: full snapshots at checkpoints and
+            # structural changes, tiny append deltas in between.
             # ----
             if token_type == 'reasoning':
                 # step numbers bump on SEGMENT boundaries only (the old
@@ -858,8 +873,22 @@ class TurnCollector:
                 if token.get("content"):
                     step["reasoning_content"] += token["content"]
 
-                stamp_label(step)
-                queue(step)
+                if token.get("content") and last_token_type == 'reasoning':
+                    delta_counts[step_num] = delta_counts.get(step_num, 0) + 1
+                    if delta_counts[step_num] % 128:
+                        pending_deltas.append({
+                            "step": step_num,
+                            "append": [{
+                                "field": "reasoning_content",
+                                "text": token["content"],
+                            }],
+                        })
+                    else:
+                        stamp_label(step)
+                        queue(step)
+                else:
+                    stamp_label(step)
+                    queue(step)
 
             elif token_type == 'content':
                 if last_token_type != 'content' or provisional_final is None:
@@ -889,10 +918,18 @@ class TurnCollector:
                     }
                     if token.get("is_cmd"):
                         provisional_final["is_cmd"] = True
+                    emit_final = True
                 else:
-                    provisional_final["content"] += token.get("content") or ""
-
-                emit_final = True
+                    added = token.get("content") or ""
+                    provisional_final["content"] += added
+                    delta_counts["final"] = delta_counts.get("final", 0) + 1
+                    if delta_counts["final"] % 128 == 0:
+                        emit_final = True
+                    elif added:
+                        emit_final_delta = {
+                            "step": provisional_final["step"],
+                            "text": added,
+                        }
 
             elif token_type == 'tool_calls':
                 if provisional_final is not None:
@@ -913,7 +950,15 @@ class TurnCollector:
                 step_has_tools = True
                 refresh_tools(step)
                 stamp_step(step)
-                queue(step)
+                if last_token_type == 'tool_calls':
+                    # streamed args re-parse every token: send a snapshot
+                    # only every 8th, the display reads server-parsed
+                    # args_parsed, so there is no clean append to delta
+                    delta_counts[step_num] = delta_counts.get(step_num, 0) + 1
+                    if delta_counts[step_num] % 8 == 0:
+                        queue(step)
+                else:
+                    queue(step)
 
             elif token_type == 'tool':
                 # responses accumulate per call; the OWNING step re-emits
@@ -924,9 +969,37 @@ class TurnCollector:
                 ) + (token.get("content") or "")
                 step = tools_owner.get(token["tool_call_id"])
                 if step is not None:
-                    refresh_tools(step)
-                    stamp_step(step)
-                    queue(step)
+                    first_chunk = token["tool_call_id"] not in responses_seen
+                    responses_seen.add(token["tool_call_id"])
+                    if first_chunk:
+                        refresh_tools(step)
+                        stamp_step(step)
+                        queue(step)
+                    else:
+                        delta_counts[token["tool_call_id"]] = (
+                            delta_counts.get(token["tool_call_id"], 0) + 1
+                        )
+                        if delta_counts[token["tool_call_id"]] % 128 == 0:
+                            refresh_tools(step)
+                            stamp_step(step)
+                            queue(step)
+                        elif token.get("content"):
+                            # keep the internal snapshot current silently,
+                            # the delta carries the chunk to the client
+                            for tool in step["tool_calls"]:
+                                if tool.get("id") == token["tool_call_id"]:
+                                    tool.setdefault("_metadata", {})["response"] = (
+                                        stream_response_map[token["tool_call_id"]]
+                                    )
+                                    break
+                            pending_deltas.append({
+                                "step": step["step"],
+                                "append": [{
+                                    "field": "tool_response",
+                                    "id": token["tool_call_id"],
+                                    "text": token["content"],
+                                }],
+                            })
 
             last_token_type = token_type
 
@@ -939,8 +1012,12 @@ class TurnCollector:
             for step in emit_steps:
                 if step_is_visible(step):
                     yield {"type": "step", "content": step}
+            for delta in pending_deltas:
+                yield {"type": "step_delta", "content": delta}
             if retracted is not None:
                 yield {"type": "final", "content": []}
             if emit_final and (provisional_final.get("content") or "").strip():
                 yield {"type": "final", "content": [provisional_final]}
+            if emit_final_delta:
+                yield {"type": "final_delta", "content": emit_final_delta}
 

@@ -1260,6 +1260,24 @@ class Channel:
                     async for out in emit_step_text(step):
                         yield out
 
+            elif event_type == "step_delta":
+                delta = event.get("content")
+                st = step_state.get((delta or {}).get("step") or 0)
+                if st is not None:
+                    async for out in emit_step_text(st["step_obj"]):
+                        yield out
+
+            elif event_type == "final_delta":
+                delta = event.get("content") or {}
+                sn = delta.get("step") or 0
+                final_text[sn] = final_text.get(sn, "") + (delta.get("text") or "")
+                st = step_state.get(sn)
+                step_obj = (st or {}).get("step_obj")
+                if step_obj is None:
+                    step_obj = {"step": sn, "content": "", "reasoning_content": ""}
+                async for out in emit_step_text(step_obj):
+                    yield out
+
             elif event_type == "final":
                 # re-render every step whose live final text changed
                 touched = set(final_text)
@@ -1285,7 +1303,8 @@ class Channel:
         groups incoming tokens into step events using the
         TurnCollector defined in core/turns.py
 
-        yields {"type": "token"}, {"type": "step"}, and {"type": "final"} objects
+        yields {"type": "token"}, {"type": "step"}, {"type": "step_delta"},
+        {"type": "final"} and {"type": "final_delta"} objects
         see TurnCollector.group_stream for the full description!
 
         this used to be exclusive to the webUI, but i've ported it over to the core, so that it

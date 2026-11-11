@@ -658,6 +658,17 @@ class Cli(core.channel.Channel):
                 elif event_type == "final":
                     view.set_final(event.get("content") or [])
                     repaint()
+                elif event_type in ("step_delta", "final_delta"):
+                    # since we already have the latest content due to
+                    # python passing objects as references,
+                    # we can just repaint and the new content shows up
+                    if event_type == "step_delta" and (event.get("content") or {}).get("step") not in view.steps:
+                        continue
+                    if event_type == "final_delta" and not view.final_messages:
+                        continue
+                    
+                    view.dirty += 1
+                    repaint()
                 else:
                     token = event.get("content") or {}
                     token_type = token.get("type")
