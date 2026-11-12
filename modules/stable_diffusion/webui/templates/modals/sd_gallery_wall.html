@@ -1,0 +1,57 @@
+{# -- AI GENERATED CODE (2026-11-12) harness:openlumara
+   stable_diffusion: gallery wall modal - the whole image collection as a
+   DeviantArt-style masonry (CSS columns: portrait and landscape tiles
+   flow next to each other, re-flowing at every breakpoint). Clicking a
+   tile opens the shared lightbox; its back button brings this modal back
+   at the exact scroll position, since every tile reserves its true
+   aspect box before pixels load. Closed with × or Esc (the lightbox back
+   trip is the only path that keeps the position). #}
+
+{% if module_config.get('enable_gallery', true) %}
+<template x-if="$store.ui.currentModal === 'sd_gallery_wall'" x-cloak>
+    <div @keydown.escape.window="$store.ui.closeModal()">
+        <div class="modal sd-wall-modal">
+            <div class="header">
+                <h2>gallery wall
+                    <span class="sd-wall-count" x-text="'· ' + $store.sdgallery.wallImages().length"></span>
+                </h2>
+                <select class="sd-wall-filter" title="Filter by category"
+                        x-model="$store.sdgallery.wallFilter"
+                        @change="$store.sdgallery.wallScroll = 0">
+                    <option value="all">all categories</option>
+                    <template x-for="c in $store.sdgallery.categories" :key="c">
+                        <option :value="c" x-text="c"></option>
+                    </template>
+                </select>
+                <button class="close" @click="$store.ui.closeModal()" aria-label="Close">&times;</button>
+            </div>
+            <div class="sd-wall-body"
+                 x-effect="if ($el.scrollTop !== $store.sdgallery.wallScroll) $el.scrollTop = $store.sdgallery.wallScroll"
+                 @scroll.passive="$store.sdgallery.wallScroll = $el.scrollTop">
+                <div class="sd-wall-empty" x-show="!$store.sdgallery.images.length">
+                    nothing on the wall yet — generate one from the sidebar ✨
+                </div>
+                <div class="sd-wall-empty" x-show="$store.sdgallery.images.length && !$store.sdgallery.wallImages().length">
+                    nothing filed under this category.
+                </div>
+                <div class="sd-wall-grid">
+                    <template x-for="(col, ci) in $store.sdgallery.wallColumns()" :key="ci">
+                        <div class="sd-wall-col">
+                            <template x-for="img in col" :key="img.token">
+                                <button type="button" class="sd-wall-item"
+                                        :class="{ 'sd-gal-fresh': img.token === $store.sdgallery.freshToken }"
+                                        :title="(img.name || img.token) + ' — click to enlarge'"
+                                        @click="$store.sdgallery.openFromWall(img.token)">
+                                    <img :src="img.url" loading="lazy" :alt="img.name || 'generated image'"
+                                         :style="img.width && img.height ? `aspect-ratio: ${img.width}/${img.height}` : ''">
+                                    <span class="sd-gal-name" x-text="$store.sdgallery.excerpt(img)"></span>
+                                </button>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+{% endif %}

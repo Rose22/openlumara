@@ -1,0 +1,94 @@
+{# -- AI GENERATED CODE (Qwen3.8 Flash Next) :: (2026-11-12)
+   stable_diffusion: lightbox modal for the gallery - big image, its full
+   prompt in a scrollable box below, and a scrollable key => value
+   metadata column beside that. Opened via $store.sdgallery.open(token);
+   state comes from the same sdgallery store the sidebar wall renders
+   from. Gated on enable_gallery, mirroring the sidebar panel. #}
+
+{% if module_config.get('enable_gallery', true) %}
+<template x-if="$store.ui.currentModal === 'sd_gallery_image'" x-cloak>
+    <div @keydown.escape.window="$store.sdgallery.fromWall ? $store.sdgallery.leaveLightbox() : $store.ui.closeModal()">
+        <div class="modal sd-gal-modal">
+            <div class="header">
+                {# opens the way it came: back to the gallery wall, scroll and all #}
+                <button type="button" class="sd-gal-back" title="Back to gallery wall"
+                        x-show="$store.sdgallery.fromWall" x-cloak
+                        @click="$store.sdgallery.leaveLightbox()">&larr;</button>
+                <h2 class="sd-gal-modal-title" x-text="$store.sdgallery.selected()?.name || $store.sdgallery.selected()?.token || 'generated image'"></h2>
+                <button type="button" class="sd-gal-delhead" title="Delete this image"
+                        x-show="$store.sdgallery.selected()"
+                        @click="$store.sdgallery.deleteImage()" aria-label="Delete image">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 7h16"/>
+                        <path d="M9 7V4.8A.8.8 0 0 1 9.8 4h4.4a.8.8 0 0 1 .8.8V7"/>
+                        <path d="M6.5 7l.9 12.2a1.5 1.5 0 0 0 1.5 1.3h6.2a1.5 1.5 0 0 0 1.5-1.3L17.5 7"/>
+                        <path d="M10 11v6M14 11v6"/>
+                    </svg>
+                </button>
+                <button class="close" @click="$store.ui.closeModal()" aria-label="Close">&times;</button>
+            </div>
+            <div class="sd-gal-modal-body">
+                <template x-if="$store.sdgallery.selected()">
+                    <div>
+                        <img class="sd-gal-full" :src="$store.sdgallery.selected().url"
+                             :alt="$store.sdgallery.selected().name || 'generated image'">
+                        <div class="sd-gal-detail">
+                            {# the full prompt: its own scrollable box #}
+                            <div class="sd-gal-box sd-gal-promptbox">
+                                <div class="sd-gal-box-label">prompt</div>
+                                <p class="sd-gal-prompt"
+                                   x-text="$store.sdgallery.selected().prompt || '(no prompt stored for this image)'"></p>
+                            </div>
+                            {# everything else: one key => value row per field,
+                               in its own scrollable column to the right #}
+                            <div class="sd-gal-box sd-gal-metabox">
+                                <div class="sd-gal-box-label">metadata
+                                    <button type="button" class="sd-gal-editbtn" title="Edit name and category"
+                                            x-show="!$store.sdgallery.editOpen" x-cloak
+                                            @click="$store.sdgallery.startEdit()">✎ edit</button>
+                                </div>
+                                {# name + category are yours; the recipe stays engraved #}
+                                <div class="sd-gal-edit" x-show="$store.sdgallery.editOpen" x-cloak>
+                                    <input class="sd-gal-input" placeholder="name" autocomplete="off"
+                                           x-model="$store.sdgallery.editName"
+                                           :disabled="$store.sdgallery.editSaving"
+                                           @keydown.enter="$store.sdgallery.saveEdit()">
+                                    <input class="sd-gal-input" list="sd-gal-catlist" placeholder="category"
+                                           autocomplete="off" x-model="$store.sdgallery.editCategory"
+                                           :disabled="$store.sdgallery.editSaving"
+                                           @keydown.enter="$store.sdgallery.saveEdit()">
+                                    <div class="sd-gal-edit-note" x-show="$store.sdgallery.editErr"
+                                         x-text="$store.sdgallery.editErr"></div>
+                                    <button type="button" class="sd-gal-go"
+                                            :disabled="$store.sdgallery.editSaving"
+                                            @click="$store.sdgallery.saveEdit()"
+                                            x-text="$store.sdgallery.editSaving ? 'Saving..' : 'Save'"></button>
+                                    <button type="button" class="sd-gal-cancel"
+                                            @click="$store.sdgallery.editOpen = false">Cancel</button>
+                                </div>
+                                <template x-for="row in $store.sdgallery.metaRows()" :key="row.k">
+                                    <div class="sd-gal-kv">
+                                        <span class="sd-gal-k" x-text="row.k"></span>
+                                        <template x-if="row.chat">
+                                            <a href="#" class="sd-gal-v sd-gal-chatlink"
+                                               :title="'open chat ' + row.v"
+                                               @click.prevent="$store.sdgallery.openChat(row.v)"
+                                               x-text="row.v"></a>
+                                        </template>
+                                        <template x-if="!row.chat">
+                                            <span class="sd-gal-v" x-text="row.v"></span>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+                <template x-if="!$store.sdgallery.selected()">
+                    <p class="sd-gal-empty" style="font-style: italic;">this image is no longer in the gallery.</p>
+                </template>
+            </div>
+        </div>
+    </div>
+</template>
+{% endif %}

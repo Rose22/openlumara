@@ -1,0 +1,12 @@
+{# -- AI GENERATED CODE (Qwen3.8 Flash Next) :: (2026-11-12)
+   stable_diffusion: head slot. The gallery tab is auto-discovered by the
+   core sidebar, so a disabled setting can't gate the tab button itself -
+   this flag tells sd_images.js to pull the button out of the DOM before
+   Alpine initializes (the tabbar's :has()-driven visibility then hides
+   the strip automatically when it was the only extension tab). #}
+
+{% macro head() %}
+{% if not module_config.get('enable_gallery', true) %}
+<script>window.SD_GALLERY_DISABLED = true;</script>
+{% endif %}
+{% endmacro %}

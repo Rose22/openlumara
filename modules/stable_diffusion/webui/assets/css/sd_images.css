@@ -1,0 +1,41 @@
+/* stable_diffusion :: {{sd|token}} generated art.
+
+   The frames carry both sd-img-wrap and adv-img-wrap. Inside a campaign the
+   adventure stylesheet must own the looks: its rules match on compound
+   selectors like `.adv-img-wrap.adv-img-left`, so every rule here keeps its
+   specificity BELOW that (span/img + one class) - the game's styles always
+   win where both classes are present. Out of game the same rules give the
+   tag a look mirroring the game's model: a centered block line by default,
+   and for |left/|right a real float lifted to the top of its paragraph by
+   the JS lift pass, cleared by the stamped classes at the bottom (the
+   plain-chat echo of adv-float-host / adv-bfc). */
+
+.sd-img-pending { display: inline-block; opacity: 0.6; font-style: italic; }
+.sd-img-pending:empty { display: none; }
+
+span.sd-img-wrap {
+    display: block;
+    margin: 0.9em auto;
+    text-align: center;
+    line-height: 0;
+}
+img.sd-img {
+    display: inline-block;
+    max-width: 100%;
+    height: auto;
+    border-radius: 10px;
+}
+
+/* floated: pinned width like the game's, the prose wraps around it */
+span.sd-img-wrap.sd-img-left  { float: left;  width: min(320px, 44%); margin: 0 1.3em 0.7em 0; }
+span.sd-img-wrap.sd-img-right { float: right; width: min(320px, 44%); margin: 0 0 0.7em 1.3em; }
+span.sd-img-wrap.sd-img-left img.sd-img,
+span.sd-img-wrap.sd-img-right img.sd-img { width: 100%; max-width: none; }
+
+/* paragraph clearing, stamped by the lift pass in sd_images.js (only ever
+   while no campaign is active - the adventure module stamps its own pair
+   inside games): every block after the floated picture's paragraph starts
+   fully below it, and flow-root on the container keeps a picture in the
+   last paragraph from leaning into the next message. */
+.sd-float-host ~ * { clear: both; }
+.sd-float-root { display: flow-root; }

@@ -1,0 +1,96 @@
+{# -- AI GENERATED CODE (Qwen3.8 Flash Next) :: (2026-11-12)
+   stable_diffusion: gallery sidebar tab - a newest-first wall of every
+   generated image; clicking a tile opens it in the lightbox modal.
+   Data lives in the sdgallery Alpine store (sd_images.js), which the same
+   file also feeds to the sd_gallery_image modal.
+
+   gated on the enable_gallery setting: with it off this panel renders
+   nothing, and sd_images.js removes the tab button itself (the button is
+   auto-discovered by the core sidebar, hence the JS assist). #}
+
+{% if module_config.get('enable_gallery', true) %}
+{# x-intersect fires every time the tab reveals the panel (and once on
+   load when the tab was already selected) - so the wall always re-reads
+   the manifest when opened, catching images made elsewhere. #}
+<div class="sd-gal-panel" x-intersect.enter="$store.sdgallery.refresh(); $store.sdgallery.syncBusy(); $store.sdgallery.loadResolution()">
+
+    <div class="sd-gal-head">
+        <span class="sd-gal-count" x-text="$store.sdgallery.images.length + ( $store.sdgallery.images.length === 1 ? ' image' : ' images')"></span>
+        <span class="sd-gal-head-actions">
+            <button type="button" class="sd-gal-resbtn"
+                    :title="'Resolution: ' + $store.sdgallery.resolution + ' \u2014 click to cycle ' + $store.sdgallery.resTiers.join(' \u2192 ')"
+                    @click="$store.sdgallery.cycleResolution()"
+                    x-text="$store.sdgallery.resolution"></button>
+            <button type="button" class="sd-gal-orbtn"
+                    :class="{ landscape: $store.sdgallery.formOrientation === 'landscape' }"
+                    :title="'Next image: ' + $store.sdgallery.formOrientation + ' \u2014 click to flip'"
+                    @click="$store.sdgallery.toggleOrientation()">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">
+                    <rect x="7" y="3.5" width="10" height="17" rx="1.5"/>
+                </svg>
+            </button>
+            <button type="button" class="sd-gal-wallbtn" title="Open the gallery wall"
+                    @click="$store.sdgallery.openWall()">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3.5" y="3.5" width="7" height="10" rx="1.5"/>
+                    <rect x="13.5" y="3.5" width="7" height="6.5" rx="1.5"/>
+                    <rect x="3.5" y="16.5" width="7" height="4" rx="1.5"/>
+                    <rect x="13.5" y="13" width="7" height="7.5" rx="1.5"/>
+                </svg>
+            </button>
+            <button type="button" class="sd-gal-refresh" title="Reload the gallery"
+                    :disabled="$store.sdgallery.loading"
+                    @click="$store.sdgallery.refresh()">↻</button>
+        </span>
+    </div>
+
+    {# manual generation form: category first, then prompt, then the wall's own make-one button #}
+    <div class="sd-gal-gen">
+        {# free text or a pick from the categories the gallery already knows #}
+        <input class="sd-gal-input" list="sd-gal-catlist" placeholder="category (optional)"
+               autocomplete="off"
+               x-model="$store.sdgallery.formCategory"
+               :disabled="$store.sdgallery.busy">
+        <datalist id="sd-gal-catlist">
+            <template x-for="c in $store.sdgallery.categories" :key="c">
+                <option :value="c"></option>
+            </template>
+        </datalist>
+        <textarea class="sd-gal-input" rows="3" placeholder="prompt…"
+                  x-model="$store.sdgallery.formPrompt"
+                  :disabled="$store.sdgallery.busy"
+                  @keydown.ctrl.meta.enter="$store.sdgallery.generate()"></textarea>
+        <textarea class="sd-gal-input" rows="2" placeholder="negative prompt (optional)"
+                  x-model="$store.sdgallery.formNegative"
+                  :disabled="$store.sdgallery.busy"></textarea>
+        <button type="button" class="sd-gal-go"
+                :disabled="$store.sdgallery.busy"
+                @click="$store.sdgallery.generate()"><span class="sd-gal-spinner" x-show="$store.sdgallery.busy" x-cloak></span><span x-text="$store.sdgallery.busy ? 'Generating..' : 'Generate'"></span></button>
+        <button type="button" class="sd-gal-cancel" title="Cancel this generation"
+                x-show="$store.sdgallery.busy" x-cloak
+                @click="$store.sdgallery.cancel()">Cancel</button>
+        <div class="sd-gal-note" :class="{ 'ok': $store.sdgallery.noteOk }"
+             x-show="$store.sdgallery.note" x-text="$store.sdgallery.note"></div>
+    </div>
+
+    <div class="sd-gal-empty" x-show="!$store.sdgallery.images.length && !$store.sdgallery.loading" x-cloak>
+        no images yet — ask the AI to generate one and it will appear on this wall ✨
+    </div>
+
+    <div class="sd-gal-grid"
+         @scroll.passive="$store.sdgallery.updateFade($el)"
+         x-effect="if ($store.sdgallery.images.length >= 0) $nextTick(() => $store.sdgallery.updateFade($el))">
+        <template x-for="img in $store.sdgallery.images" :key="img.token">
+            <button type="button" class="sd-gal-item"
+                    :class="{ 'sd-gal-fresh': img.token === $store.sdgallery.freshToken }"
+                    :title="(img.name || img.prompt || img.token) + ' — click to enlarge'"
+                    @click="$store.sdgallery.open(img.token)">
+                <img :src="img.url" loading="lazy" :alt="img.name || 'generated image'"
+                     :style="img.width && img.height ? `aspect-ratio: ${img.width}/${img.height}` : ''">
+                {# the hover caption: a one-line excerpt of the prompt #}
+                <span class="sd-gal-name" x-text="$store.sdgallery.excerpt(img)"></span>
+            </button>
+        </template>
+    </div>
+</div>
+{% endif %}

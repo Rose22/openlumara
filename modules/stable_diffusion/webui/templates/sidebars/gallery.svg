@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <!-- framed picture with a sun over hills: the gallery tab -->
+  <rect x="3.5" y="4.5" width="17" height="15" rx="2"/>
+  <circle cx="9" cy="9.5" r="1.6"/>
+  <path d="M4 16l4.5-4.5c.6-.6 1.5-.6 2.1 0L15 15.5m-1 1l2.5-2.5c.6-.6 1.5-.6 2.1 0L20 15"/>
+</svg>
