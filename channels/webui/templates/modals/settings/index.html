@@ -49,7 +49,7 @@
                         <!-- CHANNELS CONTENT -->
                         {% include 'modals/settings/channels.html' %}
 
-                        <!-- MODULE LIBRARY CONTENT -->
+                        <!-- YOUR SKILLS CONTENT -->
                         {% include 'modals/settings/module_library.html' %}
 
                         <!-- APPEARANCE (special theme section) -->
@@ -68,7 +68,7 @@
                         
                         <!-- ALL OTHER $store.settings.categories (core and so on) -->
                         <template x-if="!activeModule && !activeChannel && 
-                                         !['appearance', 'audio', 'modules', 'user_modules', 'channels', 'user_channels', 'module_library', 'system_prompt', 'system_logs'].includes(activeCategory) && 
+                                         !['appearance', 'audio', 'modules', 'user_modules', 'channels', 'user_channels', 'your_skills', 'system_prompt', 'system_logs'].includes(activeCategory) && 
                                          activeCategory">
                             <div class="section">
                                 <h3 class="section-title" x-text="$store.settings.categories[activeCategory].title"></h3>

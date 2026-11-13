@@ -16,7 +16,9 @@ def register(app, channel):
     async def settings_load():
         """Returns the complete, render-ready settings structure (categories, field types, schemas and current values merged)"""
         module_info, core_sections = settings_structure.get_module_info()
-        structure = settings_structure.build_settings_structure(core.config.config, module_info, core_sections)
+        # the Your Skills tab only makes sense while the skills module is loaded
+        skills_enabled = "skills" in channel.manager.modules
+        structure = settings_structure.build_settings_structure(core.config.config, module_info, core_sections, skills_enabled=skills_enabled)
 
         return utils.api_result({
             "categories": structure,

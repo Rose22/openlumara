@@ -121,14 +121,12 @@ class Commands:
         "module": "enables/disables a module by name",
         "channel": "toggles a channel",
         "library": {
-            "": "shows configured module libraries",
-            "sync": "clones/updates all configured library repos",
-            "list": "lists installable modules from the cloned libraries",
-            "add <git url>": "adds a library repo url to the core settings",
-            "remove <git url>": "removes a library repo url from the core settings",
-            "install <name> [library]": "installs a module/channel from a library",
-            "update <name> [library]": "updates an installed module from its library",
-            "remove <name>": "removes an installed user module/channel (alias: uninstall)",
+            "": "shows help for content installed from git repos",
+            "list": "lists installed modules, channels, skills and themes",
+            "install <git url>": "clones a content repo into staging for review",
+            "confirm": "installs the last staged repo",
+            "update <name>": "git pulls an installed module/channel in place",
+            "remove <name>": "removes an installed entry (alias: uninstall)",
         },
         "tools": {
             "": "lists tools available to the AI",
@@ -499,61 +497,25 @@ class Commands:
         return f"channel {'enabled' if new_state else 'disabled'}\nrestart required - run /restart"
 
     async def cmd_library(self, args: list):
-        """manage external content libraries"""
+        """install content from git repos: stage for review, confirm, update, remove"""
         mm = self.channel.manager.module_manager
 
         if not args:
-            lines = ["== content libraries =="]
-            repos = mm.list_repos()
-            if repos:
-                lines.append("configured repos:")
-                lines.extend([f"  - {repo}" for repo in repos])
-            else:
-                lines.append("no repos configured - add git urls under core -> module_libraries")
-
-            libs = mm.list_libraries()
-            if libs:
-                lines.append("cloned: " + ", ".join(libs.keys()))
-            else:
-                lines.append("nothing cloned yet - run /library sync")
-
-            lines.append("\nsubcommands: sync | list | add <git url> | remove <git url> | install <name> | update <name> | remove <name>")
-            return "\n".join(lines)
+            return "subcommands: list | install <git url> | confirm | update <name> | remove <name>"
 
         subcmd = args[0].lower()
 
-        def _resolve_library(name):
-            """find which cloned libraries contain a module/channel by name"""
-            matches = []
-            for lib_name, lib_path in mm.list_libraries().items():
-                source, kind = mm._find_source(lib_path, name)
-                if source:
-                    matches.append(lib_name)
-            return matches
-
-        if subcmd == "sync":
-            if not mm.list_repos():
-                return "no module libraries configured - add git urls under core -> module_libraries first"
-
-            await self.channel.push("syncing module libraries..")
-            if not await mm.load():
-                return "sync failed - check the logs"
-
-            available = mm.list_available()
-            return f"synced {len(mm.list_libraries())} librar{'y' if len(mm.list_libraries()) == 1 else 'ies'} - {len(available)} installable entries found. use /library list"
-
         if subcmd == "list":
-            available = mm.list_available()
+            available = mm.list_installed()
             if not available:
-                return "no installable modules found - run /library sync first"
+                return "nothing installed yet - /library install <git url> to get something"
 
             groups = {}
             for entry in available:
                 groups.setdefault(entry["type"], []).append(entry)
 
-            # installed entries first within each group, then alphabetically by name
             for entries in groups.values():
-                entries.sort(key=lambda e: (not e["installed"], e["name"].lower()))
+                entries.sort(key=lambda e: e["name"].lower())
 
             kind_order = ["module", "channel", "skill", "theme"]
             ordered_kinds = [k for k in kind_order if k in groups] + \
@@ -565,114 +527,98 @@ class Commands:
             for kind in ordered_kinds:
                 lines.append(f"== {kind}s ==")
                 for entry in groups[kind]:
-                    flag = " (installed)" if entry["installed"] else ""
+                    source = f" ({entry['library']})" if entry["library"] else ""
                     doc = f" - {entry['doc']}" if entry["doc"] else ""
-                    lines.append(f"  {entry['name']} ({entry['library']}){flag}{doc}")
+                    lines.append(f"  {entry['name']}{source}{doc}")
                 lines.append("")
             return "\n".join(lines).rstrip("\n")
 
-        if subcmd == "add":
-            if len(args) < 2:
-                return "usage: /library add <git url>"
-
-            url = args[1].strip()
-            if not (url.startswith(("http://", "https://", "git://", "git@"))):
-                return "that doesn't look like a git url - expected http(s)://, git:// or git@..."
-
-            repos = list(mm.list_repos())
-            if url in repos:
-                return f"'{url}' is already in the library list"
-
-            repos.append(url)
-            core.config.config["core"]["module_libraries"] = repos
-            core.config.config.save()
-            return f"added {url} - run /library sync to clone it"
-
-        def _kind_done_note(kind, target):
-            if kind == "theme":
-                return f"{target}\nit appears in Settings -> Appearance after a page reload"
-            if kind == "skill":
-                return f"{target}\nrun /skills reload (or restart) to load it"
-            return f"{target}\nrestart required - run /restart"
-
         if subcmd == "install":
             if len(args) < 2:
-                return "usage: /library install <name> [library]"
+                return "usage: /library install <git url>"
 
-            name = args[1]
-            if len(args) >= 3:
-                library = args[2]
+            url = args[1].strip()
+            token, info = await mm.stage_repo(url)
+            if token is None:
+                return info
+
+            review = mm.stage_review(token) or {}
+            lines = [f"staged {info['kind']} repo from {url}"]
+
+            if info["kind"] in ("module", "channel"):
+                if info["skipped"]:
+                    return f"'{info['name']}' is already installed - remove it first to reinstall"
+                lines.append(f"installs as: {', '.join(info['entries'])}")
             else:
-                matches = _resolve_library(name)
-                if not matches:
-                    return f"'{name}' not found in any cloned library - run /library sync first"
-                if len(matches) > 1:
-                    return f"'{name}' exists in multiple libraries ({', '.join(matches)}) - add the library name to disambiguate"
-                library = matches[0]
+                if info["entries"]:
+                    lines.append("will install: " + ", ".join(info["entries"]))
+                if info["skipped"]:
+                    lines.append("already installed, will be skipped: " + ", ".join(info["skipped"]))
+                if not info["entries"]:
+                    mm._last_stage = None
+                    return "\n".join(lines) + "\nnothing new in this repo"
 
-            success, message, kind = mm.install(library, name)
+            for warning in review.get("warnings", []):
+                lines.append(f"WARNING: {warning}")
+
+            flags = review.get("flags", [])
+            if flags:
+                lines.append("worth a look: " + ", ".join(f"{f['name']} (line {f['line']})" for f in flags))
+
+            lines.append(f"read the code first ({mm.staging_root()}/{token}), then run /library confirm to install it")
+            return "\n".join(lines)
+
+        if subcmd == "confirm":
+            if not mm._last_stage:
+                return "nothing staged - run /library install <git url> first"
+
+            token = mm._last_stage
+            mm._last_stage = None
+
+            success, result, kind = mm.commit_stage(token)
             if not success:
-                return message
+                return result.get("message", "install failed")
 
             if kind in ("module", "channel"):
                 pkg = "user_channels" if kind == "channel" else "user_modules"
-                try:
-                    await core.modules.install_module_deps(__import__(pkg), name, self.channel.manager)
-                except Exception as e:
-                    self.channel.log("libraries", f"dependency install failed for {name}: {core.detail_error(e)}")
+                for name in result.get("installed", []):
+                    try:
+                        await core.modules.install_module_deps(__import__(pkg), name, self.channel.manager)
+                    except Exception as e:
+                        self.channel.log("libraries", f"dependency install failed for {name}: {core.detail_error(e)}")
 
-            return f"installed {kind} '{name}' - {_kind_done_note(kind, message)}"
+            note = ", skipped already installed: " + ", ".join(result["skipped"]) if result.get("skipped") else ""
+            done = "installed: " + ", ".join(result.get("installed", [])) + note
+            if kind in ("module", "channel"):
+                return f"{done} (enabled)\nrestart required - run /restart"
+            if kind == "skill":
+                return f"{done}\nrun /skills reload (or restart) to load them"
+            return f"{done}\nthey appear in Settings -> Appearance after a page reload"
 
         if subcmd == "update":
             if len(args) < 2:
-                return "usage: /library update <name> [library]"
+                return "usage: /library update <name>"
 
             name = args[1]
-            if len(args) >= 3:
-                library = args[2]
-            else:
-                matches = _resolve_library(name)
-                if not matches:
-                    return f"'{name}' not found in any cloned library - it may have been removed upstream"
-                if len(matches) > 1:
-                    return f"'{name}' exists in multiple libraries ({', '.join(matches)}) - add the library name to disambiguate"
-                library = matches[0]
-
-            success, message, kind = await mm.update(library, name)
+            success, message, kind, changed = await mm.update_entry(name)
             if not success:
                 return message
 
-            if kind in ("module", "channel"):
+            if changed and kind in ("module", "channel"):
                 pkg = "user_channels" if kind == "channel" else "user_modules"
                 try:
                     await core.modules.install_module_deps(__import__(pkg), name, self.channel.manager)
                 except Exception as e:
                     self.channel.log("libraries", f"dependency install failed for {name}: {core.detail_error(e)}")
+                return f"{message}\nrestart required - run /restart"
 
-            return f"updated {kind} '{name}' from library '{library}'\n{message}\n" + (
-                "restart required - run /restart" if kind in ("module", "channel")
-                else "run /skills reload (or restart) to load it" if kind == "skill"
-                else "it appears in Settings -> Appearance after a page reload"
-            )
+            return message
 
         if subcmd in ("remove", "uninstall"):
             if len(args) < 2:
-                return "usage: /library remove <git url> | /library remove <module name>"
+                return "usage: /library remove <name>"
 
-            target = args[1].strip()
-
-            # a url removes the repo from the core settings; anything else is treated as an installed module/channel name
-            if "://" in target or target.startswith("git@"):
-                repos = list(mm.list_repos())
-                if target not in repos:
-                    return f"'{target}' is not a configured repo url"
-
-                repos.remove(target)
-                core.config.config["core"]["module_libraries"] = repos
-                core.config.config.save()
-                return f"removed {target} from the library list (any cloned copy stays on disk until deleted manually)"
-
-            name = target
+            name = args[1].strip()
 
             # clean up dependencies while the module files still exist so deps can be read from them
             for kind in ("user_modules", "user_channels"):
@@ -690,7 +636,7 @@ class Commands:
 
             return f"removed {kind} '{name}' from {message}\nrestart required - run /restart"
 
-        return f"unknown subcommand: {subcmd}. use sync | list | install | update | remove"
+        return f"unknown subcommand: {subcmd}. use list | install | confirm | update | remove"
 
     async def cmd_tools(self, args: list):
         if not core.config.get("model").get("use_tools", False):

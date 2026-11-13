@@ -42,10 +42,6 @@ core_settings_schema = {
             "default": 30,
             "description": "Timeout in seconds for tool execution. This applies per individual tool, and is used to forcefully kill off tools that run too long."
         },
-        "module_libraries": {
-            "description": "A list of git repo urls containing modules, channels, skills and themes you want to be able to download and update in openlumara.",
-            "default": ["https://github.com/Rose22/openlumara-rose22-content"]
-        }
     },
     "api": {
         "url": {

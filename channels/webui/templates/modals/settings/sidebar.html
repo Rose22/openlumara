@@ -9,7 +9,7 @@
     'user_channels': 'svg/chat.svg',
     'modules': 'svg/wrench.svg',
     'user_modules': 'svg/wrench.svg',
-    'module_library': 'svg/download.svg',
+    'your_skills': 'svg/download.svg',
     'system_prompt': 'svg/thought_bubble.svg',
     'system_logs': 'svg/clipboard.svg'
 } %}
@@ -17,7 +17,7 @@
     <nav class="nav">
         <template x-for="[cat, data] in $store.settings.sortedCategories" :key="cat">
             <div x-animate.duration.150ms>
-                <template x-if="['module_library', 'system_prompt'].includes(cat)">
+                <template x-if="cat === 'system_prompt'">
                     <hr class="nav-divider">
                 </template>
 

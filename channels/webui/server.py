@@ -35,7 +35,9 @@ ADMIN_ONLY_ENDPOINTS = [
     "/api/system/context_size",
     
     "/api/libraries/status",
-    "/api/libraries/sync",
+    "/api/libraries/stage",
+    "/api/libraries/progress",
+    "/api/libraries/cancel",
     "/api/libraries/install",
     "/api/libraries/update",
     "/api/libraries/uninstall",

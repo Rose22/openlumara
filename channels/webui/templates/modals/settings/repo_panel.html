@@ -1,0 +1,29 @@
+<!-- Clone bar + pre-install review modal for Your Modules / Your Channels.
+     Included by modules.html and channels.html inside their
+     x-data="repoManager(kind)" list scopes, where the per-card Update and
+     Uninstall buttons live too. repo_kind_word sets the url placeholder.
+     Logic lives in js/components/module_library.js (repoManager). -->
+<div class="module-library repo-panel">
+    <div class="library-message" x-show="message" x-cloak :class="messageKind" x-text="message"></div>
+
+    <div class="library-urlbar">
+        <input type="text" class="library-url-input" spellcheck="false"
+               placeholder="https://example.com/user/my-{{ repo_kind_word }}"
+               x-model="newRepoUrl" @keydown.enter.prevent="stageAndInstall()">
+        <button type="button" class="library-btn primary" @click="stageAndInstall()"
+                :disabled="staging || committing || !newRepoUrl.trim()">
+            <span x-text="staging ? (clonePercent >= 5 ? 'Downloading ' + clonePercent + '%' : 'Downloading..') : 'Download & Install'"></span>
+        </button>
+        <button type="button" class="library-btn danger" x-show="staging" x-cloak
+                @click="cancelClone()" :disabled="cancelling">
+            <span x-text="cancelling ? 'Cancelling..' : 'Cancel'"></span>
+        </button>
+    </div>
+
+    <div class="library-clone-progress" x-show="staging" x-cloak>
+        <div class="library-clone-fill" :style="'width: ' + clonePercent + '%'"></div>
+    </div>
+
+    {% include 'modals/settings/repo_audit.html' %}
+</div>
+

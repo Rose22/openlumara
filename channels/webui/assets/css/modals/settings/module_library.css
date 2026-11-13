@@ -6,57 +6,31 @@
 .module-library {
     width: 100%;
 
-    /* horizontal Modules | Channels switcher, spanning the full content width.
-       the Sync Libraries button lives on the right end of the same bar */
-    .library-type-tabs {
+    /* Update / Uninstall pair on Your Modules / Your Channels cards
+       (single wrapper: this Alpine build's x-if is single-root only) */
+    .unified-card .git-card-actions {
         display: flex;
-        width: 100%;
-        gap: 4px;
-        padding: 4px;
-        border: 1px solid var(--border-color);
-        border-radius: var(--radius-sm);
-        background: var(--bg-tertiary);
-        margin-bottom: 16px;
+        align-items: center;
+        gap: 8px;
+    }
 
-        .library-type-tab {
-            display: inline-flex;
-            flex: 1;
-            justify-content: center;
-            align-items: center;
-            gap: 6px;
-            padding: 6px 16px;
-            border: none;
-            border-radius: var(--radius-sm);
-            background: transparent;
-            color: var(--text-secondary);
-            font-family: var(--font-primary);
-            font-size: 13px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.15s ease;
+    /* square icon-only button variant */
+    .library-btn.icon {
+        padding: 7px 10px;
 
-            &:hover {
-                color: var(--text-primary);
-            }
-
-            &.active {
-                background: var(--button-bg);
-                color: var(--button-text);
-            }
-
-            .tab-count {
-                font-size: 11px;
-                opacity: 0.7;
-            }
-        }
-
-        .library-sync-btn {
-            flex-shrink: 0;
-            margin: 1px 1px 1px 4px;
-            padding: 5px 14px;
-            border-color: var(--border-color);
+        svg {
+            width: 15px;
+            height: 15px;
         }
     }
+
+    /* small muted helper line under a repo manager */
+    .library-note {
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin: 6px 0 10px 0;
+    }
+
 
     /* buttons: same visual language as the settings footer, but local */
     .library-btn {
@@ -103,17 +77,21 @@
         }
     }
 
-    /* reload icon: spins while the libraries are syncing */
-    .library-sync-icon {
-        display: inline-flex;
+    /* live clone percentage, shown under a url bar while staging */
+    .library-clone-progress {
+        height: 6px;
+        margin: -8px 0 14px 0;
+        border: 1px solid var(--border-color);
+        border-radius: 99px;
+        background: var(--bg-primary);
+        overflow: hidden;
+    }
 
-        svg {
-            display: block;
-        }
-
-        &.spinning {
-            animation: library-spin 0.9s linear infinite;
-        }
+    .library-clone-fill {
+        height: 100%;
+        border-radius: 99px;
+        background: var(--accent);
+        transition: width 0.35s ease;
     }
 
     .library-message {
@@ -142,32 +120,28 @@
         }
     }
 
-    .library-restart {
+    /* repo url install bar: one git repo per module/channel */
+    .library-urlbar {
         display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        padding: 10px 14px;
-        border: 1px solid var(--accent);
-        border-radius: var(--radius-sm);
+        gap: 8px;
         margin-bottom: 14px;
-        font-size: 13px;
-        color: var(--text-primary);
-        background: var(--bg-tertiary);
-    }
 
-    .library-loading {
-        display: flex;
-        justify-content: center;
-        padding: 40px 0;
+        .library-url-input {
+            flex: 1;
+            min-width: 0;
+            box-sizing: border-box;
+            padding: 7px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: var(--font-primary);
+            font-size: 13px;
 
-        .spinner {
-            width: 34px;
-            height: 34px;
-            border: 3px solid var(--border-color);
-            border-top-color: var(--accent);
-            border-radius: 50%;
-            animation: library-spin 0.8s linear infinite;
+            &:focus {
+                outline: none;
+                border-color: var(--accent);
+            }
         }
     }
 
@@ -175,12 +149,6 @@
         color: var(--text-muted);
         font-size: 13px;
         margin: 8px 0;
-    }
-
-    .library-list {
-        display: flex;
-        flex-direction: column;
-        gap: 18px;
     }
 
     .library-group {
@@ -196,16 +164,6 @@
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
-
-            a {
-                color: inherit;
-                text-decoration: none;
-
-                &:hover {
-                    color: var(--accent);
-                    text-decoration: underline;
-                }
-            }
         }
     }
 
@@ -252,24 +210,10 @@
             margin: 0;
         }
 
-        .library-item-lib {
+        .library-item-repo {
             font-size: 11px;
             color: var(--text-muted);
-        }
-
-        /* installed marker: quiet accent check between description and buttons */
-        .library-installed-indicator {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 18px;
-            flex-shrink: 0;
-            color: var(--accent);
-            opacity: 0.85;
-
-            svg {
-                display: block;
-            }
+            margin: 0;
         }
 
         .library-item-actions {
@@ -460,7 +404,8 @@
         justify-content: center;
         padding: 30px 0;
 
-        /* the tab's .spinner is scoped to .library-loading - duplicate here */
+        /* duplicated spinner styling: the teleported audit modal lives at body
+           level, so nothing scoped to the tabs can reach it */
         .spinner {
             width: 34px;
             height: 34px;

@@ -1,10 +1,8 @@
 """
-Module Library API routes (external module repos): status, sync, the
-pre-install code-review source viewer, install/update/uninstall.
+Content install API routes: stage a git repo for review, commit a staged
+install, update git-installed modules/channels in place, uninstall, and
+the installed-content listing that feeds the settings panels.
 """
-
-import os
-import ast
 
 import fastapi
 
@@ -12,179 +10,91 @@ import core
 
 import channels.webui.utils as utils
 
-# static hints for the pre-install code review modal. the entry file is only parsed with ast.
-# nothing from the library is imported or executed here.
-_REVIEW_IMPORT_FLAGS = {
-    "subprocess": "imports subprocess - can run shell commands",
-    "ctypes": "imports ctypes - can call native code",
-    "socket": "imports socket - can open raw network connections",
-}
-
-def library_review_flags(entry_path):
-    """returns (flags, warnings) for a library module's entry file:
-    flags = places the user should look (dependencies, on_install, on_ready),
-    warnings = anything that smells like shell/exec/network access."""
-    flags = []
-    warnings = []
-    try:
-        with open(entry_path, "r", encoding="utf-8", errors="replace") as f:
-            tree = ast.parse(f.read())
-    except Exception:
-        return flags, warnings
-
-    warned = set()
-    def warn(text):
-        if text not in warned:
-            warned.add(text)
-            warnings.append(text)
-
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Assign):
-            for target in node.targets:
-                if isinstance(target, ast.Name) and target.id == "dependencies":
-                    flags.append({"name": "dependencies", "line": node.lineno, "kind": "info",
-                                  "desc": "pip packages - auto-installed when you install this module"})
-        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            if node.name == "on_install":
-                flags.append({"name": "on_install", "line": node.lineno, "kind": "warn",
-                              "desc": "runs code the moment this module is installed"})
-            elif node.name == "on_ready":
-                flags.append({"name": "on_ready", "line": node.lineno, "kind": "warn",
-                              "desc": "runs code every time the server starts"})
-        elif isinstance(node, ast.Import):
-            for alias in node.names:
-                top = str(alias.name).split(".")[0]
-                if top in _REVIEW_IMPORT_FLAGS:
-                    warn(_REVIEW_IMPORT_FLAGS[top])
-        elif isinstance(node, ast.ImportFrom):
-            top = str(node.module or "").split(".")[0]
-            if top in _REVIEW_IMPORT_FLAGS:
-                warn(_REVIEW_IMPORT_FLAGS[top])
-        elif isinstance(node, ast.Call):
-            fn = node.func
-            if isinstance(fn, ast.Name) and fn.id in ("eval", "exec", "compile", "__import__"):
-                warn(f"calls {fn.id}() - can run dynamically generated code")
-            elif isinstance(fn, ast.Attribute) and fn.attr in ("system", "popen", "execv", "execve", "spawnl", "spawnv"):
-                warn(f"calls os.{fn.attr}() - can run shell commands")
-
-    flags.sort(key=lambda flag: flag["line"])
-    return flags, warnings
 
 def get_module_manager(channel):
     return channel.manager.module_manager
 
+
 def register(app, channel):
     # ----------------------------
-    # Module Library (external module repos)
+    # content installs (one repo per module/channel, packs for skills/themes)
     # ----------------------------
     @app.get("/api/libraries/status")
     async def libraries_status():
-        """Returns the configured library repos, the cloned libraries, and every installable module found in them"""
+        """every content entry installed on disk: modules, channels, skills and themes"""
         mm = get_module_manager(channel)
-        return utils.api_result({
-            "repos": mm.list_repos(),
-            "libraries": list(mm.list_libraries().keys()),
-            "modules": mm.list_available(),
-        })
+        return utils.api_result({"modules": mm.list_installed()})
 
-    @app.post("/api/libraries/sync")
-    async def libraries_sync():
-        """Clones/updates every repo in core.module_libraries, then returns the refreshed module list"""
+    @app.post("/api/libraries/stage")
+    async def libraries_stage(request: fastapi.Request):
+        """clones a repo into the staging area so its code can be reviewed before anything is installed"""
+        data = await request.json()
+        url = str(data.get("url") or "").strip()
+        progress_key = str(data.get("progress_key") or "").strip() or None
+
         mm = get_module_manager(channel)
-        if not mm.list_repos():
-            return utils.api_result("No module libraries configured. Add github repo urls under Core settings first.", success=False)
+        token, info = await mm.stage_repo(url, branch=data.get("branch"), progress_key=progress_key)
+        if token is None:
+            return utils.api_result(info, success=False)
 
-        synced = await mm.load()
-        return utils.api_result({"synced": bool(synced), "modules": mm.list_available()}, success=True)
+        return utils.api_result(dict(info, token=token))
 
-    # source viewer for the pre-install code review modal
+    @app.post("/api/libraries/cancel")
+    async def libraries_cancel(request: fastapi.Request):
+        """terminate the in-flight clone started by /stage under this key"""
+        data = await request.json()
+        key = str(data.get("key") or "").strip()
+
+        if not get_module_manager(channel).cancel_clone(key):
+            return utils.api_result("that clone is no longer running", success=False)
+
+        return utils.api_result(None)
+
+    # live clone percentage for the stage request currently in flight
+    @app.get("/api/libraries/progress")
+    async def libraries_progress(request: fastapi.Request):
+        """percentage of the clone running under this progress_key; data is null once it's done"""
+        key = (request.query_params.get("key") or "").strip()
+        return utils.api_result(get_module_manager(channel).clone_progress(key))
+
+    # source viewer for the pre-install code review modal (reads the staging copy)
     @app.get("/api/libraries/source")
     async def libraries_source(request: fastapi.Request):
-        """returns a library module's source code plus review hints"""
-        library = (request.query_params.get("library") or "").strip()
-        name = (request.query_params.get("name") or "").strip()
+        """a staged repo's file list plus the contents of one file, with review hints"""
+        token = (request.query_params.get("token") or "").strip()
         file_rel = (request.query_params.get("file") or "").strip()
 
         mm = get_module_manager(channel)
-        lib_path = mm.list_libraries().get(library)
-        if not lib_path:
-            return utils.api_result("library not found", success=False)
-        
-        source, kind = mm._find_source(lib_path, name)
-        if not source:
-            return utils.api_result("module not found in this library", success=False)
+        review = mm.stage_review(token, file_rel)
+        if review is None:
+            return utils.api_result("staged repo not found - stage it again", success=False)
 
-        source_root = os.path.realpath(source)
-        REVIEW_TEXT_EXTS = (".py", ".json", ".md", ".txt", ".yaml", ".yml", ".css", ".js", ".html")
-
-        if kind == "theme":
-            files = [f for f in (f"{name}.json", f"{name}.css")
-                     if os.path.isfile(os.path.join(source_root, f))]
-            entry = f"{name}.json"
-        else:
-            files = []
-            for dirpath, dirnames, filenames in os.walk(source_root):
-                dirnames[:] = [d for d in dirnames if d not in ("__pycache__", ".git")]
-                for fname in filenames:
-                    if fname.endswith(REVIEW_TEXT_EXTS):
-                        rel = os.path.relpath(os.path.join(dirpath, fname), source_root)
-                        files.append(rel.replace(os.sep, "/"))
-            files.sort()
-            entry = "module.py" if kind == "module" else "channel.py" if kind == "channel" else "SKILL.md"
-
-        wanted = file_rel if file_rel in files else entry
-        full = os.path.realpath(os.path.join(source_root, wanted))
-        if not full.startswith(source_root + os.sep) or not os.path.isfile(full):
-            return utils.api_result("file is not part of this module", success=False)
-
-        max_chars = 500_000
-        try:
-            with open(full, "r", encoding="utf-8", errors="replace") as f:
-                code = f.read(max_chars)
-        except Exception as e:
-            return utils.api_result(core.detail_error(e), success=False)
-
-        # shell/exec smell checks only apply to runnable python entries
-        if kind in ("module", "channel"):
-            flags, warnings = library_review_flags(os.path.join(source_root, entry))
-        else:
-            flags, warnings = [], []
-
-        return utils.api_result({
-            "library": library,
-            "name": name,
-            "kind": kind,
-            "file": wanted,
-            "files": files,
-            "code": code,
-            "truncated": len(code) >= max_chars,
-            "flags": flags,
-            "warnings": warnings
-        })
+        return utils.api_result(review)
 
     @app.post("/api/libraries/install")
     async def libraries_install(request: fastapi.Request):
-        """Installs a module/channel/skill/theme from a library and installs its dependencies"""
+        """commits a reviewed staging folder and installs dependencies for module/channel entries"""
         data = await request.json()
-        library = (data.get("library") or "").strip()
-        name = (data.get("name") or "").strip()
+        token = (data.get("token") or "").strip()
 
         mm = get_module_manager(channel)
-        success, message, kind = mm.install(library, name)
+        success, result, kind = mm.commit_stage(token)
         if not success:
-            return utils.api_result(message, success=False)
+            return utils.api_result(result.get("message", "install failed"), success=False)
 
         if kind in ("module", "channel"):
             pkg = "user_channels" if kind == "channel" else "user_modules"
-            try:
-                await core.modules.install_module_deps(__import__(pkg), name, channel.manager)
-            except Exception as e:
-                channel.log("libraries", f"dependency install failed for {name}: {core.detail_error(e)}")
+            for name in result.get("installed", []):
+                try:
+                    await core.modules.install_module_deps(__import__(pkg), name, channel.manager)
+                except Exception as e:
+                    channel.log("libraries", f"dependency install failed for {name}: {core.detail_error(e)}")
 
         return utils.api_result({
             "kind": kind,
+            "installed": result.get("installed", []),
+            "skipped": result.get("skipped", []),
             "restart_required": kind in ("module", "channel"),
-            "message": message,
             "note": {
                 "theme": "Pick it in Settings -> Appearance after a page reload.",
                 "skill": "Run /skills reload to load it.",
@@ -193,17 +103,16 @@ def register(app, channel):
 
     @app.post("/api/libraries/update")
     async def libraries_update(request: fastapi.Request):
-        """Re-syncs a library and overwrites an installed entry with the newest version from it"""
+        """git pulls an installed module/channel repo back up to date, in place"""
         data = await request.json()
-        library = (data.get("library") or "").strip()
         name = (data.get("name") or "").strip()
 
         mm = get_module_manager(channel)
-        success, message, kind = await mm.update(library, name)
+        success, message, kind, changed = await mm.update_entry(name)
         if not success:
             return utils.api_result(message, success=False)
 
-        if kind in ("module", "channel"):
+        if changed and kind in ("module", "channel"):
             pkg = "user_channels" if kind == "channel" else "user_modules"
             try:
                 await core.modules.install_module_deps(__import__(pkg), name, channel.manager)
@@ -212,17 +121,14 @@ def register(app, channel):
 
         return utils.api_result({
             "kind": kind,
-            "restart_required": kind in ("module", "channel"),
+            "up_to_date": not changed,
+            "restart_required": changed,
             "message": message,
-            "note": {
-                "theme": "Pick it in Settings -> Appearance after a page reload.",
-                "skill": "Run /skills reload to load it.",
-            }.get(kind, ""),
         }, success=True)
 
     @app.post("/api/libraries/uninstall")
     async def libraries_uninstall(request: fastapi.Request):
-        """Removes an installed user module/channel and cleans up dependencies nothing else needs anymore"""
+        """Removes an installed user module/channel/skill/theme and cleans up dependencies nothing else needs anymore"""
         data = await request.json()
         name = (data.get("name") or "").strip()
 

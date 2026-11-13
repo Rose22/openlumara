@@ -1,0 +1,84 @@
+<!-- staged repo review modal: reads the staging copy via /api/libraries/source.
+     Binds to the surrounding repoManager component, so include it inside one. -->
+<template x-teleport="body">
+    <div class="library-audit-overlay" x-show="audit" x-cloak @keydown.escape.window="closeAudit()">
+        <template x-if="audit">
+        <div class="library-audit-modal" role="dialog" aria-modal="true">
+            <div class="library-audit-header">
+                <h3 class="section-title"
+                    x-text="audit.kind === 'skill' ? 'Review these skills before installing' : 'Review this code before installing'"></h3>
+                <span class="library-audit-repo" x-text="audit.url" :title="audit.url"></span>
+            </div>
+
+            <p class="library-audit-lead" x-show="audit.entries.length > 0">
+                Will install: <strong x-text="audit.entries.join(', ')"></strong>
+            </p>
+            <p class="library-audit-lead" x-show="audit.skipped.length > 0" x-cloak>
+                Already installed, will be skipped: <strong x-text="audit.skipped.join(', ')"></strong>
+            </p>
+
+            <p class="library-audit-lead" x-show="audit.kind === 'module' || audit.kind === 'channel'">
+                This is Python code that runs with <strong>full access to your host system</strong>.
+                Read through the source below first - the buttons under this text jump straight to the parts that matter.
+            </p>
+            <p class="library-audit-lead" x-show="audit.kind === 'skill'" x-cloak>
+                Skills are instruction files that get loaded into <strong>your AI's context</strong>.
+                Read through them below first - a skill tells your AI what to do.
+            </p>
+
+            <div class="library-audit-flags" x-show="audit.flags.length > 0">
+                <template x-for="flag in audit.flags" :key="'flag-' + flag.name + '-' + flag.line">
+                    <button type="button" class="audit-flag" :class="[flag.kind, { focused: audit.focusLine === flag.line }]"
+                            @click="auditJump(flag.line)">
+                        <span class="audit-flag-name" x-text="flag.name"></span>
+                        <span class="audit-flag-line" x-text="'line ' + flag.line"></span>
+                        <span class="audit-flag-desc" x-text="flag.desc"></span>
+                    </button>
+                </template>
+            </div>
+
+            <div class="library-audit-warnings" x-show="audit.warnings.length > 0">
+                <template x-for="(warning, i) in audit.warnings" :key="'warn-' + i">
+                    <div class="audit-warning" x-text="warning"></div>
+                </template>
+            </div>
+
+            <div class="library-audit-filebar">
+                <label>File:
+                    <select :value="audit.file" @change="auditSelectFile($event.target.value)">
+                        <template x-for="f in audit.files" :key="f">
+                            <option :value="f" x-text="f"></option>
+                        </template>
+                    </select>
+                </label>
+                <span class="audit-truncated" x-show="audit.truncated" x-cloak>file is truncated in this view</span>
+            </div>
+
+            <div class="library-audit-loading" x-show="audit.loading" x-cloak>
+                <div class="spinner"></div>
+            </div>
+
+            <div class="library-audit-error" x-show="audit.error" x-cloak x-text="audit.error"></div>
+
+            <div class="library-audit-code" id="library-audit-scroll" x-show="!audit.loading && !audit.error">
+                <div class="audit-gutter" aria-hidden="true">
+                    <template x-for="n in auditLineNums" :key="'ln-' + n">
+                        <span class="audit-line" :class="{ focus: n === audit.focusLine }" x-text="n"></span>
+                    </template>
+                </div>
+                <pre class="audit-code hljs" x-html="auditHighlighted"></pre>
+            </div>
+
+            <div class="library-audit-footer">
+                <span class="library-audit-footnote" x-show="!auditIsData">Only install code you have read and trust.</span>
+                <span class="library-audit-footnote" x-show="auditIsData" x-cloak>Skills tell your AI what to do - give them a quick skim first.</span>
+                <div class="library-audit-actions">
+                    <button type="button" class="library-btn" @click="closeAudit()">Reject</button>
+                    <button type="button" :class="['library-btn', auditIsData ? 'primary' : 'danger']" @click="confirmAudit()"
+                            :disabled="audit.loading || Boolean(audit.error)" x-text="auditIsData ? 'Install' : 'Confirm'"></button>
+                </div>
+            </div>
+        </div>
+        </template>
+    </div>
+</template>

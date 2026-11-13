@@ -54,6 +54,46 @@
         </div>
         
         
+        <!-- Theme Repos: pull themes straight from a git repo -->
+        <div class="module-library" x-data="repoManager('theme')">
+            <div class="library-message" x-show="message" x-cloak :class="messageKind" x-text="message"></div>
+
+            <div class="library-urlbar">
+                <input type="text" class="library-url-input" spellcheck="false"
+                       placeholder="https://example.com/user/my-theme-pack"
+                       x-model="newRepoUrl" @keydown.enter.prevent="stageAndInstall()">
+                <button type="button" class="library-btn primary" @click="stageAndInstall()"
+                        :disabled="staging || committing || !newRepoUrl.trim()">
+                    <span x-text="staging ? (clonePercent >= 5 ? 'Downloading ' + clonePercent + '%' : 'Downloading..') : 'Download Theme Repo'"></span>
+                </button>
+                <button type="button" class="library-btn danger" x-show="staging" x-cloak
+                        @click="cancelClone()" :disabled="cancelling">
+                    <span x-text="cancelling ? 'Cancelling..' : 'Cancel'"></span>
+                </button>
+            </div>
+
+            <div class="library-clone-progress" x-show="staging" x-cloak>
+                <div class="library-clone-fill" :style="'width: ' + clonePercent + '%'"></div>
+            </div>
+
+            <template x-for="m in entries" :key="m.name">
+                <div class="library-item installed">
+                    <div class="library-item-main">
+                        <div class="library-item-header">
+                            <span class="library-item-name" x-text="formatLabel(m.name)"></span>
+                        </div>
+                        <p class="library-item-repo" x-show="repoLabel(m)" x-text="repoLabel(m)" title="comes from this repo"></p>
+                    </div>
+                    <div class="library-item-actions">
+                        <button type="button" class="library-btn danger" @click="uninstall(m)"
+                                :disabled="busyName !== null || committing">
+                            <span x-text="busyName === m.name ? 'Working..' : 'Remove'"></span>
+                        </button>
+                    </div>
+                </div>
+            </template>
+        </div>
+
         <!-- Typography Settings -->
         <div class="typography-section">
             <h4>Typography</h4>

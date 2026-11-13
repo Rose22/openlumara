@@ -1,9 +1,9 @@
 <!-- CHANNELS: Unified list -->
-<template x-if="(activeCategory === 'channels' || activeCategory === 'user_channels') && !activeChannel">
+<template x-if="activeCategory === 'channels' && !activeChannel">
     <div class="unified-list">
         <h3 x-text="$store.settings.categories[activeCategory].title"></h3>
         <p class="section-desc" x-text="$store.settings.categories[activeCategory].description"></p>
-        
+
         <!-- All channels (enabled first, then disabled) -->
         <template x-for="channel in [...$store.settings.categories[activeCategory].enabled, ...$store.settings.categories[activeCategory].disabled]" :key="channel">
             <template x-if="$store.settings.showUnsafe || !$store.settings.categories[activeCategory].unsafeModules[channel]">
@@ -12,6 +12,47 @@
                         <span type="button" class="channel-name-btn" x-text="formatLabel(channel)"></span>
                         <p class="description" x-html="renderMarkdown($store.settings.categories[activeCategory].descriptions[channel]) || ''"></p>
                     </div>
+                    <button type="button" :class="{'toggle': true, 'toggle-off': $store.settings.categories[activeCategory].disabled.includes(channel), 'toggle-on': $store.settings.categories[activeCategory].enabled.includes(channel) }" 
+                            @click="$store.settings.toggleEnabled(activeCategory, channel)">
+                    </button>
+                </div>
+            </template>
+        </template>
+    </div>
+</template>
+
+<!-- YOUR CHANNELS: the same cards, plus the clone bar, plus git management
+     (Update / Uninstall) on each card. Local installs (no .git) stay plain. -->
+<template x-if="activeCategory === 'user_channels' && !activeChannel">
+    <div class="unified-list module-library" x-data="repoManager('channel')">
+        <h3 x-text="$store.settings.categories[activeCategory].title"></h3>
+        <p class="section-desc" x-text="$store.settings.categories[activeCategory].description"></p>
+
+        {% set repo_kind_word = 'channel' %}
+        {% include 'modals/settings/repo_panel.html' %}
+
+        <!-- All channels (enabled first, then disabled) -->
+        <template x-for="channel in [...$store.settings.categories[activeCategory].enabled, ...$store.settings.categories[activeCategory].disabled]" :key="channel">
+            <template x-if="$store.settings.showUnsafe || !$store.settings.categories[activeCategory].unsafeModules[channel]">
+                <div class="unified-card" :class="{ 'disabled': !$store.settings.categories[activeCategory].enabled.includes(channel), 'unsafe': $store.settings.categories[activeCategory].unsafeModules[channel] }">
+                    <div class="info" @click="activeChannel = channel">
+                        <span type="button" class="channel-name-btn" x-text="formatLabel(channel)"></span>
+                        <p class="description" x-html="renderMarkdown($store.settings.categories[activeCategory].descriptions[channel]) || ''"></p>
+                        <p class="library-note" x-show="repoNameOf(channel)" x-text="repoNameOf(channel)" title="comes from this repo"></p>
+                    </div>
+                    <template x-if="isGitContent(channel)">
+                        <div class="git-card-actions">
+                            <button type="button" class="library-btn icon" @click="updateContent(channel)"
+                                    :disabled="busyName !== null"
+                                    :title="busyName === channel ? 'Working..' : 'Update from its repo'">
+                                {% include 'svg/reload.svg' %}
+                            </button>
+                            <button type="button" class="library-btn danger icon" @click="uninstallContent(channel)"
+                                    :disabled="busyName !== null" title="Uninstall">
+                                {% include 'svg/trash.svg' %}
+                            </button>
+                        </div>
+                    </template>
                     <button type="button" :class="{'toggle': true, 'toggle-off': $store.settings.categories[activeCategory].disabled.includes(channel), 'toggle-on': $store.settings.categories[activeCategory].enabled.includes(channel) }" 
                             @click="$store.settings.toggleEnabled(activeCategory, channel)">
                     </button>

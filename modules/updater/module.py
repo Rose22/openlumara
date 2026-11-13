@@ -6,6 +6,8 @@ import sys
 class Updater(core.module.Module):
     """lets you update openlumara remotely using a `/update` command"""
 
+    category = "core"
+
     @core.module.command("update")
     async def update(self, args: list):
         if sys.platform == "win32":

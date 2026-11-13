@@ -1,9 +1,9 @@
 <!-- MODULES: Unified list (no module selected) -->
-<template x-if="(activeCategory === 'modules' || activeCategory === 'user_modules') && !activeModule">
+<template x-if="activeCategory === 'modules' && !activeModule">
     <div class="unified-list">
         <h3 x-text="$store.settings.categories[activeCategory].title"></h3>
         <p class="section-desc" x-text="$store.settings.categories[activeCategory].description"></p>
-        
+
         <template x-for="group in $store.settings.groupedSubItems(activeCategory)" :key="group.label">
             <div class="module-group">
                 <template x-if="group.label">
@@ -16,6 +16,52 @@
                             <span type="button" class="btn" x-text="formatLabel(module)"></span>
                             <p class="description" x-html="renderMarkdown($store.settings.categories[activeCategory].descriptions[module]) || ''"></p>
                         </div>
+                        <button type="button" :class="{'toggle': true, 'toggle-off': $store.settings.categories[activeCategory].disabled.includes(module), 'toggle-on': $store.settings.categories[activeCategory].enabled.includes(module) }" 
+                                @click="$store.settings.toggleEnabled(activeCategory, module)">
+                        </button>
+                    </div>
+                </template>
+            </div>
+        </template>
+    </div>
+</template>
+
+<!-- YOUR MODULES: the same cards, plus the clone bar, plus git management
+     (Update / Uninstall) on each card. Local installs (no .git) stay plain. -->
+<template x-if="activeCategory === 'user_modules' && !activeModule">
+    <div class="unified-list module-library" x-data="repoManager('module')">
+        <h3 x-text="$store.settings.categories[activeCategory].title"></h3>
+        <p class="section-desc" x-text="$store.settings.categories[activeCategory].description"></p>
+
+        {% set repo_kind_word = 'module' %}
+        {% include 'modals/settings/repo_panel.html' %}
+
+        <template x-for="group in $store.settings.groupedSubItems(activeCategory)" :key="group.label">
+            <div class="module-group">
+                <template x-if="group.label">
+                    <h4 class="module-group-label" x-text="group.label"></h4>
+                </template>
+
+                <template x-for="module in group.items" :key="module">
+                    <div class="unified-card" :class="{ 'disabled': !$store.settings.categories[activeCategory].enabled.includes(module), 'unsafe': $store.settings.categories[activeCategory].unsafeModules[module] }">
+                        <div class="info" @click="activeModule = module">
+                            <span type="button" class="btn" x-text="formatLabel(module)"></span>
+                            <p class="description" x-html="renderMarkdown($store.settings.categories[activeCategory].descriptions[module]) || ''"></p>
+                            <p class="library-note" x-show="repoNameOf(module)" x-text="repoNameOf(module)" title="comes from this repo"></p>
+                        </div>
+                        <template x-if="isGitContent(module)">
+                            <div class="git-card-actions">
+                                <button type="button" class="library-btn icon" @click="updateContent(module)"
+                                        :disabled="busyName !== null"
+                                        :title="busyName === module ? 'Working..' : 'Update from its repo'">
+                                    {% include 'svg/reload.svg' %}
+                                </button>
+                                <button type="button" class="library-btn danger icon" @click="uninstallContent(module)"
+                                        :disabled="busyName !== null" title="Uninstall">
+                                    {% include 'svg/trash.svg' %}
+                                </button>
+                            </div>
+                        </template>
                         <button type="button" :class="{'toggle': true, 'toggle-off': $store.settings.categories[activeCategory].disabled.includes(module), 'toggle-on': $store.settings.categories[activeCategory].enabled.includes(module) }" 
                                 @click="$store.settings.toggleEnabled(activeCategory, module)">
                         </button>

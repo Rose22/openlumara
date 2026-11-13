@@ -137,7 +137,7 @@ def build_field_settings(obj, schema, prefix=""):
     return settings
 
 
-def build_settings_structure(original_data, module_info, core_sections):
+def build_settings_structure(original_data, module_info, core_sections, skills_enabled=False):
     categories = {}
     order = 0
 
@@ -167,29 +167,39 @@ def build_settings_structure(original_data, module_info, core_sections):
         "isThemeCategory": True,
     }
 
+    # sidebar order: the stock sections first, then the git-installed ones
     section_order = {
-        "channels": 10,
-        "modules": 11,
+        "modules": 10,
+        "channels": 11,
+        "user_modules": 12,
         "user_channels": 13,
-        "user_modules": 14,
     }
-    module_library_order = 12
 
-    for top_key, top_value in original_data.items():
+    # custom panel tab: install skills packs from git repos and manage the ones on disk.
+    # only shown when the skills module is loaded, otherwise there is nothing to load them.
+    if skills_enabled:
+        categories["your_skills"] = {
+            "title": "Your Skills",
+            "description": "Install skills from git repos and manage the ones on disk",
+            "order": 14,
+            "isThemeCategory": True,
+        }
+
+    # Your Channels / Your Modules are proper sidebar entries even on a fresh
+    # install: synthesize empty toggle-list sections when the config holds none
+    # yet, so the clone bar is reachable before the first repo is ever installed.
+    data = dict(original_data)
+    for key in ("user_channels", "user_modules"):
+        if not isinstance(data.get(key), dict):
+            data[key] = {"enabled": [], "disabled": [], "settings": {}}
+
+    for top_key, top_value in data.items():
         if top_key.lower() in ("theme", "theme_mode"):
             continue
 
-        if top_key == "channels" and "module_library" not in categories:
-            categories["module_library"] = {
-                "title": "Get Content",
-                "description": "Install content from external libraries",
-                "order": module_library_order,
-                "isThemeCategory": True,
-            }
-
         section_titles = {
-            "user_channels": "Installed Channels",
-            "user_modules": "Installed Modules",
+            "user_channels": "Your Channels",
+            "user_modules": "Your Modules",
         }
 
         display_title = section_titles.get(top_key, format_label(top_key))
@@ -244,16 +254,6 @@ def build_settings_structure(original_data, module_info, core_sections):
                 category["settings"] = {}
 
         categories[top_key] = category
-
-    # safety net: if the channels section was absent from the config,
-    # the tab still shows up (appended at the end of the regular sections)
-    if "module_library" not in categories:
-        categories["module_library"] = {
-            "title": "Get Modules",
-            "description": "Install modules from external libraries",
-            "order": module_library_order,
-            "isThemeCategory": True,
-        }
 
     return categories
 
