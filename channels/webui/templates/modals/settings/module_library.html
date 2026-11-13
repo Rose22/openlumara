@@ -3,7 +3,7 @@
 <template x-if="activeCategory === 'your_skills'">
     <div class="module-library" x-data="repoManager('skill')">
         <h3 class="section-title">Your Skills</h3>
-        <p class="section-desc">Skills are instruction files your AI can use. Install a skills pack by pasting its repo url - the repo needs skill folders (each containing a SKILL.md) at its root.</p>
+        <p class="section-desc">Skills are instruction files your AI can use</p>
 
         <div class="library-message" x-show="message" x-cloak :class="messageKind" x-text="message"></div>
 
