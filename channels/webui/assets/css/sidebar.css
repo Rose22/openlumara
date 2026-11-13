@@ -655,7 +655,7 @@
             &.active {
                 color: var(--accent);
                 border-color: var(--accent);
-                background: rgba(var(--primary-rgb), 0.15);
+                background: color-mix(in srgb, var(--accent) 15%, transparent);
             }
         }
     }
@@ -707,7 +707,7 @@
             &.selected {
                 color: var(--accent);
                 border-color: var(--accent);
-                background: rgba(var(--primary-rgb), 0.15);
+                background: color-mix(in srgb, var(--accent) 15%, transparent);
             }
 
             &:disabled {
