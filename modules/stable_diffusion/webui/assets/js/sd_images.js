@@ -116,6 +116,8 @@
             var m = sdMeta(token);
             if (!m) { sdNoteUnknown(token); continue; }
             el.setAttribute("src", m.url);
+            // the token stays the image's key even after the pixels land
+            el.setAttribute("data-img", token);
             el.removeAttribute("data-sd");
             if (m.name) el.setAttribute("alt", m.name);
             if (m.width && m.height && !el.getAttribute("width")) {
@@ -202,7 +204,7 @@
                 if (src) {
                     return '<span class="' + cls + '">' +
                         '<img class="' + imgCls + '" src="' + esc(src) + '" alt="' + label +
-                        '" loading="lazy"' + dims + '></span>';
+                        '" loading="lazy" data-img="' + esc(token.token) + '"' + dims + '></span>';
                 }
                 sdNoteUnknown(token.token);
                 return '<span class="' + cls + '">' +
