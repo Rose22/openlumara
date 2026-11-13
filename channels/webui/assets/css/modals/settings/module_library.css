@@ -167,6 +167,11 @@
         }
     }
 
+    /* stacked cards (skills panel) get breathing room between them */
+    .library-item + .library-item {
+        margin-top: 10px;
+    }
+
     .library-item {
         display: flex;
         align-items: center;
