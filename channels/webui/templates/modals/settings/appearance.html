@@ -60,7 +60,7 @@
 
             <div class="library-urlbar">
                 <input type="text" class="library-url-input" spellcheck="false"
-                       placeholder="https://example.com/user/my-theme-pack"
+                       placeholder="https://github.com/username/my-theme-pack"
                        x-model="newRepoUrl" @keydown.enter.prevent="stageAndInstall()">
                 <button type="button" class="library-btn primary" @click="stageAndInstall()"
                         :disabled="staging || committing || !newRepoUrl.trim()">
