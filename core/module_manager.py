@@ -7,6 +7,7 @@ import time
 import shutil
 import asyncio
 import uuid
+import yaml
 import core
 
 # staged installs (clones awaiting review/confirmation) live here, inside the data folder
@@ -145,6 +146,38 @@ class ModuleManager:
             # sanitize dot-only names (e.g. '..', '...')
             name = "repo"
         return name
+
+    def _manifest_declared_name(self, folder):
+        """the install name an openlumara.yaml manifest declares
+        (`name: <python-valid identifier>`), or None with no manifest."""
+        for filename in ("openlumara.yaml", "openlumara.yml"):
+            path = os.path.join(folder, filename)
+            if not os.path.isfile(path):
+                continue
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    data = yaml.safe_load(f)
+            except Exception as e:
+                self.log(f"could not read {filename}: {core.detail_error(e)}")
+                return None
+
+            if isinstance(data, dict) and data.get("name"):
+                return str(data["name"]).strip()
+            return None
+
+        return None
+
+    def _resolve_install_name(self, repo_folder_name, staging, override=None):
+        """decide the folder a module/channel installs as: an explicit override
+        first, then the repo's openlumara.yaml manifest, then the repo folder
+        name. returns (name, error)."""
+        declared = str(override or "").strip() or self._manifest_declared_name(staging) or repo_folder_name
+        if not re.fullmatch(r"[a-zA-Z_][a-zA-Z0-9_]*", declared):
+            source = "install name" if override else "manifest name"
+            return None, (f"invalid {source} '{declared}' - module and channel folders "
+                          "must be valid python names (letters, digits, underscores)")
+
+        return declared, None
 
     def _find_git(self):
         git = shutil.which("git")
@@ -418,12 +451,15 @@ class ModuleManager:
             return "theme"
         return None
 
-    async def stage_repo(self, url, branch=None, progress_key=None):
+    async def stage_repo(self, url, branch=None, progress_key=None, install_name=None):
         """
         phase 1 of installing: clone the repo (full history) into the staging area
         and classify it. nothing is installed or executed yet.
         progress_key is optional: when given, the clone's live percentage is
         exposed through clone_progress() until it finishes.
+        install_name overrides the folder a module/channel repo installs as;
+        without it, an openlumara.yaml manifest at the repo root may declare
+        one, falling back to the repo folder name.
         returns (token, info) on success, (None, error_message) on failure.
         info: {kind, name, url, entries, skipped} - entries are the things this repo
         would install, skipped the ones already present that will be left alone.
@@ -462,6 +498,11 @@ class ModuleManager:
                           "(skills pack) or .json theme files (themes pack)")
 
         if kind in ("module", "channel"):
+            name, name_error = self._resolve_install_name(name, staging, install_name)
+            if name_error:
+                shutil.rmtree(staging, ignore_errors=True)
+                return None, name_error
+
             entries = [name]
             skipped = [name] if name in self._installed_names(kind) else []
         elif kind == "skill":

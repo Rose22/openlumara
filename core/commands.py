@@ -123,7 +123,7 @@ class Commands:
         "library": {
             "": "shows help for content installed from git repos",
             "list": "lists installed modules, channels, skills and themes",
-            "install <git url>": "clones a content repo into staging for review",
+            "install <git url> [name]": "clones a content repo into staging for review, optionally installing it under a different folder name",
             "confirm": "installs the last staged repo",
             "update <name>": "git pulls an installed module/channel in place",
             "remove <name>": "removes an installed entry (alias: uninstall)",
@@ -535,10 +535,11 @@ class Commands:
 
         if subcmd == "install":
             if len(args) < 2:
-                return "usage: /library install <git url>"
+                return "usage: /library install <git url> [install name]"
 
             url = args[1].strip()
-            token, info = await mm.stage_repo(url)
+            install_name = args[2].strip() if len(args) > 2 else None
+            token, info = await mm.stage_repo(url, install_name=install_name)
             if token is None:
                 return info
 

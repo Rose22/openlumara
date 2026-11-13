@@ -33,7 +33,8 @@ def register(app, channel):
         progress_key = str(data.get("progress_key") or "").strip() or None
 
         mm = get_module_manager(channel)
-        token, info = await mm.stage_repo(url, branch=data.get("branch"), progress_key=progress_key)
+        token, info = await mm.stage_repo(url, branch=data.get("branch"), progress_key=progress_key,
+                                          install_name=str(data.get("name") or "").strip() or None)
         if token is None:
             return utils.api_result(info, success=False)
 
