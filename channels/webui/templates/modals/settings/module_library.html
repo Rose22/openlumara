@@ -3,7 +3,7 @@
 <template x-if="activeCategory === 'your_skills'">
     <div class="module-library" x-data="repoManager('skill')">
         <h3 class="section-title">Your Skills</h3>
-        <p class="section-desc">Skills are instruction files your AI can use. Install a skills pack by pasting its repo url - the repo needs skill folders (each containing a SKILL.md) at its root. Existing skills are never overwritten.</p>
+        <p class="section-desc">Skills are instruction files your AI can use. Install a skills pack by pasting its repo url - the repo needs skill folders (each containing a SKILL.md) at its root.</p>
 
         <div class="library-message" x-show="message" x-cloak :class="messageKind" x-text="message"></div>
 
@@ -43,8 +43,6 @@
                 </div>
             </div>
         </template>
-
-        <p class="library-note" x-show="entries.length > 0">Skills load when the server starts - run /skills reload to pick up new ones without restarting.</p>
 
         {% include 'modals/settings/repo_audit.html' %}
     </div>
