@@ -164,6 +164,10 @@ class Module:
         """Overridable method that triggers when the auto-installer uninstalls the dependencies for a module"""
         pass
 
+    async def on_chat_clear(self):
+        """This is called when the chat is cleared"""
+        pass
+
 # --------------
 # tool decorator (@core.module.tool)
 def tool(func=None, bypass_timeout=False):

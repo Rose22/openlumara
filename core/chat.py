@@ -356,6 +356,9 @@ class Chat:
 
         await self.save()
 
+        for name, module in self.channel.manager.modules.items():
+            await module.on_chat_clear()
+
         return True
 
     async def delete(self, id: str):
