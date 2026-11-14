@@ -53,6 +53,56 @@
         }
     }
 
+    .number-input {
+        position: relative;
+
+        input[type="number"] {
+            padding-right: 42px;
+            -moz-appearance: textfield;
+            appearance: textfield;
+
+            &::-webkit-inner-spin-button,
+            &::-webkit-outer-spin-button {
+                -webkit-appearance: none;
+                margin: 0;
+            }
+        }
+
+        .number-stepper {
+            position: absolute;
+            top: 1px;
+            right: 1px;
+            bottom: 1px;
+            width: 30px;
+            display: flex;
+            flex-direction: column;
+            border-left: 1px solid var(--border-color);
+            border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+            overflow: hidden;
+
+            button {
+                flex: 1;
+                min-height: 0;
+                padding: 0;
+                border: 0;
+                background: var(--bg-tertiary);
+                color: var(--text-secondary);
+                font-size: 11px;
+                line-height: 1;
+                cursor: pointer;
+
+                &:hover {
+                    background: var(--button-bg);
+                    color: var(--button-text);
+                }
+            }
+
+            button + button {
+                border-top: 1px solid var(--border-color);
+            }
+        }
+    }
+
     /* --- Textarea --- */
     textarea {
         width: 100%;
