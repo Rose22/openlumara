@@ -52,6 +52,46 @@ const CHARACTERS_PANEL = {
             this.selected = "";
             this.chats = [];
         }
+        this.saveSelection();
+    },
+
+    // -- remember the picked category + character across reloads. one json
+    // blob under a single key; both writes and reads are guarded since
+    // localStorage can throw (private mode, quota).
+    _storeKey: "characters_panel_selection",
+
+    saveSelection() {
+        try {
+            localStorage.setItem(this._storeKey, JSON.stringify({
+                category: this.category,
+                selected: this.selected,
+            }));
+        } catch (e) { /* storage unavailable - the panel simply starts fresh */ }
+    },
+
+    // runs once per page load, right after /names arrives: the saved
+    // entries are validated against the live list first, so a deleted
+    // character or a vanished category silently falls back to defaults.
+    restoreSelection() {
+        let saved = null;
+        try {
+            saved = JSON.parse(localStorage.getItem(this._storeKey) || "null");
+        } catch (e) { return; }
+        if (!saved || typeof saved !== "object") { return; }
+        if (typeof saved.category === "string"
+            && (!saved.category || saved.category === "__none__"
+                || this.categories().includes(saved.category))) {
+            this.category = saved.category;
+        }
+        if (typeof saved.selected === "string"
+            && this.names.some(n => n.key === saved.selected)) {
+            this.selected = saved.selected;
+            // a saved character hidden behind a stale category filter would
+            // look like nothing was picked at all; widen back to all.
+            if (!this.visibleNames().some(n => n.key === this.selected)) {
+                this.category = "";
+            }
+        }
     },
 
     // driven by x-intersect on the panel root: fires every time the tab
@@ -83,6 +123,9 @@ const CHARACTERS_PANEL = {
             ]);
             this.names = names;
             this.counts = counts;
+            // before the first chat load: pick up the saved category +
+            // character so the panel restores where you left off
+            this.restoreSelection();
             await this.loadChats();
             this.loaded = true;
         } catch (e) {
@@ -107,6 +150,7 @@ const CHARACTERS_PANEL = {
 
     select(key) {
         this.selected = key;
+        this.saveSelection();
         this.loadChats();
     },
 
