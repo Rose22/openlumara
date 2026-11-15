@@ -569,16 +569,12 @@
                 try { await simpleApiPost("/api/ext/stable_diffusion/generate_cancel", {}); } catch (e) {}
             },
             updateFade: function (el) {
-                // edge fades for the wall, but only when it reads as a
-                // single column: with two or more columns abreast the
-                // scroll already has a visible shape and the masks would
-                // just eat into the pictures
+                // edge fades on the wall whenever an edge still has tiles
+                // offscreen - regardless of column count (phones and wide
+                // sidebars scroll the grid too; the masks mark where)
                 if (!el) return;
-                var tracks = getComputedStyle(el).gridTemplateColumns;
-                var cols = tracks ? tracks.split(" ").filter(Boolean).length : 1;
-                var single = cols <= 1;
-                el.classList.toggle("fade-top", single && el.scrollTop > 1);
-                el.classList.toggle("fade-bottom", single &&
+                el.classList.toggle("fade-top", el.scrollTop > 1);
+                el.classList.toggle("fade-bottom",
                     el.scrollTop + el.clientHeight < el.scrollHeight - 1);
             },
             open: function (token) {
