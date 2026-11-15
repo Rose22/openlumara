@@ -769,6 +769,45 @@ class StableDiffusion(core.module.Module):
             pass  # the frontend map refresh picks it up
         return {'success': True, 'meta': entry}
 
+    @webui.route('favorite', method='POST')
+    async def _route_favorite(self, body=None, query=None):
+        """Star an image as a favorite, or un-star it: {token, favorite}.
+
+        The flag lives in the sidecar next to the rest of the picture's
+        story (absent means not starred, so un-favoriting keeps the
+        sidecar clean). Announces sd_image_meta so every open tab
+        repaints its lightbox star, wall badges and favorites view live."""
+        body = body or {}
+        token = str(body.get('token') or '').strip().lower()
+        if not self.TOKEN_RE.match(token):
+            return self.result('No image with that token.', success=False)
+        base = self._base_for_token(token)
+        if base is None:
+            return self.result('No image with that token.', success=False)
+        meta = {}
+        try:
+            with open(os.path.join(self.output_dir, base + '.json')) as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                meta = data
+        except Exception:
+            pass  # pre-sidecar image: starring writes its first sidecar
+        want = bool(body.get('favorite'))
+        if want:
+            meta['favorite'] = True
+        else:
+            meta.pop('favorite', None)
+        self._record_image(base, meta)
+        entry = dict(self._load_manifest().get(token) or {})
+        entry.update(meta)
+        entry['url'] = '/ext-assets/stable_diffusion/gen/{}.png'.format(base)
+        try:
+            await self.channel.websocket_manager.broadcast({
+                'type': 'sd_image_meta', 'token': token, 'meta': entry})
+        except Exception:
+            pass  # the frontend map refresh picks it up
+        return {'success': True, 'favorite': want}
+
     @webui.route('delete_image', method='POST')
     async def _route_delete_image(self, body=None, query=None):
         """Delete an image for good: its png and its sidecar, whatever

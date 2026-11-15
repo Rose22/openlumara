@@ -1,8 +1,10 @@
 {# -- AI GENERATED CODE (Qwen3.8 Flash Next) :: (2026-11-12)
-   stable_diffusion: gallery sidebar tab - a newest-first wall of every
-   generated image; clicking a tile opens it in the lightbox modal.
-   Data lives in the sdgallery Alpine store (sd_images.js), which the same
-   file also feeds to the sd_gallery_image modal.
+   stable_diffusion: gallery sidebar tab - a newest-first wall of the
+   images generated today; clicking a tile opens it in the lightbox modal.
+   The full collection (grouped into the chat sidebar's relative-date
+   sections) lives in the gallery wall modal. Data lives in the sdgallery
+   Alpine store (sd_images.js), which the same file also feeds to the
+   sd_gallery_image modal.
 
    gated on the enable_gallery setting: with it off this panel renders
    nothing, and sd_images.js removes the tab button itself (the button is
@@ -15,7 +17,7 @@
 <div class="sd-gal-panel" x-intersect.enter="$store.sdgallery.refresh(); $store.sdgallery.syncBusy(); $store.sdgallery.loadResolution()">
 
     <div class="sd-gal-head">
-        <span class="sd-gal-count" x-text="$store.sdgallery.images.length + ( $store.sdgallery.images.length === 1 ? ' image' : ' images')"></span>
+        <span class="sd-gal-count" x-text="$store.sdgallery.todayImages().length + ( $store.sdgallery.todayImages().length === 1 ? ' image today' : ' images today')"></span>
         <span class="sd-gal-head-actions">
             <button type="button" class="sd-gal-resbtn"
                     :title="'Resolution: ' + $store.sdgallery.resolution + ' \u2014 click to cycle ' + $store.sdgallery.resTiers.join(' \u2192 ')"
@@ -73,14 +75,14 @@
              x-show="$store.sdgallery.note" x-text="$store.sdgallery.note"></div>
     </div>
 
-    <div class="sd-gal-empty" x-show="!$store.sdgallery.images.length && !$store.sdgallery.loading" x-cloak>
-        no images yet — ask the AI to generate one and it will appear on this wall ✨
+    <div class="sd-gal-empty" x-show="!$store.sdgallery.todayImages().length && !$store.sdgallery.loading" x-cloak>
+        No images were generated yet today. Generate some by using the prompt box above or ask the AI to generate an image.
     </div>
 
     <div class="sd-gal-grid"
          @scroll.passive="$store.sdgallery.updateFade($el)"
-         x-effect="if ($store.sdgallery.images.length >= 0) $nextTick(() => $store.sdgallery.updateFade($el))">
-        <template x-for="img in $store.sdgallery.images" :key="img.token">
+         x-effect="if ($store.sdgallery.todayImages().length >= 0) $nextTick(() => $store.sdgallery.updateFade($el))">
+        <template x-for="img in $store.sdgallery.todayImages()" :key="img.token">
             <button type="button" class="sd-gal-item"
                     :class="{ 'sd-gal-fresh': img.token === $store.sdgallery.freshToken }"
                     :title="(img.name || img.prompt || img.token) + ' — click to enlarge'"

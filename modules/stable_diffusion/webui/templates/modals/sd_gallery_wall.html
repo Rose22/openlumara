@@ -19,6 +19,7 @@
                         x-model="$store.sdgallery.wallFilter"
                         @change="$store.sdgallery.wallScroll = 0">
                     <option value="all">all categories</option>
+                    <option value="favorites">★ favorites</option>
                     <template x-for="c in $store.sdgallery.categories" :key="c">
                         <option :value="c" x-text="c"></option>
                     </template>
@@ -32,24 +33,31 @@
                     nothing on the wall yet — generate one from the sidebar ✨
                 </div>
                 <div class="sd-wall-empty" x-show="$store.sdgallery.images.length && !$store.sdgallery.wallImages().length">
-                    nothing filed under this category.
+                    <span x-show="$store.sdgallery.wallFilter !== 'favorites'">nothing filed under this category.</span>
+                    <span x-show="$store.sdgallery.wallFilter === 'favorites'" x-cloak>no favorites yet — star an image from its lightbox ★</span>
                 </div>
-                <div class="sd-wall-grid">
-                    <template x-for="(col, ci) in $store.sdgallery.wallColumns()" :key="ci">
-                        <div class="sd-wall-col">
-                            <template x-for="img in col" :key="img.token">
-                                <button type="button" class="sd-wall-item"
-                                        :class="{ 'sd-gal-fresh': img.token === $store.sdgallery.freshToken }"
-                                        :title="(img.name || img.token) + ' — click to enlarge'"
-                                        @click="$store.sdgallery.openFromWall(img.token)">
-                                    <img :src="img.url" loading="lazy" :alt="img.name || 'generated image'"
-                                         :style="img.width && img.height ? `aspect-ratio: ${img.width}/${img.height}` : ''">
-                                    <span class="sd-gal-name" x-text="$store.sdgallery.excerpt(img)"></span>
-                                </button>
+                <template x-for="sec in $store.sdgallery.wallSections()" :key="sec.label">
+                    <div class="sd-wall-section">
+                        <div class="sd-wall-day" x-text="sec.label"></div>
+                        <div class="sd-wall-grid">
+                            <template x-for="(col, ci) in sec.cols" :key="ci">
+                                <div class="sd-wall-col">
+                                    <template x-for="img in col" :key="img.token">
+                                        <button type="button" class="sd-wall-item"
+                                                :class="{ 'sd-gal-fresh': img.token === $store.sdgallery.freshToken }"
+                                                :title="(img.name || img.token) + ' — click to enlarge'"
+                                                @click="$store.sdgallery.openFromWall(img.token)">
+                                            <img :src="img.url" loading="lazy" :alt="img.name || 'generated image'"
+                                                 :style="img.width && img.height ? `aspect-ratio: ${img.width}/${img.height}` : ''">
+                                            <span class="sd-wall-fav" x-show="img.favorite" x-cloak>★</span>
+                                            <span class="sd-gal-name" x-text="$store.sdgallery.excerpt(img)"></span>
+                                        </button>
+                                    </template>
+                                </div>
                             </template>
                         </div>
-                    </template>
-                </div>
+                    </div>
+                </template>
             </div>
         </div>
     </div>

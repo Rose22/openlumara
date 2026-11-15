@@ -607,7 +607,7 @@
                 var w = window.innerWidth;
                 this.wallCols = w <= 1280 ? 3 : 4;
             },
-            wallColumns: function () {
+            masonry: function (imgs) {
                 // newest-first, row-major: each tile (in date order) is dealt
                 // into the currently shortest column, so the latest pictures
                 // line up along the top row - plain CSS columns read
@@ -615,7 +615,6 @@
                 var n = this.wallCols || 4;
                 var cols = [], heights = [], i;
                 for (i = 0; i < n; i++) { cols.push([]); heights.push(0); }
-                var imgs = this.wallImages();
                 for (i = 0; i < imgs.length; i++) {
                     var m = imgs[i], best = 0;
                     for (var c = 1; c < n; c++) if (heights[c] < heights[best]) best = c;
@@ -624,10 +623,97 @@
                 }
                 return cols;
             },
+            wallColumns: function () {
+                return this.masonry(this.wallImages());
+            },
+            /* day grouping: same tiers and labels as the chat sidebar's
+               group_key()/day_label_from_key() (channels/webui/
+               chat_listing.py): this week (Mon..today) gets one group per
+               day, last week is a single "Last Week" group, anything older
+               groups per month. SD dates are naive local 'YYYY-MM-DD
+               HH:MM:SS', so the day is simply the first ten characters. */
+            _dayKey: function (d) {
+                // 'YYYY-MM-DD' for a Date, via the core's format.js helper
+                if (typeof localDayKey === "function") return localDayKey(d);
+                var m = String(d.getMonth() + 1), day = String(d.getDate());
+                return d.getFullYear() + "-" + (m.length < 2 ? "0" + m : m) +
+                    "-" + (day.length < 2 ? "0" + day : day);
+            },
+            _todayStart: function () {
+                var t = new Date();
+                return new Date(t.getFullYear(), t.getMonth(), t.getDate());
+            },
+            todayKey: function () {
+                return this._dayKey(new Date());
+            },
+            dayKeyOf: function (m) {
+                var d = String((m && m.date) || "");
+                return d.length >= 10 ? d.slice(0, 10) : "";
+            },
+            todayImages: function () {
+                // the sidebar's list: only the pictures made today; images
+                // without a date never count as today's
+                var k = this.todayKey();
+                return this.images.filter(function (m) {
+                    return String(m.date || "").slice(0, 10) === k;
+                });
+            },
+            groupKeyOf: function (day) {
+                if (!day) return "undated";
+                var today = this._todayStart();
+                var monday = new Date(today);
+                monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+                var lastMonday = new Date(monday);
+                lastMonday.setDate(monday.getDate() - 7);
+                var mKey = this._dayKey(monday), lKey = this._dayKey(lastMonday);
+                if (day >= mKey) return day;
+                if (day >= lKey) return "last-week-" + lKey;
+                return day.slice(0, 7);
+            },
+            groupLabel: function (key) {
+                // mirrors day_label_from_key(): Today / Yesterday / weekday
+                // for this week's days, "Last Week", "November 2026" for
+                // months, "September 15" (", 2025" when past) for lone days
+                if (!key || key === "undated") return "Undated";
+                if (key.indexOf("last-week") === 0) return "Last Week";
+                var parts = String(key).split("-");
+                var d = new Date(+parts[0], +parts[1] - 1, parts[2] ? +parts[2] : 1);
+                if (isNaN(d.getTime())) return "Undated";
+                var month = d.toLocaleDateString("en-US", { month: "long" });
+                if (parts.length === 2) return month + " " + parts[0];
+                var diff = Math.round((this._todayStart() - d) / 86400000);
+                if (diff === 0) return "Today";
+                if (diff === 1) return "Yesterday";
+                if (diff < 7) return d.toLocaleDateString("en-US", { weekday: "long" });
+                if (d.getFullYear() === this._todayStart().getFullYear())
+                    return month + " " + d.getDate();
+                return month + " " + d.getDate() + ", " + d.getFullYear();
+            },
+            wallSections: function () {
+                // the wall laid out in relative-date sections (same tiers
+                // and labels as the chat sidebar). the list is newest-first,
+                // so walking it hands the groups out in natural order and
+                // the dateless images sink into a trailing "Undated" one.
+                var imgs = this.wallImages(), buckets = {}, order = [];
+                for (var i = 0; i < imgs.length; i++) {
+                    var k = this.groupKeyOf(this.dayKeyOf(imgs[i]));
+                    if (!buckets[k]) { buckets[k] = []; order.push(k); }
+                    buckets[k].push(imgs[i]);
+                }
+                var out = [];
+                for (var j = 0; j < order.length; j++)
+                    out.push({ label: this.groupLabel(order[j]),
+                               cols: this.masonry(buckets[order[j]]) });
+                return out;
+            },
             wallImages: function () {
                 // the wall's tiles, narrowed by the category dropdown.
-                // images predating the category field count as 'general'
+                // images predating the category field count as 'general';
+                // the special 'favorites' entry shows every starred picture
                 if (!this.wallFilter || this.wallFilter === "all") return this.images;
+                if (this.wallFilter === "favorites") return this.images.filter(function (m) {
+                    return !!m.favorite;
+                });
                 var f = String(this.wallFilter).toLowerCase();
                 return this.images.filter(function (m) {
                     return String(m.category || "general").toLowerCase() === f;
@@ -666,6 +752,21 @@
                     // this lightbox all by itself
                 } catch (e) {
                     window.alert(String((e && (e.data || e.message)) || e || "could not delete"));
+                }
+            },
+            toggleFavorite: async function () {
+                // the lightbox star: flip the flag on the selected picture
+                var m = this.selected();
+                if (!m) return;
+                try {
+                    await simpleApiPost("/api/ext/stable_diffusion/favorite", {
+                        token: this.selectedToken, favorite: !m.favorite
+                    });
+                    // the sd_image_meta broadcast merges the new flag and
+                    // repaints the star, the wall badges and the favorites
+                    // view live - nothing else to do here
+                } catch (e) {
+                    window.alert(String((e && (e.data || e.message)) || e || "could not update favorite"));
                 }
             },
             saveEdit: async function () {

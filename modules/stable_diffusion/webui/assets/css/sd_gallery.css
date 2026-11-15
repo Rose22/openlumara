@@ -410,6 +410,36 @@
     color: var(--button-text);
     border-color: var(--accent);
 }
+/* the favorites toggle: dressed like its header neighbours, lit gold
+   (and filled) while the picture is starred */
+.sd-gal-star {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    padding: 4px 8px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.sd-gal-star svg {
+    display: block;
+    width: 16px;
+    height: 16px;
+    fill: none;
+    transition: fill 0.15s ease;
+}
+.sd-gal-star:hover {
+    background: var(--button-bg);
+    color: var(--button-text);
+    border-color: var(--accent);
+}
+.sd-gal-star.on { color: #ffcf5c; border-color: rgba(255, 207, 92, 0.5); }
+.sd-gal-star.on svg { fill: currentColor; }
+.sd-gal-star.on:hover { color: #ffd97a; border-color: #ffcf5c; }
 .sd-gal-edit {
     display: flex;
     flex-direction: column;
@@ -535,6 +565,39 @@
 .sd-wall-col {
     flex: 1 1 0;
     min-width: 0;
+}
+/* relative-date sections in every wall view: one masonry block per chat
+   sidebar group (Today / Yesterday / weekday / Last Week / month), under
+   a small letter-spaced heading with a trailing rule */
+.sd-wall-section + .sd-wall-section { margin-top: 4px; }
+.sd-wall-day {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin: 14px 2px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--text-secondary);
+}
+.sd-wall-section:first-child .sd-wall-day { margin-top: 2px; }
+.sd-wall-day::after {
+    content: "";
+    flex: 1 1 auto;
+    height: 1px;
+    background: var(--border-color);
+}
+/* the corner star on wall tiles marks the favorites in every view */
+.sd-wall-fav {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    font-size: 12px;
+    line-height: 1;
+    color: #ffcf5c;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.65);
+    pointer-events: none;
 }
 .sd-wall-item {
     position: relative;
