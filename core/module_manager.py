@@ -172,10 +172,13 @@ class ModuleManager:
         first, then the repo's openlumara.yaml manifest, then the repo folder
         name. returns (name, error)."""
         declared = str(override or "").strip() or self._manifest_declared_name(staging) or repo_folder_name
-        if not re.fullmatch(r"[a-zA-Z_][a-zA-Z0-9_]*", declared):
-            source = "install name" if override else "manifest name"
-            return None, (f"invalid {source} '{declared}' - module and channel folders "
-                          "must be valid python names (letters, digits, underscores)")
+        # module/channel folders are imported as python packages, so any character
+        # invalid in a python name gets converted to an underscore when installing
+        declared = re.sub(r"[^a-zA-Z0-9_]", "_", declared)
+        # drop boilerplate words repos commonly carry (openlumara-foo-module -> foo)
+        parts = [p for p in declared.split("_") if p and p.lower() not in ("openlumara", "module")]
+        if parts:
+            declared = "_".join(parts)
 
         return declared, None
 
