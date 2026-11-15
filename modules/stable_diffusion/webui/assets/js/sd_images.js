@@ -815,7 +815,8 @@
                 }
                 add("name", m.name);
                 add("category", m.category);
-                add("negative prompt", m.negative_prompt);
+                // the negative prompt lives in its own box under the
+                // positive prompt in the lightbox - no duplicate row here
                 add("seed", m.seed);
                 if (m.width && m.height) add("size", m.width + "\u00d7" + m.height);
                 add("orientation", m.orientation);
