@@ -126,6 +126,32 @@
         width: 44px;
         height: 44px;
     }
+
+    /* phone-only close: floats in the overlay's top-right corner, outside
+       the tab strip's flow (x-show hides it off mobile entirely). rides
+       above the tab row's empty right side; sized like a tab, matches
+       the header styling language */
+    .sidebar-close {
+        position: absolute;
+        top: 3px;
+        right: 7px;
+        z-index: 5;
+        width: 44px;
+        height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--bg-primary);
+        border: none;
+        border-radius: var(--radius-sm);
+        color: var(--text-secondary);
+        cursor: pointer;
+    }
+
+    .sidebar-close:active {
+        background: var(--button-bg);
+        color: var(--text-primary);
+    }
 }
 
 /* list of chats */

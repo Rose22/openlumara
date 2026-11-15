@@ -32,6 +32,17 @@
             }
         },
     }">
+    {# phone-only overlay close, pinned to the shell's top-right corner -
+       deliberately OUTSIDE the tab bar (the tab strip must stay purely
+       for switching panels), shown whenever the mobile overlay is up #}
+    <button type="button" class="sidebar-close" aria-label="Close sidebar"
+            x-show="$store.ui.isMobile" x-cloak
+            @click="$store.ui.showSidebar = false">
+        <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+    </button>
     <nav class="sidebar-tabbar" aria-label="Sidebar tabs">
         <button type="button" class="sidebar-tab" data-tab=""
             :class="{ 'active': sidebarTab === '' }"
