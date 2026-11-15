@@ -488,7 +488,7 @@ class StableDiffusion(core.module.Module):
                 prompt = str(global_prompt).replace("{prompt}", prompt)
             else:
                 # prepend it
-                prompt = str(", ".join(global_prompt, prompt))
+                prompt = str(", ".join((global_prompt, prompt)))
 
         global_negative_prompt = self.config.get("global_negative_prompt")
         if global_negative_prompt:
@@ -497,7 +497,7 @@ class StableDiffusion(core.module.Module):
                 negative_prompt = str(global_negative_prompt).replace("{prompt}", negative_prompt)
             else:
                 # prepend it
-                negative_prompt = str(", ".join(global_negative_prompt, negative_prompt))
+                negative_prompt = str(", ".join((global_negative_prompt, negative_prompt)))
 
         return prompt, negative_prompt
 
