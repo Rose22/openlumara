@@ -30,9 +30,13 @@
 .sd-gal-count {
     color: var(--text-secondary);
     font-size: 12.5px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.sd-gal-head-actions { display: flex; align-items: center; gap: 2px; }
+.sd-gal-head-actions { display: flex; align-items: center; gap: 2px; flex: 0 0 auto; }
 .sd-gal-refresh,
 .sd-gal-wallbtn,
 .sd-gal-orbtn,

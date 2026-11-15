@@ -17,7 +17,7 @@
 <div class="sd-gal-panel" x-intersect.enter="$store.sdgallery.refresh(); $store.sdgallery.syncBusy(); $store.sdgallery.loadResolution()">
 
     <div class="sd-gal-head">
-        <span class="sd-gal-count" x-text="$store.sdgallery.todayImages().length + ( $store.sdgallery.todayImages().length === 1 ? ' image today' : ' images today')"></span>
+        <span class="sd-gal-count" x-text="$store.sdgallery.todayImages().length + ($store.sdgallery.todayImages().length === 1 ? ' image' : ' images')"></span>
         <span class="sd-gal-head-actions">
             <button type="button" class="sd-gal-resbtn"
                     :title="'Resolution: ' + $store.sdgallery.resolution + ' \u2014 click to cycle ' + $store.sdgallery.resTiers.join(' \u2192 ')"
