@@ -46,9 +46,11 @@
                     <div>
                         <img class="sd-gal-full" :src="$store.sdgallery.selected().url"
                              :alt="$store.sdgallery.selected().name || 'generated image'">
-                        {# the name as a little centered caption under the picture #}
-                        <div class="sd-gal-caption">&mdash;&nbsp;<span
-                                x-text="$store.sdgallery.selected().name || $store.sdgallery.selected().token || 'generated image'"></span>&nbsp;&mdash;</div>
+                        {# the name as a little centered caption under the picture;
+                           nameless images show nothing but the picture #}
+                        <div class="sd-gal-caption" x-show="$store.sdgallery.selected().name"
+                             x-cloak>&mdash;&nbsp;<span
+                                x-text="$store.sdgallery.selected().name"></span>&nbsp;&mdash;</div>
                         <div class="sd-gal-detail">
                             {# the prompt column: positive prompt on top, the
                                negative prompt in its own box right below #}

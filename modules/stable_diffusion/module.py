@@ -220,6 +220,9 @@ class StableDiffusion(core.module.Module):
         cat = ' '.join(str(value or '').split()).lower()
         return cat or 'general'
 
+    def _display_name(self, value):
+        return str(value or '').replace('_', ' ')
+
     @staticmethod
     def _slugify(value):
         # a filesystem-safe echo of an image's name: lowercase words joined
@@ -313,6 +316,7 @@ class StableDiffusion(core.module.Module):
                 base = token  # the name was refused: plain token.png will do
         entry = self._record_image(base, meta)
         entry['url'] = '/ext-assets/stable_diffusion/gen/{}.png'.format(base)
+        entry['name'] = self._display_name(entry.get('name'))
         try:
             await self.channel.websocket_manager.broadcast({
                 'type': 'sd_new_image', 'token': token, 'meta': entry})
@@ -737,6 +741,7 @@ class StableDiffusion(core.module.Module):
                     # registry has not met yet (folder edited externally)
                     self._categories.add(str(entry['category']))
                 entry['url'] = '/ext-assets/stable_diffusion/gen/{}.png'.format(stem)
+                entry['name'] = self._display_name(entry.get('name'))
                 images[token] = entry
         except Exception:
             pass
@@ -796,6 +801,7 @@ class StableDiffusion(core.module.Module):
         entry = dict(self._load_manifest().get(token) or {})
         entry.update(meta)
         entry['url'] = '/ext-assets/stable_diffusion/gen/{}.png'.format(new_base)
+        entry['name'] = self._display_name(entry.get('name'))
         try:
             await self.channel.websocket_manager.broadcast({
                 'type': 'sd_image_meta', 'token': token, 'meta': entry})
@@ -835,6 +841,7 @@ class StableDiffusion(core.module.Module):
         entry = dict(self._load_manifest().get(token) or {})
         entry.update(meta)
         entry['url'] = '/ext-assets/stable_diffusion/gen/{}.png'.format(base)
+        entry['name'] = self._display_name(entry.get('name'))
         try:
             await self.channel.websocket_manager.broadcast({
                 'type': 'sd_image_meta', 'token': token, 'meta': entry})

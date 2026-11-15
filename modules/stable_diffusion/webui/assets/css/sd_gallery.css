@@ -343,8 +343,11 @@
 
 /* the detail row under the picture: prompt box (left, wider) + metadata
    column (right). both scroll on their own; on a narrow modal they wrap
-   into a single stack. */
+   into a single stack. inline-size containment: the row queries its own
+   width below, so the stacked layout follows the ACTUAL wrap - a narrow
+   picture squeezing the fit-content modal included, not just phones. */
 .sd-gal-detail {
+    container-type: inline-size;
     display: flex;
     flex-wrap: wrap;
     align-items: stretch;
@@ -403,6 +406,29 @@
     }
     /* stacked layout: the equal-height trick has no purpose here - let the
        metadata box be a plain full-width flex item that grows with content */
+    .sd-gal-metabox-wrap {
+        display: contents;
+    }
+    .sd-gal-metabox {
+        position: static;
+        flex: 1 1 100%;
+    }
+}
+/* single-column whenever the detail row ACTUALLY wraps - the flex bases
+   (promptcol 360 + metawrap 240 + 14 gap) sum to 614px, so below that
+   width the two columns drop under each other even on a desktop, e.g.
+   when a narrow picture keeps the fit-content modal slim. Same
+   full-height treatment as the phone stack; also LAST on purpose. */
+@container (max-width: 614px) {
+    .sd-gal-metabox,
+    .sd-gal-promptbox {
+        min-width: 0;
+        max-height: none;
+        overflow-y: visible;
+    }
+    .sd-gal-promptcol {
+        flex-basis: 100%;
+    }
     .sd-gal-metabox-wrap {
         display: contents;
     }
@@ -547,6 +573,9 @@
     cursor: pointer;
     border-bottom: 1px dotted var(--accent);
     width: fit-content;
+    /* the fit-content box no longer fills the cell, so the right-alignment
+       must happen at the grid level: park the shrunk box against the end */
+    justify-self: end;
 }
 .sd-gal-chatlink:hover { border-bottom-style: solid; }
 
