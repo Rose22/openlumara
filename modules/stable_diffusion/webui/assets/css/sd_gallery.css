@@ -266,6 +266,22 @@
     flex-direction: column;
     overflow: hidden;
 }
+/* phones: fit-content hugs whatever the picture happens to be wide -
+   useless there. the core makes phone modals full-screen columns, so
+   take the full width; the detail boxes already wrap into a stack, and
+   the picture is capped by max-width so it never overflows. */
+@media (max-width: 768px) {
+    .modal.sd-gal-modal {
+        width: 100%;
+        max-width: 100%;
+        border-radius: 0;
+        border-left: none;
+        border-right: none;
+    }
+    .sd-gal-metabox {
+        min-width: 0;
+    }
+}
 /* header: [back] title .......... [x] - the title takes the slack */
 .sd-gal-modal .header { justify-content: flex-start; gap: 8px; }
 .sd-gal-modal .header h2.sd-gal-modal-title {
