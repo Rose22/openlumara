@@ -181,6 +181,34 @@
     height: 650px;
 }
 
+/* Phone: every modal fills the screen and its content scrolls - the
+   settings-modal recipe (height:100% + flex column + overflow hidden on
+   the shell; the fixed/inset/margin:auto centering makes that full
+   viewport). The generic .modal defaults (fit-content height, 90vh cap)
+   waste space and clip on small screens. Direct content children become
+   the scroll region; .header and .actions stay pinned. ID-height modals
+   (export/shortcuts) are reeled in too - IDs outrank classes. */
+@media (max-width: 768px) {
+    .modal {
+        height: 100%;
+        max-height: 100dvh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .modal > :not(.header):not(.actions) {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+    }
+
+    #export-modal,
+    #shortcuts-modal {
+        height: 100%;
+    }
+}
+
 /* --- Actions Bar --- */
 .actions {
     display: flex;
