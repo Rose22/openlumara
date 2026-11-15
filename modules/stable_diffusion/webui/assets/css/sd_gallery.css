@@ -352,6 +352,18 @@
     min-width: 200px;
     max-height: 32vh;
 }
+/* phones: the stacked layout leaves no reason for inner scrollwells -
+   both boxes grow their full height and the modal body is the one
+   scroller. LAST on purpose: same specificity as the base rules above,
+   and the later rule wins (an earlier copy here silently lost). */
+@media (max-width: 768px) {
+    .sd-gal-metabox,
+    .sd-gal-promptbox {
+        min-width: 0;
+        max-height: none;
+        overflow-y: visible;
+    }
+}
 .sd-gal-box-label {
     font-size: 10.5px;
     font-weight: 600;
