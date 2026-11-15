@@ -67,6 +67,16 @@ class StableDiffusion(core.module.Module):
             "description": "Name of the sampler to use. Leave blank to default to the server's setting",
             "default": ""
         },
+        "global_prompt": {
+            "type": "long_text",
+            "description": "Modifies every prompt so you can prepend or append things you want. For example: score_9, score_8, masterpiece.. and so on. Use `{prompt}` to specify where the original prompt should be. Without `{prompt}`, it defaults to prepending your global prompt to the original prompt",
+            "default": ""
+        },
+        "global_negative_prompt": {
+            "type": "long_text",
+            "description": "Like the global prompt, but for the negative prompt",
+            "default": ""
+        },
         'output_folder': {
             'description': 'Folder where generated images are saved and served from',
             'default': '~/gen_images'
@@ -465,6 +475,28 @@ class StableDiffusion(core.module.Module):
             resp.raise_for_status()
             return await resp.read()  # raw PNG
 
+    def _apply_global_prompts(self, prompt: str, negative_prompt: str):
+        # use global prompts
+        global_prompt = self.config.get("global_prompt")
+        if global_prompt:
+            if "{prompt}" in global_prompt.lower():
+                # replace {prompt} with the original prompt
+                prompt = str(global_prompt).replace("{prompt}", prompt)
+            else:
+                # prepend it
+                prompt = str(", ".join(global_prompt, prompt))
+
+        global_negative_prompt = self.config.get("global_negative_prompt")
+        if global_negative_prompt:
+            if "{prompt}" in global_negative_prompt.lower():
+                # replace {prompt} with the original negative prompt
+                negative_prompt = str(global_negative_prompt).replace("{prompt}", negative_prompt)
+            else:
+                # prepend it
+                negative_prompt = str(", ".join(global_negative_prompt, negative_prompt))
+
+        return prompt, negative_prompt
+
     async def _generate_image_internal(self, prompt, negative_prompt='', steps=8, width=1024,
                                        height=1024, cfg_scale=1.0, sampler_name='', seed=-1,
                                        note=None):
@@ -477,8 +509,10 @@ class StableDiffusion(core.module.Module):
             'openai': self._gen_openai,
             'thenoise': self._gen_thenoise,
         }.get(backend)
+
         if gen is None:
             return None, "Unknown backend '{}'. Use sdcpp, a1111, openai, or thenoise.".format(backend)
+
         timeout = aiohttp.ClientTimeout(total=300)
         try:
             async with aiohttp.ClientSession(timeout=timeout) as session:
@@ -492,10 +526,7 @@ class StableDiffusion(core.module.Module):
     @core.module.tool
     async def generate_image(self, prompt, name='', negative_prompt='', category='', seed=-1, orientation='portrait', aspect_ratio=''):
         """Generate an image and get an inline tag to place it in your messages.
-        The result gives you a tag like {{sd|ab12cd3}}: insert that tag verbatim anywhere in any message you write from now on (also in later turns, also during an adventure game) and the picture appears at that spot. Add a placement tail to float it beside the text: {{sd|ab12cd3|left}} or {{sd|ab12cd3|right}}. The name argument is a short human label for the image (e.g. 'tavern at dusk').
-        The category argument files the picture under a gallery category (e.g. 'portraits'): use one of the available image categories when one fits, a new one is created otherwise. Omit it to file under 'general'.
-        The orientation argument must be either 'portrait' (tall) or 'landscape' (wide); pick whichever suits the subject. The optional aspect_ratio argument ('W:H', e.g. '1:1', '4:3', '16:9' or '21:9') reshapes the frame away from the default 3:2 while keeping the same pixel budget; orientation always decides tall vs wide, so a plain '16:9' asked in portrait just becomes 9:16.
-        The optional negative_prompt argument lists things to keep out of the image (e.g. 'text, watermark, extra fingers').
+        The orientation argument must be either 'portrait' (tall) or 'landscape' (wide); pick whichever suits the subject. You can supply an aspect ratio, e.g. '3:2' or '16:9'
         The seed used is returned: pass it back with an adjusted prompt to refine this same image. Omit seed (or pass -1) for a brand new image."""
         seed = int(seed)
         if seed < 0:
@@ -520,6 +551,8 @@ class StableDiffusion(core.module.Module):
         sampler = self.config.get("sampler")
         backend = (self.config.get("backend") or "sdcpp").lower()
         token = self._new_token()
+        prompt, negative_prompt = self._apply_global_prompts(prompt, negative_prompt)
+
         image_bytes, err = await self._generate_image_internal(
             prompt, negative_prompt,
             steps=steps,
@@ -580,6 +613,7 @@ class StableDiffusion(core.module.Module):
         backend = (self.config.get('backend') or 'sdcpp').lower()
         seed = random.randint(0, 2**32 - 1)
         token = self._new_token()
+        prompt, negative_prompt = self._apply_global_prompts(prompt, negative_prompt)
         image_bytes, err = await self._generate_image_internal(
             prompt, negative_prompt,
             steps=steps, width=width, height=height,

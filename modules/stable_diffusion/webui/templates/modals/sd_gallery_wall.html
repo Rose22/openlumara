@@ -12,7 +12,7 @@
     <div @keydown.escape.window="$store.ui.closeModal()">
         <div class="modal sd-wall-modal">
             <div class="header">
-                <h2>gallery wall
+                <h2>Gallery
                     <span class="sd-wall-count" x-text="'· ' + $store.sdgallery.wallImages().length"></span>
                 </h2>
                 <select class="sd-wall-filter" title="Filter by category"
@@ -50,7 +50,7 @@
                                             <img :src="img.url" loading="lazy" :alt="img.name || 'generated image'"
                                                  :style="img.width && img.height ? `aspect-ratio: ${img.width}/${img.height}` : ''">
                                             <span class="sd-wall-fav" x-show="img.favorite" x-cloak>★</span>
-                                            <span class="sd-gal-name" x-text="$store.sdgallery.excerpt(img)"></span>
+                                            <span class="sd-gal-name" x-text="img.name || $store.sdgallery.excerpt(img)"></span>
                                         </button>
                                     </template>
                                 </div>

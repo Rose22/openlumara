@@ -89,8 +89,9 @@
                     @click="$store.sdgallery.open(img.token)">
                 <img :src="img.url" loading="lazy" :alt="img.name || 'generated image'"
                      :style="img.width && img.height ? `aspect-ratio: ${img.width}/${img.height}` : ''">
-                {# the hover caption: a one-line excerpt of the prompt #}
-                <span class="sd-gal-name" x-text="$store.sdgallery.excerpt(img)"></span>
+                {# the hover caption: the image's name, falling back to a
+                   one-line prompt excerpt when it never got one #}
+                <span class="sd-gal-name" x-text="img.name || $store.sdgallery.excerpt(img)"></span>
             </button>
         </template>
     </div>

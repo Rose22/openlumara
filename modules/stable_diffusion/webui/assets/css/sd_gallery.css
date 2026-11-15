@@ -294,17 +294,18 @@
 .sd-gal-modal .header .close { flex: 0 0 auto; }
 .sd-gal-back {
     flex: 0 0 auto;
-    padding: 0 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 8px;
     background: transparent;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-sm);
-    font-size: 1.1rem;
-    line-height: 1;
     color: var(--text-secondary);
     cursor: pointer;
     transition: all 0.15s ease;
-    font-family: var(--font-primary);
 }
+.sd-gal-back svg { display: block; width: 16px; height: 16px; }
 .sd-gal-back:hover {
     background: var(--button-bg);
     color: var(--button-text);
@@ -324,6 +325,17 @@
     height: auto;
     border-radius: 10px;
 }
+/* the name header under the picture: a centered caption framed by
+   em dashes (the dashes live in the markup) */
+.sd-gal-caption {
+    margin-top: 10px;
+    text-align: center;
+    font-size: 13.5px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--text-primary);
+    word-break: break-word;
+}
 
 /* the detail row under the picture: prompt box (left, wider) + metadata
    column (right). both scroll on their own; on a narrow modal they wrap
@@ -342,15 +354,34 @@
     padding: 12px 14px;
     overflow-y: auto;
 }
-.sd-gal-promptbox {
+/* left column of the detail row: the positive prompt box with the
+   negative prompt box stacked directly beneath it */
+.sd-gal-promptcol {
     flex: 2 1 360px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+.sd-gal-promptbox {
     min-width: 0;
     max-height: 32vh;
 }
-.sd-gal-metabox {
+/* the metadata column rides in a wrapper that carries no height of its
+   own: the flex row is sized purely by the prompt column, and the box
+   fills the stretched wrapper absolutely - so its height always equals
+   the prompt/negative-prompt column's current height, and its rows
+   scroll inside that. */
+.sd-gal-metabox-wrap {
     flex: 1 1 240px;
     min-width: 200px;
-    max-height: 32vh;
+    position: relative;
+}
+.sd-gal-metabox {
+    position: absolute;
+    inset: 0;
+    min-width: 200px;
+    overflow-y: auto;
 }
 /* phones: the stacked layout leaves no reason for inner scrollwells -
    both boxes grow their full height and the modal body is the one
@@ -362,6 +393,18 @@
         min-width: 0;
         max-height: none;
         overflow-y: visible;
+    }
+    .sd-gal-promptcol {
+        flex-basis: 100%;
+    }
+    /* stacked layout: the equal-height trick has no purpose here - let the
+       metadata box be a plain full-width flex item that grows with content */
+    .sd-gal-metabox-wrap {
+        display: contents;
+    }
+    .sd-gal-metabox {
+        position: static;
+        flex: 1 1 100%;
     }
 }
 .sd-gal-box-label {
@@ -626,6 +669,9 @@
     border-color: var(--accent);
     box-shadow: var(--shadow-soft, 0 4px 14px rgba(0, 0, 0, 0.35));
 }
+/* the same name-on-hover fade the sidebar tiles have: the shared
+   .sd-gal-name caption sits hidden until the tile is hovered */
+.sd-wall-item:hover .sd-gal-name { opacity: 1; }
 @media (max-width: 560px) {
     .sd-wall-body { padding: 10px; }
     .sd-wall-grid { gap: 8px; }
