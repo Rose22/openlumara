@@ -330,6 +330,7 @@ class Coder(core.module.Module):
             structure=True,
             imports=True,
             comments=False,
+            docstrings=False,
             parse_timeout_ms=2000
         ))
         if not extraction:
@@ -349,9 +350,7 @@ class Coder(core.module.Module):
                     entry["start_line"] = int(item.span.start_line) + 1
                     entry["end_line"] = int(item.span.end_line) + 1
                 if item.signature:
-                    entry["signature"] = " ".join(item.signature.split())[:150]
-                if item.doc_comment:
-                    entry["doc"] = item.doc_comment.replace("\n", " ")[:200]
+                    entry["signature"] = " ".join(item.signature.split())
                     
                 flattened.append(entry)
                 if item.children:
@@ -370,7 +369,7 @@ class Coder(core.module.Module):
             "total_lines": metrics.total_lines,
             "error_count": metrics.error_count
         }
-        data["imports"] = [imprt.source for imprt in extraction.imports]
+        data["imports"] = list(dict.fromkeys(imprt.source for imprt in extraction.imports))
 
         return data
 
@@ -392,17 +391,11 @@ class Coder(core.module.Module):
 
             depth = full_name.count(".") - (1 if full_name.startswith(".") else 0)
             line = f"{'    ' * depth} ln:{s['start_line']}-{s['end_line']} {display}"
-            if s.get("doc"):
-                line += "  // " + " ".join(s["doc"].split()).lstrip("/![]* ")[:80]
             lines.append(line)
 
         imports = structure.get("imports")
         if imports:
             lines.append("imports: " + " | ".join(imports))
-
-        metrics = structure.get("metrics", {})
-        if metrics.get("error_count", 0) > 0:
-            lines.append(f"parse-errors: {metrics['error_count']}")
 
         return "\n".join(lines)
 
