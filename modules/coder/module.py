@@ -54,6 +54,64 @@ def _nofollow_open(path: str, mode: str = "r", base: str = None):
     return os.fdopen(fd, fdopen_mode, encoding="utf-8")
 
 
+def _strip_sig_comment(signature: str):
+    """
+    removes inline comments (# or //) from a signature string, since the
+    tree-sitter language pack bakes the comments sitting after a def line
+    into the signature itself. quote-aware, so # inside quoted defaults
+    like color="#fff" survives.
+    """
+    quote = None
+    i = 0
+    while i < len(signature):
+        char = signature[i]
+        if quote:
+            if char == "\\":
+                i += 2
+                continue
+            if char == quote:
+                quote = None
+        elif char in ("'", '"', "`"):
+            quote = char
+        elif char == "#" or (char == "/" and signature[i + 1:i + 2] == "/"):
+            return signature[:i].rstrip()
+        i += 1
+    return signature
+
+
+def _look_up_decorators(lines: list, def_index: int):
+    """
+    collects decorator lines sitting directly above a function/class definition.
+    the language pack's spans start at the def/class keyword, so the
+    decorated_definition wrapper (and with it every @decorator) is otherwise
+    lost from the outline.
+    """
+    decorators = []
+    i = def_index - 1
+    while i >= 0:
+        stripped = lines[i].strip()
+        if not stripped or stripped.startswith("#"):
+            i -= 1
+            continue
+        if not stripped.startswith("@"):
+            break
+        # consume upward while brackets stay open (multiline decorators)
+        collected = []
+        depth = 0
+        while i >= 0:
+            collected.insert(0, lines[i].strip())
+            depth += lines[i].count("(") + lines[i].count("[") - lines[i].count(")") - lines[i].count("]")
+            if depth <= 0:
+                break
+            i -= 1
+        decorators.insert(0, " ".join(collected))
+        i -= 1
+    if not decorators:
+        return None
+    joined = " ".join(decorators)
+    return joined if len(joined) <= 120 else joined[:117] + "..."
+
+
 class Coder(core.module.Module):
     """Lets your AI write code within sandboxes, without using a shell. Validates code syntax before writing to disk to protect your code from breaking."""
 
@@ -364,6 +422,21 @@ class Coder(core.module.Module):
             # tell the AI that this is a file that must be read manually instead
             return None
 
+        # the pack bakes comments into signatures, and its spans skip decorators:
+        # clean both up here so the outline shows what each symbol actually is
+        code_lines = code.splitlines()
+        for entry in data["symbols"]:
+            if entry.get("signature"):
+                cleaned = _strip_sig_comment(entry["signature"])
+                if cleaned:
+                    entry["signature"] = cleaned
+                else:
+                    del entry["signature"]
+            if entry.get("start_line"):
+                decorators = _look_up_decorators(code_lines, entry["start_line"] - 1)
+                if decorators:
+                    entry["decorators"] = decorators
+
         metrics = extraction.metrics
         data["metrics"] = {
             "total_lines": metrics.total_lines,
@@ -390,7 +463,10 @@ class Coder(core.module.Module):
                 continue
 
             depth = full_name.count(".") - (1 if full_name.startswith(".") else 0)
-            line = f"{'    ' * depth} ln:{s['start_line']}-{s['end_line']} {display}"
+            prefix_text = ""
+            if s.get("decorators"):
+                prefix_text = s["decorators"] + " "
+            line = f"{'    ' * depth} ln:{s['start_line']}-{s['end_line']} {prefix_text}{display}"
             lines.append(line)
 
         imports = structure.get("imports")
