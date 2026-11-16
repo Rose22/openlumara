@@ -374,6 +374,39 @@ class Coder(core.module.Module):
 
         return data
 
+    def _render_compact(self, structure: dict):
+        """
+        renders the symbol tree from _extract_code_structure into a compact text
+        outline
+        """
+        lines = []
+        for s in structure["symbols"]:
+            full_name = s["name"]
+            display = s.get("signature") or full_name.rsplit(".", 1)[-1].lstrip(".")
+            if not display:
+                continue
+
+            # handle broken grammar output
+            if full_name == "(anonymous)" and len(display.split()) <= 1 and s["end_line"] == s["start_line"]:
+                continue
+
+            depth = full_name.count(".") - (1 if full_name.startswith(".") else 0)
+            line = f"{'    ' * depth}{display} ln:{s['start_line']}-{s['end_line']}"
+            if s.get("doc"):
+                line += "  // " + " ".join(s["doc"].split()).lstrip("/![]* ")[:80]
+            lines.append(line)
+
+        imports = structure.get("imports")
+        if imports:
+            lines.append("imports: " + " | ".join(imports))
+
+        metrics = structure.get("metrics", {})
+        if metrics.get("error_count", 0) > 0:
+            lines.append(f"parse-errors: {metrics['error_count']}")
+
+        return "\n".join(lines)
+
+
     # ---------------------------
     # helper functions: templates
     # ---------------------------
@@ -619,7 +652,7 @@ class Coder(core.module.Module):
     # ----------------------
     @core.module.tool
     async def file_outline(self, sandbox: str, path: str):
-        """ALWAYS use this on source code files before calling file_read(). Provides information about symbols such as functions and classes within the file, including their start line number and end line number. Only works on source code files."""
+        """ALWAYS use this on source code files before calling file_read(). Returns a compact map of all functions and classes within the file, including their line_start and line_end. Only works on source code files."""
         target_path = await self._get_sandbox_subpath(sandbox, path)
         try:
             root = await self._get_full_sandbox_path(sandbox)
@@ -629,7 +662,7 @@ class Coder(core.module.Module):
                 if not structure:
                     return self.result("This file could not be read by the code inspector because it is not a source code file. Use file_read instead", success=False)
 
-                return self.result(structure)
+                return self.result(self._render_compact(structure))
         except Exception as e:
             # FAWK KUAH
             return self.result(str(e), success=False)
