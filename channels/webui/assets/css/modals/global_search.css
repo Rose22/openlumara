@@ -170,7 +170,7 @@
 .global-search-result-snippet mark {
     padding: 0 1px;
     border-radius: 2px;
-    background: rgba(var(--accent-rgb), 0.25);
+    background: color-mix(in srgb, var(--accent) 25%, transparent);
     color: var(--accent);
 }
 
