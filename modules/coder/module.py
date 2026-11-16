@@ -85,26 +85,33 @@ def _look_up_decorators(lines: list, def_index: int):
     the language pack's spans start at the def/class keyword, so the
     decorated_definition wrapper (and with it every @decorator) is otherwise
     lost from the outline.
+
+    walks upward tracking bracket depth, so decorators wrapped across several
+    lines are consumed as one chunk - the chunk only counts if it bottoms
+    out at a line starting with @.
     """
     decorators = []
+    chunk = []
+    depth = 0
     i = def_index - 1
     while i >= 0:
-        stripped = lines[i].strip()
-        if not stripped or stripped.startswith("#"):
+        line = lines[i]
+        stripped = line.strip()
+        if depth == 0 and (not stripped or stripped.startswith("#")):
             i -= 1
             continue
-        if not stripped.startswith("@"):
-            break
-        # consume upward while brackets stay open (multiline decorators)
-        collected = []
-        depth = 0
-        while i >= 0:
-            collected.insert(0, lines[i].strip())
-            depth += lines[i].count("(") + lines[i].count("[") - lines[i].count(")") - lines[i].count("]")
-            if depth <= 0:
+        # counting upward: a line closing more brackets than it opens means
+        # the statement continues on a line further above
+        depth += line.count(")") + line.count("]") - line.count("(") - line.count("[")
+        if depth < 0:
+            depth = 0
+        chunk.insert(0, _strip_sig_comment(stripped))
+        if depth == 0:
+            if chunk[0].startswith("@"):
+                decorators.insert(0, " ".join(chunk))
+            else:
                 break
-            i -= 1
-        decorators.insert(0, " ".join(collected))
+            chunk = []
         i -= 1
     if not decorators:
         return None
