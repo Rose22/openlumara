@@ -67,9 +67,14 @@ class StableDiffusion(core.module.Module):
             "description": "Name of the sampler to use. Leave blank to default to the server's setting",
             "default": ""
         },
+        "extra_instructions": {
+            "type": "long_text",
+            "description": "Extra instructions for the AI to follow when making a call to generate an image. For example 'for every part that features text, fully write out the text that should be depicted'",
+            "default": ""
+        },
         "global_prompt": {
             "type": "long_text",
-            "description": "Modifies every prompt so you can prepend or append things you want. For example: score_9, score_8, masterpiece.. and so on. Use `{prompt}` to specify where the original prompt should be. Without `{prompt}`, it defaults to prepending your global prompt to the original prompt",
+            "description": "Modifies every stable diffusion prompt so you can prepend or append things you want. For example: score_9, score_8, masterpiece.. and so on. Use `{prompt}` to specify where the original prompt should be. Without `{prompt}`, it defaults to prepending your global prompt to the original prompt",
             "default": ""
         },
         "global_negative_prompt": {
@@ -143,6 +148,13 @@ class StableDiffusion(core.module.Module):
         self._load_categories()
         self.channel.log(self.name, 'Stable Diffusion Module ready. Backend: {} @ {} | images: {}'.format(
             self.config.get('backend'), self.config.get('URL'), self.output_dir))
+
+    async def on_system_prompt(self):
+        sysprompt = self.config.get("extra_instructions")
+        if not sysprompt:
+            return None
+
+        return f"When generating images using stable diffusion, follow these instructions exactly: {sysprompt}"
 
     # ---- legacy token manifest (sd_manifest.json) -------------------------
     # metadata now lives in per-image sidecars (<token>.json). the old single
