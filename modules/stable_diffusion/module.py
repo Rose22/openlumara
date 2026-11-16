@@ -149,13 +149,6 @@ class StableDiffusion(core.module.Module):
         self.channel.log(self.name, 'Stable Diffusion Module ready. Backend: {} @ {} | images: {}'.format(
             self.config.get('backend'), self.config.get('URL'), self.output_dir))
 
-    async def on_system_prompt(self):
-        sysprompt = self.config.get("extra_instructions")
-        if not sysprompt:
-            return None
-
-        return f"When generating images using stable diffusion, follow these instructions exactly: {sysprompt}"
-
     # ---- legacy token manifest (sd_manifest.json) -------------------------
     # metadata now lives in per-image sidecars (<token>.json). the old single
     # manifest is still READ as a fallback so pre-sidecar images keep their
@@ -267,13 +260,21 @@ class StableDiffusion(core.module.Module):
         return None
 
     async def on_system_prompt(self):
-        # mirrors the chats module: the line earns its place once picking
-        # a category is actually a choice
+        output = []
+
+        sysprompt = self.config.get("extra_instructions")
+        if sysprompt:
+            output.append(f"When generating images using stable diffusion, follow these instructions exactly: {sysprompt}")
+
         cats = self._image_categories()
         if len(cats) > 1:
-            return "Available categories to categorise generated images into: {}".format(
-                ", ".join(cats))
-        return None
+            output.append("Available categories to categorise generated images into: {}".format(
+                ", ".join(cats)))
+
+        if not output:
+            return None
+
+        return "\n".join(output)
 
     def _current_chat_id(self):
         # the chat in focus when the picture was made: the gallery links
