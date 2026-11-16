@@ -121,10 +121,6 @@
             color: var(--text-primary);
             position: relative;
             overflow: hidden;
-
-            &:active {
-                transform: scale(0.96) translateY(0);
-            }
         }
 
         #send {

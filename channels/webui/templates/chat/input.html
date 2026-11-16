@@ -48,7 +48,7 @@
 {% include 'chat/context_pill.html' %}
 {% endif %}
 
-<button id="send" aria-label="Send message"
+<button id="send" aria-label="Send message" x-show="$store.stream.state === 'idle'"
     @click="
         $event.preventDefault();
         if (!$store.chat.user_input) { return; }
