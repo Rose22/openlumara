@@ -9,6 +9,7 @@ import glob
 import fnmatch
 import difflib
 import asyncio
+import ast
 import subprocess
 import tree_sitter_language_pack as tslp
 
@@ -131,12 +132,6 @@ class Coder(core.module.Module):
             "description": "Show the coder card on the webui welcome screen: the resume-last-file row, pinned + recent files and the git strip.",
             "depends": "enable_webui_extension"
         },
-        # -- AI GENERATED CODE (Qwen3.8 Flash Next) :: (2026-10-23) harness:openlumara
-        "git_keep_committed_visible": {
-            "default": True,
-            "description": "Git sidebar behavior after a commit.\n\n**On (new way)**: committed-but-unpushed files STAY in the changes list with a violet 'committed' dot, so nothing you wrote silently vanishes before it ships - they leave the list when you push.\n\n**Off (classic)**: committing removes files from the list immediately, plain `git status` style.",
-            "depends": "enable_webui_extension"
-        },
 
         # blacklists
         "folder_blacklist": {
@@ -163,15 +158,10 @@ class Coder(core.module.Module):
 
         # enable/disable tools based on selected modes
         if self.config.get("read-only"):
-            self.disabled_tools.extend(["file_create", "file_move", "file_delete", "file_edit", "folder_delete"])
+            self.disabled_tools.extend(["file_create", "file_move", "file_delete", "file_edit", "folder_delete", "add_symbol_before", "add_symbol_after", "edit_symbol"])
 
         if self.config.get("insert_sandbox_paths_into_system_prompt"):
             self.disabled_tools.append("list_sandboxes")
-
-        # still figuring out how to best guide the AI in when to use file_inspect over file_read.
-        # it's a very tough thing since most LLM's are trained to just read entire files
-        # and are inclined to do so
-        self.disabled_tools.append("file_outline")
 
     async def on_system_prompt(self):
         final_output = []
@@ -311,6 +301,16 @@ class Coder(core.module.Module):
             for diag in result.diagnostics:
                 errors.append(f"Line {diag.span.start_line + 1}, Col {diag.span.start_column + 1}: {diag.message}")
 
+        if lang == "python":
+            # tree-sitter's error recovery silently accepts unindented function
+            # and class bodies (e.g. "def f():\nreturn x"), so also run the
+            # content through CPython's own parser, which flags these as
+            # IndentationError instead of shrugging them off.
+            try:
+                ast.parse(code.lstrip("\ufeff"), filename=file_path)
+            except SyntaxError as e:
+                errors.append(f"Line {e.lineno or 1}, Col {e.offset or 1}: {e.msg}")
+
         # return errors if they were found, otherwise it's an empty list and callers will know there were no errors
         return errors
 
@@ -319,8 +319,6 @@ class Coder(core.module.Module):
         uses treesitter-language-pack to extract useful information from source code
         this can then be used by the LLM to do very targeted reads of specific sections of code,
         reducing the need to read entire files into context and thus saving on token use massively
-
-        (..but it's not done yet.)
         """
         lang = tslp.detect_language_from_path(file_path)
         if not lang:
@@ -331,23 +329,37 @@ class Coder(core.module.Module):
             language=lang,
             structure=True,
             imports=True,
-            comments=False
+            comments=False,
+            parse_timeout_ms=2000
         ))
         if not extraction:
             # was likely an empty file, or failed to parse
             return None
 
+        def flatten(items, prefix=""):
+            flattened = []
+            for item in items:
+                full_name = f"{prefix}{item.name}" if item.name else prefix.rstrip(".")
+                entry = {
+                    "name": full_name or "(anonymous)",
+                    "kind": str(item.kind)
+                }
+                
+                if item.span:
+                    entry["start_line"] = int(item.span.start_line) + 1
+                    entry["end_line"] = int(item.span.end_line) + 1
+                if item.signature:
+                    entry["signature"] = " ".join(item.signature.split())[:150]
+                if item.doc_comment:
+                    entry["doc"] = item.doc_comment.replace("\n", " ")[:200]
+                    
+                flattened.append(entry)
+                if item.children:
+                    flattened.extend(flatten(item.children, prefix=f"{full_name}."))
+            return flattened
+
         data = {}
-        data["symbols"] = []
-        for item in extraction.structure:
-            data["symbols"].append({
-                "name": str(item.name),
-                "kind": str(item.kind),
-                "start_line": int(item.span.start_line),
-                "end_line": int(item.span.end_line),
-                "doc_comment": item.doc_comment,
-                "signature": item.signature
-            })
+        data["symbols"] = flatten(extraction.structure)
 
         if not data["symbols"]:
             # tell the AI that this is a file that must be read manually instead
@@ -607,7 +619,7 @@ class Coder(core.module.Module):
     # ----------------------
     @core.module.tool
     async def file_outline(self, sandbox: str, path: str):
-        """provides information about source code. only works on source code files."""
+        """ALWAYS use this on source code files before calling file_read(). Provides information about symbols such as functions and classes within the file, including their start line number and end line number. Only works on source code files."""
         target_path = await self._get_sandbox_subpath(sandbox, path)
         try:
             root = await self._get_full_sandbox_path(sandbox)
@@ -621,6 +633,215 @@ class Coder(core.module.Module):
         except Exception as e:
             # FAWK KUAH
             return self.result(str(e), success=False)
+
+    @core.module.tool
+    async def add_symbol_before(self, sandbox: str, path: str, target_symbol: str, content: str):
+        """inserts new code (a function/class/method definition) immediately before target_symbol. dotted names like MyClass.my_method work. content gets re-indented to match the target, and the result is syntax-checked before writing."""
+        return await self._add_symbol_relative(sandbox, path, target_symbol, content, before=True)
+
+    @core.module.tool
+    async def add_symbol_after(self, sandbox: str, path: str, target_symbol: str, content: str):
+        """inserts new code (a function/class/method definition) immediately after target_symbol. dotted names like MyClass.my_method work. content gets re-indented to match the target, and the result is syntax-checked before writing."""
+        return await self._add_symbol_relative(sandbox, path, target_symbol, content, before=False)
+
+    @core.module.tool
+    async def edit_symbol(self, sandbox: str, path: str, symbol: str, new_content: str):
+        """replaces the ENTIRE definition of symbol with new_content. dotted names like MyClass.my_method work. new_content must be the complete new definition (signature included); it gets re-indented to match the original and syntax-checked before writing. prefer file_edit for small changes inside a symbol."""
+        error, ctx = await self._prepare_symbol_edit(sandbox, path, symbol)
+        if error:
+            return error
+
+        lines = ctx["lines"]
+        item = ctx["item"]
+        target_indent = self._line_indent(lines, int(item.span.start_line))
+
+        new_lines = self._reindent_block(new_content, target_indent)
+        if not new_lines:
+            return self.result("Replacement content was empty - provide the complete new definition of the symbol.", success=False)
+
+        # replace the symbol's full line range. span lines are 0-indexed and
+        # end_line points at the definition's last line, so the slicing is direct.
+        merged = "\n".join(
+            lines[: int(item.span.start_line)]
+            + new_lines
+            + lines[int(item.span.end_line) + 1:]
+        )
+
+        errors = await self._check_syntax(merged, ctx["target_path"])
+        if errors:
+            return self.result({
+                "errors": errors,
+                "message": "Syntax errors detected! The edit was not written to disk. Fix the content and try again."
+            }, success=False)
+
+        try:
+            root = await self._get_full_sandbox_path(sandbox)
+            with _nofollow_open(path, "w", base=root) as f:
+                f.write(merged)
+        except Exception as e:
+            return self.result(str(e), success=False)
+
+        return self.result(f"Symbol '{symbol}' replaced (was lines {int(item.span.start_line) + 1}-{int(item.span.end_line) + 1}) in {path}.")
+
+    async def _prepare_symbol_edit(self, sandbox: str, path: str, target_symbol: str):
+        """
+        shared by the symbol tools: loads the file, parses it with treesitter,
+        and locates the target symbol via its dotted path (e.g. MyClass.my_method).
+        returns (error_result, None) on failure, or (None, context_dict) on success.
+        """
+        target_path = await self._get_sandbox_subpath(sandbox, path)
+
+        lang = tslp.detect_language_from_path(target_path)
+        if not lang:
+            return self.result("This file is not a recognized source code file, so its symbols can't be located. Use file_edit instead.", success=False), None
+
+        try:
+            root = await self._get_full_sandbox_path(sandbox)
+            with _nofollow_open(path, "r", base=root) as f:
+                code = f.read()
+        except Exception as e:
+            return self.result(str(e), success=False), None
+
+        extraction = tslp.process(code, tslp.ProcessConfig(
+            language=lang,
+            structure=True,
+            imports=False,
+            exports=False,
+            parse_timeout_ms=2000
+        ))
+        if not extraction:
+            return self.result("Failed to parse the file for symbols. Use file_edit instead.", success=False), None
+
+        # walk the dotted path down the structure tree
+        parts = target_symbol.split(".")
+        candidates = extraction.structure
+        item = None
+        for part in parts:
+            item = None
+            for candidate in candidates:
+                if candidate.name == part:
+                    item = candidate
+                    break
+            if not item:
+                break
+            candidates = item.children
+
+        if not item or not item.span:
+            return self.result(f"Symbol '{target_symbol}' was not found in {path}. Use file_outline to see the available symbols.", success=False), None
+
+        return None, {
+            "target_path": target_path,
+            "code": code,
+            "lines": code.split("\n"),
+            "item": item,
+        }
+
+    def _line_indent(self, lines: list, line_idx: int):
+        """returns the leading whitespace of a (0-indexed) line."""
+        line = lines[line_idx]
+        return line[: len(line) - len(line.lstrip())]
+
+    def _reindent_block(self, content: str, target_indent: str):
+        """
+        re-indents a block of code to match a target symbol's indentation:
+        strips the block's common leading indent, then applies the target's indent.
+        also trims leading/trailing blank lines for predictable spacing.
+        """
+        content_lines = content.split("\n")
+
+        block_indent = None
+        for line in content_lines:
+            if line.strip():
+                indent = line[: len(line) - len(line.lstrip())]
+                if block_indent is None:
+                    block_indent = indent
+                else:
+                    block_indent = os.path.commonprefix([block_indent, indent])
+
+        reindented = []
+        for line in content_lines:
+            if not line.strip():
+                reindented.append("")
+            else:
+                # block_indent is the common prefix of every non-empty line's
+                # indent (possibly ""), so slicing it off always preserves the
+                # block's relative structure before applying target_indent.
+                # (The old `block_indent and ...` guard treated the empty
+                # prefix as falsy and flattened bodies via lstrip.)
+                reindented.append(target_indent + line[len(block_indent):])
+
+        while reindented and not reindented[0]:
+            reindented.pop(0)
+        while reindented and not reindented[-1]:
+            reindented.pop()
+
+        return reindented
+
+    def _decorator_start(self, lines: list, def_idx: int):
+        """returns the index of the first line of the decorator stack directly above
+        a def/class line (or def_idx itself when there is none), so inserting before
+        a decorated symbol lands above its decorators, not between them and the def."""
+        i = def_idx - 1
+        bal = 0
+        while i >= 0:
+            line = lines[i]
+            stripped = line.strip()
+            bal += line.count("(") - line.count(")")
+            if bal == 0:
+                if stripped.startswith("@"):
+                    i -= 1
+                    continue
+                break
+            if bal > 0 or not stripped:
+                break
+            i -= 1
+        return i + 1
+
+    async def _add_symbol_relative(self, sandbox: str, path: str, target_symbol: str, content: str, before: bool):
+        error, ctx = await self._prepare_symbol_edit(sandbox, path, target_symbol)
+        if error:
+            return error
+
+        lines = ctx["lines"]
+        item = ctx["item"]
+
+        if before:
+            # walk up any decorator stack: the symbol's span starts at the
+            # def/class line, so inserting "before" without this would slip
+            # between the decorators and their definition
+            insert_idx = self._decorator_start(lines, int(item.span.start_line))
+        else:
+            insert_idx = int(item.span.end_line) + 1
+
+        target_indent = self._line_indent(lines, int(item.span.start_line))
+        reindented = self._reindent_block(content, target_indent)
+
+        if not reindented:
+            return self.result("Nothing to insert - content was empty.", success=False)
+
+        if before:
+            block = reindented + [""]
+        else:
+            block = [""] + reindented + [""]
+
+        merged = "\n".join(lines[:insert_idx] + block + lines[insert_idx:])
+
+        errors = await self._check_syntax(merged, ctx["target_path"])
+        if errors:
+            return self.result({
+                "errors": errors,
+                "message": "Syntax errors detected! The insertion was not written to disk. Fix the content and try again."
+            }, success=False)
+
+        try:
+            root = await self._get_full_sandbox_path(sandbox)
+            with _nofollow_open(path, "w", base=root) as f:
+                f.write(merged)
+        except Exception as e:
+            return self.result(str(e), success=False)
+
+        direction = "before" if before else "after"
+        return self.result(f"Inserted new code {direction} '{target_symbol}' (around line {insert_idx + 1}) in {path}.")
 
     @core.module.tool
     async def file_read(self, sandbox: str, path: str, line_start: int = None, line_end: int = None):
@@ -1469,23 +1690,21 @@ class Coder(core.module.Module):
         changes = self._parse_porcelain_z(raw_s) if rc_s == 0 else []
 
         # -- AI GENERATED CODE (Qwen3.8 Flash Next) :: (2026-10-23) harness:openlumara
-        # keep-committed mode (setting git_keep_committed_visible): files
+        # keep-committed mode): files
         # that sit in unpushed commits stay in the list marked 'committed'
         # instead of vanishing on commit; they leave when a push ships them.
         # committed+still-dirty files keep their working-tree entry and just
         # gain the committed flag. base resolution is fully server side.
-        keep = bool(self.config.get("git_keep_committed_visible"))
         committed = {}
-        if keep:
-            base, _target, _note = await self._git_pending_base(root)
-            if base:
-                rc_n, raw_n = await self._run_git_bytes(root, "diff", "--numstat", "--no-renames", f"{base}..HEAD")
-                if rc_n == 0:
-                    for line in raw_n.decode("utf-8", "replace").splitlines():
-                        parts = line.split("\t", 2)
-                        if len(parts) < 3:
-                            continue
-                        committed[parts[2].replace(os.sep, "/")] = True
+        base, _target, _note = await self._git_pending_base(root)
+        if base:
+            rc_n, raw_n = await self._run_git_bytes(root, "diff", "--numstat", "--no-renames", f"{base}..HEAD")
+            if rc_n == 0:
+                for line in raw_n.decode("utf-8", "replace").splitlines():
+                    parts = line.split("\t", 2)
+                    if len(parts) < 3:
+                        continue
+                    committed[parts[2].replace(os.sep, "/")] = True
         # a dirty file whose path is in an unpushed commit appears TWICE:
         # once in the active group (its working-tree state, with a purple
         # ring) and once in the pinned bottom group as committed_only - the
@@ -1516,7 +1735,6 @@ class Coder(core.module.Module):
             "branches": branches,
             "changes": changes,
             "read_only": bool(self.config.get("read-only")),
-            "keep_committed": keep,
             "last_commit": last_commit,
         }
 
