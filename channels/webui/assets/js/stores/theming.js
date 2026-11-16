@@ -61,10 +61,7 @@ THEME_STORE = {
         const finalTheme = themeData[effectiveMode];
         const root = document.documentElement;
 
-        // Apply base theme vars first. base.json is a small theme family
-        // ({common, dark, light}): common holds the mode-independent values,
-        // then the group for the mode in play. A legacy flat base.json is
-        // still applied as-is in both modes.
+        // Apply base theme vars first, from themes/base.json
         const baseTheme = this.themeCache['base'];
         if (baseTheme) {
             const baseGroups = ('common' in baseTheme)
@@ -108,9 +105,6 @@ THEME_STORE = {
             }
         }
 
-        // Button label: when the theme names its fill but not the label, derive
-        // the label from the fill. Same rule in both modes, so no theme has to
-        // repeat it and light themes with a saturated button keep a light label.
         if (!(finalTheme && '--button-text' in finalTheme)) {
             const label = this.buttonLabel();
             if (label) root.style.setProperty('--button-text', label);
@@ -141,10 +135,7 @@ THEME_STORE = {
         }));
     },
 
-    // Readable label for --button-bg: light text on saturated/dark fills, dark
-    // text on pale ones. Uses the AVERAGE luminance of the fill's colour stops
-    // so a gradient counts as a whole. Null when the value carries no colour
-    // (then base's --button-text stays as the fallback).
+    // button labels work across dark/light
     buttonLabel() {
         const raw = getComputedStyle(document.documentElement).getPropertyValue('--button-bg').trim();
         const stops = [];
