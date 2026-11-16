@@ -480,11 +480,12 @@ class Coder(core.module.Module):
                         
                         # filter by extensions if specified
                         if file_extensions:
+                            # normalize the extension so that the AI can pass .py, or just `py`
                             _, ext = os.path.splitext(file)
-                            # remove dot from the extension
-                            ext = ext.lstrip('.')
+                            ext = ext.lstrip('.').lower()
+                            wanted = [e.lstrip('.').lower() for e in file_extensions]
 
-                            if ext not in file_extensions:
+                            if ext not in wanted:
                                 continue
 
                         with _nofollow_open(filepath, "r") as f:
@@ -505,9 +506,12 @@ class Coder(core.module.Module):
                                         "line": line.rstrip(),
                                     }
                                     if context:
+                                        context_before = [all_lines[i].rstrip() for i in range(start, line_num - 1)]
+                                        context_after  = [all_lines[i].rstrip() for i in range(line_num, end)]
+
                                         match_dict.update({
-                                            "context_before": context_lines[:context],
-                                            "context_after": context_lines[-context:] if context > 0 else []
+                                            "context_before": context_before,
+                                            "context_after": context_after
                                         })
 
                                     matches.append(match_dict)
