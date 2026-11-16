@@ -391,7 +391,7 @@ class Coder(core.module.Module):
                 continue
 
             depth = full_name.count(".") - (1 if full_name.startswith(".") else 0)
-            line = f"{'    ' * depth}{display} ln:{s['start_line']}-{s['end_line']}"
+            line = f"{'    ' * depth} ln:{s['start_line']}-{s['end_line']} {display}"
             if s.get("doc"):
                 line += "  // " + " ".join(s["doc"].split()).lstrip("/![]* ")[:80]
             lines.append(line)
@@ -652,7 +652,7 @@ class Coder(core.module.Module):
     # ----------------------
     @core.module.tool
     async def file_outline(self, sandbox: str, path: str):
-        """ALWAYS use this on source code files before calling file_read(). Returns a compact map of all functions and classes within the file, including their line_start and line_end. Only works on source code files."""
+        """ALWAYS use this on source code files before calling file_read(). Returns a compact map of all functions and classes within the file, including their line_start and line_end. Format: `ln:start-end signature`. Only works on source code files."""
         target_path = await self._get_sandbox_subpath(sandbox, path)
         try:
             root = await self._get_full_sandbox_path(sandbox)
