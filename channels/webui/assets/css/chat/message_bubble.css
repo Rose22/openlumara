@@ -156,8 +156,8 @@
         }
 
         &.user {
-            background: var(--bg-message-user);
-            border: 1px solid var(--border-user);
+            background: transparent;
+            border: 1px solid var(--border-color);
             border-bottom-right-radius: var(--radius-sm);
             color: var(--text-primary);
             word-break: break-word;

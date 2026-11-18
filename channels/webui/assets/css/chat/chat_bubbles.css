@@ -11,6 +11,7 @@
 }
 
 #messages.chat-bubbles .message.user {
+    background: var(--bg-message-user);
     border-bottom-right-radius: 4px;
 }
 
