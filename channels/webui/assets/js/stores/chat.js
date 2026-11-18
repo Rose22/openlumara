@@ -1,28 +1,33 @@
-function mergeTurnHistory(existing, incoming) {
+/*
+ * splices a freshly fetched page of turns into the loaded window.
+ */
+function mergeTurnPage(existing, existingStart, incoming, incomingStart) {
     incoming = incoming || [];
-    if (!Array.isArray(existing) || existing.length === 0) return incoming;
+    existing = existing || [];
 
-    const merged = new Array(incoming.length);
+    if (existing.length === 0) return incoming;
 
-    for (let i = 0; i < incoming.length; i++) {
-        merged[i] = (existing[i] && existing[i].hash && existing[i].hash === incoming[i].hash)
-            ? existing[i]
-            : incoming[i];
-    }
+    const keptPrefix = existing.slice(0, Math.max(0, Math.min(existing.length, incomingStart - existingStart)));
+
+    const merged = incoming.map((turn, i) => {
+        const prev = existing[i + incomingStart - existingStart];
+        return (prev && prev.hash && prev.hash === turn.hash) ? prev : turn;
+    });
+
+    const result = keptPrefix.concat(merged);
 
     const tail = existing[existing.length - 1];
     if (tail && tail.live === true) {
         let lastUser = -1;
-        for (let i = incoming.length - 1; i >= 0; i--) {
-            if (incoming[i].role === 'user') { lastUser = i; break; }
+        for (let i = result.length - 1; i >= 0; i--) {
+            if (result[i].role === 'user') { lastUser = i; break; }
         }
 
-        const kept = lastUser === -1 ? merged : merged.slice(0, lastUser + 1);
-        kept.push(tail);
-        return kept;
+        if (lastUser !== -1) result.length = lastUser + 1;
+        result.push(tail);
     }
 
-    return merged;
+    return result;
 }
 
 function parseStoredTags() {
@@ -51,6 +56,13 @@ CHAT_STORE = {
     selectedCategory: 'general',
 
     turnHistory: [],
+    turnStart: 0,
+    totalTurns: 0,
+    hasMoreOlder: false,
+    loadingOlder: false,
+    turnPageSize: 5,
+    olderTriggerPx: 300,
+
     editingMessageIndex: null,
     editContent: '',
 
@@ -114,21 +126,177 @@ CHAT_STORE = {
 
     contextBreakdown: null,
 
+    /* ----------------------
+     * turn pagination
+     * ----------------------- */
+    turnAt(absIndex) {
+        return this.turnHistory[absIndex - this.turnStart];
+    },
+
+    resetWindow() {
+        this.turnHistory = [];
+        this.turnStart = 0;
+        this.totalTurns = 0;
+        this.hasMoreOlder = false;
+        this.loadingOlder = false;
+    },
+
+    windowSize() {
+        const last = this.turnHistory[this.turnHistory.length - 1];
+        const loaded = this.turnHistory.length - (last && last.live === true ? 1 : 0);
+        return Math.max(this.turnPageSize, loaded);
+    },
+
+    applyTurnPage(result, merge) {
+        const incoming = result.turn_history ?? [];
+        const page = result.turn_page ?? {};
+        const start = typeof page.start === 'number' ? page.start : Math.max(0, incoming.length - this.turnPageSize);
+        const total = typeof page.total === 'number' ? page.total : start + incoming.length;
+
+        if (merge) {
+            const keptPrefix = this.turnHistory.length > 0 && this.turnStart < start;
+            this.turnHistory = mergeTurnPage(this.turnHistory, this.turnStart, incoming, start);
+            if (!keptPrefix) this.turnStart = start;
+        } else {
+            this.turnHistory = incoming;
+            this.turnStart = start;
+        }
+
+        this.totalTurns = total;
+        this.hasMoreOlder = this.turnStart > 0;
+    },
+
+    _anchorGen: 0,
+
+    _anchorScrollTo(el, turnEl, offsetTop) {
+        if (!el || !turnEl || !turnEl.isConnected) return;
+
+        const current = turnEl.getBoundingClientRect().top - el.getBoundingClientRect().top;
+        const shift = current - offsetTop;
+
+        if (Math.abs(shift) > 0.5) {
+            el.scrollTo({ top: el.scrollTop + shift, behavior: 'instant' });
+        }
+    },
+
+    async loadOlderTurns(anchor = true) {
+        if (this.loadingOlder || !this.hasMoreOlder) return;
+
+        this.loadingOlder = true;
+
+        const el = document.getElementById('messages');
+
+        try {
+            const firstTurnEl = el?.querySelector('.turn') ?? null;
+            const offsetTop = firstTurnEl
+                ? firstTurnEl.getBoundingClientRect().top - el.getBoundingClientRect().top
+                : 0;
+
+            const result = await simpleApiFetch(
+                `/api/chat/turns?before=${this.turnStart}&limit=${this.turnPageSize}`
+            );
+            if (!result) return;
+
+            const turns = result.turns ?? [];
+            if (turns.length === 0) {
+                this.hasMoreOlder = false;
+                return;
+            }
+
+            this.turnHistory = turns.concat(this.turnHistory);
+            this.turnStart = result.start;
+            this.totalTurns = result.total;
+            this.hasMoreOlder = result.start > 0;
+
+            if (anchor && firstTurnEl) {
+                const gen = ++this._anchorGen;
+
+                await Alpine.nextTick();
+                this._anchorScrollTo(el, firstTurnEl, offsetTop);
+
+                // content above can keep growing for a few frames after the
+                // swap; keep nudging back until it settles instead of
+                // snapping once and leaving the difference on screen
+                let settleFrames = 30;
+                let lastTop = el.scrollTop;
+                const settle = () => {
+                    if (gen !== this._anchorGen || settleFrames-- <= 0) return;
+
+                    // the moment the wheel/keyboard moves the scroll on its
+                    // own, hands off - never fight the user mid-settle
+                    if (Math.abs(el.scrollTop - lastTop) > 2) return;
+
+                    this._anchorScrollTo(el, firstTurnEl, offsetTop);
+                    lastTop = el.scrollTop;
+                    requestAnimationFrame(settle);
+                };
+                requestAnimationFrame(settle);
+            }
+        } catch (err) {
+            console.warn('loading older turns failed:', err);
+        } finally {
+            this.loadingOlder = false;
+        }
+    },
+
+    async resyncWindow() {
+        if (this.turnHistory.length === 0) {
+            await this.reloadChat();
+            return;
+        }
+
+        const size = Math.min(this.windowSize(), 200);
+        const result = await simpleApiFetch(
+            `/api/chat/turns?before=${this.turnStart + size}&limit=${size}`
+        );
+        if (!result) return;
+
+        const turns = result.turns ?? [];
+        const keepCount = Math.max(0, Math.min(this.turnHistory.length, result.start - this.turnStart));
+
+        this.turnHistory = this.turnHistory.slice(0, keepCount).concat(turns);
+        if (keepCount === 0) this.turnStart = result.start;
+        this.totalTurns = result.total;
+        this.hasMoreOlder = this.turnStart > 0;
+    },
+
+    maybeLoadOlder(el) {
+        if (!el) el = document.getElementById('messages');
+        if (!el || this.loadingOlder || !this.hasMoreOlder) return;
+        if (el.scrollTop <= this.olderTriggerPx) this.loadOlderTurns();
+    },
+
+    async fillViewport(maxPages = 8) {
+        const el = document.getElementById('messages');
+        if (!el) return;
+
+        let pages = 0;
+        while (this.hasMoreOlder && pages < maxPages && el.scrollHeight <= el.clientHeight + 8) {
+            await this.loadOlderTurns(false);
+            await Alpine.nextTick();
+            pages++;
+        }
+
+        if (pages > 0 && Alpine.store('ui').shouldScroll) {
+            el.scrollTo({ top: el.scrollHeight, behavior: 'instant' });
+        }
+    },
+
     async load() {
         // called by Alpine.init
         await this.reloadCategories();
         this.loadInputHistory();
 
-        const result = await simpleApiFetch(`/api/chat/current`);
+        const result = await simpleApiFetch(`/api/chat/current?limit=${this.windowSize()}`);
         if (!result) { return }
+
+        document.getElementById('messages')?.classList.add('anchor-hidden');
 
         this.chat = result;
         this.selectedChat = result.id;
         this.selectedCategory = result.category;
-        this.turnHistory = mergeTurnHistory(this.turnHistory, result.turn_history);
+        this.applyTurnPage(result, true);
         this.currentTokenUsage = result.token_usage;
-
-        Alpine.store('ui').prepareBottomWindow();
 
         await this.reloadChats();
 
@@ -139,34 +307,47 @@ CHAT_STORE = {
     /* ----------------------
      * chat manipulation
      * ----------------------- */
+    /*
+     * opens a chat at its end without ever showing the top of it first
+     */
+    async anchorToBottom() {
+        const ui = Alpine.store('ui');
+        const el = document.getElementById('messages');
+
+        if (!el) {
+            await ui.forceScrollToBottom();
+            return;
+        }
+
+        el.classList.add('anchor-hidden');
+        try {
+            await Alpine.nextTick();
+            await ui.forceScrollToBottom();
+            await this.fillViewport();
+        } finally {
+            el.classList.remove('anchor-hidden');
+        }
+    },
+
     async loadChat(chatId) {
         if (this.selectedChat === chatId) { return; }
 
         // don't allow chat switching if a stream is ongoing
         if (Alpine.store("stream").state != 'idle') { return; }
 
-        const result = await simpleApiFetch(`/api/chat/load/${chatId}`);
+        const result = await simpleApiFetch(`/api/chat/load/${chatId}?limit=${this.turnPageSize}`);
         if (!result) { return; }
 
-        const ui = Alpine.store('ui');
-
-        this.turnHistory = [];
-        ui.resetTurnMounts();
-        await Alpine.nextTick();
-
+        this.resetWindow();
         this.chat = result;
         this.selectedChat = chatId;
         this.selectedCategory = result.category;
-        this.turnHistory = result.turn_history;
+        this.applyTurnPage(result, false);
         this.currentTokenUsage = result.token_usage;
 
-        // bottom-up: mount the tail of the chat before scrolling to it
-        ui.prepareBottomWindow();
+        await this.anchorToBottom();
 
         await this.ensureChatVisible(chatId);
-
-        // make sure it always shows the bottom of the chat
-        await ui.forceScrollToBottom();
     },
 
     /* ----------------------
@@ -495,7 +676,7 @@ CHAT_STORE = {
 
         await simpleApiPost('/api/chat/new', body);
 
-        result = await simpleApiFetch('/api/chat/current');
+        result = await simpleApiFetch(`/api/chat/current?limit=${this.turnPageSize}`);
         if (!result) { return; }
 
         this.chat = result;
@@ -503,7 +684,7 @@ CHAT_STORE = {
         this.selectedChat = result.id;
         this.selectedCategory = result.category;
         this.currentTokenUsage = result.token_usage;
-        this.turnHistory = result.turn_history;
+        this.applyTurnPage(result, false);
 
         // the new chat may live in a category the dropdown doesn't list yet
         await this.reloadCategories();
@@ -569,7 +750,7 @@ CHAT_STORE = {
             return;
         }
 
-        const result = await simpleApiFetch(`/api/chat/current`);
+        const result = await simpleApiFetch(`/api/chat/current?limit=${this.windowSize()}`);
         if (!result) { return }
 
         const prevCategory = this.selectedCategory;
@@ -578,12 +759,7 @@ CHAT_STORE = {
         this.selectedChat = result.id;
         this.selectedCategory = result.category;
 
-        // reuse the existing turn objects for every turn that didn't actually
-        // change, so alpine doesn't re-render (and re-parse the markdown of)
-        // the entire conversation on every single reload
-        this.turnHistory = mergeTurnHistory(this.turnHistory, result.turn_history);
-
-        Alpine.store('ui').syncMountWindows();
+        this.applyTurnPage(result, true);
 
         if (result.category !== prevCategory) {
             await this.reloadCategories();
@@ -682,7 +858,7 @@ CHAT_STORE = {
      * message actions
      * ----------------------- */
     async copyMessage(turnIndex) {
-      const turn = this.turnHistory[turnIndex];
+      const turn = this.turnAt(turnIndex);
       const msg = turn?.messages?.[turn.messages?.length - 1]; // last message in the turn
       if (!msg) return;
 
@@ -702,7 +878,7 @@ CHAT_STORE = {
     },
 
     async deleteMessage(turnIndex) {
-        const turn = this.turnHistory[turnIndex];
+        const turn = this.turnAt(turnIndex);
         if (!turn) return;
         await simpleSocketSend({
             "type": "message_delete",
@@ -711,7 +887,7 @@ CHAT_STORE = {
     },
 
     async regenerateMessage(turnIndex) {
-        const turn = this.turnHistory[turnIndex];
+        const turn = this.turnAt(turnIndex);
         if (!turn) return;
 
         Alpine.store('stream').userMsg = null;
@@ -724,7 +900,7 @@ CHAT_STORE = {
     },
 
     async startEdit(turnIndex) {
-        const turn = this.turnHistory[turnIndex];
+        const turn = this.turnAt(turnIndex);
         const msg = turn?.messages?.[turn.messages?.length - 1]; // last message in the turn
         if (!msg) { return; }
         

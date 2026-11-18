@@ -33,16 +33,20 @@
 
     {{ extension_slot("above_chat_history") }}
 
+    <!--
+        only a window of the chat is loaded (see $store.chat.turnStart).
+    -->
+    <div class="older-turns" x-show="$store.chat.hasMoreOlder" x-cloak
+         @click="$store.chat.loadOlderTurns()">
+        <span class="older-spinner" x-show="$store.chat.loadingOlder"></span>
+        <span x-text="$store.chat.loadingOlder ? 'Loading older messages..' : 'Older messages'"></span>
+    </div>
+
     <!-- historical turns -->
-    <template x-for="(turn, turnIndex) in $store.chat.turnHistory" :key="turnIndex">
-        <div class="fullwidth turn" :data-turn-index="turnIndex">
+    <template x-for="(turn, idx) in $store.chat.turnHistory" :key="$store.chat.turnStart + idx">
+        <div class="fullwidth turn" :data-turn-index="$store.chat.turnStart + idx"
+             x-data="{ get turnIndex() { return $store.chat.turnStart + idx } }">
 
-            <template x-if="!$store.ui.isTurnMounted(turnIndex)">
-                <div class="turn-lazy" :style="`min-height: ${$store.ui.turnPlaceholderHeight(turn)}px`"></div>
-            </template>
-
-            <template x-if="$store.ui.isTurnMounted(turnIndex)">
-                <div>
             <!-- user turn (always one message) -->
             <template x-if="turn.role === 'user'">
                 <div class="message-wrapper user" x-data="{ get message() { return turn.messages[0] } }">
@@ -198,9 +202,6 @@
                     </div>
                 </div>
             </template>
-                </div>
-            </template>
-            <!-- /lazy-mount wrappers -->
         </div>
     </template>
 

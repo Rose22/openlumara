@@ -1,5 +1,3 @@
-const _turnHeights = new WeakMap();
-
 const _interruptBound = new WeakSet();
 
 // pure JS lerp pump knobs; see directives/autoscroll.js for the full story
@@ -101,127 +99,6 @@ UI_STORE = {
         }
     },
 
-    captureTurnHeight(turn, el) {
-        _turnHeights.set(turn, el.offsetHeight);
-    },
-
-    turnPlaceholderHeight(turn) {
-        const cached = _turnHeights.get(turn);
-        if (cached) return cached;
-
-        const chars = (turn.messages || []).reduce(
-            (n, m) => n + (m && typeof m.content === 'string' ? m.content.length : 200), 0
-        ) + (turn.steps || []).reduce(
-            (n, s) => n + (s && s.reasoning_content ? s.reasoning_content.length : 0)
-                + (s && s.content ? s.content.length : 0), 0
-        ) + (turn.final_messages || []).reduce(
-            (n, m) => n + (m && m.content ? m.content.length : 100), 0
-        );
-        return Math.min(400, Math.max(40, Math.round(chars / 6)));
-    },
-
-    turnMounted: {},
-    mountMargin: 800,      // px: mount turns approaching the viewport
-    unmountMargin: 2500,   // px: recycle mounted dom that drifted far outside
-    _mountRaf: null,
-
-    isTurnMounted(turnIndex) {
-        if (this.turnMounted[turnIndex]) return true;
-        const turn = Alpine.store('chat').turnHistory?.[turnIndex];
-        return Boolean(turn && turn.live === true);
-    },
-
-    resetTurnMounts() {
-        this.turnMounted = {};
-    },
-
-    prepareBottomWindow() {
-        const container = document.getElementById('messages');
-        const turns = Alpine.store('chat').turnHistory;
-        if (!container || !turns || turns.length === 0) return;
-
-        const budget = Math.max(container.clientHeight * 2, 600);
-        let total = 0;
-        for (let i = turns.length - 1; i >= 0; i--) {
-            this.turnMounted[i] = true;
-            total += this.turnPlaceholderHeight(turns[i]);
-            if (total >= budget) break;
-        }
-    },
-
-    /*
-     * called after every turnHistory mutation: prune mount entries for
-     * turns that no longer exist, keep the newest turns mounted (a fresh
-     * message must never flash in as a placeholder), schedule a pass.
-     */
-    syncMountWindows() {
-        const turns = Alpine.store('chat').turnHistory;
-        const n = (turns || []).length;
-
-        for (const k of Object.keys(this.turnMounted)) {
-            if (Number(k) >= n) delete this.turnMounted[k];
-        }
-        for (let i = Math.max(0, n - 2); i < n; i++) this.turnMounted[i] = true;
-
-        this.updateMounts();
-    },
-
-    updateMounts() {
-        if (this._mountRaf !== null) return;
-        this._mountRaf = requestAnimationFrame(() => {
-            this._mountRaf = null;
-            this._mountPass();
-        });
-    },
-
-    _mountPass() {
-        const container = document.getElementById('messages');
-        if (!container) return;
-        const turns = Alpine.store('chat').turnHistory;
-        if (!turns || turns.length === 0) return;
-
-        const cRect = container.getBoundingClientRect();
-        const mountTop = cRect.top - this.mountMargin;
-        const mountBottom = cRect.bottom + this.mountMargin;
-        const farTop = cRect.top - this.unmountMargin;
-        const farBottom = cRect.bottom + this.unmountMargin;
-
-        const mounts = [];
-
-        container.querySelectorAll('[data-turn-index]').forEach(el => {
-            const i = Number(el.dataset.turnIndex);
-            const turn = turns[i];
-            if (!turn) return;
-
-            const r = el.getBoundingClientRect();
-            if (this.turnMounted[i]) {
-                if (r.bottom < farTop || r.top > farBottom) {
-                    this.captureTurnHeight(turn, el);
-                    delete this.turnMounted[i];
-                }
-            } else if (r.bottom > mountTop && r.top < mountBottom) {
-                mounts.push({ i, above: r.bottom <= cRect.top, h: el.offsetHeight });
-            }
-        });
-
-        if (mounts.length === 0) return;
-
-        (async () => {
-            for (const m of mounts) this.turnMounted[m.i] = true;
-
-            await Alpine.nextTick();
-
-            let shift = 0;
-            for (const m of mounts) {
-                const el = container.querySelector(`[data-turn-index="${m.i}"]`);
-                if (el && m.above) shift += el.offsetHeight - m.h;
-            }
-            if (shift) container.scrollTo({ top: container.scrollTop + shift, behavior: 'instant' });
-
-            this.updateMounts();
-        })();
-    },
-
     windowWidth: window.innerWidth,
     isMobile: false,
 
@@ -274,8 +151,7 @@ UI_STORE = {
 
         this.expandReasoning = localStorage.getItem("expandReasoning") !== 'false';
 
-        // a resize moves the mount window: re-evaluate lazily-mounted turns
-        window.addEventListener('resize', () => this.updateMounts());
+        window.addEventListener('resize', () => Alpine.store('chat').maybeLoadOlder());
     },
 
     async toggleSidebar() {
@@ -317,7 +193,7 @@ UI_STORE = {
         const el = document.getElementById(containerId);
         if (!el) return;
 
-        this.updateMounts();
+        Alpine.store('chat').maybeLoadOlder(el);
 
         if (this._suppressScroll) return;
 
@@ -327,9 +203,12 @@ UI_STORE = {
     async _jumpToBottom(el) {
         this._stopPump();
 
+        // land on the bottom immediately, then keep chasing it for as long
+        // as the content above keeps growing (markdown/code finishing render)
+        el.scrollTo({ top: el.scrollHeight, behavior: 'instant' });
+
         let lastHeight = -1;
         for (let i = 0; i < 24; i++) {
-            this.updateMounts();
             await Alpine.nextTick();
             el.scrollTo({ top: el.scrollHeight, behavior: 'instant' });
             await new Promise(resolve => requestAnimationFrame(resolve));
@@ -377,7 +256,6 @@ UI_STORE = {
 
         let lastTop = -1;
         for (let i = 0; i < 24; i++) {
-            this.updateMounts();
             await Alpine.nextTick();
 
             const el = document.querySelector(`[data-turn-index="${turnIndex}"]`);
@@ -386,8 +264,6 @@ UI_STORE = {
             const containerRect = container.getBoundingClientRect();
             const elementRect = el.getBoundingClientRect();
             const offset = elementRect.top - containerRect.top - (containerRect.height / 2) + (elementRect.height / 2);
-            // instant jump: smooth would sweep the lazy-mount zone through
-            // every turn between here and the target
             container.scrollTo({ top: container.scrollTop + offset, behavior: 'instant' });
 
             await new Promise(resolve => requestAnimationFrame(resolve));

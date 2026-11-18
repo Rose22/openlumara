@@ -13,6 +13,40 @@ import channels.webui.utils as utils
 import channels.webui.chat_ops as chat_ops
 import channels.webui.chat_listing as listing
 
+TURN_PAGE_SIZE = 25
+TURN_PAGE_MAX = 200
+
+
+def _page_limit(request, default=TURN_PAGE_SIZE):
+    try:
+        limit = int(request.query_params.get("limit", default))
+    except (TypeError, ValueError):
+        limit = default
+
+    return max(1, min(limit, TURN_PAGE_MAX))
+
+
+def _page_info(turns, start, total):
+    return {
+        "turn_history": turns,
+        "turn_page": {"start": start, "total": total, "has_more": start > 0}
+    }
+
+
+async def _turns_page(channel, before, limit):
+    """groups the whole history, then slices out the page of turns ending at
+    the absolute index `before` (exclusive). before=None means the newest page."""
+    history = await channel.group_history()
+    total = len(history)
+
+    end = total
+    if before is not None:
+        end = max(0, min(before, total))
+
+    start = max(0, end - limit)
+    return history[start:end], start, total
+
+
 def register(app, channel):
     # ------------------
     # API routes (/api)
@@ -24,27 +58,52 @@ def register(app, channel):
     # -- GET
     @app.get("/api/chat/load/{chat_id}")
     async def chat_load(chat_id: str, request: fastapi.Request):
-        """Loads a specific chat by its id"""
+        """Loads a specific chat by its id.
+
+        Only the newest `limit` turns are returned, plus the turn_page
+        descriptor (start index, total turn count, whether older turns exist)"""
         success = await chat_ops.op_chat_switch(channel, chat_id)
         if not success:
             return utils.api_result("error while loading chat", success=False)
 
+        page, start, total = await _turns_page(channel, None, _page_limit(request))
+
         chat = dict(channel.context.chat.get())
-        chat["turn_history"] = await channel.group_history()
+        chat.update(_page_info(page, start, total))
         chat["token_usage"] = await channel.context.get_total_tokens()
-        
+
         await channel.websocket_manager.push_context_update()
         return utils.api_result(chat, success=True)
 
     @app.get("/api/chat/current")
-    async def chat_get_current():
-        """Gives you the currently loaded chat's data"""
+    async def chat_get_current(request: fastapi.Request):
+        """Gives you the currently loaded chat's data, paginated the same way
+        /api/chat/load does"""
+
+        page, start, total = await _turns_page(channel, None, _page_limit(request))
 
         chat = dict(channel.context.chat.get())
-        chat["turn_history"] = await channel.group_history()
-        
+        chat.update(_page_info(page, start, total))
+
         chat["token_usage"] = await channel.context.get_total_tokens()
         return utils.api_result(chat)
+
+    @app.get("/api/chat/turns")
+    async def chat_turns(request: fastapi.Request):
+        """One page of the currently loaded chat's turns, oldest first."""
+        try:
+            before = int(request.query_params.get("before"))
+        except (TypeError, ValueError):
+            before = None
+
+        page, start, total = await _turns_page(channel, before, _page_limit(request))
+
+        return utils.api_result({
+            "turns": page,
+            "start": start,
+            "total": total,
+            "has_more": start > 0
+        }, success=True)
 
     @app.get("/api/stream/state")
     async def stream_state_get():

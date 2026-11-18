@@ -65,12 +65,16 @@ document.addEventListener('alpine:init', async () => {
     await Alpine.store('system').loadData();
 
     // fetch current chat
-    await Alpine.store('chat').load();
+    try {
+        await Alpine.store('chat').load();
 
-    // do the initial scroll to bottom
-    requestAnimationFrame(() => {
-        Alpine.store('ui').forceScrollToBottom();
-    });
+        // do the initial scroll to bottom, masked so the top of the chat is
+        // never painted first
+        await Alpine.store('chat').anchorToBottom();
+    } finally {
+        // never leave the chat hidden, whatever happened above
+        document.getElementById('messages')?.classList.remove('anchor-hidden');
+    }
 
     await registerKeyboardShortcuts();
 

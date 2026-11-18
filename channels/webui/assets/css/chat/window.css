@@ -22,12 +22,47 @@
         */
 
         overflow-anchor: none;
+
+        /* kept invisible (but laid out, so heights still measure) while a
+           freshly loaded chat is scrolled to its end */
+        &.anchor-hidden {
+            visibility: hidden;
+        }
         padding: 4px 20px;
         flex-direction: column;
         gap: 4px;
         margin: 0 auto;
         margin-bottom: 7px;
         min-height: 0;
+
+        .older-turns {
+            align-self: center;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin: 2px 0 8px;
+            padding: 4px 14px;
+            border-radius: 99px;
+            font-size: 0.78rem;
+            color: var(--text-secondary, #888);
+            background: var(--bg-secondary, rgba(255, 255, 255, 0.06));
+            cursor: pointer;
+            user-select: none;
+            transition: color 0.15s ease;
+
+            &:hover {
+                color: var(--accent, #f06595);
+            }
+
+            .older-spinner {
+                width: 11px;
+                height: 11px;
+                border-radius: 50%;
+                border: 2px solid color-mix(in srgb, var(--accent, #f06595) 25%, transparent);
+                border-top-color: var(--accent, #f06595);
+                animation: older-turns-spin 0.8s linear infinite;
+            }
+        }
 
         .message-wrapper {
             /* message bubble alignment */
@@ -110,6 +145,12 @@
                 flex-shrink: 0;
             }
         }
+    }
+}
+
+@keyframes older-turns-spin {
+    to {
+        transform: rotate(360deg);
     }
 }
 

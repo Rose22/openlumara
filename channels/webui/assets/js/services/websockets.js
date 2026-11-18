@@ -178,7 +178,6 @@ async function handleWebSocketMessage(data) {
 
                 stream.turn = {role: "assistant", live: true, steps: [], final_messages: []};
                 chat.turnHistory.push(stream.turn);
-                Alpine.store('ui').syncMountWindows();
             }
 
             if (data_type === "turn_step") {
@@ -430,11 +429,10 @@ async function handleWebSocketMessage(data) {
 
         case "sync":
             // make sure we sync chat
-            chat.turnHistory = [];
             await stream.clear();
-            await chat.reloadChat();
+            await chat.resyncWindow();
 
-            if (ui.scrollToTurnIndex) {
+            if (ui.scrollToTurnIndex !== null) {
                 await ui.scrollToTurn(ui.scrollToTurnIndex);
             } else {
                 await ui.forceScrollToBottom();
@@ -511,8 +509,6 @@ async function handleWebSocketMessage(data) {
             } else {
                 chat.turnHistory.push(stream.turn);
             }
-
-            Alpine.store('ui').syncMountWindows();
 
             // then clear the user message placeholder and the current turn
             await stream.clear();
