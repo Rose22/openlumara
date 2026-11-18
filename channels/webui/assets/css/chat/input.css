@@ -154,7 +154,7 @@
                 }
 
                 &[aria-pressed="true"] {
-                    color: var(--accent);
+                    color: var(--text-primary);
                 }
 
                 &:disabled {

@@ -63,18 +63,10 @@
 
     <button class="pill-button"
             :class="{ 'active': percentage >= 70, 'warning': percentage >= 75 }"
+            :style="`--pct: ${percentage}%`"
             @click="toggle()"
             :title="`${$store.chat.currentTokenUsage.toLocaleString()} / ${( $store.system.data.max_context || 0 ).toLocaleString()} tokens`"
             :aria-label="'Context usage: ' + Math.round(percentage) + '%'">
-        <!-- stadium outline drawn as one path starting at top center, so the
-             fill stroke progresses clockwise from 12 o'clock -->
-        <svg class="pill-outline" viewBox="0 0 76 30" preserveAspectRatio="none" aria-hidden="true">
-            <path class="pill-track"
-                  d="M38 1 H61 A14 14 0 0 1 75 15 A14 14 0 0 1 61 29 H14 A14 14 0 0 1 1 15 A14 14 0 0 1 14 1 Z"></path>
-            <path class="pill-fill" pathLength="100"
-                  :stroke-dasharray="percentage + ' ' + (100 - percentage)"
-                  d="M38 1 H61 A14 14 0 0 1 75 15 A14 14 0 0 1 61 29 H14 A14 14 0 0 1 1 15 A14 14 0 0 1 14 1 Z"></path>
-        </svg>
         <span class="pill-pct" x-text="Math.round(percentage) + '%'"></span>
     </button>
 

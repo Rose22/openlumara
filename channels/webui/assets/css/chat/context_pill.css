@@ -1,3 +1,9 @@
+@property --pct {
+    syntax: '<percentage>';
+    initial-value: 0%;
+    inherits: true;
+}
+
 #context-pill {
     position: relative;
     display: flex;
@@ -13,40 +19,49 @@
         height: auto;
         line-height: 1;
         padding: 0.5em 0.95em;
-        background: var(--bg-secondary);
+        background: transparent;
         border: none;
-        border-radius: 999px;
+        border-radius: var(--radius-md);
         cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
-        &:hover {
-            .pill-track {
-                stroke: color-mix(in srgb, var(--accent) 45%, var(--border-color));
+        transition: --pct 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+        /* progress ring: a conic arc (starting at 12 o'clock, clockwise)
+           masked down to a 1px stadium outline that always fits the real
+           button box -- no svg viewBox, no aspect distortion */
+        &::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            padding: 2px;
+            background: conic-gradient(
+                from 0deg,
+                var(--accent) var(--pct, 0%),
+                var(--border-color) var(--pct, 0%)
+            );
+            -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+            -webkit-mask-composite: xor;
+            mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+            mask-composite: exclude;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        &.warning {
+            &::before {
+                background: conic-gradient(
+                    from 0deg,
+                    var(--error) var(--pct, 0%),
+                    var(--border-color) var(--pct, 0%)
+                );
             }
 
             .pill-pct {
-                color: var(--accent);
+                color: var(--error);
             }
-        }
-
-        .pill-outline {
-            position: absolute;
-            inset: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-        }
-
-        .pill-track {
-            stroke: var(--border-color);
-            transition: stroke 0.3s ease;
-        }
-
-        .pill-fill {
-            stroke: var(--accent);
-            stroke-linecap: round;
-            transition: stroke-dasharray 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), stroke 0.3s ease;
         }
 
         .pill-pct {
@@ -54,24 +69,12 @@
             /* inherits the button's 0.85rem base, so it scales with root font */
             font-size: 1rem;
             font-weight: 600;
-            color: var(--text-muted);
+            color: var(--text-secondary);
             pointer-events: none;
             transition: color 0.3s ease;
             min-width: 35px;
         }
 
-        &.active .pill-fill {
-            stroke: var(--accent);
-        }
-
-        &.warning {
-            .pill-fill {
-                stroke: var(--error);
-            }
-            .pill-pct {
-                color: var(--error);
-            }
-        }
     }
 
     .context-popup {
@@ -82,7 +85,7 @@
         max-width: 360px;
         background: var(--bg-secondary);
         border: 1px solid var(--border-color);
-        border-radius: var(--radius-sm);
+        border-radius: var(--radius-md);
         box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
         padding: 12px 14px;
         font-size: 0.75rem;
