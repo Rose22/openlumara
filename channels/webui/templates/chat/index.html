@@ -5,7 +5,7 @@
 </template>
 
 <!-- the main message view -->
-<div id="messages" x-ref="messages" x-cloak
+<div id="messages" class="{{ 'chat-bubbles' if config.get('message_style') == 'chat' }}" x-ref="messages" x-cloak
     @scroll.throttle.100ms="$store.ui.onScroll()"
 >
     <!--
@@ -191,10 +191,10 @@
                         <template x-for="(message, messageIndex) in turn.final_messages ?? []" :key="'final-'+messageIndex">
                             {% include 'chat/turns/assistant_history.html' %}
                         </template>
+                    </div>
 
-                        <div x-data="{ get targetIndex() { return turn.last_message_index } }" class="fullwidth">
-                            {% include 'chat/message_buttons.html' %}
-                        </div>
+                    <div x-data="{ get targetIndex() { return turn.last_message_index } }" class="fullwidth">
+                        {% include 'chat/message_buttons.html' %}
                     </div>
                 </div>
             </template>

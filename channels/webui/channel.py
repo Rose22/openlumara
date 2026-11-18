@@ -98,6 +98,15 @@ class Webui(core.channel.Channel, ui_extensions.UiExtensionsMixin):
             "description": "Because logins are disabled, you need protection from outside intruders (think of this like a firewall). Specify a list of IP ranges that are allowed to request private data from the webui's API. Clients in these ranges get full access while those coming from outside your network are refused. Set it to just your LAN's range (such as `192.168.0.0/24`) to tighten it, or to [] to only ever allow the machine itself.",
             "depends": {"require_login": False}
         },
+        "message_style": {
+            "description": "How messages should look",
+            "type": "select",
+            "options": {
+                "page": "Display the chat like a page, with the AI's responses taking up the full width. Looks professional.",
+                "chat": "Display the chat using chat bubbles, like a chat/texting app. More casual!"
+            },
+            "default": "page"
+        },
         "enable_chain_expansion": {
             "description": "Whether the processing chain can be expanded to view the AI's thoughts and intermediate steps. When disabled, it stays locked in its collapsed state (showing only 'Processing..'/'Thinking..' labels), so you always see that the AI is busy without being able to peek inside. Very useful for public instances!",
             "default": True

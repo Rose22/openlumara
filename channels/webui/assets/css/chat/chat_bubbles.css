@@ -1,0 +1,26 @@
+#messages.chat-bubbles {
+    gap: 12px;
+}
+
+
+
+#messages.chat-bubbles .message.user,
+#messages.chat-bubbles .message.assistant {
+    max-width: 85% !important;
+    border-radius: 14px;
+}
+
+#messages.chat-bubbles .message.user {
+    border-bottom-right-radius: 4px;
+}
+
+#messages.chat-bubbles .message.assistant {
+    background: var(--bg-message-ai);
+    border: 1px solid var(--border-message);
+    border-bottom-left-radius: 4px;
+    backdrop-filter: blur(10px);
+    min-width: 0;
+    width: fit-content;
+    max-width: var(--message-max-width, 75%);
+    box-shadow: none;
+}
