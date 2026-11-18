@@ -183,6 +183,15 @@
 
             <div class="item">
                 <div class="toggle-row">
+                    <label>Frosted glass</label>
+                    <button class="toggle" type="button" :class="{ active: frostedGlassEnabled }" @click="handleFrostedGlassToggle()">
+                    </button>
+                </div>
+                <span class="description">Blur and soften what passes beneath overlays like the pinned prompt and the floating input bar. Turn off for solid backgrounds instead.</span>
+            </div>
+
+            <div class="item">
+                <div class="toggle-row">
                     <label>Pinned prompts</label>
                     <button class="toggle" type="button" :class="{ active: pinnedPromptsEnabled }" @click="handlePinnedPromptsToggle()">
                     </button>

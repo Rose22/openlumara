@@ -100,6 +100,9 @@ function settingsModal() {
         // keep the last user prompt pinned to the top while its response is
         // in view (localStorage; default on)
         pinnedPromptsEnabled: localStorage.getItem('pinnedPromptsEnabled') !== 'false',
+        // blur + translucent tint on the pinned prompt and floating input bar
+        // (localStorage; default on)
+        frostedGlassEnabled: localStorage.getItem('frostedGlassEnabled') !== 'false',
         // 'Step display mode' dropdown: default | thinking | steps.
         stepDisplayMode: localStorage.getItem('stepDisplayMode') || 'default',
         tokenFadeMs: localStorage.getItem('tokenFadeMs') || '750',
@@ -364,6 +367,12 @@ function settingsModal() {
         handleCollapseChainToggle() {
             this.collapseChainDefault = !this.collapseChainDefault;
             localStorage.setItem('collapseChainDefault', this.collapseChainDefault);
+        },
+
+        handleFrostedGlassToggle() {
+            this.frostedGlassEnabled = !this.frostedGlassEnabled;
+            localStorage.setItem('frostedGlassEnabled', this.frostedGlassEnabled);
+            document.body.classList.toggle('no-frosted', !this.frostedGlassEnabled);
         },
 
         handlePinnedPromptsToggle() {

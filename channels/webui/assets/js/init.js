@@ -3,6 +3,8 @@ marked.setOptions({
     gfm: true
 });
 
+document.body.classList.toggle('no-frosted', localStorage.getItem('frostedGlassEnabled') === 'false');
+
 /*
  * initializes Alpine and registers all the necessary stuff
  */
