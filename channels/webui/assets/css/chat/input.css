@@ -214,7 +214,7 @@
 
         #send, #stop {
             padding: 0 14px;
-            margin-left: 2px;
+            margin-left: 6px;
             height: auto;
             border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
             border: none;
