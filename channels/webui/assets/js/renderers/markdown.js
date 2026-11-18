@@ -5,6 +5,27 @@ const _tempHighlightDiv = document.createElement('div');
 // keeps live-streaming re-renders cheap (only the growing block re-highlights).
 const _hlCache = new Map();
 
+// fence languages that always get the HTML preview button
+const _HTML_LANGS = new Set(['html', 'htm', 'xml', 'xhtml', 'svg', 'vue']);
+
+// decide whether a fenced code block holds HTML
+function _isHtmlCode(lang, code) {
+    if (lang) return _HTML_LANGS.has(lang.toLowerCase());
+
+    const trimmed = code.trim();
+    if (!trimmed.startsWith('<')) return false;
+
+    // a doctype alone is a strong html signal (match any casing)
+    if (/^<!doctype\s/i.test(trimmed)) return true;
+
+    // must OPEN with a lowercase tag...
+    if (!/^<[a-z][a-z0-9:-]*(?=[\s/>])/.test(trimmed)) return false;
+
+    // ..and actually look like markup
+    return /<\/[a-z][a-z0-9:-]*\s*>/i.test(trimmed)
+        || /<[a-z][a-z0-9:-]*(?:\s[^<>]*[=/>])/.test(trimmed);
+}
+
 function renderMarkdown(text, live = false) {
     if (!text) return '';
 
@@ -13,6 +34,8 @@ function renderMarkdown(text, live = false) {
 
     // protect against XSS
     html = DOMPurify.sanitize(html);
+
+    _tempHighlightDiv.innerHTML = html;
 
     // syntax highlighting
     // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-15) status:reviewed
@@ -23,8 +46,6 @@ function renderMarkdown(text, live = false) {
     // is a map lookup. (keyed by lang+code, so identical blocks across
     // the whole app share the result too.)
     if (typeof hljs !== 'undefined') {
-        _tempHighlightDiv.innerHTML = html;
-
         const blocks = _tempHighlightDiv.querySelectorAll('pre code');
 
         blocks.forEach((block, i) => {
@@ -54,18 +75,28 @@ function renderMarkdown(text, live = false) {
             block.innerHTML = highlighted;
             block.classList.add('hljs');
         });
-
-        html = _tempHighlightDiv.innerHTML;
     }
 
-    // add the copy button to all pre statements.
-    // this used to inject an `x-copy-code` alpine directive, but that forced
-    // alpine to walk and re-initialize the entire rendered subtree on every
-    // update. it's plain markup now, handled by a single delegated listener
-    // (see directives/markdown.js)
-    html = html.replace(/<pre><code/g, '<pre><button class="copy-btn" type="button">Copy</button><code');
+    // add the buttons to all code blocks.
+    _tempHighlightDiv.querySelectorAll('pre').forEach((pre) => {
+        const codeEl = pre.querySelector(':scope > code');
+        if (!codeEl) return;
 
-    return html;
+        let buttons = '';
+
+        if (!live) {
+            const langMatch = codeEl.className.match(/(?:^|\s)language-([\w+#-]+)/);
+            if (_isHtmlCode(langMatch ? langMatch[1] : undefined, codeEl.textContent)) {
+                buttons += '<button class="preview-btn" type="button">Preview</button>';
+            }
+        }
+
+        buttons += '<button class="copy-btn" type="button">Copy</button>';
+
+        pre.insertAdjacentHTML('afterbegin', `<div class="code-actions">${buttons}</div>`);
+    });
+
+    return _tempHighlightDiv.innerHTML;
 }
 
 // cache of rendered markdown, keyed by the message object itself.

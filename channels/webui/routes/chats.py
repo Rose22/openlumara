@@ -262,13 +262,19 @@ def register(app, channel):
     # -- POST
     @app.post("/api/chat/new")
     async def chat_new(request: fastapi.Request):
-        """Creates a new chat"""
-        # optional json body with a category, so the webui can create
-        # the chat inside the currently selected category.
+        """Creates a new chat.
+
+        Optional json body: category (created inside it), plus title and
+        tags - birth metadata for the sidebar's forge flow."""
         category = "general"
+        title = ""
+        raw_tags = []
         try:
             data = await request.json()
             category = (data.get("category") or "general").strip() or "general"
+            title = (data.get("title") or "").strip()
+            if isinstance(data.get("tags"), list):
+                raw_tags = data.get("tags")
         except Exception:
             pass
 
@@ -278,8 +284,20 @@ def register(app, channel):
             if error:
                 return utils.api_result(error, success=False)
 
-        new_id = await chat_ops.op_chat_new(channel, category=category)
-        
+        # normalize tags: drop '#' sigils, empties, dupes; cap count/length
+        tags = []
+        for tag in raw_tags:
+            tag = str(tag).lstrip("#").strip()
+            if tag and tag not in tags and len(tags) < 8 and len(tag) <= 32:
+                tags.append(tag)
+
+        # clamp the title so a pasted wall of text can't break the sidebar
+        title = title[:120]
+
+        new_id = await chat_ops.op_chat_new(
+            channel, category=category, title=title or None, tags=tags or None
+        )
+
         await channel.websocket_manager.push_context_update()
         return utils.api_result({"id": new_id})
 

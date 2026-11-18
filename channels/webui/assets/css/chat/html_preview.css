@@ -1,0 +1,120 @@
+/* ==========================================================================
+ *  Docked HTML Preview Panel
+ *  ========================================================================== */
+
+#html-preview-panel {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    min-width: 0;
+    background-color: var(--bg-secondary);
+    border-left: 1px solid var(--border-color);
+    z-index: 10;
+}
+
+.hpp-titlebar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+.hpp-title {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.hpp-actions {
+    margin-left: auto;
+    display: flex;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+.hpp-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+
+    &:hover {
+        background: var(--bg-tertiary);
+        color: var(--text-primary);
+    }
+
+    /* toggled-on state (theme toggle) */
+    &.active {
+        color: var(--accent);
+        background: color-mix(in srgb, var(--accent) 14%, transparent);
+    }
+
+    svg {
+        width: 14px;
+        height: 14px;
+    }
+}
+
+.hpp-frame {
+    flex: 1;
+    width: 100%;
+    min-height: 0;
+    border: none;
+    /* matches the app theme; the srcdoc's injected theme block restyles the
+       previewed document itself (see stores/html_preview.js) */
+    background: var(--bg-primary);
+}
+
+/* theme toggle off: fully raw rendering - browser-default white page
+   background instead of the theme's, and light color-scheme so unstyled
+   form controls and scrollbars match. the iframe canvas sits under the
+   document, so this is what shows whenever the html has no bg itself. */
+.hpp-frame.raw {
+    background: #ffffff;
+    color-scheme: light;
+}
+
+/* invisible grab zone straddling the panel's left edge */
+.hpp-resize {
+    position: absolute;
+    left: -3px;
+    top: 0;
+    bottom: 0;
+    width: 7px;
+    cursor: col-resize;
+    z-index: 1;
+
+    &:hover {
+        background: color-mix(in srgb, var(--accent-color, var(--text-secondary)) 25%, transparent);
+    }
+}
+
+/* on phones the panel takes the whole screen instead of squeezing the chat */
+@media (max-width: 768px) {
+    #html-preview-panel {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 100vw !important;
+        z-index: 60;
+    }
+
+    .hpp-resize {
+        display: none;
+    }
+}

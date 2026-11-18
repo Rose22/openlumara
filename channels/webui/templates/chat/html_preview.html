@@ -1,0 +1,48 @@
+<!--
+    docked HTML preview panel (right side of the chat window).
+
+    opened by the Preview button on fenced HTML code blocks:
+    detection lives in renderers/markdown.js, state in stores/html_preview.js.
+
+    the iframe runs the code's JavaScript on purpose (this is the one place
+    that deliberately bypasses DOMPurify), but WITHOUT allow-same-origin in
+    the sandbox: the preview gets an opaque origin, so it can't reach the
+    app's DOM, storage or session.
+-->
+<template x-if="$store.htmlPreview.open">
+    <section id="html-preview-panel" :style="`width: ${$store.htmlPreview.width}px`">
+        <!-- drag handle: resize the panel -->
+        <div class="hpp-resize" @pointerdown="$store.htmlPreview.startResize($event)"></div>
+
+        <div class="hpp-titlebar">
+            <button class="hpp-btn" title="Close" @click="$store.htmlPreview.close()">
+                {% include 'svg/cross.svg' %}
+            </button>
+
+            <span class="hpp-title">HTML Preview</span>
+
+            <div class="hpp-actions">
+                <button class="hpp-btn" :class="{ 'active': $store.htmlPreview.useTheme }"
+                    :title="$store.htmlPreview.useTheme ? 'OpenLumara theme: on (click for raw HTML styling)' : 'OpenLumara theme: off (click to apply the app theme)'"
+                    @click="$store.htmlPreview.toggleTheme()">
+                    {% include 'svg/contrast.svg' %}
+                </button>
+                <button class="hpp-btn" title="Reload" @click="$store.htmlPreview.refresh()">
+                    {% include 'svg/reload.svg' %}
+                </button>
+                <button class="hpp-btn" title="Open in new tab" @click="$store.htmlPreview.openInTab()">
+                    {% include 'svg/open_in_new.svg' %}
+                </button>
+            </div>
+        </div>
+
+        <!-- srcdoc = guard script + raw code (stores/html_preview.js):
+             links/forms/window.open are neutered so the preview can't
+             navigate to external sites. no allow-popups either, so
+             target="_blank" and friends are dead at the sandbox level. -->
+        <iframe class="hpp-frame" :class="{ 'raw': !$store.htmlPreview.useTheme }"
+            :srcdoc="$store.htmlPreview.srcdoc"
+            sandbox="allow-scripts allow-modals allow-forms"
+            title="HTML preview"></iframe>
+    </section>
+</template>

@@ -60,35 +60,118 @@
         {% endfor %}
     </nav>
 
-<div id="chat-list" x-ref="chat-list" x-cloak x-show="sidebarTab === '' && ($store.ui.isMobile || !$store.ui.sidebarCollapsed)" x-data="{ tagPanel: false }">
+<div id="chat-list" x-ref="chat-list" x-cloak x-show="sidebarTab === '' && ($store.ui.isMobile || !$store.ui.sidebarCollapsed)" x-data="{
+    tagPanel: false,
+
+    forgeTags: [],
+
+    filterTop: 0,
+    filterLeft: 0,
+
+    filterActive() {
+        return $store.chat.searchInContent || $store.chat.selectedTags.length > 0;
+    },
+
+    forgeAddTag(raw) {
+        const tag = String(raw).replace(/^#+/, '').trim();
+        if (!tag || this.forgeTags.includes(tag) || this.forgeTags.length >= 8) { return; }
+        this.forgeTags = [...this.forgeTags, tag];
+    },
+
+    forgeRemoveTag(tag) {
+        this.forgeTags = this.forgeTags.filter(t => t !== tag);
+    },
+
+    forgeHarvestToken(allowBare) {
+        const q = $store.chat.searchQuery;
+        const m = q.match(/(?:^|\s)#([^\s#]{1,32})[\s,]+$/)
+               || (allowBare ? q.match(/(?:^|\s)#([^\s#]{1,32})$/) : null);
+        if (!m) { return false; }
+
+        this.forgeAddTag(m[1]);
+        const stripped = (q.slice(0, m.index) + ' ' + q.slice(m.index + m[0].length)).trim();
+        $store.chat.setSearchQuery(stripped);
+        return true;
+    },
+
+    forgeInput(e) {
+        if (this.forgeHarvestToken(false)) { return; }
+        $store.chat.setSearchQuery(e.target.value);
+    },
+
+    forgeEnter(e) {
+        if (e.isComposing) { return; }
+        e.preventDefault();
+
+        if (this.forgeHarvestToken(true)) { return; }
+
+        // ⌘/Ctrl+⏎: open the top match instead of forging a new one
+        if (e.metaKey || e.ctrlKey) {
+            const first = $store.chat.searchResults[0];
+            if (first) {
+                $store.chat.setSearchQuery('');
+                $store.chat.loadChat(first.id);
+                if ($store.ui.isMobile) { $store.ui.showSidebar = false; }
+            }
+            return;
+        }
+
+        this.forgeCreate();
+    },
+
+    async forgeCreate() {
+        if (Alpine.store('stream').state !== 'idle') { return; }
+
+        const title = $store.chat.searchQuery.trim();
+        const tags = this.forgeTags;
+
+        // leave search mode first, so the fresh chat is visible right away
+        $store.chat.setSearchQuery('');
+        this.forgeTags = [];
+
+        await $store.chat.newChat(null, title || null, tags);
+        if ($store.ui.isMobile) { $store.ui.showSidebar = false; }
+    },
+
+    forgeBackspace(e) {
+        // empty field + pills: backspace pops the last pill before eating text
+        if (!$store.chat.searchQuery && this.forgeTags.length > 0) {
+            this.forgeTags = this.forgeTags.slice(0, -1);
+        }
+    },
+
+    forgeEsc(e) {
+        if ($store.chat.searchQuery || this.forgeTags.length > 0) {
+            $store.chat.setSearchQuery('');
+            this.forgeTags = [];
+        } else {
+            e.target.blur();
+        }
+    }
+}">
     {{ extension_slot("top") }}
 
-    <div class="category-select" x-data="{ open: false, top: 0, left: 0, width: 0 }">
+    <div class="masthead" x-data="{ open: false, top: 0, left: 0 }">
         <button
             type="button"
-            class="category-trigger"
+            class="masthead-title"
             :class="{ 'open': open }"
             :disabled="$store.stream.state !== 'idle'"
             title="Filter chats by category"
             @click="
                 const r = $el.getBoundingClientRect();
-                /* overlap by 1px so the menu's top edge merges with the
-                   trigger's (whose bottom border/radius is hidden while
-                   open) - they read as one element */
-                top = r.bottom - 1;
+                top = r.bottom + 4;
                 left = r.left;
-                width = r.width;
                 open = !open;
             "
         >
-            <span class="cat-icon" x-show="$store.chat.selectedCategory === 'general'">{% include 'svg/home.svg' %}</span>
-            <span class="cat-icon" x-show="$store.chat.selectedCategory !== 'general'">{% include 'svg/folder.svg' %}</span>
-            <span class="cat-label" x-text="$store.chat.selectedCategory"></span>
-            <svg class="cat-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" width="12" height="12"><path fill="currentColor" d="M6 8L1 3h10z"/></svg>
+            <span class="cat-name" x-text="$store.chat.selectedCategory"></span>
+            <svg class="cat-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" width="11" height="11"><path fill="currentColor" d="M6 8L1 3h10z"/></svg>
         </button>
+
         <template x-teleport="body">
             <div class="category-menu" x-show="open" x-transition.opacity.duration.120ms
-                :style="`top: ${top}px; left: ${left}px; width: ${width}px`"
+                :style="`top: ${top}px; left: ${left}px`"
                 @click.stop @click.away="open = false"
                 @keydown.escape.window="open = false">
                 <!-- the selected category lives in the trigger, so it's
@@ -114,71 +197,164 @@
         </template>
     </div>
 
-    <div class="search">
-        <span class="search-icon" x-show="!$store.chat.searchLoading">{% include 'svg/search.svg' %}</span>
-        <span class="search-spinner" x-show="$store.chat.searchLoading" x-cloak></span>
-        <input name="search" type="text" placeholder="Search.."
-            :value="$store.chat.searchQuery"
-            @input.debounce="$store.chat.setSearchQuery($event.target.value)"
-            :disabled="$store.stream.state !== 'idle'"
-            >
-
-        <button type="button" class="search-toggle"
-            :class="{ 'active': $store.chat.searchInContent }"
-            @click="$store.chat.setSearchInContent(!$store.chat.searchInContent)"
-            :title="$store.chat.searchInContent
-                ? 'Searching titles + message content (click for titles only)'
-                : 'Search message content too (currently: titles only)'"
-            :aria-pressed="$store.chat.searchInContent"
-            :disabled="$store.stream.state !== 'idle'"
-        >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                <line x1="4" y1="6" x2="20" y2="6"/>
-                <line x1="4" y1="12" x2="20" y2="12"/>
-                <line x1="4" y1="18" x2="14" y2="18"/>
-            </svg>
-        </button>
-
-        <button type="button" class="search-toggle"
-            :class="{ 'active': $store.chat.selectedTags.length > 0 || tagPanel }"
-            @click="tagPanel = !tagPanel"
-            :title="$store.chat.selectedTags.length > 0
-                ? `Filtering by: ${$store.chat.selectedTags.join(', ')} (click for tag filter)`
-                : 'Filter chats by tags'"
-            :aria-expanded="tagPanel"
-            :disabled="$store.stream.state !== 'idle'"
-        >
-            {% include 'svg/tag.svg' %}
-        </button>
+    <div class="time-tabs" role="tablist" aria-label="Chat timeline">
+        <button type="button" role="tab"
+            :class="{ 'active': $store.chat.timeTab === 'today' }"
+            :aria-selected="$store.chat.timeTab === 'today'"
+            @click="$store.chat.setTimeTab('today')">Today</button>
+        <button type="button" role="tab"
+            :class="{ 'active': $store.chat.timeTab === 'week' }"
+            :aria-selected="$store.chat.timeTab === 'week'"
+            @click="$store.chat.setTimeTab('week')">This week</button>
+        <button type="button" role="tab"
+            :class="{ 'active': $store.chat.timeTab === 'older' }"
+            :aria-selected="$store.chat.timeTab === 'older'"
+            @click="$store.chat.setTimeTab('older')">Older</button>
     </div>
 
-    <div class="tag-filter" x-show="tagPanel" x-transition.opacity.duration.120ms>
-        <template x-if="$store.chat.availableTags.length === 0">
-            <div class="tag-filter-empty">no tags in this category yet</div>
-        </template>
-
-        <div class="tag-chips" x-show="$store.chat.availableTags.length > 0">
-            <template x-for="tag in $store.chat.availableTags" :key="tag">
-                <button type="button" class="tag-chip"
-                    :class="{ 'selected': $store.chat.selectedTags.includes(tag) }"
-                    :disabled="$store.stream.state !== 'idle'"
-                    @click="$store.chat.toggleTag(tag)"
-                    x-text="tag">
-                </button>
+    <div class="search-row">
+    <div class="search" :class="{ 'creating': $store.chat.searchQuery.trim() || forgeTags.length > 0 }">
+        <!-- borderless field: icon + pills + input on one quiet line -->
+        <div class="forge-field">
+            <span class="search-icon" x-show="!$store.chat.searchLoading">{% include 'svg/search.svg' %}</span>
+            <span class="search-spinner" x-show="$store.chat.searchLoading" x-cloak></span>
+            <template x-for="tag in forgeTags" :key="'pill-' + tag">
+                <span class="forge-pill"
+                    :class="{ 'is-new': !$store.chat.availableTags.includes(tag) }"
+                    :title="$store.chat.availableTags.includes(tag)
+                        ? tag + ' (click × to remove)'
+                        : tag + ' - new tag, will be created with the chat'">
+                    <span x-text="tag"></span>
+                    <button type="button" class="forge-pill-x" aria-label="remove tag"
+                        :tabindex="-1" @click.stop="forgeRemoveTag(tag)">×</button>
+                </span>
             </template>
+
+            <input name="search" type="text"
+                x-model="$store.chat.searchQuery"
+                :placeholder="forgeTags.length > 0 ? '#tag' : $store.chat.timeTab === 'today' ? 'Search or create..' : 'Search'"
+                title="Search chats while typing · ⏎ creates a chat titled with this text · #tag + space adds birth tags · ⌘/Ctrl+⏎ opens the top match"
+                @input="forgeInput($event)"
+                @keydown.enter="forgeEnter($event)"
+                @keydown.backspace="forgeBackspace($event)"
+                @keydown.escape="forgeEsc($event)"
+                :disabled="$store.stream.state !== 'idle'"
+                >
         </div>
 
-        <button type="button" class="tag-filter-clear"
-            x-show="$store.chat.selectedTags.length > 0"
-            @click="$store.chat.clearTags()">
-            clear filter
+        <button type="button" class="filter-cap"
+            :class="{ 'open': tagPanel, 'has-active': filterActive() }"
+            :disabled="$store.stream.state !== 'idle'"
+            aria-label="Chat filters"
+            :title="filterActive()
+                ? 'Filters active: ' + [$store.chat.searchInContent ? 'content search' : null, ...$store.chat.selectedTags.map(t => '#' + t)].filter(Boolean).join(', ')
+                : 'Filters: search in content + tag filter'"
+            @click="
+                const r = $el.getBoundingClientRect();
+                filterTop = r.bottom + 6;
+                filterLeft = Math.max(8, r.right - 236);
+                tagPanel = !tagPanel;
+            "
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 4h18l-7 8.5V18l-4 2v-7.5z"/>
+            </svg>
+            <span class="cap-dot" x-show="filterActive()" x-cloak></span>
         </button>
+
+        <button type="button" class="forge-row"
+            x-show="$store.chat.searchQuery.trim() || forgeTags.length > 0"
+            x-cloak
+            :disabled="$store.stream.state !== 'idle'"
+            @click="forgeCreate()">
+            <span class="forge-cta">
+                {% include 'svg/add.svg' %}
+                <span>Create</span>
+                <span class="forge-quoted" x-show="$store.chat.searchQuery.trim()"
+                    x-text="'“' + $store.chat.searchQuery.trim() + '”'"></span>
+            </span>
+            <template x-for="tag in forgeTags" :key="'row-' + tag">
+                <span class="forge-pill small"
+                    :class="{ 'is-new': !$store.chat.availableTags.includes(tag) }"
+                    x-text="'#' + tag"></span>
+            </template>
+            <kbd class="forge-kbd">⏎</kbd>
+        </button>
+
+        <template x-teleport="body">
+            <div class="filter-menu"
+                :class="{ 'sheet': $store.ui.isMobile }"
+                x-show="tagPanel" x-transition.opacity.duration.120ms
+                :style="$store.ui.isMobile ? '' : `top: ${filterTop}px; left: ${filterLeft}px`"
+                @click.stop @click.away="tagPanel = false"
+                @keydown.escape.window="tagPanel = false">
+
+                <div class="fm-handle" x-show="$store.ui.isMobile" x-cloak></div>
+
+                <button type="button" class="fm-row" role="switch"
+                    :aria-checked="$store.chat.searchInContent"
+                    :disabled="$store.stream.state !== 'idle'"
+                    @click="$store.chat.setSearchInContent(!$store.chat.searchInContent)">
+                    <span class="fm-label">search in message content</span>
+                    <span class="fm-switch" :class="{ 'on': $store.chat.searchInContent }"><span class="fm-knob"></span></span>
+                </button>
+
+                <div class="fm-divider"></div>
+                <div class="fm-sub">filter by tag</div>
+
+                <template x-if="$store.chat.availableTags.length === 0">
+                    <div class="fm-empty">no tags in this category yet</div>
+                </template>
+
+                <div class="fm-chips" x-show="$store.chat.availableTags.length > 0">
+                    <template x-for="tag in $store.chat.availableTags" :key="'fm-' + tag">
+                        <button type="button" class="fm-chip"
+                            :class="{ 'selected': $store.chat.selectedTags.includes(tag) }"
+                            :disabled="$store.stream.state !== 'idle'"
+                            @click="$store.chat.toggleTag(tag)"
+                            x-text="tag">
+                        </button>
+                    </template>
+                </div>
+
+                <button type="button" class="fm-clear"
+                    x-show="$store.chat.selectedTags.length > 0"
+                    @click="$store.chat.clearTags()">
+                    clear tag filter
+                </button>
+            </div>
+        </template>
     </div>
+
+    <button type="button" class="search-plus"
+        x-show="$store.chat.timeTab === 'today'"
+        x-cloak
+        :disabled="$store.stream.state !== 'idle'"
+        aria-label="New chat"
+        title="New chat (or ⏎ in the empty search field)"
+        @click="
+            $store.chat.setSearchQuery('');
+            forgeTags = [];
+            await $store.chat.newChat();
+            if ($store.ui.isMobile) { $store.ui.showSidebar = false; }
+        "
+    >
+        {% include 'svg/add.svg' %}
+    </button>
+    </div><!-- /search-row -->
 
     {{ extension_slot("above_chat_list") }}
 
     <div class="chats">
         {{ extension_slot("top_of_chat_list") }}
+
+        <!-- per-tab empty state (search has its own, above) -->
+        <template x-if="!$store.chat.searching && $store.chat.visibleGroups().length === 0">
+            <div class="item time-tab-empty" x-text="
+                $store.chat.timeTab === 'today' ? 'no chats today yet'
+                : $store.chat.timeTab === 'week' ? 'nothing this week'
+                : 'nothing older'"></div>
+        </template>
 
         <!-- search loading state -->
         <template x-if="$store.chat.searching && $store.chat.searchLoading && $store.chat.searchResults.length === 0">
@@ -193,9 +369,10 @@
             <div class="item">no chats found</div>
         </template>
 
-        <template x-for="group in $store.chat.displayGroups()" :key="group.key">
+        <template x-for="group in $store.chat.visibleGroups()" :key="group.key">
             <div class="day-group">
                 <button type="button" class="day-header"
+                    x-show="$store.chat.timeTab !== 'today' || $store.chat.searching"
                     :class="{ 'expanded': !$store.chat.isGroupCollapsed(group) }"
                     :aria-expanded="!$store.chat.isGroupCollapsed(group)"
                     @click="$store.chat.toggleDayGroup(group)">
@@ -334,18 +511,6 @@
 
     </div>
 
-    <div class="sidebar-footer">
-        {{ extension_slot("bottom_of_chat_list") }}
-        {{ extension_slot("buttons") }}
-        <button class="sidebar-btn" :disabled="$store.stream.state !== 'idle'"
-            @click="
-                $store.chat.newChat();
-                if ($store.ui.isMobile) { $store.ui.showSidebar = false; }
-            ">
-            {% include 'svg/add.svg' %}
-            New Chat
-        </button>
-    </div>
 </div>
 
     {% for panel in extension_sidebars() %}

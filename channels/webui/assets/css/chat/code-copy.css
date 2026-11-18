@@ -1,11 +1,26 @@
 /* ==========================================================================
- *  Code Copy Button
+ *  Code Block Buttons (Copy + HTML Preview)
  *  ========================================================================== */
 
-.copy-btn {
+/* wrapper renderMarkdown injects: buttons sit side by side in the
+   top-right corner, revealed as a group on hover */
+.code-actions {
     position: absolute;
     right: 8px;
     top: 8px;
+    display: flex;
+    flex-direction: row;
+    gap: 6px;
+    opacity: 0;
+    z-index: 1;
+
+    &:hover {
+        opacity: 1;
+    }
+}
+
+.copy-btn,
+.preview-btn {
     padding: 4px 10px;
     background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
@@ -13,13 +28,10 @@
     color: var(--text-secondary);
     font-size: 0.7rem;
     cursor: pointer;
-    opacity: 0;
     transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-    z-index: 1;
 
     &:hover {
         background: var(--bg-secondary);
         color: var(--text-primary);
-        opacity: 1;
     }
 }

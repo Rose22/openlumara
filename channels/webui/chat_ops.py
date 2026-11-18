@@ -19,13 +19,22 @@ async def op_chat_switch(channel, chat_id):
 
     return True
 
-async def op_chat_new(channel, category="general"):
-    """creates a chat, switches to it, notifies all clients"""
+async def op_chat_new(channel, category="general", title=None, tags=None):
+    """creates a chat, switches to it, notifies all clients."""
     ws_mgr = channel.websocket_manager
     if ws_mgr.active_stream_task and not ws_mgr.active_stream_task.done():
         ws_mgr.active_stream_task.cancel()
 
-    new_id = await channel.context.chat.new(category=category)
+    kwargs = {"category": category}
+    if title:
+        kwargs["title"] = title
+
+    new_id = await channel.context.chat.new(**kwargs)
+
+    if tags:
+        await channel.context.chat.set("tags", list(tags))
+        channel.context.chat.data.save()
+
     ws_mgr.active_chat_id = new_id
 
     await ws_mgr.broadcast({"type": "chat_switched", "id": new_id})

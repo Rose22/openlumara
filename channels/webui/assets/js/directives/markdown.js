@@ -118,8 +118,10 @@ document.addEventListener('click', async (e) => {
     const btn = e.target.closest('.copy-btn');
     if (!btn) return;
 
-    const code = btn.parentElement?.querySelector('code')?.textContent
-        || btn.parentElement?.textContent;
+    // buttons live in a .code-actions wrapper inside the pre, so walk up to
+    // the pre itself before looking for the code element
+    const pre = btn.closest('pre');
+    const code = pre?.querySelector('code')?.textContent || pre?.textContent;
 
     try {
         await navigator.clipboard.writeText(code);
@@ -129,4 +131,17 @@ document.addEventListener('click', async (e) => {
     }
 
     setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+});
+
+/*
+ * one delegated listener for the Preview button that renderMarkdown injects
+ * on HTML code blocks: pushes the raw code into the docked preview panel
+ * (see stores/html_preview.js + templates/chat/html_preview.html).
+ */
+document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.preview-btn');
+    if (!btn) return;
+
+    const code = btn.closest('pre')?.querySelector('code')?.textContent;
+    if (code) Alpine.store('htmlPreview').show(code);
 });

@@ -16,6 +16,7 @@ document.addEventListener('alpine:init', async () => {
     Alpine.store('theme', THEME_STORE);
     Alpine.store('audio', AUDIO_STORE);
     Alpine.store('upload', UPLOAD_STORE);
+    Alpine.store('htmlPreview', HTML_PREVIEW_STORE);
 
     // start the browser notification system
     Alpine.store('notifications', NOTIFY_STORE);

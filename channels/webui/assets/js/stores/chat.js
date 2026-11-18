@@ -250,12 +250,36 @@ CHAT_STORE = {
         return localDayKey(new Date());
     },
 
+    /* ----------------------
+     * time tabs (sidebar): Today / Week / Older.
+     * ----------------------- */
+    timeTab: localStorage.getItem('sidebarTimeTab') || 'today',
+
+    setTimeTab(tab) {
+        if (this.timeTab === tab) { return; }
+        this.timeTab = tab;
+        localStorage.setItem('sidebarTimeTab', tab);
+    },
+
+    groupTab(key) {
+        if (!key || key === 'undated') { return 'older'; }
+        if (key === this.todayKey()) { return 'today'; }
+        if (key.startsWith('last-week-')) { return 'week'; }
+        return key.split('-').length >= 3 ? 'week' : 'older';
+    },
+
+    // the x-for source in sidebar.html (search results bypass the tabs)
+    visibleGroups() {
+        if (this.searching) { return this.displayGroups(); }
+        return this.dayGroups.filter(g => this.groupTab(g.key) === this.timeTab);
+    },
+
     isGroupCollapsed(group) {
         // search results are always shown fully - hiding matches behind
         // a collapsed header would be maddening
         if (this.searching) { return false; }
         if (group.key in this.collapsedDays) { return Boolean(this.collapsedDays[group.key]); }
-        return group.key !== this.todayKey();
+        return false;
     },
 
     toggleDayGroup(group) {
@@ -339,15 +363,15 @@ CHAT_STORE = {
             loaded: false
         }));
 
+        const onTab = g => !this.isGroupCollapsed(g) && this.groupTab(g.key) === this.timeTab;
+
         await Promise.all(
-            this.dayGroups.filter(g => !this.isGroupCollapsed(g))
-                .map(g => this.loadDayChats(g))
+            this.dayGroups.filter(onTab).map(g => this.loadDayChats(g))
         );
 
         await Alpine.nextTick();
         await Promise.all(
-            this.dayGroups.filter(g => !this.isGroupCollapsed(g))
-                .map(g => this.ensureDayChatsFilled(g))
+            this.dayGroups.filter(onTab).map(g => this.ensureDayChatsFilled(g))
         );
     },
 
@@ -438,6 +462,7 @@ CHAT_STORE = {
         for (const group of this.dayGroups) {
             if (group.chats.some(c => c.id === chatId)) {
                 this.collapsedDays[group.key] = false;
+                this.setTimeTab(this.groupTab(group.key));
                 return true;
             }
 
@@ -451,6 +476,7 @@ CHAT_STORE = {
                 const progressed = await this.loadDayChats(group);
                 if (group.chats.some(c => c.id === chatId)) {
                     this.collapsedDays[group.key] = false;
+                    this.setTimeTab(this.groupTab(group.key));
                     return true;
                 }
                 if (!progressed) { break; }
@@ -460,8 +486,12 @@ CHAT_STORE = {
         return false;
     },
 
-    async newChat(category = null) {
-        await simpleApiPost('/api/chat/new', { category: category ?? this.selectedCategory });
+    async newChat(category = null, title = null, tags = []) {
+        const body = { category: category ?? this.selectedCategory };
+        if (title) { body.title = title; }
+        if (tags && tags.length > 0) { body.tags = tags; }
+
+        await simpleApiPost('/api/chat/new', body);
 
         result = await simpleApiFetch('/api/chat/current');
         if (!result) { return; }

@@ -74,15 +74,15 @@ class TailFadeTimeline {
     }
 }
 
-// text nodes in document order, skipping copy buttons and any tail spans
-// we already wrapped during this paint
+// text nodes in document order, skipping code-block buttons and any tail
+// spans we already wrapped during this paint
 function collectTextNodes(node) {
     const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
     const nodes = [];
     let tn;
     while ((tn = walker.nextNode())) {
         const parent = tn.parentElement;
-        if (!parent || parent.closest('.copy-btn') || parent.closest('.token-fade')) continue;
+        if (!parent || parent.closest('.copy-btn, .preview-btn') || parent.closest('.token-fade')) continue;
         nodes.push(tn);
     }
     return nodes;
