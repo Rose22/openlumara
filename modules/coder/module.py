@@ -163,6 +163,15 @@ class Coder(core.module.Module):
         },
 
         # flags
+        "code_explorer": {
+            "default": "Outliner",
+            "type": "select",
+            "description": "Which tool the AI uses to navigate source code. 'Outliner' enables the file_outline tool (a compact map of functions and classes), 'Grep' enables the file_grep and folder_grep tools instead.",
+            "options": {
+                "Outliner": "file_outline (default)",
+                "Grep": "file_grep + folder_grep",
+            }
+        },
         "insert_sandbox_paths_into_system_prompt": {
             "default": True,
             "description": "Puts the list of sandboxes into the AI's system prompt so that it is always aware of which paths it can access. Recommended!"
@@ -227,6 +236,11 @@ class Coder(core.module.Module):
 
         if self.config.get("insert_sandbox_paths_into_system_prompt"):
             self.disabled_tools.append("list_sandboxes")
+
+        if self.config.get("code_explorer") == "Grep":
+            self.disabled_tools.append("file_outline")
+        else:
+            self.disabled_tools.extend(["file_grep", "folder_grep"])
 
     async def on_system_prompt(self):
         final_output = []
@@ -525,7 +539,7 @@ class Coder(core.module.Module):
 
     @core.module.tool
     async def glob(self, sandbox: str, pattern: str, sub_path=None, max_results: int = 200):
-        """globs path for desired files. does not support regex. paths relative to sandbox root."""
+        """globs path for desired files. does not support regex. paths relative to sandbox root. After locating a source file, use file_outline() to understand it before reading."""
         sandbox_path = await self._get_full_sandbox_path(sandbox)
         target_path = await self._get_sandbox_subpath(sandbox, sub_path or '.')
 
@@ -728,7 +742,7 @@ class Coder(core.module.Module):
     # ----------------------
     @core.module.tool
     async def file_outline(self, sandbox: str, path: str):
-        """ALWAYS use this on source code files before calling file_read(). Returns a compact map of all functions and classes within the file, including their line_start and line_end. Format: `ln:start-end signature`. Only works on source code files."""
+        """ALWAYS use this on source code files BEFORE file_read(), so you can then read only the chunk you need. Returns a compact map of all functions and classes within the file, including their line_start and line_end. Format: `ln:start-end signature`. Only works on source code files."""
         target_path = await self._get_sandbox_subpath(sandbox, path)
         try:
             root = await self._get_full_sandbox_path(sandbox)
@@ -954,7 +968,7 @@ class Coder(core.module.Module):
 
     @core.module.tool
     async def file_read(self, sandbox: str, path: str, line_start: int = None, line_end: int = None):
-        """reads file, or part of file. use line_start and line_end to read in chunks."""
+        """reads file, or part of file. ALWAYS call file_outline() on source code files first, then use line_start and line_end to read only the relevant symbols instead of the whole file."""
         target_path = await self._get_sandbox_subpath(sandbox, path)
 
         # protect against tocccc touh
