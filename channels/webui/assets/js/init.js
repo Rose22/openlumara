@@ -76,6 +76,8 @@ document.addEventListener('alpine:init', async () => {
         document.getElementById('messages')?.classList.remove('anchor-hidden');
     }
 
+    document.getElementById('user-input')?.focus();
+
     await registerKeyboardShortcuts();
 
     // auto-close sidebar on resizing to below desktop size (mobile size)

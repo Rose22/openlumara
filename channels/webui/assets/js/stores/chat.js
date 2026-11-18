@@ -348,6 +348,8 @@ CHAT_STORE = {
         await this.anchorToBottom();
 
         await this.ensureChatVisible(chatId);
+
+        document.getElementById('user-input')?.focus();
     },
 
     /* ----------------------
@@ -694,9 +696,7 @@ CHAT_STORE = {
         await this.reloadChats();
         await this.reloadChat();
 
-        if (!Alpine.store('ui').isMobile) {
-            document.getElementById('user-input')?.focus();
-        }
+        document.getElementById('user-input')?.focus();
     },
 
     async renameChat(chat_id, newTitle) {
