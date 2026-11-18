@@ -188,7 +188,7 @@
    waste space and clip on small screens. Direct content children become
    the scroll region; .header and .actions stay pinned. ID-height modals
    (export/shortcuts) are reeled in too - IDs outrank classes. */
-@media (max-width: 768px) {
+@media (max-width: 768px), (orientation: portrait) and (max-width: 1024px) {
     .modal {
         height: 100%;
         max-height: 100dvh;

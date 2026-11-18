@@ -187,7 +187,7 @@ body:has(.sidebar-resizer:active) {
     background: var(--bg-primary);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 768px), (orientation: portrait) and (max-width: 1024px) {
     #sidebar.sidebar-slide-in {
     transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
 }

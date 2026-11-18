@@ -206,7 +206,7 @@
             }
         }
 
-        @media (max-width: 768px) {
+        @media (max-width: 768px), (orientation: portrait) and (max-width: 1024px) {
             &.docked {
                 padding: 0 4px;
             }

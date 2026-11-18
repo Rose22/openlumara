@@ -237,7 +237,7 @@
 }
 
 /* phones: cards stack, actions become a horizontal row */
-@media (max-width: 768px) {
+@media (max-width: 768px), (orientation: portrait) and (max-width: 1024px) {
     .module-library .library-item {
         flex-direction: column;
         align-items: stretch;

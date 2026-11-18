@@ -80,7 +80,7 @@ function settingsModal() {
         },
         
         // --- Viewport ---
-        mobile: window.innerWidth <= 768,
+        mobile: window.isMobileViewport(),
 
         // Theme state (synced with Alpine store)
         themeFamily: localStorage.getItem('themeFamily') || 'pro-oled',
@@ -133,7 +133,7 @@ function settingsModal() {
 
         // called from @resize.window.debounce on the modal root
         checkMobile() {
-            const newMobile = window.innerWidth <= 768;
+            const newMobile = window.isMobileViewport();
             if (newMobile !== this.mobile) {
                 this.mobile = newMobile;
             }

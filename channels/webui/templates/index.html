@@ -94,7 +94,7 @@
             const wasMobile = $store.ui.isMobile;
 
             $store.ui.windowWidth = window.innerWidth;
-            $store.ui.isMobile = window.innerWidth <= 768;
+            $store.ui.isMobile = window.isMobileViewport();
 
             if (wasMobile !== $store.ui.isMobile) {
                 $store.ui.showSidebar = !$store.ui.isMobile;

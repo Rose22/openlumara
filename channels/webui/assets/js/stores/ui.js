@@ -1,5 +1,10 @@
 const _interruptBound = new WeakSet();
 
+// phone UI up to 768px, plus tablet portrait up to 1024px
+window.isMobileViewport = () =>
+    window.innerWidth <= 768 ||
+    (window.matchMedia('(orientation: portrait)').matches && window.innerWidth <= 1024);
+
 // pure JS lerp pump knobs; see directives/autoscroll.js for the full story
 window.AUTOSCROLL_DAMP ??= 0.1;
 window.AUTOSCROLL_PUMP_MS ??= 0;
@@ -141,7 +146,7 @@ UI_STORE = {
     async init() {
         // check if this is a phone
         this.windowWidth = window.innerWidth;
-        this.isMobile = window.innerWidth <= 768;
+        this.isMobile = window.isMobileViewport();
 
         // hide sidebar on mobile (in favor of a hamburger button)
         this.showSidebar = !this.isMobile;

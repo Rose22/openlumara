@@ -104,7 +104,7 @@
 }
 
 /* on phones the panel takes the whole screen instead of squeezing the chat */
-@media (max-width: 768px) {
+@media (max-width: 768px), (orientation: portrait) and (max-width: 1024px) {
     #html-preview-panel {
         position: fixed;
         top: 0;

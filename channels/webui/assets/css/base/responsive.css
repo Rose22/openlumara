@@ -20,8 +20,8 @@
  *  Layout Breakpoints
  *  ========================================================================== */
 
-/* === MOBILE (< 768px) === */
-@media (max-width: 768px) {
+/* === MOBILE (< 768px, plus tablet portrait) === */
+@media (max-width: 768px), (orientation: portrait) and (max-width: 1024px) {
     /* Viewport height — 100vh clips on mobile with address bars */
     html, body {
         height: 100dvh;
@@ -214,7 +214,7 @@
  *  Modals
  *  ========================================================================== */
 
-@media (max-width: 768px) {
+@media (max-width: 768px), (orientation: portrait) and (max-width: 1024px) {
     .modal {
         width: 100% !important;
         height: 100% !important;
@@ -240,7 +240,7 @@
 }
 
 /* Settings modal mobile layout */
-@media (max-width: 768px) {
+@media (max-width: 768px), (orientation: portrait) and (max-width: 1024px) {
     .settings-modal {
         .body {
             flex-direction: column;
