@@ -44,6 +44,19 @@
 
 {{ extension_slot("after_input") }}
 
+{% if config.get("enable_model_switcher") and config.get("enable_admin_settings") %}
+<div class="model-switcher" x-data="modelQuickSwitch()" x-show="!$store.ui.isMobile" x-cloak>
+    <select class="model-select" :value="currentModel" :disabled="saving"
+            @change="setModel($event.target.value)"
+            @focus="lazyFetch()"
+            title="Switch model">
+        <template x-for="model in options" :key="model">
+            <option :value="model" x-text="model"></option>
+        </template>
+    </select>
+</div>
+{% endif %}
+
 {% if config.get('enable_context_pill') %}
 {% include 'chat/context_pill.html' %}
 {% endif %}

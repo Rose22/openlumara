@@ -69,25 +69,52 @@ body:has(.sidebar-resizer:active) {
     overflow: hidden;
 }
 
-/* vertical tab strip. hidden by default; :has() reveals it the moment any
-   extension contributes a .sidebar-tab.ext - no extension, no tab bar,
-   sidebar behaves exactly like it always did */
 .sidebar-tabbar {
-    display: none;
+    display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
     flex: 0 0 38px;
     width: 38px;
     padding: 7px 0;
     box-sizing: border-box;
+    overflow: hidden;
+    background: var(--bg-primary);
+}
+
+.sidebar-tab-list {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
 }
 
-.sidebar-tabbar:has(.sidebar-tab.ext) {
+.sidebar-tab-list:has(.sidebar-tab.ext) {
     display: flex;
-    background: var(--bg-primary);
+}
+
+.sidebar-tabbar-footer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    margin-top: auto;
+    padding-top: 6px;
+    width: 100%;
+}
+
+.sidebar-tabbar-footer .sidebar-tab:hover {
+    background: var(--bg-secondary, rgba(255, 255, 255, 0.06));
+    color: var(--text-primary, #eee);
+    border-radius: 8px;
+    box-shadow: none;
+}
+
+.sidebar-tabbar-footer .sidebar-tab:active {
+    background: var(--button-bg, rgba(255, 255, 255, 0.1));
 }
 
 .sidebar-tab {
@@ -147,14 +174,36 @@ body:has(.sidebar-resizer:active) {
 
     .sidebar-tabbar {
         flex-direction: row;
+        align-items: stretch;
         flex: 0 0 50px;
         width: 100%;
         height: 50px;
         padding: 3px 7px;
         border-right: none;
         border-bottom: 1px solid var(--border-color);
+        overflow: hidden;
+    }
+
+    .sidebar-tab-list {
+        flex-direction: row;
+        align-items: stretch;
         overflow-x: auto;
         overflow-y: hidden;
+    }
+
+    .sidebar-tab-list:has(.sidebar-tab.ext) {
+        /* the scrollable tab row rides next to the fixed footer */
+        flex: 1;
+        min-width: 0;
+    }
+
+    .sidebar-tabbar-footer {
+        flex-direction: row;
+        margin-top: 0;
+        margin-left: auto;
+        padding-top: 0;
+        padding-left: 6px;
+        width: auto;
     }
 
     .sidebar-tab {
@@ -169,7 +218,7 @@ body:has(.sidebar-resizer:active) {
     .sidebar-close {
         position: absolute;
         top: 3px;
-        right: 7px;
+        right: 51px;
         z-index: 5;
         width: 44px;
         height: 44px;

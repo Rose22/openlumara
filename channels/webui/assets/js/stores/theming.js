@@ -1,5 +1,5 @@
 THEME_STORE = {
-    family: localStorage.getItem('themeFamily') || 'monochrome',
+    family: localStorage.getItem('themeFamily') || 'pro-oled',
     mode: localStorage.getItem('themeMode') || 'dark',
     themeCache: {},  // Cache for loaded theme data
     themeList: [],   // List of available theme families

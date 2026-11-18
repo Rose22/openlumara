@@ -98,29 +98,6 @@ class Webui(core.channel.Channel, ui_extensions.UiExtensionsMixin):
             "description": "Because logins are disabled, you need protection from outside intruders (think of this like a firewall). Specify a list of IP ranges that are allowed to request private data from the webui's API. Clients in these ranges get full access while those coming from outside your network are refused. Set it to just your LAN's range (such as `192.168.0.0/24`) to tighten it, or to [] to only ever allow the machine itself.",
             "depends": {"require_login": False}
         },
-        "enable_chat_header": {
-            "description": "Whether to enable the header at the top of a chat. Disabling this removes access to all graphical controls, and strips the interface down to a very basic chat. You might want this for public instances!",
-            "default": True
-        },
-        "enable_title": {
-            "default": True,
-            "description": "Whether to show a fancy title in the header",
-            "depends": "enable_chat_header"
-        },
-        "title": {
-            "default": "OpenLumara",
-            "depends": {"enable_chat_header": True, "enable_title": True}
-        },
-        "enable_model_switcher": {
-            "description": "Whether to show a model dropdown in the header, so you can quickly switch models without opening the settings. Disabled on mobile due to lack of space.",
-            "default": True,
-            "depends": "enable_chat_header",
-        },
-        "enable_streaming_state_display": {
-            "description": "Whether to show an indicator in the header that tells you what the AI is currently doing. Very useful! Disabled on mobile due to lack of space.",
-            "default": False,
-            "depends": "enable_chat_header",
-        },
         "enable_chain_expansion": {
             "description": "Whether the processing chain can be expanded to view the AI's thoughts and intermediate steps. When disabled, it stays locked in its collapsed state (showing only 'Processing..'/'Thinking..' labels), so you always see that the AI is busy without being able to peek inside. Very useful for public instances!",
             "default": True
@@ -128,6 +105,10 @@ class Webui(core.channel.Channel, ui_extensions.UiExtensionsMixin):
         "enable_context_pill": {
             "description": "Whether to show the context usage pill next to the message input.",
             "default": True
+        },
+        "dock_input_bar": {
+            "description": "Whether the input bar is docked to the bottom of the page (full width, no rounded corners) instead of floating as a rounded pill above it.",
+            "default": False
         },
         "enable_file_upload": {
             "description": "Whether to allow uploading files and pasting images into the chat",

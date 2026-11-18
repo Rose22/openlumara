@@ -1,8 +1,3 @@
-<!-- chat header -->
-{% if config.get('enable_chat_header') %}
-    {% include 'chat/header.html' %}
-{% endif %}
-
 {{ extension_slot("below_header") }}
 
 <template x-if="$store.ui.notice">
@@ -237,7 +232,7 @@
 {% endif %}
 
 <!-- input field -->
-<div id="input">
+<div id="input" {% if config.get('dock_input_bar') %}class="docked"{% endif %}>
     <!-- steering queue: messages sent while the AI is busy -->
     <template x-if="$store.stream.state !== 'idle' && $store.stream.queued.length > 0">
         <div class="steering-queue">

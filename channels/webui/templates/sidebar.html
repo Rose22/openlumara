@@ -44,20 +44,31 @@
         </svg>
     </button>
     <nav class="sidebar-tabbar" aria-label="Sidebar tabs">
-        <button type="button" class="sidebar-tab" data-tab=""
-            :class="{ 'active': sidebarTab === '' }"
-            title="Chats"
-            @click="setTab('')">
-            {% include 'svg/chat.svg' %}
-        </button>
-        {% for panel in extension_sidebars() %}
-        <button type="button" class="sidebar-tab ext" data-tab="{{ panel.module }}/{{ panel.name }}"
-            :class="{ 'active': sidebarTab === '{{ panel.module }}/{{ panel.name }}' }"
-            title="{{ panel.label }}"
-            @click="setTab('{{ panel.module }}/{{ panel.name }}')">
-            {{ panel.icon }}
-        </button>
-        {% endfor %}
+        <div class="sidebar-tab-list">
+            <button type="button" class="sidebar-tab" data-tab=""
+                :class="{ 'active': sidebarTab === '' }"
+                title="Chats"
+                @click="setTab('')">
+                {% include 'svg/chat.svg' %}
+            </button>
+            {% for panel in extension_sidebars() %}
+            <button type="button" class="sidebar-tab ext" data-tab="{{ panel.module }}/{{ panel.name }}"
+                :class="{ 'active': sidebarTab === '{{ panel.module }}/{{ panel.name }}' }"
+                title="{{ panel.label }}"
+                @click="setTab('{{ panel.module }}/{{ panel.name }}')">
+                {{ panel.icon }}
+            </button>
+            {% endfor %}
+        </div>
+
+        {% if config.get("enable_admin_settings") %}
+        <div class="sidebar-tabbar-footer">
+            <button type="button" class="sidebar-tab footer-btn" title="Settings"
+                @click="await $store.ui.openModal('settings')">
+                {% include 'svg/gear.svg' %}
+            </button>
+        </div>
+        {% endif %}
     </nav>
 
 <div id="chat-list" x-ref="chat-list" x-cloak x-show="sidebarTab === '' && ($store.ui.isMobile || !$store.ui.sidebarCollapsed)" x-data="{
