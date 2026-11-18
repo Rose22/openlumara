@@ -16,8 +16,16 @@
         <template x-if="setting.type === 'number'">
             <div class="row">
                 <label x-text="setting.title"></label>
-                <input type="number" :value="setting.value" :min="setting.min" :max="setting.max" :step="setting.step || 1" 
-                       @input="updateSetting(setting, parseFloat($event.target.value))">
+                <div class="number-input">
+                    <input type="number" x-ref="numberInput" :value="setting.value" :min="setting.min" :max="setting.max" :step="setting.step || 1"
+                           @input="updateSetting(setting, parseFloat($event.target.value))">
+                    <div class="number-stepper">
+                        <button type="button" :aria-label="'Increase ' + setting.title" :disabled="setting.max != null && setting.value >= setting.max"
+                                @click="$refs.numberInput.stepUp(); updateSetting(setting, $refs.numberInput.valueAsNumber)">&#9650;</button>
+                        <button type="button" :aria-label="'Decrease ' + setting.title" :disabled="setting.min != null && setting.value <= setting.min"
+                                @click="$refs.numberInput.stepDown(); updateSetting(setting, $refs.numberInput.valueAsNumber)">&#9660;</button>
+                    </div>
+                </div>
                 <span class="description" x-show="setting.description" x-html="renderMarkdown(setting.description)"></span>
             </div>
         </template>
