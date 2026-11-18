@@ -16,15 +16,24 @@ function mergeTurnPage(existing, existingStart, incoming, incomingStart) {
 
     const result = keptPrefix.concat(merged);
 
-    const tail = existing[existing.length - 1];
-    if (tail && tail.live === true) {
+    // exactly one live turn may exist, always as the tail: a mid-stream
+    // reload used to leave a stale copy behind (often at the head of the
+    // window), rendering a duplicate agent chain inside an older message
+    const liveTails = existing.filter(t => t && t.live === true);
+    const live = liveTails.length > 0 ? liveTails[liveTails.length - 1] : null;
+
+    for (let i = result.length - 1; i >= 0; i--) {
+        if (result[i] && result[i].live === true) result.splice(i, 1);
+    }
+
+    if (live) {
         let lastUser = -1;
         for (let i = result.length - 1; i >= 0; i--) {
             if (result[i].role === 'user') { lastUser = i; break; }
         }
 
         if (lastUser !== -1) result.length = lastUser + 1;
-        result.push(tail);
+        result.push(live);
     }
 
     return result;

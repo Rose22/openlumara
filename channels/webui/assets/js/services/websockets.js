@@ -168,15 +168,33 @@ async function handleWebSocketMessage(data) {
 
         case "turn_step":
         case "turn_final": {
-            // step-based stream
-            if (stream.turn.length <= 0) {
-                while (chat.turnHistory.length > 0 &&
-                       chat.turnHistory[chat.turnHistory.length - 1].role === 'assistant' &&
-                       chat.turnHistory[chat.turnHistory.length - 1].live !== true) {
-                    chat.turnHistory.pop();
-                }
+            // step-based stream. stream.turn is an object once a turn is
+            // in flight, so `.length` can never answer "do I own one?" -
+            // and a reconnect replay used to answer it wrong, creating a
+            // second live turn beside the one already in the window
+            const isLive = (t) => t && t.live === true;
 
-                stream.turn = {role: "assistant", live: true, steps: [], final_messages: []};
+            if (!isLive(stream.turn)) {
+                const last = chat.turnHistory[chat.turnHistory.length - 1];
+
+                if (isLive(last) && (last.steps ?? []).length > 0) {
+                    // a live turn already on screen (mid-stream reload or
+                    // replay after refresh): adopt it instead of cloning it
+                    stream.turn = last;
+                }
+                else {
+                    while (chat.turnHistory.length > 0 &&
+                           chat.turnHistory[chat.turnHistory.length - 1].role === 'assistant' &&
+                           !isLive(chat.turnHistory[chat.turnHistory.length - 1])) {
+                        chat.turnHistory.pop();
+                    }
+
+                    stream.turn = {role: "assistant", live: true, steps: [], final_messages: []};
+                    chat.turnHistory.push(stream.turn);
+                }
+            }
+            else if (!chat.turnHistory.includes(stream.turn)) {
+                // we own a live turn a chat reload dropped off the window
                 chat.turnHistory.push(stream.turn);
             }
 
@@ -251,7 +269,7 @@ async function handleWebSocketMessage(data) {
             // this is required for the stream not to bog down,
             // and it saves tremendously on network use
             const delta = data.delta;
-            if (!delta || stream.turn.length <= 0) break;
+            if (!delta || !stream.turn.steps) break;
 
             const step = stream.turn.steps.find(s => s.step === delta.step);
             if (!step) break;
@@ -283,7 +301,7 @@ async function handleWebSocketMessage(data) {
 
         case "turn_final_delta": {
             const delta = data.delta;
-            if (!delta || stream.turn.length <= 0) break;
+            if (!delta || !stream.turn.final_messages) break;
 
             const finals = stream.turn.final_messages;
             const last = finals && finals[finals.length - 1];
