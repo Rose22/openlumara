@@ -54,17 +54,26 @@
             <!-- user turn (always one message) -->
             <template x-if="turn.role === 'user'">
                 <div class="message-wrapper user" x-data="{ get message() { return turn.messages[0] } }">
+                    {% set user_view = (extension_slot("user_turn_view") | string).strip().splitlines() %}
+                    {% if user_view %}
+                    {% include user_view[0] %}
+                    {% else %}
                     <div class="message user">
                         {% include 'chat/turns/user.html' %}
                         <div x-data="{ get targetIndex() { return turn.first_message_index } }" class="fullwidth">
                         </div>
                     </div>
+                    {% endif %}
                     {% include 'chat/message_buttons.html' %}
                 </div>
             </template>
 
             <template x-if="turn.live === true">
                 <div class="message-wrapper assistant">
+                    {% set turn_view = (extension_slot("live_turn_view") | string).strip().splitlines() %}
+                    {% if turn_view %}
+                    {% include turn_view[0] %}
+                    {% else %}
                     <div class="message assistant"
                          x-data="{
                              {% if config.get('enable_chain_expansion') %}
@@ -133,12 +142,17 @@
                             {% include 'chat/turns/assistant_stream.html' %}
                         </template>
                     </div>
+                    {% endif %}
                 </div>
             </template>
 
             <!-- assistant turn (multiple messages combined into one bubble) -->
             <template x-if="turn.role === 'assistant' && !turn.live">
                 <div class="message-wrapper assistant">
+                    {% set history_view = (extension_slot("history_turn_view") | string).strip().splitlines() %}
+                    {% if history_view %}
+                    {% include history_view[0] %}
+                    {% else %}
                     <div class="message assistant">
                         <template x-if="(turn.steps ?? []).length > 0">
                             <div class="agent-chain" x-data="{ collapsed: true, mounted: false,
@@ -204,6 +218,7 @@
                             {% include 'chat/turns/assistant_history.html' %}
                         </template>
                     </div>
+                    {% endif %}
 
                     <div x-data="{ get targetIndex() { return turn.last_message_index } }" class="fullwidth">
                         {% include 'chat/message_buttons.html' %}
