@@ -102,13 +102,18 @@ class Webui(core.channel.Channel, ui_extensions.UiExtensionsMixin):
             "description": "Whether the processing chain can be expanded to view the AI's thoughts and intermediate steps. When disabled, it stays locked in its collapsed state (showing only 'Processing..'/'Thinking..' labels), so you always see that the AI is busy without being able to peek inside. Very useful for public instances!",
             "default": True
         },
+        "dock_input_bar": {
+            "description": "Whether the input bar is docked to the bottom of the page (full width, no rounded corners) instead of floating as a rounded pill above it.",
+            "default": False
+        },
         "enable_context_pill": {
             "description": "Whether to show the context usage pill next to the message input.",
             "default": True
         },
-        "dock_input_bar": {
-            "description": "Whether the input bar is docked to the bottom of the page (full width, no rounded corners) instead of floating as a rounded pill above it.",
-            "default": False
+        "enable_model_switcher": {
+            "description": "Whether to show a model dropdown in the input bar, so you can quickly switch models without opening the settings. Disabled on mobile due to lack of space.",
+            "default": True,
+            "depends": "enable_chat_header",
         },
         "enable_file_upload": {
             "description": "Whether to allow uploading files and pasting images into the chat",
