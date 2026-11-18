@@ -50,14 +50,15 @@
             {% endfor %}
         </div>
 
-        {% if config.get("enable_admin_settings") %}
         <div class="sidebar-tabbar-footer">
-            <button type="button" class="sidebar-tab footer-btn" title="Settings"
-                @click="await $store.ui.openModal('settings')">
-                {% include 'svg/gear.svg' %}
-            </button>
+            {{ extension_slot('sidebar_bottom') }}
+            {% if config.get("enable_admin_settings") %}
+                <button type="button" class="sidebar-tab footer-btn" title="Settings"
+                    @click="await $store.ui.openModal('settings')">
+                    {% include 'svg/gear.svg' %}
+                </button>
+            {% endif %}
         </div>
-        {% endif %}
     </nav>
 
 <div id="chat-list" x-ref="chat-list" x-cloak x-show="sidebarTab === '' && ($store.ui.isMobile || !$store.ui.sidebarCollapsed)" x-data="{
