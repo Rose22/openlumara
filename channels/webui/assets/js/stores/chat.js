@@ -693,6 +693,10 @@ CHAT_STORE = {
 
         await this.reloadChats();
         await this.reloadChat();
+
+        if (!Alpine.store('ui').isMobile) {
+            document.getElementById('user-input')?.focus();
+        }
     },
 
     async renameChat(chat_id, newTitle) {
