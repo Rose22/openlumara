@@ -76,7 +76,11 @@
         max-height: 60vh;
         overflow-y: auto;
         overscroll-behavior: contain;
-        scrollbar-width: thin;
+        scrollbar-width: none;
+
+        &::-webkit-scrollbar {
+            display: none;
+        }
     }
 
     /* content-visibility skips rendering for stations outside the viewport

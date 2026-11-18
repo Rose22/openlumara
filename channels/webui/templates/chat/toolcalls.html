@@ -5,9 +5,11 @@
         <div>
             <div class="tool-calls-container"
                  x-data="{
-                     manual: null,
+                     // null = follow the automatic behaviour, true/false = the
+                     // user opened/closed this card themselves
+                     userOpen: null,
                      get collapsed() {
-                         if (this.manual !== null) return this.manual;
+                         if (this.userOpen !== null) return !this.userOpen;
                          {% if toolcard_in_step %}
                          if ($store.stream.state === 'idle') return toolIdx > 0;
                          {% else %}
@@ -15,7 +17,7 @@
                          {% endif %}
                          return !!(tool._metadata?.response);
                      },
-                     toggle() { this.manual = !this.collapsed },
+                     toggle() { this.userOpen = this.collapsed },
                      cacheKey: tool.id ?? ({{ scope }}.tool_call_id + ':' + toolIdx)
                  }"
             >
@@ -23,7 +25,7 @@
                     <div class="node-dot" :class="{expanded: !collapsed}" @click.stop="toggle()">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"></polyline></svg>
                     </div>
-                    <div class="header" @click="collapsed = !collapsed">
+                    <div class="header" @click="toggle()">
                         <svg class="card-chevron" :class="{'expanded': !collapsed}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 6 15 12 9 18"></polyline></svg>
                         {% include 'svg/wrench.svg' %}
                         <span class="name" x-show="toolDisplayName(tool)">
@@ -55,7 +57,7 @@
                             <!-- the response only ever renders in a card the user
                                  opened deliberately: streamed results must never
                                  paint before the auto-collapse lands -->
-                            <template x-if="tool._metadata?.response && (manual === true || $store.stream.state === 'idle')">
+                            <template x-if="tool._metadata?.response && (userOpen === true || $store.stream.state === 'idle')">
                                 <div class="response-row" x-data="{
                                          get parsed() {
                                             try {
