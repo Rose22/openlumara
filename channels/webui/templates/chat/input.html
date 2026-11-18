@@ -81,9 +81,7 @@
 >{% include 'svg/send.svg' %}</button>
 
 <button id="stop" aria-label="Stop generation" x-show="$store.stream.state != 'idle'" x-cloak @click="
-await simpleSocketSend({
-    'type': 'stop'
-})
+await stopActiveStream()
 ">
     {% include 'svg/stop.svg' %}
     <!--

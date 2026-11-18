@@ -41,6 +41,8 @@
         only a window of the chat is loaded (see $store.chat.turnStart).
     -->
     <div class="older-turns" x-show="$store.chat.hasMoreOlder" x-cloak
+         x-intersect:enter.parent.margin.300px.0px.0px.0px="$store.chat.loadOlderTurnsFromIntersect()"
+         x-intersect:leave.parent="$store.chat.olderTurnsLeftIntersect()"
          @click="$store.chat.loadOlderTurns()">
         <span class="older-spinner" x-show="$store.chat.loadingOlder"></span>
         <span x-text="$store.chat.loadingOlder ? 'Loading older messages..' : 'Older messages'"></span>
@@ -61,6 +63,8 @@
             </template>
 
             <div class="fullwidth turn" :data-turn-index="turnIndex"
+                 x-intersect:leave="$store.chat.scheduleUnloadCheck()"
+                 x-intersect:enter="$store.chat.scheduleUnloadCheck()"
                  :class="{ 'prompt-pinned': $store.chat.pinnedTurnIndex === turnIndex }"
                  :style="($store.chat.pinnedTurnIndex === turnIndex || $store.chat.releasingTurnIndex === turnIndex) ? 'min-height: ' + $store.chat.pinnedPromptHeight + 'px' : ''">
 

@@ -46,6 +46,10 @@ function repoManager(kind) {
             await this.refresh();
         },
 
+        destroy() {
+            this.stopCloneProgress();
+        },
+
         async refresh() {
             this.loading = true;
             try {

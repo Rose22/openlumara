@@ -14,9 +14,40 @@
 */
 function fadeTextRender(el, { expression }, { evaluateLater, effect, cleanup }, asHtml = false) {
     const timeline = new TailFadeTimeline();
+    const exactMax = 65536;
     let lastValue = null;
+    let lastLen = -1;
+    let lastHash = -1;
     let pending = null;
     let rafId = null;
+
+    const hashValue = (value) => {
+        let h = 2166136261;
+        for (let i = 0; i < value.length; i++) {
+            h ^= value.charCodeAt(i);
+            h = Math.imul(h, 16777619) >>> 0;
+        }
+        return h;
+    };
+
+    const matchesLast = (value) => {
+        if (value === lastValue) return true;
+        if (lastLen !== value.length) return false;
+        if (lastLen <= exactMax) return false;
+        if (lastHash === -1) return false;
+        return hashValue(value) === lastHash;
+    };
+
+    const noteValue = (value) => {
+        lastLen = value.length;
+        if (value.length <= exactMax) {
+            lastValue = value;
+            lastHash = -1;
+        } else {
+            lastValue = null;
+            lastHash = hashValue(value);
+        }
+    };
 
     const frame = () => {
         rafId = null;
@@ -60,15 +91,20 @@ function fadeTextRender(el, { expression }, { evaluateLater, effect, cleanup }, 
 
     cleanup(() => {
         if (rafId) cancelAnimationFrame(rafId);
+        rafId = null;
+        pending = null;
+        lastValue = null;
+        lastLen = -1;
+        lastHash = -1;
     });
 
     const getData = evaluateLater(expression);
 
     effect(() => {
         getData((value) => {
-            value = value ?? '';
-            if (value === lastValue) return;
-            lastValue = value;
+            value = String(value ?? '');
+            if (matchesLast(value)) return;
+            noteValue(value);
             pending = value;
 
             if (rafId === null) rafId = requestAnimationFrame(frame);

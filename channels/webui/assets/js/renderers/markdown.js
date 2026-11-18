@@ -1,9 +1,41 @@
 // create a temporary div that gets used to syntax highlight
 const _tempHighlightDiv = document.createElement('div');
 
-// cache of highlighted code blocks, keyed by language + code content.
-// keeps live-streaming re-renders cheap (only the growing block re-highlights).
 const _hlCache = new Map();
+let _hlCacheBytes = 0;
+const _HL_CACHE_MAX_BYTES = 8 * 1024 * 1024;
+
+function _hlCacheEntrySize(key, value) {
+    return key.length + String(value || '').length;
+}
+
+function _hlCacheGet(key) {
+    if (!_hlCache.has(key)) return undefined;
+    const value = _hlCache.get(key);
+    _hlCache.delete(key);
+    _hlCache.set(key, value);
+    return value;
+}
+
+function _hlCacheSet(key, value) {
+    if (_hlCache.has(key)) {
+        _hlCacheBytes -= _hlCacheEntrySize(key, _hlCache.get(key));
+        _hlCache.delete(key);
+    }
+
+    const size = _hlCacheEntrySize(key, value);
+    if (size > _HL_CACHE_MAX_BYTES) return;
+
+    while (_hlCache.size > 0 && _hlCacheBytes + size > _HL_CACHE_MAX_BYTES) {
+        const oldestKey = _hlCache.keys().next().value;
+        const oldest = _hlCache.get(oldestKey);
+        _hlCacheBytes -= _hlCacheEntrySize(oldestKey, oldest);
+        _hlCache.delete(oldestKey);
+    }
+
+    _hlCache.set(key, value);
+    _hlCacheBytes += size;
+}
 
 // fence languages that always get the HTML preview button
 const _HTML_LANGS = new Set(['html', 'htm', 'xml', 'xhtml', 'svg', 'vue']);
@@ -61,15 +93,13 @@ function renderMarkdown(text, live = false) {
             // final state gets cached on the final (live=false) render.
             const cacheable = !(live && i === blocks.length - 1);
 
-            let highlighted = cacheable ? _hlCache.get(key) : undefined;
+            let highlighted = cacheable ? _hlCacheGet(key) : undefined;
             if (highlighted === undefined) {
                 highlighted = (lang && hljs.getLanguage(lang))
                     ? hljs.highlight(code, { language: lang }).value
                     : hljs.highlightAuto(code).value;
 
-                // simple bound so a long session can't grow it forever
-                if (_hlCache.size > 400) _hlCache.clear();
-                if (cacheable) _hlCache.set(key, highlighted);
+                if (cacheable) _hlCacheSet(key, highlighted);
             }
 
             block.innerHTML = highlighted;
@@ -96,7 +126,9 @@ function renderMarkdown(text, live = false) {
         pre.insertAdjacentHTML('afterbegin', `<div class="code-actions">${buttons}</div>`);
     });
 
-    return _tempHighlightDiv.innerHTML;
+    const out = _tempHighlightDiv.innerHTML;
+    _tempHighlightDiv.innerHTML = '';
+    return out;
 }
 
 // cache of rendered markdown, keyed by the message object itself.
@@ -131,7 +163,9 @@ function renderMarkdownFor(message, live, raw) {
     // and the directive throttles live paints to ~8fps.
     const html = raw ? escapeHtml(content) : renderMarkdown(content, Boolean(live));
 
-    if (!live && content) _mdCache.set(message, { source: content, html, raw: Boolean(raw) });
+    if (!live && content && html.length <= 2 * 1024 * 1024) {
+        _mdCache.set(message, { source: content, html, raw: Boolean(raw) });
+    }
 
     return html;
 }

@@ -18,17 +18,15 @@
  * was pure overhead.
  */
 function markdownRender(el, { expression }, { evaluateLater, effect, cleanup }) {
-    let lastHtml = null;
+    let paintedMessage = null;
+    let paintedLive = null;
+    let paintedRaw = null;
+    let paintedLen = -1;
 
-    // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-15) status:reviewed
-    // streaming garbage control: each token carries the FULL accumulated
-    // content, so intermediate renders are redundant - only the newest one
-    // matters. live paints are coalesced per animation frame instead of per
-    // token: on a 120hz display that's a 120fps ceiling, since paints
-    // beyond one per frame cannot be seen and are pure garbage. the final
-    // (live=false) render is immediate.
     let pendingHtml = null;
     let pendingLen = 0;
+    let pendingMessage = null;
+    let pendingRaw = false;
     let rafId = null;
 
     // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-16) status:reviewed
@@ -39,9 +37,14 @@ function markdownRender(el, { expression }, { evaluateLater, effect, cleanup }) 
     const timeline = new TailFadeTimeline();
     let lastLen = 0;
 
-    const paint = (html, batches) => {
-        if (html === lastHtml) return;
-        lastHtml = html;
+    const paint = (html, batches, message, live, raw) => {
+        const len = message && message.content ? message.content.length : 0;
+        if (paintedMessage === message && paintedLive === live && paintedRaw === raw && paintedLen === len) return;
+
+        paintedMessage = message;
+        paintedLive = live;
+        paintedRaw = raw;
+        paintedLen = len;
 
         Alpine.mutateDom(() => {
             el.innerHTML = html;
@@ -58,6 +61,10 @@ function markdownRender(el, { expression }, { evaluateLater, effect, cleanup }) 
 
     cleanup(() => {
         if (rafId) cancelAnimationFrame(rafId);
+        rafId = null;
+        pendingHtml = null;
+        pendingMessage = null;
+        paintedMessage = null;
     });
 
     const getData = evaluateLater(expression);
@@ -79,13 +86,18 @@ function markdownRender(el, { expression }, { evaluateLater, effect, cleanup }) 
                 // timeline sample for the fade continuation logic.
                 pendingHtml = renderMarkdownFor(data.message, true, raw);
                 pendingLen = (data.message.content || '').length;
+                pendingMessage = data.message;
+                pendingRaw = raw;
 
                 if (rafId === null) {
                     rafId = requestAnimationFrame(() => {
                         rafId = null;
                         const latest = pendingHtml;
                         const latestLen = pendingLen;
+                        const latestMessage = pendingMessage;
+                        const latestRaw = pendingRaw;
                         pendingHtml = null;
+                        pendingMessage = null;
                         if (latest === null) return;
 
                         const now = performance.now();
@@ -94,7 +106,7 @@ function markdownRender(el, { expression }, { evaluateLater, effect, cleanup }) 
                         if (latestLen < lastLen) timeline.reset();
                         lastLen = latestLen;
 
-                        paint(latest, timeline.record(latestLen, now));
+                        paint(latest, timeline.record(latestLen, now), latestMessage, true, latestRaw);
                     });
                 }
                 return;
@@ -102,10 +114,15 @@ function markdownRender(el, { expression }, { evaluateLater, effect, cleanup }) 
 
             // final render: cancel any pending frame paint and replace it
             // immediately with the definitive (cached) version
-            if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null; pendingHtml = null; pendingLen = 0; }
+            if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null; pendingHtml = null; pendingLen = 0; pendingMessage = null; }
+
+            const finalLen = (data.message.content || '').length;
+            if (paintedMessage === data.message && paintedLive === false &&
+                paintedRaw === raw && paintedLen === finalLen) return;
+
             timeline.reset();
-            lastLen = (data.message.content || '').length;
-            paint(renderMarkdownFor(data.message, false, raw));
+            lastLen = finalLen;
+            paint(renderMarkdownFor(data.message, false, raw), [], data.message, false, raw);
         });
     });
 }

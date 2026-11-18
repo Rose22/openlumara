@@ -79,7 +79,6 @@ UI_STORE = {
     _pumpScrollToBottom(el) {
         if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
             this._stopPump();
-            // instant: global scroll-behavior:smooth would animate this jump
             el.scrollTo({ top: el.scrollHeight, behavior: 'instant' });
             return;
         }
@@ -115,28 +114,60 @@ UI_STORE = {
     sidebarResizing: false,
 
     startSidebarResize(e) {
+        if (this._sidebarDrag) {
+            e.preventDefault();
+            return;
+        }
+
         e.preventDefault();
         this.sidebarResizing = true;
 
         const startX = e.clientX;
         const startWidth = this.sidebarWidth;
+        const pointerId = e.pointerId;
+        const target = e.currentTarget || e.target;
+
+        try {
+            target.setPointerCapture(pointerId);
+        } catch (err) {}
 
         const onMove = (ev) => {
+            if (ev.pointerId !== undefined && ev.pointerId !== pointerId) return;
             this.sidebarWidth = Math.min(560, Math.max(220, startWidth + ev.clientX - startX));
         };
 
-        const onUp = () => {
+        let ended = false;
+        const onEnd = (ev) => {
+            if (ev && ev.pointerId !== undefined && ev.pointerId !== pointerId) return;
+            if (ended) return;
+
+            ended = true;
             this.sidebarResizing = false;
+            this._sidebarDrag = null;
             localStorage.setItem('sidebarWidth', String(this.sidebarWidth));
+
             window.removeEventListener('pointermove', onMove);
-            window.removeEventListener('pointerup', onUp);
+            window.removeEventListener('pointerup', onEnd);
+            window.removeEventListener('pointercancel', onEnd);
+            window.removeEventListener('blur', onEnd);
+            if (target) target.removeEventListener('lostpointercapture', onEnd);
+
+            try {
+                if (target.hasPointerCapture(pointerId)) target.releasePointerCapture(pointerId);
+            } catch (err) {}
         };
 
+        this._sidebarDrag = { pointerId, cleanup: onEnd };
+
         window.addEventListener('pointermove', onMove);
-        window.addEventListener('pointerup', onUp);
+        window.addEventListener('pointerup', onEnd);
+        window.addEventListener('pointercancel', onEnd);
+        window.addEventListener('blur', onEnd);
+        if (target) target.addEventListener('lostpointercapture', onEnd);
     },
 
     resetSidebarWidth() {
+        if (this._sidebarDrag) this._sidebarDrag.cleanup();
         this.sidebarWidth = 288;
         localStorage.setItem('sidebarWidth', '288');
     },
@@ -156,10 +187,11 @@ UI_STORE = {
 
         this.expandReasoning = localStorage.getItem("expandReasoning") !== 'false';
 
-        window.addEventListener('resize', () => Alpine.store('chat').maybeLoadOlder());
+
     },
 
     async toggleSidebar() {
+        if (this._sidebarDrag) this._sidebarDrag.cleanup();
         this.showSidebar = !this.showSidebar;
     },
 
@@ -197,8 +229,6 @@ UI_STORE = {
     onScroll(containerId = 'messages') {
         const el = document.getElementById(containerId);
         if (!el) return;
-
-        Alpine.store('chat').maybeLoadOlder(el);
 
         if (this._suppressScroll) return;
 

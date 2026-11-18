@@ -96,8 +96,9 @@ async function connectWebSocket() {
             }
             notice += " [" + event.code + (event.reason ? ' - ' + event.reason : '') + "]";
             Alpine.store('ui').notice = notice;
-            stream = Alpine.store("stream")
-            stream.state = 'idle';
+            const stream = Alpine.store('stream');
+            releaseLiveTurn();
+            await stream.clear(true);
 
             await scheduleWsReconnect();
         }
@@ -115,6 +116,24 @@ async function scheduleWsReconnect() {
     setTimeout(function () {
         connectWebSocket();
     }, 1000);
+}
+
+async function stopActiveStream() {
+    const sent = await simpleSocketSend({ type: 'stop' });
+    AudioManager.stopProcessingSound();
+    Alpine.store('stream').state = 'idle';
+    return sent;
+}
+
+function releaseLiveTurn() {
+    const stream = Alpine.store('stream');
+    const chat = Alpine.store('chat');
+    const turn = stream.turn;
+
+    if (turn && turn.live === true) {
+        const idx = chat.turnHistory.indexOf(turn);
+        if (idx >= 0) chat.turnHistory.splice(idx, 1);
+    }
 }
 
 async function handleWebSocketMessage(data) {
@@ -399,8 +418,10 @@ async function handleWebSocketMessage(data) {
             // process tokens based on their type
             switch (token_type) {
                 case "error":
+                    AudioManager.stopProcessingSound();
                     stream.modelLoad = null;
-                    // restore the user's last input
+                    releaseLiveTurn();
+                    await stream.clear(true);
                     if (!chat.user_input && chat.last_user_input) {
                         chat.user_input = chat.last_user_input;
                     }

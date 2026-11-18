@@ -75,10 +75,22 @@
         return m.name || m.prompt || "generated image";
     };
 
+    function sdPruneUnknownSeen(now) {
+        var keys = Object.keys(unknownSeen);
+        for (var i = 0; i < keys.length; i++) {
+            if (now - unknownSeen[keys[i]] > 60000) delete unknownSeen[keys[i]];
+        }
+
+        keys = Object.keys(unknownSeen);
+        if (keys.length <= 200) return;
+
+        keys.sort(function (a, b) { return unknownSeen[a] - unknownSeen[b]; });
+        for (var j = 0; j < keys.length - 200; j++) delete unknownSeen[keys[j]];
+    }
+
     function sdNoteUnknown(token) {
-        // a token the (fresh) map does not hold: the map may simply predate
-        // the generation - refetch, debounced across a whole passage
         var now = Date.now();
+        sdPruneUnknownSeen(now);
         if (unknownSeen[token] && now - unknownSeen[token] < 4000) return;
         unknownSeen[token] = now;
         setTimeout(sdLoadMap, 1200);
@@ -438,7 +450,7 @@
                 sdFillImgs();
                 scheduleLift();
             }, 80);
-        }).observe(messages, { childList: true, subtree: true, characterData: true });
+        }).observe(messages, { childList: true, subtree: true });
         sdLoadMap();
     }
     if (document.readyState === "loading") {

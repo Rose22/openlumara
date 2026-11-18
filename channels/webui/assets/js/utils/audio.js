@@ -315,15 +315,16 @@ const AudioManager = {
                 osc.type = 'sine';
                 osc.frequency.value = freq;
 
-                // the shared lpf is pre-connected to master inside getSynthLPF(),
-                // so the per-call lpf.connect(master) here is removed.
                 osc.connect(gain);
                 gain.connect(lpf);
 
-                // 3ms attack for a rounder, less clicky onset
                 gain.gain.setValueAtTime(0, startTime);
                 gain.gain.linearRampToValueAtTime(vol * volScale, startTime + 0.003);
                 gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.003 + decay);
+
+                osc.onended = () => {
+                    try { osc.disconnect(); gain.disconnect(); } catch (e) {}
+                };
 
                 osc.start(startTime);
                 osc.stop(startTime + 0.003 + decay + 0.05);
@@ -339,15 +340,18 @@ const AudioManager = {
                 osc.frequency.value = cfg.freq * freqMultiplier;
                 panner.pan.value = pan;
 
-                // lpf pre-connected to master in getSynthLPF()
                 osc.connect(gain);
                 gain.connect(panner);
                 panner.connect(lpf);
 
                 const t2 = t + delay;
                 gain.gain.setValueAtTime(0, t2);
-                gain.gain.linearRampToValueAtTime(vol * volScale, t2 + 0.003); // 3ms attack
+                gain.gain.linearRampToValueAtTime(vol * volScale, t2 + 0.003);
                 gain.gain.exponentialRampToValueAtTime(0.001, t2 + 0.003 + 0.25);
+
+                osc.onended = () => {
+                    try { osc.disconnect(); gain.disconnect(); panner.disconnect(); } catch (e) {}
+                };
 
                 osc.start(t2);
                 osc.stop(t2 + 0.3);
@@ -384,6 +388,12 @@ const AudioManager = {
                 osc2.connect(gain);
                 gain.connect(master);
 
+                const cleanupToken = () => {
+                    try { osc1.disconnect(); osc2.disconnect(); gain.disconnect(); } catch (e) {}
+                };
+                osc1.onended = cleanupToken;
+                osc2.onended = cleanupToken;
+
                 osc1.start(t);
                 osc2.start(t);
                 osc1.stop(t + 0.085);
@@ -406,6 +416,10 @@ const AudioManager = {
 
                 osc.connect(gain);
                 gain.connect(lpf);
+
+                osc.onended = () => {
+                    try { osc.disconnect(); gain.disconnect(); } catch (e) {}
+                };
 
                 osc.start(t);
 
@@ -479,6 +493,10 @@ const AudioManager = {
                 // This avoids creating a new GainNode on every keystroke.
                 source.connect(this.masterGainNode);
 
+                source.onended = () => {
+                    try { source.disconnect(); } catch (e) {}
+                };
+
                 source.start(0);
             } catch (e) {
                 console.warn('Error playing sound:', e);
@@ -497,63 +515,63 @@ const AudioManager = {
         this.resumeContext();
 
         if (this.buffers['processing']) {
-            // --- PLAY SOUND FILE ---
             const ctx = this.getAudioContext();
             const source = ctx.createBufferSource();
-            source.buffer = this.buffers['processing']; // Use your loaded file
+            source.buffer = this.buffers['processing'];
             source.connect(this.masterGainNode);
-            source.start();
 
-            this.processingSound = {
-                stop: () => {
-                    try { source.stop(); } catch(e) {} // Stop immediately
+            const finish = () => {
+                try { source.disconnect(); } catch (e) {}
+                if (this.processingSound && this.processingSound.source === source) {
                     this.processingSound = null;
                 }
             };
-        } else {
-            // --- FALLBACK TO SYNTH (Optional) ---
-            // Plays soft, intermittent waiting tones
-            const ctx = this.getAudioContext();
 
-            // reuse the cached reverb chain
+            source.onended = finish;
+            source.start();
+
+            this.processingSound = {
+                source,
+                stop: () => {
+                    try { source.stop(); } catch (e) {}
+                    finish();
+                }
+            };
+        } else {
+            if (this.toneTimer) clearTimeout(this.toneTimer);
+            this.toneTimer = null;
+
+            const ctx = this.getAudioContext();
             const chain = this.getProcessingChain(ctx);
             const masterFilter = chain.masterFilter;
-
-            // Single frequency
             const baseFrequency = 196.00;
 
-            // if a previous stop() muted the cached chain to kill the reverb
-            // tail, reconnect it before scheduling new tones
             if (chain.muted) {
                 chain.convolver.connect(this.masterGainNode);
                 chain.muted = false;
             }
 
-            // --- TRACK START TIME ---
             this.processingStartTime = ctx.currentTime;
             let isPlaying = true;
             let activeOsc = null;
             let activeGain = null;
 
             const playSoftTone = () => {
+                this.toneTimer = null;
                 if (!isPlaying) return;
 
-                // Check if total processing time is less than 0.5s
                 const elapsed = ctx.currentTime - this.processingStartTime;
                 if (elapsed < 0.5) {
-                    // Wait and check again (prevents playing sound for very short requests)
                     this.toneTimer = setTimeout(playSoftTone, 100);
                     return;
                 }
 
-                // --- PLAY THE TONE ---
                 const osc = ctx.createOscillator();
                 const gain = ctx.createGain();
 
                 osc.type = 'sine';
                 osc.frequency.value = baseFrequency;
 
-                // Soft attack and release (shorter than delay for clean separation)
                 const now = ctx.currentTime;
                 gain.gain.setValueAtTime(0, now);
                 gain.gain.linearRampToValueAtTime(0.12, now + 0.05);
@@ -562,45 +580,53 @@ const AudioManager = {
                 osc.connect(gain);
                 gain.connect(masterFilter);
 
-                osc.start(now);
-                osc.stop(now + 1.5);
+                osc.onended = () => {
+                    try { osc.disconnect(); gain.disconnect(); } catch (e) {}
+                    if (activeOsc === osc) {
+                        activeOsc = null;
+                        activeGain = null;
+                    }
+                };
 
                 activeOsc = osc;
                 activeGain = gain;
-                osc.onended = () => {
-                    if (activeOsc === osc) { activeOsc = null; activeGain = null; }
-                };
 
-                // Fixed 2 second delay for the next tone
-                const delay = 2000;
-                this.toneTimer = setTimeout(playSoftTone, delay);
+                osc.start(now);
+                osc.stop(now + 1.5);
+
+                this.toneTimer = setTimeout(playSoftTone, 2000);
             };
 
-            // Start the first tone (it will internally wait if < 0.2s elapsed)
             playSoftTone();
 
             this.processingSound = {
                 stop: () => {
                     isPlaying = false;
                     if (this.toneTimer) clearTimeout(this.toneTimer);
+                    this.toneTimer = null;
 
                     if (activeOsc) {
-                        try {
-                            const now = ctx.currentTime;
-                            // fade out over 20ms to avoid a click, then stop
-                            if (activeGain) {
-                                activeGain.gain.cancelScheduledValues(now);
-                                activeGain.gain.setValueAtTime(activeGain.gain.value, now);
-                                activeGain.gain.linearRampToValueAtTime(0, now + 0.02);
-                            }
-                            activeOsc.onended = null;
-                            activeOsc.stop(now + 0.02);
-                        } catch(e) {}
+                        const node = activeOsc;
+                        const gain = activeGain;
                         activeOsc = null;
                         activeGain = null;
+
+                        try {
+                            const now = ctx.currentTime;
+                            if (gain) {
+                                gain.gain.cancelScheduledValues(now);
+                                gain.gain.setValueAtTime(gain.gain.value, now);
+                                gain.gain.linearRampToValueAtTime(0, now + 0.02);
+                            }
+                            node.onended = () => {
+                                try { node.disconnect(); gain.disconnect(); } catch (e) {}
+                            };
+                            node.stop(now + 0.02);
+                        } catch (e) {
+                            try { node.disconnect(); gain.disconnect(); } catch (e2) {}
+                        }
                     }
 
-                    // cut the reverb tail by disconnecting the chain from output
                     if (!chain.muted) {
                         try { chain.convolver.disconnect(); } catch(e) {}
                         chain.muted = true;
@@ -613,6 +639,10 @@ const AudioManager = {
     },
 
     stopProcessingSound: function() {
+        if (this.toneTimer) {
+            clearTimeout(this.toneTimer);
+            this.toneTimer = null;
+        }
         if (this.processingSound) {
             this.processingSound.stop();
         }

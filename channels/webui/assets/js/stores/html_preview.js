@@ -118,6 +118,7 @@ HTML_PREVIEW_STORE = {
     },
 
     close() {
+        if (this._resizeDrag) this._resizeDrag.cleanup();
         this.open = false;
         this.html = '';
     },
@@ -138,18 +139,53 @@ HTML_PREVIEW_STORE = {
 
     // drag the handle on the panel's left edge to resize
     startResize(e) {
+        if (this._resizeDrag) {
+            e.preventDefault();
+            return;
+        }
+
         e.preventDefault();
 
-        const move = (ev) => this._setWidth(window.innerWidth - ev.clientX);
-        const stop = () => {
+        const pointerId = e.pointerId;
+        const target = e.currentTarget || e.target;
+
+        try {
+            target.setPointerCapture(pointerId);
+        } catch (err) {}
+
+        const move = (ev) => {
+            if (ev.pointerId !== undefined && ev.pointerId !== pointerId) return;
+            this._setWidth(window.innerWidth - ev.clientX);
+        };
+
+        let ended = false;
+        const stop = (ev) => {
+            if (ev && ev.pointerId !== undefined && ev.pointerId !== pointerId) return;
+            if (ended) return;
+
+            ended = true;
+            this._resizeDrag = null;
+
             window.removeEventListener('pointermove', move);
             window.removeEventListener('pointerup', stop);
+            window.removeEventListener('pointercancel', stop);
+            window.removeEventListener('blur', stop);
+            if (target) target.removeEventListener('lostpointercapture', stop);
             document.body.style.userSelect = '';
+
+            try {
+                if (target.hasPointerCapture(pointerId)) target.releasePointerCapture(pointerId);
+            } catch (err) {}
         };
+
+        this._resizeDrag = { pointerId, cleanup: stop };
 
         document.body.style.userSelect = 'none';
         window.addEventListener('pointermove', move);
         window.addEventListener('pointerup', stop);
+        window.addEventListener('pointercancel', stop);
+        window.addEventListener('blur', stop);
+        if (target) target.addEventListener('lostpointercapture', stop);
     },
 
     _setWidth(px) {

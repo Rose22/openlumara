@@ -885,6 +885,7 @@ const CODER_PANEL = {
 
         if (this.expanded[row.path]) {
             delete this.expanded[row.path];
+            delete this.children[row.path];
         } else {
             this.expanded[row.path] = true;
         }
@@ -1735,14 +1736,15 @@ const CODER_PANEL = {
 
     quickOpenFile(path) {
         Alpine.store("ui").closeModal();
+        this.quick.files = [];
+        this.quick.filesLoadedFor = "";
         this.openFile({ path });
     },
 
     closeQuick() {
         Alpine.store("ui").closeModal();
-        // -- AI GENERATED CODE (Qwen3.8 Flash Next) :: 2026-10-13
-        // if the file editor was open behind quick-open, fall back into it
-        // (content was synced in destroyEditor, dirty flag intact)
+        this.quick.files = [];
+        this.quick.filesLoadedFor = "";
         if (this.editor.path) Alpine.store("ui").openModal("coder_file");
     },
 

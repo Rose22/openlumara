@@ -25,8 +25,34 @@
 // throttle window passes.
 const STREAM_MEMO_MIN_MS = 100;
 const STREAM_MEMO_MAX = 16;
+const STREAM_MEMO_MAX_BYTES = 12 * 1024 * 1024;
 const _STREAM_MEMOS = new Map();
+let _STREAM_MEMO_BYTES = 0;
 let _RENDER_TICK = null;
+
+function _memoSize(m) {
+    let size = String(m.out || '').length;
+    for (const input of m.inputs) {
+        if (typeof input === 'string') size += input.length;
+        else if (input != null) size += 8;
+    }
+    return size;
+}
+
+function _clearMemo(m) {
+    if (m && m.timer) clearTimeout(m.timer);
+}
+
+function _evictMemos(bytesToAdd) {
+    while (_STREAM_MEMOS.size >= STREAM_MEMO_MAX ||
+           (_STREAM_MEMOS.size > 0 && _STREAM_MEMO_BYTES + bytesToAdd > STREAM_MEMO_MAX_BYTES)) {
+        const oldestKey = _STREAM_MEMOS.keys().next().value;
+        const oldest = _STREAM_MEMOS.get(oldestKey);
+        _clearMemo(oldest);
+        _STREAM_MEMO_BYTES -= _memoSize(oldest);
+        _STREAM_MEMOS.delete(oldestKey);
+    }
+}
 
 function _renderTick() {
     if (_RENDER_TICK === null) _RENDER_TICK = Alpine.reactive({ v: 0 });
@@ -40,24 +66,21 @@ function _renderTick() {
 function streamMemo(key, inputs, compute) {
     let m = _STREAM_MEMOS.get(key);
     if (m && m.inputs.length === inputs.length &&
-        m.inputs.every((v, i) => v === inputs[i])) return m.out;
-
-    if (!m) {
-        m = { inputs: [], out: null, at: 0, timer: null };
+        m.inputs.every((v, i) => v === inputs[i])) {
+        _STREAM_MEMOS.delete(key);
         _STREAM_MEMOS.set(key, m);
-        while (_STREAM_MEMOS.size > STREAM_MEMO_MAX) {
-            const oldest = _STREAM_MEMOS.keys().next().value;
-            const evicted = _STREAM_MEMOS.get(oldest);
-            if (evicted.timer) clearTimeout(evicted.timer);
-            _STREAM_MEMOS.delete(oldest);
-        }
+        return m.out;
     }
+
+    const hadOld = Boolean(m);
+    const oldSize = hadOld ? _memoSize(m) : 0;
+    if (!m) m = { inputs: [], out: null, at: 0, timer: null };
 
     const tick = _renderTick();
     const now = performance.now();
     if (m.out !== null && now - m.at < STREAM_MEMO_MIN_MS) {
-        // within the throttle window: serve the stale render and wake the
-        // getter again when the window elapses so nothing is left behind
+        _STREAM_MEMOS.delete(key);
+        _STREAM_MEMOS.set(key, m);
         if (m.timer === null) {
             m.timer = setTimeout(() => {
                 m.timer = null;
@@ -67,9 +90,22 @@ function streamMemo(key, inputs, compute) {
         return m.out;
     }
 
+    const nextOut = compute();
+
+    if (hadOld) {
+        _STREAM_MEMOS.delete(key);
+        _STREAM_MEMO_BYTES -= oldSize;
+    }
+
     m.inputs = inputs;
-    m.out = compute();
+    m.out = nextOut;
     m.at = now;
+
+    const size = _memoSize(m);
+    _evictMemos(size);
+    _STREAM_MEMOS.set(key, m);
+    _STREAM_MEMO_BYTES += size;
+
     return m.out;
 }
 

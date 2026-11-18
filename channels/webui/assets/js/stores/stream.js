@@ -12,11 +12,13 @@ let STREAM_STORE = {
     // steering message queue
     queued: [],
 
-    async clear() {
+    async clear(preserveQueued = false) {
+        if (typeof AudioManager !== 'undefined') AudioManager.stopProcessingSound();
+        this.state = 'idle';
         this.turn = [];
         this.userMsg = null;
         this.processing = {};
         this.modelLoad = null;
-        this.queued = [];
+        if (!preserveQueued) this.queued = [];
     }
 }

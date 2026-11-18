@@ -71,6 +71,10 @@ CHAT_STORE = {
     loadingOlder: false,
     turnPageSize: 5,
     olderTriggerPx: 300,
+    _anchorBusy: false,
+    _olderIntersecting: false,
+    _unloadQueued: false,
+    _lastUnloadAt: 0,
 
     editingMessageIndex: null,
     editContent: '',
@@ -307,6 +311,9 @@ CHAT_STORE = {
         this.loadingOlder = false;
         this.pinnedTurnIndex = null;
         this.pinnedPromptHeight = 0;
+        this._olderIntersecting = false;
+        this._unloadQueued = false;
+        this._lastUnloadAt = 0;
     },
 
     windowSize() {
@@ -382,17 +389,19 @@ CHAT_STORE = {
                 await Alpine.nextTick();
                 this._anchorScrollTo(el, firstTurnEl, offsetTop);
 
-                // content above can keep growing for a few frames after the
-                // swap; keep nudging back until it settles instead of
-                // snapping once and leaving the difference on screen
                 let settleFrames = 30;
                 let lastTop = el.scrollTop;
+                this._anchorBusy = true;
                 const settle = () => {
-                    if (gen !== this._anchorGen || settleFrames-- <= 0) return;
+                    if (gen !== this._anchorGen || settleFrames-- <= 0) {
+                        this._anchorBusy = false;
+                        return;
+                    }
 
-                    // the moment the wheel/keyboard moves the scroll on its
-                    // own, hands off - never fight the user mid-settle
-                    if (Math.abs(el.scrollTop - lastTop) > 2) return;
+                    if (Math.abs(el.scrollTop - lastTop) > 2) {
+                        this._anchorBusy = false;
+                        return;
+                    }
 
                     this._anchorScrollTo(el, firstTurnEl, offsetTop);
                     lastTop = el.scrollTop;
@@ -428,10 +437,94 @@ CHAT_STORE = {
         this.hasMoreOlder = this.turnStart > 0;
     },
 
-    maybeLoadOlder(el) {
-        if (!el) el = document.getElementById('messages');
-        if (!el || this.loadingOlder || !this.hasMoreOlder) return;
-        if (el.scrollTop <= this.olderTriggerPx) this.loadOlderTurns();
+    loadOlderTurnsFromIntersect() {
+        if (performance.now() - this._lastUnloadAt < 300) return;
+        this._olderIntersecting = true;
+        this._fillOlderWhileIntersecting();
+    },
+
+    olderTurnsLeftIntersect() {
+        this._olderIntersecting = false;
+    },
+
+    async _fillOlderWhileIntersecting() {
+        while (this._olderIntersecting && this.hasMoreOlder && !this.loadingOlder) {
+            if (performance.now() - this._lastUnloadAt < 300) return;
+            await this.loadOlderTurns();
+            await Alpine.nextTick();
+            await new Promise(resolve => requestAnimationFrame(resolve));
+        }
+    },
+
+    scheduleUnloadCheck() {
+        if (this._unloadQueued) return;
+        this._unloadQueued = true;
+        requestAnimationFrame(() => {
+            this._unloadQueued = false;
+            this._runUnloadCheck();
+        });
+    },
+
+    _runUnloadCheck() {
+        const messages = document.getElementById('messages');
+        if (!messages || messages.classList.contains('anchor-hidden')) return;
+        if (this.loadingOlder || this._anchorBusy) return;
+        if (this.turnHistory.length <= this.turnPageSize) return;
+
+        const turnEls = [...messages.querySelectorAll('#messages > .turn-block .turn')];
+        if (turnEls.length < 2) return;
+
+        // keep a cushion above the viewport top so unloading never drags
+        // the older-turns loader back into its prefetch margin
+        const keepAbove = Math.max(this.olderTriggerPx * 2 + 200, 600);
+        const cutLine = messages.getBoundingClientRect().top - keepAbove;
+
+        let maxDrop = this.turnHistory.length - this.turnPageSize;
+        if (this.turnHistory[this.turnHistory.length - 1]?.live === true) {
+            maxDrop = Math.min(maxDrop, this.turnHistory.length - 1);
+        }
+
+        let drop = 0;
+        for (const turnEl of turnEls) {
+            if (drop >= maxDrop) break;
+
+            const idx = Number(turnEl.dataset.turnIndex);
+            if (!Number.isFinite(idx) || idx !== this.turnStart + drop) break;
+
+            if (turnEl.getBoundingClientRect().bottom >= cutLine) break;
+            drop++;
+        }
+        if (drop <= 0) return;
+
+        const keptAbs = this.turnStart + drop;
+        const keptBefore = turnEls[drop].getBoundingClientRect().top;
+
+        this._dropPrefixTurns(drop);
+        this._lastUnloadAt = performance.now();
+
+        Alpine.nextTick(() => {
+            const keptNow = messages.querySelector(`[data-turn-index="${keptAbs}"]`);
+            if (!keptNow || !keptNow.isConnected) return;
+
+            const shift = keptNow.getBoundingClientRect().top - keptBefore;
+            if (Math.abs(shift) > 2) {
+                messages.scrollTop += shift;
+            }
+
+            Alpine.store('ui')._updateShouldScroll(messages);
+        });
+    },
+
+    _dropPrefixTurns(drop) {
+        if (drop <= 0) return;
+
+        if (this.pinnedTurnIndex !== null && this.pinnedTurnIndex - this.turnStart < drop) {
+            this.clearPromptPin();
+        }
+
+        this.turnHistory = this.turnHistory.slice(drop);
+        this.turnStart += drop;
+        this.hasMoreOlder = this.turnStart > 0;
     },
 
     async fillViewport(maxPages = 8) {
@@ -645,7 +738,12 @@ CHAT_STORE = {
         const collapse = !this.isGroupCollapsed(group);
         this.collapsedDays[group.key] = collapse;
 
-        if (!collapse) {
+        if (collapse) {
+            group.chats = [];
+            group.offset = 0;
+            group.loaded = false;
+            group.hasMore = group.count > 0;
+        } else {
             Alpine.nextTick(() => this.ensureDayChatsFilled(group));
         }
     },
@@ -744,12 +842,17 @@ CHAT_STORE = {
         const gen = this.dayFetchGen;
         const before = group.chats.length;
 
-        const result = await simpleApiFetch(
-            `/api/chats/day?day=${group.key}&offset=${group.offset}` +
-            `&limit=${this.chatLimit}&tz_offset=${this.tzOffset()}${this.catParam()}${this.tagParam()}`
-        );
-
-        group.loading = false;
+        let result = null;
+        try {
+            result = await simpleApiFetch(
+                `/api/chats/day?day=${group.key}&offset=${group.offset}` +
+                `&limit=${this.chatLimit}&tz_offset=${this.tzOffset()}${this.catParam()}${this.tagParam()}`
+            );
+        } catch (err) {
+            result = null;
+        } finally {
+            group.loading = false;
+        }
 
         // stale (list reloaded mid-flight) or failed: mark exhausted so
         // loop callers can't spin; a reload rebuilds the group anyway.
