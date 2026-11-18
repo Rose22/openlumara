@@ -79,6 +79,15 @@
         scrollbar-width: thin;
     }
 
+    /* content-visibility skips rendering for stations outside the viewport
+       (it ignores the capped body scroller), making a skipped station report
+       its contain-intrinsic-size placeholder instead of its real height -
+       which corrupts any measurement of the live chain */
+    &.is-streaming .chain-station {
+        content-visibility: visible;
+        contain: none;
+    }
+
     .agent-chain-body {
         margin-top: 0;
         margin-left: 0.09em;

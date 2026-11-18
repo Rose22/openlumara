@@ -13,8 +13,8 @@ function streamGrow(el) {
         })
     }
 
-    // the element's height without the pin's influence: offsetHeight would
-    // include the min-height we set, hiding any real shrinkage
+    // measured via the children: the element's own offsetHeight includes the
+    // min-height we set, which would hide any shrinkage from us
     const naturalHeight = () => {
         let h = 0
         for (const child of el.children) {
