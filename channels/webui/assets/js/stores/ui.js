@@ -203,6 +203,8 @@ UI_STORE = {
         if (this._suppressScroll) return;
 
         this._updateShouldScroll(el);
+
+        Alpine.store('chat').schedulePromptPinRecompute();
     },
 
     async _jumpToBottom(el) {

@@ -48,8 +48,21 @@
 
     <!-- historical turns -->
     <template x-for="(turn, idx) in $store.chat.turnHistory" :key="$store.chat.turnStart + idx">
-        <div class="fullwidth turn" :data-turn-index="$store.chat.turnStart + idx"
-             x-data="{ get turnIndex() { return $store.chat.turnStart + idx } }">
+        <div class="turn-block" x-data="{ get turnIndex() { return $store.chat.turnStart + idx } }">
+            <!--
+                flow marker for the pinned-prompt feature. it must live
+                outside the turn itself: while pinned, the turn is sticky, so
+                an observer on it always sees it as visible and the pin
+                toggles in a loop. this 1px marker stays in normal flow, so
+                its intersection tracks the turn's real position.
+            -->
+            <template x-if="turn.role === 'user'">
+                <div class="pin-marker" x-prompt-marker="$store.chat.updatePromptPin(turnIndex, intersecting, $el)"></div>
+            </template>
+
+            <div class="fullwidth turn" :data-turn-index="turnIndex"
+                 :class="{ 'prompt-pinned': $store.chat.pinnedTurnIndex === turnIndex }"
+                 :style="($store.chat.pinnedTurnIndex === turnIndex || $store.chat.releasingTurnIndex === turnIndex) ? 'min-height: ' + $store.chat.pinnedPromptHeight + 'px' : ''">
 
             <!-- user turn (always one message) -->
             <template x-if="turn.role === 'user'">
@@ -210,6 +223,7 @@
                     </div>
                 </div>
             </template>
+            </div>
         </div>
     </template>
 

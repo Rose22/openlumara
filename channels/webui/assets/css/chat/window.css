@@ -164,3 +164,73 @@
     }
 }
 
+:root {
+    interpolate-size: allow-keywords;
+}
+
+/* x-for needs a single root; display:contents keeps it from becoming a box,
+   so the marker and the turn stay direct flex children of #messages and the
+   pinned turn keeps its full stick range */
+#messages .turn-block {
+    display: contents;
+}
+
+/* invisible flow marker tracking each user turn's true position for the
+   pinned-prompt observer. as an extra flex child it adds one net 4px gap
+   plus its own pixel, cancelled by this negative margin so spacing is
+   unchanged. */
+#messages .pin-marker {
+    flex: none;
+    height: 1px;
+    margin: 0 0 -5px 0;
+}
+
+#messages .turn .message.user {
+    transition: height 0.3s ease, background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+#messages .turn .message-wrapper.user > .message-buttons {
+    transition: opacity 0.2s ease, height 0.3s ease;
+}
+
+#messages .turn.prompt-pinned:not(:has(.editing)) {
+    position: sticky;
+    top: 10px;
+    z-index: 20;
+    pointer-events: none;
+}
+
+#messages .turn.prompt-pinned:not(:has(.editing)) > .message-wrapper.user > .message.user,
+#messages .turn.prompt-pinned:not(:has(.editing)) > .message-wrapper.user > .message.user *,
+#messages .turn.prompt-pinned:not(:has(.editing)) > .message-wrapper.user > .message-buttons,
+#messages .turn.prompt-pinned:not(:has(.editing)) > .message-wrapper.user > .message-buttons * {
+    pointer-events: auto;
+}
+
+#messages .turn.prompt-pinned:not(:has(.editing)) > .message-wrapper.user > .message.user {
+    height: calc(1lh + 28px);
+    max-width: 30% !important;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    background: color-mix(in srgb, var(--bg-primary, #151515) 28%, transparent);
+    backdrop-filter: blur(5px) saturate(1.4);
+    -webkit-backdrop-filter: blur(5px) saturate(1.4);
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
+}
+
+#messages .turn.prompt-pinned:not(:has(.editing)) > .message-wrapper.user > .message.user * {
+    text-overflow: ellipsis;
+    overflow: hidden;
+}
+
+#messages .turn.prompt-pinned:not(:has(.editing)) > .message-wrapper.user > .message-buttons {
+    height: 0;
+    opacity: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+#messages.chat-bubbles .turn.prompt-pinned:not(:has(.editing)) > .message-wrapper.user > .message.user {
+    background: color-mix(in srgb, var(--bg-message-user, var(--bg-primary, #151515)) 28%, transparent);
+}
+

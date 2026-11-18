@@ -183,6 +183,15 @@
 
             <div class="item">
                 <div class="toggle-row">
+                    <label>Pinned prompts</label>
+                    <button class="toggle" type="button" :class="{ active: pinnedPromptsEnabled }" @click="handlePinnedPromptsToggle()">
+                    </button>
+                </div>
+                <span class="description">Keep the user message above the response you're reading pinned to the top of the chat, shrunk to a single line. It grows back once you scroll it into view.</span>
+            </div>
+
+            <div class="item">
+                <div class="toggle-row">
                     <label>Fade tokens</label>
                     <button class="toggle" type="button" :class="{ active: tokenFadeEnabled }" @click="handleTokenFadeToggle()">
                     </button>

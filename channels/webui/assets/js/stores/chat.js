@@ -66,6 +66,163 @@ CHAT_STORE = {
     editingMessageIndex: null,
     editContent: '',
 
+    /*
+     * the user turn currently pinned to the top of the message view.
+     * updated from the flow markers in chat/index.html via x-prompt-marker:
+     * a turn pins itself once it scrolls out through the top edge, and
+     * unpins the moment it scrolls back into view. switching is event-driven
+     * (fires only on intersection changes), never per-frame.
+     */
+    pinnedTurnIndex: null,
+    pinnedPromptHeight: 0,
+
+    // a turn that just unpinned keeps its height reserve for the duration of
+    // the grow animation, so removing it can't make the turn snap to one
+    // line and then grow back (a collapse-then-grow jolt).
+    releasingTurnIndex: null,
+    _releaseTimer: null,
+
+    updatePromptPin(turnIndex, intersecting, marker) {
+        if (intersecting) {
+            if (this.pinnedTurnIndex !== turnIndex) return;
+
+            this.pinnedTurnIndex = null;
+            this.releasingTurnIndex = turnIndex;
+
+            clearTimeout(this._releaseTimer);
+            this._releaseTimer = setTimeout(() => {
+                if (this.releasingTurnIndex === turnIndex) this.releasingTurnIndex = null;
+            }, 350);
+            return;
+        }
+
+        if (!this.pinnedPromptsEnabled()) return;
+
+        // leaving, but which way? only pin prompts that left through the
+        // TOP edge - a marker leaving through the bottom means we scrolled
+        // up to older messages, where pinning would be wrong.
+        const container = document.getElementById('messages');
+        if (!container) return;
+
+        if (marker.getBoundingClientRect().top > container.getBoundingClientRect().top) return;
+
+        /*
+         * a prompt can only take the pin if it's NEWER than the current one.
+         * every marker reports its initial intersection on its own schedule
+         * (on load, and again when older pages get prepended), so "last
+         * callback wins" would let an older prompt steal the pin - turn
+         * index is what decides, not callback order.
+         */
+        if (this.pinnedTurnIndex !== null && turnIndex <= this.pinnedTurnIndex) return;
+
+        const turnEl = container.querySelector(`[data-turn-index="${turnIndex}"]`);
+        if (!turnEl || turnEl.querySelector('.editing')) return;
+
+        const wrapper = turnEl.querySelector(':scope > .message-wrapper.user');
+        if (!wrapper) return;
+
+        // reserve the full height BEFORE the class is applied so collapsing
+        // the bubble to a single line doesn't yank the response upward
+        this.pinnedPromptHeight = wrapper.offsetHeight;
+        this.pinnedTurnIndex = turnIndex;
+    },
+
+    pinnedPromptsEnabled() {
+        return localStorage.getItem('pinnedPromptsEnabled') !== 'false';
+    },
+
+    // grow the pinned prompt back open, then drop the pin entirely
+    clearPromptPin() {
+        if (this.pinnedTurnIndex === null) return;
+
+        const releasing = this.pinnedTurnIndex;
+        this.pinnedTurnIndex = null;
+        this.releasingTurnIndex = releasing;
+
+        clearTimeout(this._releaseTimer);
+        this._releaseTimer = setTimeout(() => {
+            if (this.releasingTurnIndex === releasing) this.releasingTurnIndex = null;
+        }, 350);
+    },
+
+    /*
+     * throttled entry point from ui.onScroll (itself throttled at 100ms),
+     * coalesced into one frame. pure measurement, so it stays correct even
+     * when no marker ever reported the position change.
+     */
+    schedulePromptPinRecompute() {
+        if (this._pinRecomputeQueued) return;
+
+        this._pinRecomputeQueued = true;
+        requestAnimationFrame(() => {
+            this._pinRecomputeQueued = false;
+            this.recomputePromptPin();
+        });
+    },
+
+    /*
+     * resolves the pin by measuring every marker at once: the pin belongs to
+     * the NEWEST user turn that sits above the top edge. needed because
+     * IntersectionObserver only reports state CHANGES: on load the chat is
+     * rendered at the top and then jumped to the bottom, during which only
+     * markers near the top fire (pinning an older prompt), while markers
+     * that were below the fold and are now above it never report anything.
+     * called after anchored loads (see anchorToBottom), not per-frame.
+     */
+    recomputePromptPin() {
+        const container = document.getElementById('messages');
+        if (!container) return;
+
+        if (!this.pinnedPromptsEnabled()) {
+            this.clearPromptPin();
+            return;
+        }
+
+        const top = container.getBoundingClientRect().top;
+
+        let activeIndex = null;
+        let activeWrapper = null;
+
+        for (const marker of container.querySelectorAll('.pin-marker')) {
+            if (marker.getBoundingClientRect().top > top) continue;
+
+            // the turn is the marker's next sibling. do NOT bind an index
+            // attribute onto the marker itself: a reactive attribute on the
+            // same element as x-prompt-marker makes Alpine re-run the
+            // directive and respawn its observer on every update.
+            const turnEl = marker.nextElementSibling;
+            if (!turnEl || !turnEl.matches('.turn') || turnEl.querySelector('.editing')) continue;
+
+            const idx = Number(turnEl.dataset.turnIndex);
+
+            const wrapper = turnEl.querySelector(':scope > .message-wrapper.user');
+            if (!wrapper) continue;
+
+            activeIndex = idx;
+            activeWrapper = wrapper;
+        }
+
+        if (activeIndex === this.pinnedTurnIndex) return;
+
+        if (this.pinnedTurnIndex !== null) {
+            const releasing = this.pinnedTurnIndex;
+            this.releasingTurnIndex = releasing;
+
+            clearTimeout(this._releaseTimer);
+            this._releaseTimer = setTimeout(() => {
+                if (this.releasingTurnIndex === releasing) this.releasingTurnIndex = null;
+            }, 350);
+        }
+
+        if (activeIndex === null) {
+            this.pinnedTurnIndex = null;
+            return;
+        }
+
+        this.pinnedPromptHeight = activeWrapper.offsetHeight;
+        this.pinnedTurnIndex = activeIndex;
+    },
+
     user_input: '',
     last_user_input: '',
 
@@ -139,6 +296,8 @@ CHAT_STORE = {
         this.totalTurns = 0;
         this.hasMoreOlder = false;
         this.loadingOlder = false;
+        this.pinnedTurnIndex = null;
+        this.pinnedPromptHeight = 0;
     },
 
     windowSize() {
@@ -324,6 +483,12 @@ CHAT_STORE = {
             await Alpine.nextTick();
             await ui.forceScrollToBottom();
             await this.fillViewport();
+
+            // markers that started below the fold never report their jump to
+            // above the top edge (IO only fires on state changes, and their
+            // state stayed 'not intersecting'), so resolve the pin by hand
+            // once the anchored scroll has landed
+            requestAnimationFrame(() => this.recomputePromptPin());
         } finally {
             el.classList.remove('anchor-hidden');
         }

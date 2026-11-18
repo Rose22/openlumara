@@ -97,6 +97,9 @@ function settingsModal() {
         tokenFadeEnabled: localStorage.getItem('tokenFadeEnabled') !== 'false',
         // start the live processing chain collapsed (localStorage; default off)
         collapseChainDefault: localStorage.getItem('collapseChainDefault') === 'true',
+        // keep the last user prompt pinned to the top while its response is
+        // in view (localStorage; default on)
+        pinnedPromptsEnabled: localStorage.getItem('pinnedPromptsEnabled') !== 'false',
         // 'Step display mode' dropdown: default | thinking | steps.
         stepDisplayMode: localStorage.getItem('stepDisplayMode') || 'default',
         tokenFadeMs: localStorage.getItem('tokenFadeMs') || '750',
@@ -361,6 +364,14 @@ function settingsModal() {
         handleCollapseChainToggle() {
             this.collapseChainDefault = !this.collapseChainDefault;
             localStorage.setItem('collapseChainDefault', this.collapseChainDefault);
+        },
+
+        handlePinnedPromptsToggle() {
+            this.pinnedPromptsEnabled = !this.pinnedPromptsEnabled;
+            localStorage.setItem('pinnedPromptsEnabled', this.pinnedPromptsEnabled);
+
+            if (this.pinnedPromptsEnabled) Alpine.store('chat').recomputePromptPin();
+            else Alpine.store('chat').clearPromptPin();
         },
 
         // 'Step display mode' dropdown (default | thinking | steps)
