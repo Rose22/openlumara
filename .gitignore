@@ -16,6 +16,7 @@ user_channels/*
 skills
 skills/
 skills/*
+sandbox/
 user_webui_themes/*
 !user_webui_themes/README.md
 config.yaml
