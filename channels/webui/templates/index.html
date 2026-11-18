@@ -110,10 +110,10 @@
                             ? `flex-basis: ${$store.ui.sidebarWidth}px; width: ${$store.ui.sidebarWidth}px; max-width: ${$store.ui.sidebarWidth}px`
                             : ''"
                         x-show="$store.ui.showSidebar"
-                        x-transition:enter="transition ease-out duration-200"
-                        x-transition:enter-start="-translate-x-full"
-                        x-transition:leave="transition ease-in duration-150"
-                        x-transition:leave-end="-translate-x-full"
+                        x-transition:enter="sidebar-slide-in"
+                        x-transition:enter-start="sidebar-slide-start"
+                        x-transition:leave="sidebar-slide-out"
+                        x-transition:leave-end="sidebar-slide-end"
                     >
                         {% include 'sidebar.html' %}
                     </section>

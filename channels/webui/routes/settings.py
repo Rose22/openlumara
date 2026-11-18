@@ -43,6 +43,36 @@ def register(app, channel):
 
         return utils.api_result(result)
 
+    @app.post("/api/settings/field")
+    async def settings_field_set(request: fastapi.Request):
+        """Sets a single core config field by key path, e.g. {"path": ["model", "enable_thinking"], "value": false}.
+        The path is validated against the core settings schema, so only real, known fields can be written."""
+        data = await request.json()
+        keys = data.get("path")
+        value = data.get("value")
+
+        if not isinstance(keys, list) or not keys or not all(isinstance(k, str) and k for k in keys):
+            return utils.api_result("path must be a non-empty list of strings", success=False)
+
+        node = core.config.core_settings_schema
+        for key in keys:
+            if not isinstance(node, dict) or key not in node:
+                return utils.api_result(f"unknown setting: {'.'.join(keys)}", success=False)
+            node = node[key]
+
+        if not isinstance(node, dict) or "default" not in node:
+            return utils.api_result(f"{'.'.join(keys)} is not a setting field", success=False)
+
+        if node.get("unsafe") and not core.config.get("channels", "settings", "webui", "show_unsafe_settings", default=False):
+            return utils.api_result(f"{'.'.join(keys)} is unsafe and unsafe settings are hidden", success=False)
+
+        default = node["default"]
+        if isinstance(default, bool) != isinstance(value, bool) or isinstance(default, (int, float)) and not isinstance(default, bool) and not isinstance(value, (int, float)):
+            return utils.api_result(f"value type does not match {'.'.join(keys)}", success=False)
+
+        core.config.ConfigManager(core.config.config, base_path=keys[:-1]).set(keys[-1], value)
+        return utils.api_result({"path": keys, "value": value}, success=True)
+
     @app.post("/api/model/set")
     async def model_set(request: fastapi.Request):
         """Switches the active model to the given name"""

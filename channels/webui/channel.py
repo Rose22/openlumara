@@ -115,6 +115,10 @@ class Webui(core.channel.Channel, ui_extensions.UiExtensionsMixin):
             "default": True,
             "depends": "enable_chat_header",
         },
+        "enable_thinking_toggle": {
+            "description": "Whether to show the thinking toggle button in the input bar, so you can quickly turn model reasoning on and off without opening the settings.",
+            "default": True
+        },
         "enable_file_upload": {
             "description": "Whether to allow uploading files and pasting images into the chat",
             "default": True

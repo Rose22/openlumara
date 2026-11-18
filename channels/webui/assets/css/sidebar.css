@@ -60,6 +60,26 @@ body:has(.sidebar-resizer:active) {
     }
 }
 
+#sidebar.sidebar-slide-in {
+    transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+#sidebar.sidebar-slide-out {
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.6, 1);
+}
+
+#sidebar.sidebar-slide-start,
+#sidebar.sidebar-slide-end {
+    transform: translateX(-100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #sidebar.sidebar-slide-in,
+    #sidebar.sidebar-slide-out {
+        transition: none;
+    }
+}
+
 .sidebar-shell {
     display: flex;
     flex-direction: row;
@@ -168,7 +188,27 @@ body:has(.sidebar-resizer:active) {
 }
 
 @media (max-width: 768px) {
-    .sidebar-shell {
+    #sidebar.sidebar-slide-in {
+    transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+#sidebar.sidebar-slide-out {
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.6, 1);
+}
+
+#sidebar.sidebar-slide-start,
+#sidebar.sidebar-slide-end {
+    transform: translateX(-100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #sidebar.sidebar-slide-in,
+    #sidebar.sidebar-slide-out {
+        transition: none;
+    }
+}
+
+.sidebar-shell {
         flex-direction: column;
     }
 
@@ -211,31 +251,45 @@ body:has(.sidebar-resizer:active) {
         height: 44px;
     }
 
-    /* phone-only close: floats in the overlay's top-right corner, outside
-       the tab strip's flow (x-show hides it off mobile entirely). rides
-       above the tab row's empty right side; sized like a tab, matches
-       the header styling language */
-    .sidebar-close {
-        position: absolute;
-        top: 3px;
-        right: 51px;
-        z-index: 5;
-        width: 44px;
-        height: 44px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: var(--bg-primary);
-        border: none;
-        border-radius: var(--radius-sm);
-        color: var(--text-secondary);
-        cursor: pointer;
+    .sidebar-tab:hover {
+        box-shadow: inset 0 2px 0 color-mix(in srgb, var(--accent, #00d4ff) 35%, transparent);
+        border-radius: 0 0 8px 8px;
     }
 
-    .sidebar-close:active {
-        background: var(--button-bg);
-        color: var(--text-primary);
+    .sidebar-tab.active {
+        box-shadow: inset 0 2px 0 var(--accent, #00d4ff);
+        border-radius: 0 0 8px 8px;
     }
+
+    #chat-list .search .forge-field {
+        min-height: 42px;
+        padding: 6px 40px 6px 10px;
+        font-size: 0.95rem;
+    }
+
+    #chat-list .search input[name="search"] {
+        font-size: 16px;
+        padding: 8px 0;
+    }
+
+    #chat-list .search .filter-cap {
+        width: 38px;
+        height: 38px;
+        top: 2px;
+        right: 2px;
+    }
+
+    .search-plus {
+        width: 42px;
+        height: 44px;
+    }
+
+    .forge-row {
+        min-height: 44px;
+        padding: 10px 14px;
+        font-size: 0.95rem;
+    }
+
 }
 
 /* list of chats */
@@ -909,15 +963,6 @@ body:has(.sidebar-resizer:active) {
     border-radius: var(--radius-sm);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
 
-    .fm-handle {
-        align-self: center;
-        width: 32px;
-        height: 4px;
-        border-radius: 2px;
-        background: var(--border-color);
-        margin-bottom: 4px;
-    }
-
     .fm-row {
         display: flex;
         align-items: center;
@@ -1057,57 +1102,6 @@ body:has(.sidebar-resizer:active) {
         &:hover {
             text-decoration: underline;
         }
-    }
-}
-
-/* phone variant: bottom sheet with 40px+ touch targets */
-.filter-menu.sheet {
-    top: auto !important;
-    left: 0 !important;
-    right: 0;
-    bottom: 0;
-    width: auto;
-    border-radius: 16px 16px 0 0;
-    border-bottom: none;
-    padding: 10px 14px calc(14px + env(safe-area-inset-bottom, 0px));
-    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.45);
-    max-height: 60vh;
-    overflow-y: auto;
-
-    .fm-row {
-        padding: 12px 10px;
-        font-size: 0.9rem;
-    }
-
-    .fm-switch {
-        width: 44px;
-        height: 25px;
-
-        .fm-knob {
-            width: 19px;
-            height: 19px;
-            top: 2px;
-            left: 2px;
-        }
-
-        &.on .fm-knob {
-            transform: translateX(19px);
-        }
-    }
-
-    .fm-chips {
-        max-height: 32vh;
-        gap: 8px;
-    }
-
-    .fm-chip {
-        padding: 9px 16px;
-        font-size: 0.85rem;
-    }
-
-    .fm-clear {
-        padding: 10px 8px;
-        font-size: 0.85rem;
     }
 }
 

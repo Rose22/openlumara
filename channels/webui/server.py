@@ -25,6 +25,7 @@ import channels.webui.routes.ws as ws_routes
 ADMIN_ONLY_ENDPOINTS = [
     "/api/settings/load",
     "/api/settings/save",
+    "/api/settings/field",
     "/api/check_connection",
     "/api/models",
     "/api/model/set",
