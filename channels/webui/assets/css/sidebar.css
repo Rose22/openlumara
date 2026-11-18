@@ -52,10 +52,14 @@ body:has(.sidebar-resizer:active) {
     .sidebar-tab.active {
         background: var(--bg-primary);
         color: var(--text-secondary);
+        box-shadow: none;
+        border-radius: 8px;
         
         &:hover {
             background: var(--bg-secondary, rgba(255, 255, 255, 0.06));
             color: var(--text-primary, #eee);
+            box-shadow: inset 2px 0 0 color-mix(in srgb, var(--accent, #00d4ff) 35%, transparent);
+            border-radius: 0 8px 8px 0;
         }
     }
 }
