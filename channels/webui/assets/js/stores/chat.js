@@ -279,7 +279,9 @@ CHAT_STORE = {
         // a collapsed header would be maddening
         if (this.searching) { return false; }
         if (group.key in this.collapsedDays) { return Boolean(this.collapsedDays[group.key]); }
-        return false;
+        // month groups on the Older tab start collapsed; day groups on
+        // Today/Week stay expanded (their headers are hidden anyway)
+        return this.groupTab(group.key) === 'older';
     },
 
     toggleDayGroup(group) {
