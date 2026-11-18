@@ -176,6 +176,11 @@
         gap: 8px;
         padding: 0 2px;
         margin-top: -3px;
+
+        /* no press-squish from the global button:active rule up here */
+        button:active {
+            transform: none;
+        }
         margin-bottom: calc(var(--gap) * -1 + 2px);
 
         .masthead-title {

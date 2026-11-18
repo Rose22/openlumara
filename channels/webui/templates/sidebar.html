@@ -372,7 +372,7 @@
         <template x-for="group in $store.chat.visibleGroups()" :key="group.key">
             <div class="day-group">
                 <button type="button" class="day-header"
-                    x-show="$store.chat.timeTab !== 'today' || $store.chat.searching"
+                    x-show="$store.chat.timeTab === 'older' || $store.chat.searching"
                     :class="{ 'expanded': !$store.chat.isGroupCollapsed(group) }"
                     :aria-expanded="!$store.chat.isGroupCollapsed(group)"
                     @click="$store.chat.toggleDayGroup(group)">
