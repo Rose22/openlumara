@@ -229,6 +229,36 @@ UI_STORE = {
 
     sidebarCollapsed: false,
 
+    sidebarWidth: parseInt(localStorage.getItem('sidebarWidth')) || 288,
+    sidebarResizing: false,
+
+    startSidebarResize(e) {
+        e.preventDefault();
+        this.sidebarResizing = true;
+
+        const startX = e.clientX;
+        const startWidth = this.sidebarWidth;
+
+        const onMove = (ev) => {
+            this.sidebarWidth = Math.min(560, Math.max(220, startWidth + ev.clientX - startX));
+        };
+
+        const onUp = () => {
+            this.sidebarResizing = false;
+            localStorage.setItem('sidebarWidth', String(this.sidebarWidth));
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerup', onUp);
+        };
+
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', onUp);
+    },
+
+    resetSidebarWidth() {
+        this.sidebarWidth = 288;
+        localStorage.setItem('sidebarWidth', '288');
+    },
+
     expandReasoning: true,
 
     async init() {

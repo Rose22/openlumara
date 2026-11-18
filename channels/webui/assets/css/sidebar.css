@@ -12,10 +12,41 @@
     transition: flex-basis 0.15s ease, width 0.15s ease;
 }
 
+#sidebar.resizing {
+    transition: none;
+}
+
+.sidebar-resizer {
+    flex: 0 0 5px;
+    margin: 0 -3px 0 -2px;
+    cursor: col-resize;
+    z-index: 10;
+    position: relative;
+    touch-action: none;
+
+    &::after {
+        content: '';
+        position: absolute;
+        inset: 0 2px;
+        background: transparent;
+        transition: background 0.15s ease;
+    }
+
+    &:hover::after,
+    body:has(.sidebar-resizer:active)::after {
+        background: color-mix(in srgb, var(--accent) 45%, transparent);
+    }
+}
+
+body:has(.sidebar-resizer:active) {
+    cursor: col-resize;
+    user-select: none;
+}
+
 #sidebar.collapsed {
-    flex: 0 0 46px;
-    width: 46px;
-    max-width: 46px;
+    flex: 0 0 38px;
+    width: 38px;
+    max-width: 38px;
     border-right: none;
     
     .sidebar-tab.active {
@@ -46,9 +77,9 @@
     flex-direction: column;
     align-items: center;
     gap: 4px;
-    flex: 0 0 46px;
-    width: 46px;
-    padding: 7px 4px;
+    flex: 0 0 38px;
+    width: 38px;
+    padding: 7px 0;
     box-sizing: border-box;
     overflow-y: auto;
     overflow-x: hidden;
@@ -60,6 +91,7 @@
 }
 
 .sidebar-tab {
+    box-sizing: border-box;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -80,13 +112,17 @@
 }
 
 .sidebar-tab:hover {
-    background: var(--bg-secondary, rgba(255, 255, 255, 0.06));
+    background: none;
     color: var(--text-primary, #eee);
+    box-shadow: inset 2px 0 0 color-mix(in srgb, var(--accent, #00d4ff) 35%, transparent);
+    border-radius: 0 8px 8px 0;
 }
 
 .sidebar-tab.active {
-    background: var(--bg-secondary, rgba(255, 255, 255, 0.08));
+    background: none;
     color: var(--accent, #00d4ff);
+    box-shadow: inset 2px 0 0 var(--accent, #00d4ff);
+    border-radius: 0 8px 8px 0;
 }
 
 .sidebar-tab:disabled {
@@ -101,7 +137,6 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    border-left: 1px solid var(--border-color);
     background: var(--bg-primary);
 }
 
@@ -167,21 +202,19 @@
 
     gap: var(--gap);
     background: var(--bg-primary);
-    border-left: 1px solid var(--border-color);
 
     .masthead {
         flex-shrink: 0;
         display: flex;
         align-items: center;
         gap: 8px;
-        padding: 0 2px;
-        margin-top: -3px;
+        padding: 0 4px;
 
         /* no press-squish from the global button:active rule up here */
         button:active {
             transform: none;
         }
-        margin-bottom: calc(var(--gap) * -1 + 2px);
+        margin-bottom: calc(var(--gap) * -1 + 4px);
 
         .masthead-title {
             flex: 1;
@@ -189,7 +222,7 @@
             display: flex;
             align-items: baseline;
             gap: 6px;
-            padding: 4px 2px;
+            padding: 7px 2px 2px 0;
             background: none;
             border: none;
             color: var(--text-primary);
@@ -198,9 +231,11 @@
             text-align: left;
 
             .cat-name {
-                font-size: 1.05rem;
-                font-weight: 700;
-                letter-spacing: -0.01em;
+                font-size: 13px;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.04em;
+                color: var(--text-secondary, #999);
                 overflow: hidden;
                 text-overflow: ellipsis;
                 white-space: nowrap;
@@ -774,6 +809,8 @@
             border-bottom: 2px solid transparent;
             margin-bottom: -1px;
             color: var(--text-muted);
+            /* the underline is the state cue; no focus outline on top */
+            outline: none;
             font-size: calc(var(--font-size-base, 16px) * 0.8);
             font-family: var(--font-primary);
             cursor: pointer;
