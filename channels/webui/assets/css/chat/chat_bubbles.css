@@ -6,17 +6,18 @@
 
 #messages.chat-bubbles .message.user,
 #messages.chat-bubbles .message.assistant {
-    width: 85% !important;
     max-width: 85% !important;
     border-radius: 14px;
 }
 
 #messages.chat-bubbles .message.user {
+    width: fit-content !important;
     background: var(--bg-message-user);
     border-bottom-right-radius: 4px;
 }
 
 #messages.chat-bubbles .message.assistant {
+    width: 85% !important;
     min-width: 85% !important;
     background: var(--bg-message-ai);
     border: 1px solid var(--border-message);
