@@ -107,7 +107,13 @@
             </template>
         </span>
     </div>
+    {% if combined_stream %}
+    <!-- no collapse animation while streaming: the grow-only chain pin keeps
+         the outer height fixed, so an animated fold only shows as drift -->
+    <template x-if="!collapsed">
+    {% else %}
     <div x-show="!collapsed" x-collapse.duration.250>
+    {% endif %}
         <div class="block">
             <!-- reasoning gets the thought bubble, like a mini Thoughts
                  block inside the step -->
@@ -126,5 +132,9 @@
             {% set toolcard_in_step = True %}
             {% include 'chat/toolcalls.html' %}
         </div>
+    {% if combined_stream %}
+    </template>
+    {% else %}
     </div>
+    {% endif %}
 </div>

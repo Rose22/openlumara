@@ -65,32 +65,25 @@
 
             <template x-if="turn.live === true">
                 <div class="message-wrapper assistant">
-                    <div class="message assistant">
-                        <!-- streaming chain wrapper -->
-                        <template x-if="(turn.steps ?? []).length > 0">
-                            <!-- "Processing.." header -->
-                            <div class="agent-chain" :class="{ 'is-streaming': processing }" x-data="{
-                                     // initial collapse state follows the Appearance
-                                     // setting (read fresh at mount, so it applies
-                                     // starting from the next turn)
-                                     // reasoning display disabled: locked collapsed
-                                     {% if config.get('enable_chain_expansion') %}
-                                     collapsed: localStorage.getItem('collapseChainDefault') === 'true',
-                                     {% else %}
-                                     collapsed: true,
-                                     {% endif %}
-                                     get processing() { return $store.stream.state !== 'idle' },
-                                     get lastLabel() {
-                                         const finals = turn.final_messages ?? [];
-                                         const steps = turn.steps ?? [];
-                                         const lastItem = finals[finals.length - 1] ?? steps[steps.length - 1];
-                                         const label = lastItem?.label ?? '';
-                                         // show 'Thinking..' when still thinking, 'Thoughts' when done
-                                         return $store.stream.state === 'idle' ? label.replace('Thinking..', 'Thoughts') : label;
-                                     }
-                                 }">
-                                <!-- reasoning display disabled: locked collapsed, no
-                                     chevron and clicking does nothing -->
+                    <div class="message assistant"
+                         x-data="{
+                             {% if config.get('enable_chain_expansion') %}
+                             collapsed: localStorage.getItem('collapseChainDefault') === 'true',
+                             {% else %}
+                             collapsed: true,
+                             {% endif %}
+                             get processing() { return $store.stream.state !== 'idle' },
+                             get hasChain() { return (turn.steps ?? []).length > 0 },
+                             get lastLabel() {
+                                 const finals = turn.final_messages ?? [];
+                                 const steps = turn.steps ?? [];
+                                 const lastItem = finals[finals.length - 1] ?? steps[steps.length - 1];
+                                 const label = lastItem?.label ?? '';
+                                 return $store.stream.state === 'idle' ? label.replace('Thinking..', 'Thoughts') : label;
+                             }
+                         }">
+                        <template x-if="hasChain">
+                            <div class="agent-chain" x-stream-grow :class="{ 'is-streaming': processing }">
                                 {% if not config.get('enable_chain_expansion') %}
                                 <div class="agent-chain-header locked">
                                 {% else %}
@@ -101,7 +94,7 @@
                                     <span class="activity" x-show="collapsed && lastLabel" x-text="'(' + lastLabel + ')'"></span>
                                 </div>
                                 <template x-if="!collapsed">
-                                    <div class="agent-chain-body">
+                                    <div class="agent-chain-body" x-auto-scroll>
                                         <template x-for="(step, stepIndex) in turn.steps" :key="stepIndex">
                                             <div class="chain-station">
                                                 <div class="chain-rail"><div class="chain-dot"></div></div>
@@ -120,12 +113,23 @@
                                                 </div>
                                             </div>
                                         </template>
+                                        <!-- the provisional answer streams as the chain's last
+                                             station so it grows inside the grow-only space
+                                             instead of under it. it breaks free the moment
+                                             the stream finalizes. -->
+                                        <template x-for="(message, fIndex) in (processing ? (turn.final_messages ?? []) : [])" :key="'live-final-'+fIndex">
+                                            <div class="chain-final">
+                                                {% include 'chat/turns/assistant_stream.html' %}
+                                            </div>
+                                        </template>
                                     </div>
                                 </template>
                             </div>
                         </template>
 
-                        <template x-for="(message, messageIndex) in (turn.final_messages ?? [])" :key="'final-'+messageIndex">
+                        <!-- standalone answer bubble: shown whenever the answer is NOT
+                             inside the open chain (finalized, chain collapsed, or no chain) -->
+                        <template x-for="(message, messageIndex) in (!processing || !hasChain || collapsed ? (turn.final_messages ?? []) : [])" :key="'final-'+messageIndex">
                             {% include 'chat/turns/assistant_stream.html' %}
                         </template>
                     </div>

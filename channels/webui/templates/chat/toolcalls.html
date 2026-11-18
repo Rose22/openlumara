@@ -4,11 +4,23 @@
     <template x-for="(tool, toolIdx) in {{ scope }}.tool_calls">
         <div>
             <div class="tool-calls-container"
-                 x-data="{ collapsed: {% if toolcard_in_step %}($store.stream.state === 'idle' ? toolIdx > 0 : !!(tool._metadata?.response)){% else %}$store.stream.state === 'idle' || !!(tool._metadata?.response){% endif %}, autoCollapsed: !!(tool._metadata?.response), cacheKey: tool.id ?? ({{ scope }}.tool_call_id + ':' + toolIdx) }"
-                 x-effect="if (tool._metadata?.response && !autoCollapsed) { autoCollapsed = true; collapsed = true }"
+                 x-data="{
+                     manual: null,
+                     get collapsed() {
+                         if (this.manual !== null) return this.manual;
+                         {% if toolcard_in_step %}
+                         if ($store.stream.state === 'idle') return toolIdx > 0;
+                         {% else %}
+                         if ($store.stream.state === 'idle') return true;
+                         {% endif %}
+                         return !!(tool._metadata?.response);
+                     },
+                     toggle() { this.manual = !this.collapsed },
+                     cacheKey: tool.id ?? ({{ scope }}.tool_call_id + ':' + toolIdx)
+                 }"
             >
             <div class="tool-call-card" :class="{ 'tool-pending': !tool._metadata?.response, 'tool-error': tool._metadata?.failed }">
-                    <div class="node-dot" :class="{expanded: !collapsed}" @click.stop="collapsed = !collapsed">
+                    <div class="node-dot" :class="{expanded: !collapsed}" @click.stop="toggle()">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"></polyline></svg>
                     </div>
                     <div class="header" @click="collapsed = !collapsed">
@@ -25,7 +37,7 @@
                               x-text="toolCallResultSummary(tool, tool.id ?? {{ scope }}?.tool_call_id)"></span>
                     </div>
 
-                    <div x-show="!collapsed" x-collapse.duration.250>
+                    <template x-if="!collapsed">
                     <div class="body" x-data="{ cacheKey: tool.id ?? ({{ scope }}.tool_call_id + ':' + toolIdx) }">
                         {% include 'chat/tool_displays.html' %}
                         <template x-if="toolDisplayView(tool)" x-data="{ get err() { return toolDisplayError(tool) } }">
@@ -62,7 +74,7 @@
                         </div>
                         </template>
                     </div>
-                    </div>
+                    </template>
                 </div>
             </div>
         </div>

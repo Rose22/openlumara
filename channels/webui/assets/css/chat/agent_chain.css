@@ -69,6 +69,16 @@
         flex-shrink: 0;
     }
 
+    /* capped viewport so the newest station stays visible even when the
+       chain outgrows the window. only the live chain scrolls internally -
+       history chains expand to their full height */
+    &.is-streaming .agent-chain-body {
+        max-height: 60vh;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        scrollbar-width: thin;
+    }
+
     .agent-chain-body {
         margin-top: 0;
         margin-left: 0.09em;
@@ -243,6 +253,21 @@
     .chain-content .content {
         color: var(--text-secondary);
         font-size: 0.85rem;
+    }
+
+    /* the provisional answer rides in the chain as a station, but must look
+       exactly like a normal answer bubble: the chain widget shrinks itself to
+       0.85rem, which a plain `inherit` cannot undo, so the bubble's root font
+       size is restored explicitly here */
+    .chain-final {
+        font-size: var(--font-size-base);
+        line-height: 1.6;
+        color: var(--text-primary);
+    }
+
+    .chain-final .content {
+        color: var(--text-primary);
+        font-size: var(--font-size-base);
     }
 
     .chain-end {

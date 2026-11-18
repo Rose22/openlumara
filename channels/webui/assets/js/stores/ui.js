@@ -224,6 +224,15 @@ UI_STORE = {
         }
     },
 
+    // while the live chain is capped it scrolls itself (x-auto-scroll);
+    // pumping the outer window at the same time makes the two scrollers
+    // fight, so the outer follow stands down until the chain breaks free
+    _chainOwnsScroll() {
+        const body = document.querySelector('.agent-chain.is-streaming .agent-chain-body');
+        if (!body) return false;
+        return body.scrollHeight > body.clientHeight + 1;
+    },
+
     async scrollToBottom(containerId = 'messages', instant = false) {
         if (!this.shouldScroll) return;
 
@@ -232,6 +241,11 @@ UI_STORE = {
 
         if (instant) {
             await this._jumpToBottom(el);
+            return;
+        }
+
+        if (this._chainOwnsScroll()) {
+            this._stopPump();
             return;
         }
 
