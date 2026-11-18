@@ -1,3 +1,7 @@
+<!-- chat header -->
+{% if config.get('enable_chat_header') %}
+    {% include 'chat/header.html' %}
+{% endif %}
 {{ extension_slot("below_header") }}
 
 <template x-if="$store.ui.notice">

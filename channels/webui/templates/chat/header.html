@@ -1,0 +1,52 @@
+<header>
+    <div class="left">
+        <button class="menu-btn" title="Toggle sidebar" @click="$store.ui.toggleSidebar()" x-show="$store.ui.isMobile" x-cloak>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+            </svg>
+        </button>
+        {% if config.get("enable_title") %}
+            <h1>{{ config.get("title") }}</h1>
+        {% endif %}
+
+        <!-- extension slot: modules fill this via a left() macro in <module>/chat/header.html -->
+        {{ extension_slot("left") }}
+    </div>
+    <div class="right">
+        <!-- extension slot: modules fill this via a right() macro in <module>/chat/header.html -->
+        {{ extension_slot("right") }}
+
+        <!-- TODO
+        <button class="btn" id="search-btn" title="Search messages (Ctrl+F)">
+            {% include 'svg/search.svg' %}
+        </button>
+        -->
+        <button class="btn" title="Export chat" @click="$store.chat.export()">
+            {% include 'svg/download.svg' %}
+        </button>
+        <!-- TODO
+        <button class="btn shortcuts-btn" title="Keyboard shortcuts (?)" x-show="!$store.ui.isMobile" x-cloak>
+            {% include 'svg/keyboard.svg' %}
+        </button>
+        -->
+
+        <!--
+        storage editor was too much to quickly remake from scratch for this release.
+        so, TODO: make a good openluamra storage editor... preferably in the core instead of the webui. then just hook the webui into it
+
+        <button class="btn" title="Storage Editor" x-show="!$store.ui.isMobile" x-cloak>
+            {% include 'svg/folder.svg' %}
+        </button>
+        -->
+        <button class="btn" title="Clear chat" @click="
+            if (!confirm('Are you sure you want to clear this chat?')) { return }
+
+            await simpleSocketSend({
+                'type': 'user_message',
+                'content': '/clear'
+            })
+        ">
+            {% include 'svg/trash.svg' %}
+        </button>
+    </div>
+</header>
