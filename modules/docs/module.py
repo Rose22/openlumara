@@ -10,7 +10,7 @@ class Docs(core.module.Module):
     settings = {
         "folders": {
             "description": "The folders to grab docs from. These folders can contain any plaintext files you want, such as txt, markdown, and so on, and it can be a nested folder structure.",
-            "default": ["openlumara_docs"]
+            "default": ["docs"]
         },
         "insert_system_prompt": {
             "description": "Will make your AI aware of all documentation subjects available to it. Stays small in system prompt because it only lists the top-level folders, which are the topics the documentation is about, not the individual pages.",
