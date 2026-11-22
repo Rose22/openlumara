@@ -293,6 +293,16 @@
 .live-turn-shell {
     display: flex;
     flex-direction: column;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.live-turn-shell > .agent-chain,
+.live-turn-shell > .live-answer {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
 }
 
 .live-turn-shell > .live-answer {
