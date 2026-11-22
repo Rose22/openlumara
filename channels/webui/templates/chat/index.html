@@ -99,56 +99,52 @@
                                  return $store.stream.state === 'idle' ? label.replace('Thinking..', 'Thoughts') : label;
                              }
                          }">
-                        <template x-if="hasChain">
-                            <div class="agent-chain" x-stream-grow :class="{ 'is-streaming': processing }">
-                                {% if not config.get('enable_chain_expansion') %}
-                                <div class="agent-chain-header locked">
-                                {% else %}
-                                <div class="agent-chain-header" @click="collapsed = !collapsed">
-                                {% endif %}
-                                    {% include 'svg/gear.svg' %}
-                                    <span class="label" x-text="processing ? 'Processing..' : 'Process'"></span>
-                                    <span class="activity" x-show="collapsed && lastLabel" x-text="'(' + lastLabel + ')'"></span>
-                                </div>
-                                <template x-if="!collapsed">
-                                    <div class="agent-chain-body" x-auto-scroll>
-                                        <template x-for="(step, stepIndex) in turn.steps" :key="stepIndex">
-                                            <div class="chain-station">
-                                                <div class="chain-rail"><div class="chain-dot"></div></div>
-                                                <div class="chain-content">
-                                                    {% set combined_stream = True %}
-                                                    {% include 'chat/combined_block.html' %}
-                                                </div>
-                                            </div>
-                                        </template>
-                                        <template x-if="$store.stream.state === 'processing_tools'">
-                                            <div class="chain-station">
-                                                <div class="chain-rail"><div class="chain-dot"></div></div>
-                                                <div class="chain-content">
-                                                    {% set pp_variant = 'tool' %}
-                                                    {% include 'chat/prompt_processing.html' %}
-                                                </div>
-                                            </div>
-                                        </template>
-                                        <!-- the provisional answer streams as the chain's last
-                                             station so it grows inside the grow-only space
-                                             instead of under it. it breaks free the moment
-                                             the stream finalizes. -->
-                                        <template x-for="(message, fIndex) in (processing ? (turn.final_messages ?? []) : [])" :key="'live-final-'+fIndex">
-                                            <div class="chain-final">
-                                                {% include 'chat/turns/assistant_stream.html' %}
-                                            </div>
-                                        </template>
+                        <div class="live-turn-shell" x-stream-grow>
+                            <template x-if="hasChain">
+                                <div class="agent-chain" :class="{ 'is-streaming': processing }">
+                                    {% if not config.get('enable_chain_expansion') %}
+                                    <div class="agent-chain-header locked">
+                                    {% else %}
+                                    <div class="agent-chain-header" @click="collapsed = !collapsed">
+                                    {% endif %}
+                                        {% include 'svg/gear.svg' %}
+                                        <span class="label" x-text="processing ? 'Processing..' : 'Process'"></span>
+                                        <span class="activity" x-show="collapsed && lastLabel" x-text="'(' + lastLabel + ')'"></span>
                                     </div>
-                                </template>
-                            </div>
-                        </template>
+                                    <template x-if="!collapsed">
+                                        <div class="agent-chain-body" x-auto-scroll>
+                                            <template x-for="(step, stepIndex) in turn.steps" :key="stepIndex">
+                                                <div class="chain-station">
+                                                    <div class="chain-rail"><div class="chain-dot"></div></div>
+                                                    <div class="chain-content">
+                                                        {% set combined_stream = True %}
+                                                        {% include 'chat/combined_block.html' %}
+                                                    </div>
+                                                </div>
+                                            </template>
+                                            <template x-if="$store.stream.state === 'processing_tools'">
+                                                <div class="chain-station">
+                                                    <div class="chain-rail"><div class="chain-dot"></div></div>
+                                                    <div class="chain-content">
+                                                        {% set pp_variant = 'tool' %}
+                                                        {% include 'chat/prompt_processing.html' %}
+                                                    </div>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
 
-                        <!-- standalone answer bubble: shown whenever the answer is NOT
-                             inside the open chain (finalized, chain collapsed, or no chain) -->
-                        <template x-for="(message, messageIndex) in (!processing || !hasChain || collapsed ? (turn.final_messages ?? []) : [])" :key="'final-'+messageIndex">
-                            {% include 'chat/turns/assistant_stream.html' %}
-                        </template>
+                            <!-- The provisional answer stays semantically separate from the
+                                 agent chain. It can be visually adjacent, but it is never a
+                                 step/station in the Process body. -->
+                            <template x-for="(message, messageIndex) in (turn.final_messages ?? [])" :key="'final-'+messageIndex">
+                                <div class="live-answer">
+                                    {% include 'chat/turns/assistant_stream.html' %}
+                                </div>
+                            </template>
+                        </div>
                     </div>
                 </div>
             </template>

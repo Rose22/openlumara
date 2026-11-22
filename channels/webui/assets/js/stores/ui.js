@@ -258,10 +258,13 @@ UI_STORE = {
 
     // while the live chain is capped it scrolls itself (x-auto-scroll);
     // pumping the outer window at the same time makes the two scrollers
-    // fight, so the outer follow stands down until the chain breaks free
+    // fight, so the outer follow stands down until the chain breaks free.
+    // a live answer is outside the chain, so once the answer exists the
+    // outer window must follow it even if the process body is still scrollable
     _chainOwnsScroll() {
         const body = document.querySelector('.agent-chain.is-streaming .agent-chain-body');
         if (!body) return false;
+        if (document.querySelector('.live-turn-shell .live-answer')) return false;
         return body.scrollHeight > body.clientHeight + 1;
     },
 

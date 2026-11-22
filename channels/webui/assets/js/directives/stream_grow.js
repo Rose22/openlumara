@@ -3,9 +3,9 @@ function streamGrow(el) {
     let raf = null
     let ro = null
 
-    const chainOpen = () => !!el.querySelector('.agent-chain-body')
-
-    const eligible = () => Alpine.store('stream').state !== 'idle' && chainOpen()
+    const isReleased = () => el.classList.contains('stream-grow-released')
+    const hasGrowContent = () => !!el.querySelector('.agent-chain-body, .live-answer')
+    const eligible = () => Alpine.store('stream').state !== 'idle' && hasGrowContent() && !isReleased()
 
     const setMin = (value) => {
         Alpine.mutateDom(() => {
@@ -30,6 +30,10 @@ function streamGrow(el) {
             return
         }
 
+        // The live shell is the stable surface: it contains both the process
+        // chain and the provisional answer. Do not release the pin when a
+        // provisional answer appears/retracts; otherwise repeated provisional
+        // content causes layout jumps.
         const height = naturalHeight()
         if (height > max) {
             max = height
@@ -44,11 +48,15 @@ function streamGrow(el) {
         if (raf !== null) return
         raf = requestAnimationFrame(() => {
             raf = null
-            const bodyBefore = el.querySelector('.agent-chain-body')
+            const before = growTargets()
             apply()
-            if (el.querySelector('.agent-chain-body') !== bodyBefore) observeContent()
+            if (!sameTargets(before, growTargets())) observeContent()
         })
     }
+
+    const growTargets = () => Array.from(el.querySelectorAll('.agent-chain, .agent-chain-body, .live-answer'))
+
+    const sameTargets = (a, b) => a.length === b.length && a.every((x, i) => x === b[i])
 
     const observeContent = () => {
         ro?.disconnect()
@@ -56,15 +64,15 @@ function streamGrow(el) {
         if (typeof ResizeObserver === 'undefined') return
         ro = new ResizeObserver(schedule)
         ro.observe(el)
-        const body = el.querySelector('.agent-chain-body')
-        if (body) ro.observe(body)
+        for (const target of growTargets()) ro.observe(target)
     }
 
-    const isChainNode = (node) => {
+    const isTrackedNode = (node) => {
         return node.nodeType === 1 && (
             node.classList.contains('agent-chain') ||
             node.classList.contains('agent-chain-body') ||
-            node.closest('.agent-chain')
+            node.classList.contains('live-answer') ||
+            node.closest('.agent-chain, .live-answer')
         )
     }
 
@@ -72,20 +80,20 @@ function streamGrow(el) {
         for (const mutation of mutations) {
             if (mutation.type !== 'childList') continue
 
-            if (mutation.target.nodeType === 1 && mutation.target.closest('.agent-chain')) {
+            if (mutation.target.nodeType === 1 && mutation.target.closest('.agent-chain, .live-answer')) {
                 schedule()
                 return
             }
 
             for (const node of mutation.addedNodes) {
-                if (isChainNode(node)) {
+                if (isTrackedNode(node)) {
                     schedule()
                     return
                 }
             }
 
             for (const node of mutation.removedNodes) {
-                if (isChainNode(node)) {
+                if (isTrackedNode(node)) {
                     schedule()
                     return
                 }
@@ -98,7 +106,8 @@ function streamGrow(el) {
     observeContent()
 
     const stop = Alpine.effect(() => {
-        void Alpine.store('stream').state
+        const state = Alpine.store('stream').state
+        if (state === 'message_sending') el.classList.remove('stream-grow-released')
         schedule()
     })
 

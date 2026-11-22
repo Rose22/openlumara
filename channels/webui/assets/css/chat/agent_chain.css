@@ -268,20 +268,8 @@
         font-size: 0.85rem;
     }
 
-    /* the provisional answer rides in the chain as a station, but must look
-       exactly like a normal answer bubble: the chain widget shrinks itself to
-       0.85rem, which a plain `inherit` cannot undo, so the bubble's root font
-       size is restored explicitly here */
-    .chain-final {
-        font-size: var(--font-size-base);
-        line-height: 1.6;
-        color: var(--text-primary);
-    }
-
-    .chain-final .content {
-        color: var(--text-primary);
-        font-size: var(--font-size-base);
-    }
+    /* The provisional answer used to ride in the chain as a station.
+       It now lives outside the chain as .live-answer. */
 
     .chain-end {
         display: flex;
@@ -298,4 +286,32 @@
             margin-top: -2px;
         }
     }
+}
+
+/* provisional answer for the live turn. It is a sibling of the agent chain,
+   not a chain station, so it must restore the normal message typography. */
+.live-turn-shell {
+    display: flex;
+    flex-direction: column;
+}
+
+.live-turn-shell > .live-answer {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.live-answer {
+    min-width: 0;
+    color: var(--text-primary);
+    font-size: var(--font-size-base);
+    line-height: 1.6;
+}
+
+.agent-chain + .live-answer {
+    margin-top: 0.45rem;
+}
+
+.live-answer .content {
+    color: var(--text-primary);
+    font-size: var(--font-size-base);
 }
