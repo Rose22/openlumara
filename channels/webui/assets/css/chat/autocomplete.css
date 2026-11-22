@@ -1,0 +1,96 @@
+/* ==========================================================================
+ *  Slash-Command Autocomplete Dropdown (see js/components/command_autocomplete.js)
+ *  ========================================================================== */
+
+#autocomplete-anchor {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 100%;
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+    z-index: 60;
+}
+
+#chat-window #input .autocomplete-dropdown {
+    pointer-events: auto;
+    width: var(--chat-content-width, calc(100% - 28px));
+    max-width: calc(100% - 28px);
+    max-height: 300px;
+    overflow-y: auto;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-bottom: none;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    box-shadow: var(--shadow-medium);
+    display: flex;
+    flex-direction: column;
+    scrollbar-width: thin;
+
+    .autocomplete-category {
+        padding: 6px 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        background: var(--bg-tertiary);
+        border-bottom: 1px solid var(--border-color);
+        letter-spacing: 0.05em;
+        position: sticky;
+        top: 0;
+    }
+
+    .autocomplete-item {
+        padding: 8px 12px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: background 0.15s ease;
+        font-size: 0.9rem;
+        color: var(--text-primary);
+
+        &:hover,
+        &.selected {
+            background: var(--button-hover);
+            color: var(--accent);
+        }
+
+        &.selected {
+            font-weight: 500;
+        }
+
+        .cmd-name {
+            font-family: monospace;
+            font-weight: 600;
+            white-space: nowrap;
+
+            mark {
+                background: color-mix(in srgb, var(--accent) 25%, transparent);
+                color: inherit;
+                border-radius: 3px;
+                padding: 0 1px;
+            }
+        }
+
+        .cmd-desc {
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            margin-left: auto;
+            text-align: right;
+            max-width: 60%;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+    }
+}
+
+/* on mobile / docked the input bar spans the full width anyway */
+@media (max-width: 768px), (orientation: portrait) and (max-width: 1024px) {
+    #chat-window #input .autocomplete-dropdown {
+        width: 100%;
+        border-radius: 0;
+    }
+}

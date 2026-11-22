@@ -38,6 +38,19 @@ def register(app, channel):
     async def get_logs():
         return utils.api_result(channel.logs)
 
+    # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-11-23) harness:openlumara
+    # slash-command autocomplete (ported from the old webui): the frontend
+    # needs the configured prefix plus the full command list, so it can show
+    # suggestions while the user types. not admin-only: any chat user can
+    # run these commands anyway.
+    @app.get("/api/command_prefix")
+    async def get_command_prefix():
+        return utils.api_result(core.config.get("core", "cmd_prefix"))
+
+    @app.get("/api/commands")
+    async def get_commands():
+        return utils.api_result(core.commands.get_commands(channel.manager.modules))
+
     # -- POST
     @app.post("/api/system/restart")
     async def restart_server():

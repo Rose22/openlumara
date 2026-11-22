@@ -34,13 +34,8 @@ document.addEventListener('alpine:init', async () => {
     // defined in directives/
     
     // pass Alpine's cleanup hook through, otherwise the teardown fn returned by
-    // autoScroll() is ignored and scroll listeners + MutationObservers leak per element.
-    // the effect hook re-syncs the streaming height ratchet on every morph, which
-    // is also when the element first lands in the DOM (setup runs on a placeholder)
-    Alpine.directive('auto-scroll', (el, modifiers, { cleanup, effect }) => {
-        effect(() => autoscrollSyncStreaming(el));
-        cleanup(autoScroll(el));
-    });
+    // autoScroll() is ignored and scroll listeners + MutationObservers leak per element
+    Alpine.directive('auto-scroll', (el, modifiers, { cleanup }) => cleanup(autoScroll(el)));
     Alpine.directive('md', markdownRender);
 
     // x-text / x-html variants that fade newly streamed content in

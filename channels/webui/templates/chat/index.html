@@ -277,6 +277,28 @@
         </div>
     </template>
 
+    <!-- slash-command autocomplete (see js/components/command_autocomplete.js) -->
+    <div id="autocomplete-anchor" x-data="commandAutocomplete()" x-cloak
+         @click.outside="hide()"
+         x-effect="watch($store.chat.user_input)">
+        <div class="autocomplete-dropdown" x-show="visible">
+            <template x-for="group in groups" :key="group.category">
+                <div>
+                    <div class="autocomplete-category" x-text="group.category"></div>
+                    <template x-for="cmd in group.cmds" :key="cmd.name">
+                        <div class="autocomplete-item"
+                             :class="{ 'selected': selectedName === cmd.name }"
+                             @click="accept()"
+                             @mouseenter="select(items.findIndex(i => i.name === cmd.name))">
+                            <span class="cmd-name" x-html="cmd.nameHtml"></span>
+                            <span class="cmd-desc" x-text="cmd.desc"></span>
+                        </div>
+                    </template>
+                </div>
+            </template>
+        </div>
+    </div>
+
     <div class="input-wrapper">
         {% include 'chat/input.html' %}
     </div>
