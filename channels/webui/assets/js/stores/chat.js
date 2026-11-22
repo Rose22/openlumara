@@ -71,6 +71,7 @@ CHAT_STORE = {
     loadingOlder: false,
     turnPageSize: 5,
     olderTriggerPx: 300,
+    olderPrefetchPx: 600,
     _olderIntersecting: false,
     _unloadQueued: false,
     _lastUnloadAt: 0,
@@ -423,7 +424,6 @@ CHAT_STORE = {
     },
 
     loadOlderTurnsFromIntersect() {
-        if (performance.now() - this._lastUnloadAt < 300) return;
         this._olderIntersecting = true;
         this._fillOlderWhileIntersecting();
     },
@@ -433,8 +433,20 @@ CHAT_STORE = {
     },
 
     async _fillOlderWhileIntersecting() {
-        while (this._olderIntersecting && this.hasMoreOlder && !this.loadingOlder) {
-            if (performance.now() - this._lastUnloadAt < 300) return;
+        while (this._olderIntersecting && this.hasMoreOlder) {
+            const sinceUnload = performance.now() - this._lastUnloadAt;
+
+            if (sinceUnload < 300) {
+                await new Promise(resolve => setTimeout(resolve, 300 - sinceUnload + 1));
+                if (!this._olderIntersecting) return;
+                continue;
+            }
+
+            if (this.loadingOlder) {
+                await Alpine.nextTick();
+                continue;
+            }
+
             await this.loadOlderTurns();
             await Alpine.nextTick();
             await new Promise(resolve => requestAnimationFrame(resolve));

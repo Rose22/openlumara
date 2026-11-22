@@ -41,7 +41,7 @@
         only a window of the chat is loaded (see $store.chat.turnStart).
     -->
     <div class="older-turns" x-show="$store.chat.hasMoreOlder" x-cloak
-         x-intersect:enter.parent.margin.300px.0px.0px.0px="$store.chat.loadOlderTurnsFromIntersect()"
+         x-intersect:enter.parent.margin.600px.0px.0px.0px="$store.chat.loadOlderTurnsFromIntersect()"
          x-intersect:leave.parent="$store.chat.olderTurnsLeftIntersect()"
          @click="$store.chat.loadOlderTurns()">
         <span class="older-spinner" x-show="$store.chat.loadingOlder"></span>
