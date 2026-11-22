@@ -348,7 +348,11 @@ UI_STORE = {
         this.saveSidebarVisibility();
     },
 
-    async openModal(name) {
+    // when set, the settings modal opens straight on this category
+    // (used by the command palette; consumed by the modal's init)
+    settingsCategory: null,
+
+    async openModal(name, category = null) {
         if (this.currentModal === 'settings' && name !== 'settings') {
             const settings = Alpine.store('settings');
             if (settings.hasChanges &&
@@ -357,6 +361,7 @@ UI_STORE = {
             }
         }
 
+        this.settingsCategory = (name === 'settings') ? category : null;
         this.currentModal = name;
 
         /*

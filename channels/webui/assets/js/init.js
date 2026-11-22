@@ -20,6 +20,9 @@ document.addEventListener('alpine:init', async () => {
     Alpine.store('upload', UPLOAD_STORE);
     Alpine.store('htmlPreview', HTML_PREVIEW_STORE);
 
+    // command palette (Ctrl+K), see components/command_palette.js
+    Alpine.store('palette', PALETTE);
+
     // user-rebindable keyboard shortcuts (localStorage-backed)
     Alpine.store('keyboard', KEYBOARD_STORE);
     Alpine.store('keyboard').init();
@@ -31,8 +34,13 @@ document.addEventListener('alpine:init', async () => {
     // defined in directives/
     
     // pass Alpine's cleanup hook through, otherwise the teardown fn returned by
-    // autoScroll() is ignored and scroll listeners + MutationObservers leak per element
-    Alpine.directive('auto-scroll', (el, modifiers, { cleanup }) => cleanup(autoScroll(el)));
+    // autoScroll() is ignored and scroll listeners + MutationObservers leak per element.
+    // the effect hook re-syncs the streaming height ratchet on every morph, which
+    // is also when the element first lands in the DOM (setup runs on a placeholder)
+    Alpine.directive('auto-scroll', (el, modifiers, { cleanup, effect }) => {
+        effect(() => autoscrollSyncStreaming(el));
+        cleanup(autoScroll(el));
+    });
     Alpine.directive('md', markdownRender);
 
     // x-text / x-html variants that fade newly streamed content in
@@ -49,6 +57,18 @@ document.addEventListener('alpine:init', async () => {
     Alpine.directive('prompt-marker', (el, { expression }, { evaluateLater, cleanup }) => {
         const run = evaluateLater(expression);
         cleanup(promptMarker(el, (intersecting) => run(() => {}, { scope: { intersecting } })));
+    });
+
+    // clones a command palette icon (see the #cmd-icons sprite) into the row,
+    // re-resolving whenever the expression changes
+    Alpine.directive('cmd-icon', (el, { expression }, { evaluate }) => {
+        el.replaceChildren();
+
+        const sprite = document.getElementById('cmd-icons');
+        const src = sprite && sprite.querySelector(`[data-cmdi="${evaluate(expression)}"]`);
+        const fallback = sprite && sprite.querySelector('[data-cmdi="sparkle"]');
+
+        if (src || fallback) el.appendChild((src ?? fallback).firstElementChild.cloneNode(true));
     });
 
     self.notice = "Please wait, connecting to backend server..";

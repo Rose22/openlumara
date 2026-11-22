@@ -1,0 +1,171 @@
+/* ==========================================================================
+ *  Command Palette (Ctrl+K)
+ *  ========================================================================== */
+
+.cmd-palette-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1200;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(2px);
+    padding-top: 12vh;
+}
+
+.cmd-palette {
+    display: flex;
+    flex-direction: column;
+    width: min(620px, 92vw);
+    max-height: min(480px, 70vh);
+    overflow: hidden;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-strong);
+}
+
+.cmd-input-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.cmd-search-icon {
+    flex-shrink: 0;
+    color: var(--text-muted);
+}
+
+#command-palette-input {
+    flex: 1;
+    min-width: 0;
+    background: transparent;
+    border: none;
+    outline: none;
+    font-size: 1rem;
+    color: var(--text-primary);
+}
+
+#command-palette-input::placeholder {
+    color: var(--text-muted);
+}
+
+.cmd-list {
+    flex: 1;
+    padding: 6px;
+    overflow-y: auto;
+}
+
+.cmd-row {
+    width: 100%;
+}
+
+.cmd-group-label {
+    flex-shrink: 0;
+    padding: 10px 12px 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.cmd-item {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 8px 12px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s;
+}
+
+.cmd-item.active {
+    background: var(--bg-secondary);
+    border-color: var(--accent);
+}
+
+.cmd-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    color: var(--text-muted);
+}
+
+.cmd-icon svg {
+    width: 16px;
+    height: 16px;
+}
+
+.cmd-item.active .cmd-icon {
+    color: var(--accent);
+}
+
+#cmd-icons {
+    display: none;
+}
+
+.cmd-label {
+    flex: 1;
+    overflow: hidden;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    color: var(--text-primary);
+}
+
+.cmd-hint {
+    flex-shrink: 0;
+    padding: 2px 6px;
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+}
+
+.cmd-kbd {
+    flex-shrink: 0;
+    padding: 2px 6px;
+    font-size: 0.65rem;
+    color: var(--text-secondary);
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+}
+
+.cmd-empty {
+    padding: 40px 20px;
+    font-size: 0.9rem;
+    text-align: center;
+    color: var(--text-muted);
+}
+
+.cmd-footer {
+    display: flex;
+    gap: 16px;
+    padding: 8px 16px;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    border-top: 1px solid var(--border-color);
+}
+
+.cmd-footer kbd {
+    padding: 1px 5px;
+    margin-right: 4px;
+    font-size: 0.65rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+}
+
+@media (max-width: 768px) {
+    .cmd-palette-overlay {
+        padding-top: 6vh;
+    }
+}

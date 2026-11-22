@@ -85,7 +85,7 @@
 
         {{ extension_slot("head") }}
     </head>
-    <body>
+    <body{% if login_enabled %} data-login-enabled{% endif %}>
         <!-- 
             we use alpine stores for data access across the app,
             as putting every possible thing in one massive data object was no fun

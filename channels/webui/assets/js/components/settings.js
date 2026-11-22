@@ -117,7 +117,13 @@ function settingsModal() {
             this.themeFamily = Alpine.store('theme').family;
             this.themeMode = Alpine.store('theme').mode;
 
-            this.activeCategory = "appearance";
+            // the command palette (or anything else) can aim the modal at a
+            // specific page through the ui store before opening it
+            const aimed = Alpine.store('ui').settingsCategory;
+            this.activeCategory = (aimed && Alpine.store('settings').categories?.[aimed])
+                ? aimed
+                : "appearance";
+            Alpine.store('ui').settingsCategory = null;
 
             // restore which sidebar categories were folded away last time
             try {

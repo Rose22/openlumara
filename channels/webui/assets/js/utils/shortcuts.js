@@ -60,6 +60,11 @@ const SHORTCUT_DEFS = [
         default: 'Ctrl+Shift+G'
     },
     {
+        id: 'command_palette', label: 'Command palette',
+        description: 'Open the command palette, which reaches every action in the interface.',
+        default: 'Ctrl+K'
+    },
+    {
         id: 'global_search', label: 'Global search',
         description: 'Open (or close) the global search dialog.',
         default: 'Ctrl+Space'

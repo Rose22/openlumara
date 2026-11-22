@@ -1,0 +1,97 @@
+<!-- Command palette (Ctrl+K) -->
+
+<!--
+    icon sprite: every palette icon name resolves to a node in this hidden
+    block, which x-cmd-icon clones into the row. existing ui icons are reused
+    straight from templates/svg; palette-specific ones are the cmd_*.svg files.
+-->
+<div id="cmd-icons" aria-hidden="true">
+    <span data-cmdi="add">{% include 'svg/add.svg' %}</span>
+    <span data-cmdi="trash">{% include 'svg/trash.svg' %}</span>
+    <span data-cmdi="clear">{% include 'svg/cmd_clear.svg' %}</span>
+    <span data-cmdi="download">{% include 'svg/download.svg' %}</span>
+    <span data-cmdi="edit">{% include 'svg/edit.svg' %}</span>
+    <span data-cmdi="folder">{% include 'svg/folder.svg' %}</span>
+    <span data-cmdi="stop">{% include 'svg/stop.svg' %}</span>
+    <span data-cmdi="scroll-bottom">{% include 'svg/cmd_scroll-bottom.svg' %}</span>
+    <span data-cmdi="arrow-up">{% include 'svg/cmd_arrow-up.svg' %}</span>
+    <span data-cmdi="arrow-down">{% include 'svg/cmd_scroll-bottom.svg' %}</span>
+    <span data-cmdi="sidebar">{% include 'svg/cmd_sidebar.svg' %}</span>
+    <span data-cmdi="panel-close">{% include 'svg/cmd_panel-close.svg' %}</span>
+    <span data-cmdi="search">{% include 'svg/search.svg' %}</span>
+    <span data-cmdi="brain">{% include 'svg/brain.svg' %}</span>
+    <span data-cmdi="lightbulb">{% include 'svg/cmd_lightbulb.svg' %}</span>
+    <span data-cmdi="sun-moon">{% include 'svg/cmd_sun-moon.svg' %}</span>
+    <span data-cmdi="clipboard">{% include 'svg/clipboard.svg' %}</span>
+    <span data-cmdi="server">{% include 'svg/cmd_server.svg' %}</span>
+    <span data-cmdi="gear">{% include 'svg/gear.svg' %}</span>
+    <span data-cmdi="reload">{% include 'svg/reload.svg' %}</span>
+    <span data-cmdi="logout">{% include 'svg/logout.svg' %}</span>
+    <span data-cmdi="cube">{% include 'svg/cube.svg' %}</span>
+    <span data-cmdi="layers">{% include 'svg/layers.svg' %}</span>
+    <span data-cmdi="wrench">{% include 'svg/wrench.svg' %}</span>
+    <span data-cmdi="chat">{% include 'svg/chat.svg' %}</span>
+    <span data-cmdi="chat-page">{% include 'svg/cmd_chat-page.svg' %}</span>
+    <span data-cmdi="turn-up">{% include 'svg/cmd_turn-up.svg' %}</span>
+    <span data-cmdi="turn-down">{% include 'svg/cmd_turn-down.svg' %}</span>
+    <span data-cmdi="keyboard">{% include 'svg/keyboard.svg' %}</span>
+    <span data-cmdi="sparkle">{% include 'svg/cmd_sparkle.svg' %}</span>
+</div>
+
+<template x-if="$store.palette.visible" x-cloak>
+    <div class="cmd-palette-overlay" @click.self="$store.palette.close()">
+        <div class="cmd-palette">
+            <div class="cmd-input-row">
+                <svg class="cmd-search-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <path d="m21 21-4.35-4.35"></path>
+                </svg>
+                <input id="command-palette-input" type="text"
+                       x-model="$store.palette.query"
+                       @input="$store.palette.rebuild()"
+                       @keydown.escape.stop.prevent="$store.palette.close()"
+                       @keydown.arrow-down.prevent="$store.palette.move(1)"
+                       @keydown.arrow-up.prevent="$store.palette.move(-1)"
+                       @keydown.page-down.prevent="$store.palette.move($store.palette.pageStep())"
+                       @keydown.page-up.prevent="$store.palette.move(-$store.palette.pageStep())"
+                       @keydown.enter.prevent="$store.palette.runActive()"
+                       placeholder="Type a command.."
+                       aria-label="Command palette">
+            </div>
+
+            <div class="cmd-list" id="cmd-list">
+                <!--
+                    one flat x-for: headers are rows too. a nested x-for under
+                    x-if re-renders whole groups when keys churn, which let the
+                    highlight visibly jump past categories; with a single list,
+                    row === index always.
+                -->
+                <template x-for="(row, i) in $store.palette.rows" :key="row.id">
+                    <div class="cmd-row">
+                        <div class="cmd-group-label" x-show="row.header" x-text="row.label"></div>
+                        <div class="cmd-item" x-show="!row.header"
+                             :class="{ 'active': $store.palette.activeIndex === i }"
+                             @click="$store.palette.runItem(row.cmd)"
+                             @mouseenter="$store.palette.activeIndex = i"
+                             role="button" tabindex="-1">
+                            <span class="cmd-icon" x-cmd-icon="row.cmd.icon" aria-hidden="true"></span>
+                            <span class="cmd-label" x-text="row.cmd.label"></span>
+                            <span class="cmd-hint" x-show="row.cmd.hint" x-text="row.cmd.hint"></span>
+                            <kbd class="cmd-kbd" x-show="$store.palette.keyFor(row.cmd)" x-text="$store.palette.keyFor(row.cmd)"></kbd>
+                        </div>
+                    </div>
+                </template>
+
+                <div class="cmd-empty" x-show="$store.palette.rows.length === 0" x-cloak>
+                    No matching commands
+                </div>
+            </div>
+
+            <div class="cmd-footer">
+                <span><kbd>↑</kbd><kbd>↓</kbd> navigate</span>
+                <span><kbd>↵</kbd> run</span>
+                <span><kbd>esc</kbd> close</span>
+            </div>
+        </div>
+    </div>
+</template>

@@ -18,6 +18,54 @@
 window.AUTOSCROLL_DAMP ??= 0.1;
 window.AUTOSCROLL_PUMP_MS ??= 0;
 
+/*
+ * one-way height while streaming: the live agent chain only ever grows (up
+ * to its CSS max-height), never shrinks back when content re-syncs shorter.
+ * without the ratchet, a mid-stream retract yanks the whole message list
+ * upward - exactly the jump the pump below refuses to chase. when
+ * .is-streaming is gone the floor is released (just after the end-of-turn
+ * fold animation) and the body collapses to its content size again.
+ *
+ * syncs from two places: the MutationObserver below (content changes), and
+ * the Alpine effect hook in init.js (every morph - that is when
+ * .is-streaming flips, and when the directive element first lands in the
+ * DOM, since setup itself runs on a detached placeholder).
+ */
+const AUTOSCROLL_PEAKS = new WeakMap();
+
+function autoscrollSyncStreaming(el) {
+    // a live chain: ratchet the floor upward. null peak means the floor was
+    // already released, so growth starts fresh instead of re-arming an old
+    // (possibly reused) element's stale peak
+    if (el.closest && el.closest('.agent-chain.is-streaming')) {
+        // a release timer may still be pending when a reused node goes live
+        // again: disarm it, its clear must not fire mid-stream
+        clearTimeout(el._autoscrollClearTimer);
+
+        const peak = AUTOSCROLL_PEAKS.get(el);
+        if (peak === null) AUTOSCROLL_PEAKS.set(el, 0);
+
+        const h = el.scrollHeight;
+        if (h > (peak ?? 0)) {
+            AUTOSCROLL_PEAKS.set(el, h);
+            el.style.minHeight = h + 'px';
+        }
+        return;
+    }
+
+    if (AUTOSCROLL_PEAKS.get(el) && el.style.minHeight) {
+        AUTOSCROLL_PEAKS.set(el, null);
+        // give the stream_complete fold animation room to play before the
+        // floor is removed, so releasing never fights the collapse. if the
+        // element morphed back into a live chain by then (instant regenerate
+        // reusing the node), leave the floor to the growth path above
+        clearTimeout(el._autoscrollClearTimer);
+        el._autoscrollClearTimer = setTimeout(() => {
+            if (!el.closest || !el.closest('.agent-chain.is-streaming')) el.style.minHeight = '';
+        }, 400);
+    }
+}
+
 function autoScroll(el) {
   let isAtBottom = true;
   let pumpRaf = null;
@@ -26,6 +74,8 @@ function autoScroll(el) {
   let pumpTarget = 0;
 
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+
 
   const checkBottom = () => {
     const threshold = 50; // px tolerance
@@ -121,6 +171,8 @@ function autoScroll(el) {
   el.addEventListener('scroll', onScroll);
 
   const observer = new MutationObserver(() => {
+    autoscrollSyncStreaming(el);
+
     const height = el.scrollHeight;
 
     // A collapse is a height decrease. Follow growth only; shrinking content
@@ -169,3 +221,5 @@ function autoScroll(el) {
     observer.disconnect();
   };
 }
+
+
