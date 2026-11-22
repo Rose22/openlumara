@@ -167,6 +167,7 @@
 
 :root {
     interpolate-size: allow-keywords;
+    --floating-input-height: 72px;
 }
 
 /* x-for needs a single root; display:contents keeps it from becoming a box,
@@ -197,7 +198,7 @@
 /* floating (non-docked) input bar: an overlay surface the chat scrolls
    beneath, with the same frosted-glass treatment as the pinned prompt */
 #chat-window:has(#input:not(.docked)) #messages {
-    padding-bottom: 72px;
+    padding-bottom: calc(var(--floating-input-height) + 12px);
 }
 
 #chat-window #input:not(.docked) {

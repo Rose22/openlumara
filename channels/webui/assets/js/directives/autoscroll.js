@@ -22,6 +22,8 @@ function autoScroll(el) {
   let isAtBottom = true;
   let pumpRaf = null;
   let pumpLast = 0;
+  let lastScrollHeight = el.scrollHeight;
+  let pumpTarget = 0;
 
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
@@ -55,13 +57,34 @@ function autoScroll(el) {
   // which stops the loop and re-evaluates the resting position.
   const pumpHop = (dt) => {
     const bottom = el.scrollHeight - el.clientHeight;
-    const remaining = bottom - el.scrollTop;
-    if (remaining <= 1) {
-      el.scrollTo({ top: bottom, behavior: 'instant' });
+
+    // Collapsing content lowers the bottom. Do not chase it: that is the jump
+    // we are trying to avoid. Let native scroll anchoring hold the visual point.
+    if (bottom < pumpTarget - 1) {
+      lastScrollHeight = el.scrollHeight;
       stopPump();
       checkBottom();
       return false;
     }
+
+    pumpTarget = Math.max(pumpTarget, bottom);
+    const remaining = bottom - el.scrollTop;
+
+    if (remaining <= 1) {
+      if (bottom < el.scrollTop - 1) {
+        lastScrollHeight = el.scrollHeight;
+        stopPump();
+        checkBottom();
+        return false;
+      }
+
+      el.scrollTo({ top: bottom, behavior: 'instant' });
+      lastScrollHeight = el.scrollHeight;
+      stopPump();
+      checkBottom();
+      return false;
+    }
+
     el.scrollTo({ top: el.scrollTop + remaining * dampFor(dt), behavior: 'instant' });
     return true;
   };
@@ -98,14 +121,35 @@ function autoScroll(el) {
   el.addEventListener('scroll', onScroll);
 
   const observer = new MutationObserver(() => {
+    const height = el.scrollHeight;
+
+    // A collapse is a height decrease. Follow growth only; shrinking content
+    // must not pull the user toward the new bottom.
+    if (height < lastScrollHeight - 1) {
+      lastScrollHeight = height;
+      stopPump();
+      checkBottom();
+      return;
+    }
+
+    lastScrollHeight = height;
+
     if (!isAtBottom) return;
 
+    const bottom = Math.max(0, height - el.clientHeight);
+    if (bottom <= el.scrollTop + 1) {
+      checkBottom();
+      return;
+    }
+
     if (reducedMotion.matches) {
-      el.scrollTo({ top: el.scrollHeight, behavior: 'instant' });
+      el.scrollTo({ top: bottom, behavior: 'instant' });
+      checkBottom();
       return;
     }
 
     if (pumpRaf === null) {
+      pumpTarget = bottom;
       el.addEventListener('wheel', giveUp, { passive: true });
       el.addEventListener('touchstart', giveUp, { passive: true });
       // seed with the current time so the very first hop sees a real

@@ -22,6 +22,7 @@ UI_STORE = {
     _pumpRaf: null,
     _pumpEl: null,
     _pumpLast: 0,
+    _pumpTarget: 0,
 
     _updateShouldScroll(el) {
         const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
@@ -31,6 +32,7 @@ UI_STORE = {
     _stopPump() {
         if (this._pumpRaf !== null) cancelAnimationFrame(this._pumpRaf);
         this._pumpRaf = null;
+        this._pumpTarget = 0;
         this._suppressScroll = false;
     },
 
@@ -43,13 +45,31 @@ UI_STORE = {
         if (!el) return false;
 
         const bottom = el.scrollHeight - el.clientHeight;
+
+        // One-way follow: growing content pulls the view along, but collapsing
+        // content must not drag the user toward a newly shortened bottom.
+        if (bottom < this._pumpTarget - 1) {
+            this._stopPump();
+            this._updateShouldScroll(el);
+            return false;
+        }
+
+        this._pumpTarget = Math.max(this._pumpTarget, bottom);
+
         const remaining = bottom - el.scrollTop;
         if (remaining <= 1) {
+            if (bottom < el.scrollTop - 1) {
+                this._stopPump();
+                this._updateShouldScroll(el);
+                return false;
+            }
+
             el.scrollTo({ top: bottom, behavior: 'instant' });
             this._stopPump();
             this._updateShouldScroll(el);
             return false;
         }
+
         el.scrollTo({ top: el.scrollTop + remaining * this._lerpDamp(dt), behavior: 'instant' });
         return true;
     },
@@ -77,9 +97,14 @@ UI_STORE = {
     },
 
     _pumpScrollToBottom(el) {
+        const bottom = Math.max(0, el.scrollHeight - el.clientHeight);
+
         if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
             this._stopPump();
-            el.scrollTo({ top: el.scrollHeight, behavior: 'instant' });
+            if (bottom > el.scrollTop + 1) {
+                el.scrollTo({ top: bottom, behavior: 'instant' });
+            }
+            this._updateShouldScroll(el);
             return;
         }
 
@@ -95,7 +120,15 @@ UI_STORE = {
 
         this._suppressScroll = true;
         this._pumpEl = el;
+
+        if (bottom <= el.scrollTop + 1) {
+            this._suppressScroll = false;
+            this._updateShouldScroll(el);
+            return;
+        }
+
         if (this._pumpRaf === null) {
+            this._pumpTarget = bottom;
             // seed with the current time so the very first hop sees a real
             // frame-sized dt instead of "time since page load"
             this._pumpLast = performance.now();
@@ -173,6 +206,37 @@ UI_STORE = {
     },
 
     expandReasoning: true,
+    _floatingInputObserver: null,
+
+    observeFloatingInput() {
+        const input = document.getElementById('input');
+        if (!input) return;
+
+        let lastHeight = -1;
+        let first = true;
+
+        const update = () => {
+            const height = input.offsetHeight;
+            if (height === lastHeight) return;
+
+            lastHeight = height;
+            document.documentElement.style.setProperty('--floating-input-height', `${height}px`);
+
+            if (!first && this.shouldScroll) {
+                this.forceScrollToBottom('messages');
+            }
+
+            first = false;
+        };
+
+        update();
+
+        if (!this._floatingInputObserver) {
+            this._floatingInputObserver = new ResizeObserver(update);
+        }
+
+        this._floatingInputObserver.observe(input);
+    },
 
     async init() {
         // check if this is a phone
@@ -187,7 +251,7 @@ UI_STORE = {
 
         this.expandReasoning = localStorage.getItem("expandReasoning") !== 'false';
 
-
+        this.observeFloatingInput();
     },
 
     async toggleSidebar() {
