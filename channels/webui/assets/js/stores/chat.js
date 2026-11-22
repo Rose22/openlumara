@@ -1162,7 +1162,8 @@ CHAT_STORE = {
         ? msg.content.filter((b, i) => b?.type === 'text' && b.text && !filenames[i]).map(b => b.text).join('\n\n')
         : msg.content;
 
-      navigator.clipboard.writeText(text)
+      // resolves to whether the write to the clipboard succeeded
+      return navigator.clipboard.writeText(text)
         .then(() => {
             return true;
         })

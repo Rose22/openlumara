@@ -1,0 +1,65 @@
+<template x-if="activeCategory === 'keyboard' && !activeModule && !activeChannel">
+    <div class="settings-section" x-data="keyboardShortcuts()">
+        <h3 class="section-title" x-text="$store.settings.categories.keyboard?.title ?? 'Keyboard'"></h3>
+        <p class="section-desc" x-text="$store.settings.categories.keyboard?.description ?? 'Rebind the keyboard shortcuts used in the chat'"></p>
+
+        <hr>
+
+        <!--
+        <div class="item">
+            <div class="toggle-row">
+                <label>Enable keyboard shortcuts</label>
+                <button class="toggle" type="button" :class="{ active: $store.keyboard.enabled }"
+                        @click="$store.keyboard.setEnabled(!$store.keyboard.enabled)"></button>
+            </div>
+        </div>
+        -->
+
+        <div class="shortcut-toolbar">
+            <h4>Shortcuts</h4>
+            <button type="button" class="shortcut-reset" @click="$store.keyboard.resetAll()">Restore defaults</button>
+        </div>
+
+        <p class="shortcut-hint">
+            Click a shortcut, then press the combination you want. <kbd>Esc</kbd> to cancel,
+            <kbd>Backspace</kbd> to reset a shortcut.
+        </p>
+
+        <div class="shortcut-message" x-show="$store.keyboard.message" x-cloak
+             :class="$store.keyboard.message?.kind" x-text="$store.keyboard.message?.text"></div>
+
+        <div class="shortcut-list">
+            <template x-for="def in $store.keyboard.defs" :key="def.id">
+                <div class="shortcut-item" :class="{ recording: $store.keyboard.recording === def.id }">
+                    <div class="shortcut-info">
+                        <span class="shortcut-label" x-text="def.label"></span>
+                        <span class="shortcut-desc" x-text="def.description"></span>
+                        <span class="shortcut-default" x-show="def.default && $store.keyboard.bindings[def.id] !== def.default"
+                              x-text="'Default: ' + def.default"></span>
+                    </div>
+
+                    <div class="shortcut-keys" data-shortcut-control>
+                        <button type="button" class="shortcut-binding"
+                                :class="{ recording: $store.keyboard.recording === def.id, unbound: !$store.keyboard.bindings[def.id] }"
+                                @click="$store.keyboard.recording === def.id ? $store.keyboard.stopRecording() : $store.keyboard.startRecording(def.id)"
+                                :title="$store.keyboard.recording === def.id ? 'Press a combination.. (Esc to cancel)' : 'Click to rebind'">
+                            <span x-text="$store.keyboard.recording === def.id
+                                ? 'Press keys..'
+                                : ($store.keyboard.bindings[def.id] ? $store.keyboard.bindings[def.id] : 'Unbound')"></span>
+                        </button>
+
+                        <button type="button" class="shortcut-clear" x-show="$store.keyboard.recording === def.id" x-cloak
+                                @click="$store.keyboard.stopRecording()" title="Cancel">
+                            {% include 'svg/cross.svg' %}
+                        </button>
+
+                        <button type="button" class="shortcut-clear" x-show="def.default && $store.keyboard.bindings[def.id] !== def.default" x-cloak
+                                @click="$store.keyboard.resetOne(def.id)" title="Reset this shortcut to its default">
+                            {% include 'svg/reload.svg' %}
+                        </button>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+</template>

@@ -20,6 +20,10 @@ document.addEventListener('alpine:init', async () => {
     Alpine.store('upload', UPLOAD_STORE);
     Alpine.store('htmlPreview', HTML_PREVIEW_STORE);
 
+    // user-rebindable keyboard shortcuts (localStorage-backed)
+    Alpine.store('keyboard', KEYBOARD_STORE);
+    Alpine.store('keyboard').init();
+
     // start the browser notification system
     Alpine.store('notifications', NOTIFY_STORE);
     await Alpine.store('notifications').init();

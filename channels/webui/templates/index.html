@@ -97,7 +97,7 @@
             $store.ui.isMobile = window.isMobileViewport();
 
             if (wasMobile !== $store.ui.isMobile) {
-                $store.ui.showSidebar = !$store.ui.isMobile;
+                $store.ui.applySidebarViewport();
             }
         ">
             {{ extension_slot("above_page") }}
@@ -136,6 +136,9 @@
             </section>
 
             {{ extension_slot("below_page") }}
+
+            <!-- transient feedback bubble for keyboard actions -->
+            <div id="kb-toast" x-show="$store.ui.toastMsg" x-cloak x-text="$store.ui.toastMsg"></div>
         </div>
 
         <!-- utility functions used by everything else -->

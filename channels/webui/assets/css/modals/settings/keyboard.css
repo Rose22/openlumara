@@ -1,0 +1,194 @@
+/* ==========================================================================
+ *  Settings - Keyboard shortcuts
+ *  ========================================================================== */
+
+.shortcut-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 14px;
+}
+
+.shortcut-toolbar h4 {
+    margin: 0;
+    color: var(--text-primary);
+}
+
+.shortcut-reset {
+    padding: 6px 12px;
+    font-size: 0.78rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.shortcut-reset:hover {
+    border-color: var(--accent);
+    color: var(--text-primary);
+}
+
+.shortcut-hint {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin: 6px 0 14px;
+    line-height: 1.7;
+}
+
+.shortcut-hint kbd {
+    font-family: var(--code-font);
+    font-size: 0.72rem;
+    padding: 1px 6px;
+    border: 1px solid var(--border-color);
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+.shortcut-message {
+    font-size: 0.8rem;
+    padding: 8px 12px;
+    margin-bottom: 12px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+}
+
+.shortcut-message.error {
+    border-color: var(--error, #e5484d);
+    color: var(--error, #e5484d);
+}
+
+.shortcut-message.ok {
+    border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+    color: var(--text-primary);
+}
+
+.shortcut-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.shortcut-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 10px 14px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--bg-primary);
+    transition: border-color 0.2s ease;
+}
+
+.shortcut-item.recording {
+    border-color: var(--accent);
+}
+
+.shortcut-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.shortcut-label {
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.shortcut-desc {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+}
+
+.shortcut-default {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    opacity: 0.8;
+}
+
+.shortcut-keys {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.shortcut-binding {
+    min-width: 130px;
+    padding: 7px 12px;
+    font-family: var(--code-font);
+    font-size: 0.78rem;
+    text-align: center;
+    border: 1px solid var(--border-color);
+    border-bottom-width: 2px;
+    border-radius: var(--radius-md);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.shortcut-binding:hover {
+    border-color: var(--accent);
+}
+
+.shortcut-binding.recording {
+    border-color: var(--accent);
+    color: var(--accent);
+    animation: statusPulse 1.2s ease-in-out infinite;
+}
+
+.shortcut-binding.unbound {
+    color: var(--text-muted);
+    font-style: italic;
+    border-bottom-width: 1px;
+    border-style: dashed;
+}
+
+.shortcut-clear {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-md);
+    background: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.shortcut-clear:hover {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+.shortcut-clear svg {
+    width: 13px;
+    height: 13px;
+}
+
+@media (max-width: 640px) {
+    .shortcut-item {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+
+    .shortcut-keys {
+        justify-content: flex-end;
+    }
+}

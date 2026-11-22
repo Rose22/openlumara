@@ -58,6 +58,9 @@
                         <!-- AUDIO -->
                         {% include 'modals/settings/audio.html' %}
 
+                        <!-- KEYBOARD SHORTCUTS -->
+                        {% include 'modals/settings/keyboard.html' %}
+
                         <!-- SYSTEM PROMPT -->
                         {% include 'modals/settings/system_prompt.html' %}
 
@@ -68,7 +71,7 @@
                         
                         <!-- ALL OTHER $store.settings.categories (core and so on) -->
                         <template x-if="!activeModule && !activeChannel && 
-                                         !['appearance', 'audio', 'modules', 'user_modules', 'channels', 'user_channels', 'your_skills', 'system_prompt', 'system_logs'].includes(activeCategory) && 
+                                         !['appearance', 'audio', 'keyboard', 'modules', 'user_modules', 'channels', 'user_channels', 'your_skills', 'system_prompt', 'system_logs'].includes(activeCategory) && 
                                          activeCategory">
                             <div class="section">
                                 <h3 class="section-title" x-text="$store.settings.categories[activeCategory].title"></h3>

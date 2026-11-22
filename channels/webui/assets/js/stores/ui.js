@@ -18,6 +18,16 @@ UI_STORE = {
     shouldScroll: true,
     scrollToTurnIndex: null,
 
+    // transient feedback bubble for keyboard actions (see #kb-toast in index.html)
+    toastMsg: null,
+    _toastTimer: null,
+
+    toast(msg, ms = 2000) {
+        this.toastMsg = msg;
+        clearTimeout(this._toastTimer);
+        this._toastTimer = setTimeout(() => { this.toastMsg = null; }, ms);
+    },
+
     _suppressScroll: false,
     _pumpRaf: null,
     _pumpEl: null,
@@ -238,13 +248,25 @@ UI_STORE = {
         this._floatingInputObserver.observe(input);
     },
 
+    /*
+     * viewport-driven sidebar visibility. phones always start hidden (the
+     * hamburger owns that state, and a chat tap dismisses the panel), while
+     * a desktop restores whatever Ctrl+B last left it on.
+     */
+    applySidebarViewport() {
+        if (this.isMobile) { this.showSidebar = false; return; }
+
+        this.showSidebar = localStorage.getItem('showSidebar') !== 'false';
+    },
+
     async init() {
         // check if this is a phone
         this.windowWidth = window.innerWidth;
         this.isMobile = window.isMobileViewport();
 
-        // hide sidebar on mobile (in favor of a hamburger button)
-        this.showSidebar = !this.isMobile;
+        // hide sidebar on mobile (in favor of a hamburger button), otherwise
+        // restore the saved show/hide preference
+        this.applySidebarViewport();
 
         // restore the collapsed-sidebar preference (default: expanded)
         this.sidebarCollapsed = localStorage.getItem("sidebarCollapsed") === 'true';
@@ -254,9 +276,76 @@ UI_STORE = {
         this.observeFloatingInput();
     },
 
+    // which sidebar panel the tab strip shows ('' = the chat list)
+    sidebarTab: localStorage.getItem('sidebarTab') || '',
+
+    // single source of truth for the rail-collapsed state
+    setSidebarCollapsed(collapsed) {
+        this.sidebarCollapsed = Boolean(collapsed);
+        localStorage.setItem('sidebarCollapsed', String(this.sidebarCollapsed));
+    },
+
+    // the tab strip's tabs in rendered order (the chat list plus any panel a
+    // module contributed). read from the DOM because the set of panels is
+    // decided server-side per boot.
+    sidebarTabs() {
+        return [...document.querySelectorAll('.sidebar-tab-list .sidebar-tab[data-tab]')]
+            .map(b => b.dataset.tab);
+    },
+
+    setSidebarTab(tab) {
+        if (this.sidebarTab !== tab) {
+            this.sidebarTab = tab;
+            localStorage.setItem('sidebarTab', tab);
+        }
+
+        // moving to a different tab always reveals the panel again: the rail
+        // is only ever collapsed on the tab you're already sitting on
+        if (this.sidebarCollapsed) this.setSidebarCollapsed(false);
+    },
+
+    /*
+     * only an explicit desktop change becomes a saved preference: on a phone
+     * the panel is dismissed transiently (hamburger, picking a chat, an edge
+     * swipe), and remembering that would leave the sidebar hidden the next
+     * time the window happens to be desktop-sized.
+     */
+    saveSidebarVisibility() {
+        if (!this.isMobile) localStorage.setItem('showSidebar', String(this.showSidebar));
+    },
+
+    // reveal the sidebar: a keyboard tab switch must never look like a no-op
+    showSidebarPanel() {
+        if (this.showSidebar) return;
+
+        this.showSidebar = true;
+        this.saveSidebarVisibility();
+    },
+
+    // prev/next sidebar tab, wrapping at both ends
+    cycleSidebarTab(direction) {
+        const tabs = this.sidebarTabs();
+        if (tabs.length < 2) { this.toast('No sidebar tabs to cycle through'); return; }
+
+        // Ctrl+B may have hidden the sidebar: revealing it keeps a keyboard
+        // tab switch from appearing to do nothing at all
+        this.showSidebarPanel();
+
+        const idx = tabs.indexOf(this.sidebarTab);
+        if (idx === -1) {
+            // the current tab isn't in the strip anymore (its module went
+            // away): jump to the end we're heading towards
+            this.setSidebarTab(direction < 0 ? tabs[tabs.length - 1] : tabs[0]);
+            return;
+        }
+
+        this.setSidebarTab(tabs[(idx + direction + tabs.length) % tabs.length]);
+    },
+
     async toggleSidebar() {
         if (this._sidebarDrag) this._sidebarDrag.cleanup();
         this.showSidebar = !this.showSidebar;
+        this.saveSidebarVisibility();
     },
 
     async openModal(name) {

@@ -154,6 +154,14 @@ def build_settings_structure(original_data, module_info, core_sections, skills_e
         "order": order,
         "isThemeCategory": True,
     }
+    order += 1
+    categories["keyboard"] = {
+        "title": "Keyboard",
+        "description": "Rebind the chat's keyboard shortcuts",
+        "order": order,
+        "isThemeCategory": True,
+    }
+    order += 1
     categories["system_prompt"] = {
         "title": "System Prompt",
         "description": "See the current system prompt",

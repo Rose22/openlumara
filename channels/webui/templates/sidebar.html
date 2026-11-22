@@ -1,48 +1,47 @@
 <!-- list of chats -->
 <div class="sidebar-shell" x-data="{
-        sidebarTab: '',
+        // which panel is shown lives in $store.ui.sidebarTab, so clicking a
+        // tab and the prev/next-tab keyboard shortcut drive the same state
         init() {
-            const saved = localStorage.getItem('sidebarTab') || '';
-            const tabs = Array.from(document.querySelectorAll('.sidebar-tab')).map(b => b.dataset.tab);
-            this.sidebarTab = tabs.includes(saved) ? saved : '';
+            // a saved tab whose panel no longer exists (module uninstalled)
+            // would leave the sidebar showing nothing: fall back to the chat
+            // list. validated here rather than in the store because the tabs
+            // only exist in the DOM once Alpine has walked the page.
+            const tabs = Array.from(document.querySelectorAll('.sidebar-tab-list .sidebar-tab[data-tab]')).map(b => b.dataset.tab);
+            if (!tabs.includes($store.ui.sidebarTab)) $store.ui.setSidebarTab('');
                                    
-            // with no extension tabs the tab bar is hidden, so a saved
-            // collapsed state would leave an empty strip with no way to
-            // expand - drop it in that case.
-            if (!$store.ui.isMobile && $store.ui.sidebarCollapsed &&
-                document.querySelectorAll('.sidebar-tab.ext').length === 0) {
-                $store.ui.sidebarCollapsed = false;
-                localStorage.setItem('sidebarCollapsed', 'false');
-            }
+            // collapsing only means something while the tab strip is visible:
+            // with no extension panels a collapsed sidebar is an empty sliver
+            // with nothing to click to expand it again. decided from the
+            // template rather than the live DOM, because this runs before
+            // Alpine has painted - and possibly before $store.ui.init() has
+            // restored the flag.
+            {% if not extension_sidebars() %}
+            $store.ui.setSidebarCollapsed(false);
+            {% endif %}
         },
         setTab(tab) {
-            // toggle the sidebar when clicking the active tab, except on mobile
-            if (tab === this.sidebarTab && !$store.ui.isMobile) {
-                $store.ui.sidebarCollapsed = !$store.ui.sidebarCollapsed;
-                localStorage.setItem('sidebarCollapsed', String($store.ui.sidebarCollapsed));
+            // clicking the tab you're already on collapses/expands the rail,
+            // except on mobile where there is no rail to collapse to
+            if (tab === $store.ui.sidebarTab && !$store.ui.isMobile) {
+                $store.ui.setSidebarCollapsed(!$store.ui.sidebarCollapsed);
                 return;
             }
                                    
-            this.sidebarTab = tab;
-            localStorage.setItem('sidebarTab', tab);
-            // switching to a different tab always reveals the panel again
-            if ($store.ui.sidebarCollapsed) {
-                $store.ui.sidebarCollapsed = false;
-                localStorage.setItem('sidebarCollapsed', 'false');
-            }
+            $store.ui.setSidebarTab(tab);
         },
     }">
     <nav class="sidebar-tabbar" aria-label="Sidebar tabs">
         <div class="sidebar-tab-list">
             <button type="button" class="sidebar-tab" data-tab=""
-                :class="{ 'active': sidebarTab === '' }"
+                :class="{ 'active': $store.ui.sidebarTab === '' }"
                 title="Chats"
                 @click="setTab('')">
                 {% include 'svg/chat.svg' %}
             </button>
             {% for panel in extension_sidebars() %}
             <button type="button" class="sidebar-tab ext" data-tab="{{ panel.module }}/{{ panel.name }}"
-                :class="{ 'active': sidebarTab === '{{ panel.module }}/{{ panel.name }}' }"
+                :class="{ 'active': $store.ui.sidebarTab === '{{ panel.module }}/{{ panel.name }}' }"
                 title="{{ panel.label }}"
                 @click="setTab('{{ panel.module }}/{{ panel.name }}')">
                 {{ panel.icon }}
@@ -61,7 +60,7 @@
         </div>
     </nav>
 
-<div id="chat-list" x-ref="chat-list" x-cloak x-show="sidebarTab === '' && ($store.ui.isMobile || !$store.ui.sidebarCollapsed)" x-data="{
+<div id="chat-list" x-ref="chat-list" x-cloak x-show="$store.ui.sidebarTab === '' && ($store.ui.isMobile || !$store.ui.sidebarCollapsed)" x-data="{
     tagPanel: false,
 
     forgeTags: [],
@@ -515,7 +514,7 @@
     {# the owning module's settings are exposed to the included panel as
        `module_config` (a loop-scoped set is visible to includes) #}
     {% set module_config = panel.config %}
-    <div class="sidebar-panel" x-show="sidebarTab === '{{ panel.module }}/{{ panel.name }}' && ($store.ui.isMobile || !$store.ui.sidebarCollapsed)" x-cloak>
+    <div class="sidebar-panel" x-show="$store.ui.sidebarTab === '{{ panel.module }}/{{ panel.name }}' && ($store.ui.isMobile || !$store.ui.sidebarCollapsed)" x-cloak>
         {% include panel.template %}
     </div>
     {% endfor %}
