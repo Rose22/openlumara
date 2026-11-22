@@ -95,6 +95,28 @@ CHAT_STORE = {
     releasingTurnIndex: null,
     _releaseTimer: null,
 
+    /*
+     * is any user turn currently overlapping the messages viewport? measured
+     * via the pin markers, which always track the turn's true flow position:
+     * a pinned turn is sticky, so its own bounding rect always reports it as
+     * visible. the turn keeps its full flow height while pinned (the min-height
+     * reserve), so marker top + turn offsetHeight is its true flow bottom.
+     */
+    userPromptInView(container) {
+        const rect = container.getBoundingClientRect();
+
+        for (const marker of container.querySelectorAll('.pin-marker')) {
+            const turnEl = marker.nextElementSibling;
+            if (!turnEl || !turnEl.matches('.turn')) continue;
+            if (!turnEl.querySelector(':scope > .message-wrapper.user')) continue;
+
+            const flowTop = marker.getBoundingClientRect().top;
+            if (flowTop < rect.bottom && flowTop + turnEl.offsetHeight > rect.top) return true;
+        }
+
+        return false;
+    },
+
     updatePromptPin(turnIndex, intersecting, marker) {
         if (intersecting) {
             if (this.pinnedTurnIndex !== turnIndex) return;
@@ -118,6 +140,10 @@ CHAT_STORE = {
         if (!container) return;
 
         if (marker.getBoundingClientRect().top > container.getBoundingClientRect().top) return;
+
+        // the pin only exists to keep context visible while the chat window
+        // shows no user prompt of its own
+        if (this.userPromptInView(container)) return;
 
         /*
          * a prompt can only take the pin if it's NEWER than the current one.
@@ -186,7 +212,9 @@ CHAT_STORE = {
         const container = document.getElementById('messages');
         if (!container) return;
 
-        if (!this.pinnedPromptsEnabled()) {
+        // the pin only shows while no user prompt is in view at all; once
+        // any real prompt is on screen the sticky duplicate is redundant
+        if (!this.pinnedPromptsEnabled() || this.userPromptInView(container)) {
             this.clearPromptPin();
             return;
         }
