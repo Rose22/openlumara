@@ -469,14 +469,39 @@ CHAT_STORE = {
             maxDrop = Math.min(maxDrop, this.turnHistory.length - 1);
         }
 
+        // never unload past the newest user turn: it owns the response that
+        // may be filling the viewport below it, and the pinned-prompt feature
+        // needs its marker in the DOM long after it scrolled out the top
+        let lastUser = -1;
+        for (let i = this.turnHistory.length - 1; i >= 0; i--) {
+            if (this.turnHistory[i]?.role === 'user') { lastUser = i; break; }
+        }
+        if (lastUser !== -1) maxDrop = Math.min(maxDrop, lastUser);
+
+        const viewTop = messages.getBoundingClientRect().top;
+
         let drop = 0;
-        for (const turnEl of turnEls) {
+        for (let t = 0; t < turnEls.length; t++) {
             if (drop >= maxDrop) break;
 
+            const turnEl = turnEls[t];
             const idx = Number(turnEl.dataset.turnIndex);
             if (!Number.isFinite(idx) || idx !== this.turnStart + drop) break;
 
             if (turnEl.getBoundingClientRect().bottom >= cutLine) break;
+
+            // pin handover: a user turn must stay loaded until the next newer
+            // user turn's flow position has crossed the viewport top (its
+            // marker tracks the true position even while that turn is pinned
+            // sticky). dropping it earlier leaves the response region above
+            // with no prompt left to pin.
+            if (turnEl.querySelector(':scope > .message-wrapper.user')) {
+                const nextUser = turnEls.slice(t + 1).find(e => e.querySelector(':scope > .message-wrapper.user'));
+                const nextMarker = nextUser ? nextUser.previousElementSibling : null;
+
+                if (!nextMarker || nextMarker.getBoundingClientRect().top >= viewTop) break;
+            }
+
             drop++;
         }
         if (drop <= 0) return;
