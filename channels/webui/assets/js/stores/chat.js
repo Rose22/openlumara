@@ -71,7 +71,6 @@ CHAT_STORE = {
     loadingOlder: false,
     turnPageSize: 5,
     olderTriggerPx: 300,
-    _anchorBusy: false,
     _olderIntersecting: false,
     _unloadQueued: false,
     _lastUnloadAt: 0,
@@ -369,32 +368,12 @@ CHAT_STORE = {
         this.hasMoreOlder = this.turnStart > 0;
     },
 
-    _anchorGen: 0,
-
-    _anchorScrollTo(el, turnEl, offsetTop) {
-        if (!el || !turnEl || !turnEl.isConnected) return;
-
-        const current = turnEl.getBoundingClientRect().top - el.getBoundingClientRect().top;
-        const shift = current - offsetTop;
-
-        if (Math.abs(shift) > 0.5) {
-            el.scrollTo({ top: el.scrollTop + shift, behavior: 'instant' });
-        }
-    },
-
-    async loadOlderTurns(anchor = true) {
+    async loadOlderTurns() {
         if (this.loadingOlder || !this.hasMoreOlder) return;
 
         this.loadingOlder = true;
 
-        const el = document.getElementById('messages');
-
         try {
-            const firstTurnEl = el?.querySelector('.turn') ?? null;
-            const offsetTop = firstTurnEl
-                ? firstTurnEl.getBoundingClientRect().top - el.getBoundingClientRect().top
-                : 0;
-
             const result = await simpleApiFetch(
                 `/api/chat/turns?before=${this.turnStart}&limit=${this.turnPageSize}`
             );
@@ -406,37 +385,15 @@ CHAT_STORE = {
                 return;
             }
 
+            // pure prepend: native scroll anchoring keeps the viewport exactly
+            // where it is while older content appears above it. this requires
+            // #messages to NOT set overflow-anchor: none (see chat/window.css);
+            // any manual scrollTop correction layered on top would double-move
+            // and reintroduce the jump.
             this.turnHistory = turns.concat(this.turnHistory);
             this.turnStart = result.start;
             this.totalTurns = result.total;
             this.hasMoreOlder = result.start > 0;
-
-            if (anchor && firstTurnEl) {
-                const gen = ++this._anchorGen;
-
-                await Alpine.nextTick();
-                this._anchorScrollTo(el, firstTurnEl, offsetTop);
-
-                let settleFrames = 30;
-                let lastTop = el.scrollTop;
-                this._anchorBusy = true;
-                const settle = () => {
-                    if (gen !== this._anchorGen || settleFrames-- <= 0) {
-                        this._anchorBusy = false;
-                        return;
-                    }
-
-                    if (Math.abs(el.scrollTop - lastTop) > 2) {
-                        this._anchorBusy = false;
-                        return;
-                    }
-
-                    this._anchorScrollTo(el, firstTurnEl, offsetTop);
-                    lastTop = el.scrollTop;
-                    requestAnimationFrame(settle);
-                };
-                requestAnimationFrame(settle);
-            }
         } catch (err) {
             console.warn('loading older turns failed:', err);
         } finally {
@@ -496,7 +453,7 @@ CHAT_STORE = {
     _runUnloadCheck() {
         const messages = document.getElementById('messages');
         if (!messages || messages.classList.contains('anchor-hidden')) return;
-        if (this.loadingOlder || this._anchorBusy) return;
+        if (this.loadingOlder) return;
         if (this.turnHistory.length <= this.turnPageSize) return;
 
         const turnEls = [...messages.querySelectorAll('#messages > .turn-block .turn')];
@@ -524,21 +481,12 @@ CHAT_STORE = {
         }
         if (drop <= 0) return;
 
-        const keptAbs = this.turnStart + drop;
-        const keptBefore = turnEls[drop].getBoundingClientRect().top;
-
         this._dropPrefixTurns(drop);
         this._lastUnloadAt = performance.now();
 
+        // no scrollTop compensation needed: native scroll anchoring holds
+        // the visual position while the prefix elements disappear
         Alpine.nextTick(() => {
-            const keptNow = messages.querySelector(`[data-turn-index="${keptAbs}"]`);
-            if (!keptNow || !keptNow.isConnected) return;
-
-            const shift = keptNow.getBoundingClientRect().top - keptBefore;
-            if (Math.abs(shift) > 2) {
-                messages.scrollTop += shift;
-            }
-
             Alpine.store('ui')._updateShouldScroll(messages);
         });
     },
@@ -561,7 +509,7 @@ CHAT_STORE = {
 
         let pages = 0;
         while (this.hasMoreOlder && pages < maxPages && el.scrollHeight <= el.clientHeight + 8) {
-            await this.loadOlderTurns(false);
+            await this.loadOlderTurns();
             await Alpine.nextTick();
             pages++;
         }

@@ -21,7 +21,13 @@
         background-size: var(--bg-pattern-size);
         */
 
-        overflow-anchor: none;
+        /* native scroll anchoring (the browser default) stays ENABLED here:
+           it is what keeps the viewport perfectly still when older turns
+           are prepended above it (and when far-off turns are dropped below
+           it). setting `overflow-anchor: none` disables that and forces
+           error-prone manual scrollTop compensation - do not re-add it.
+           descendants that should never act as the anchor can still opt out
+           individually with `overflow-anchor: none`. */
 
         /* kept invisible (but laid out, so heights still measure) while a
            freshly loaded chat is scrolled to its end */
