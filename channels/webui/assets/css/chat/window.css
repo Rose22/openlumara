@@ -232,6 +232,69 @@ body.no-frosted #messages .turn.prompt-pinned:not(:has(.editing)) > .message-wra
     background: var(--bg-primary, #151515);
 }
 
+/* floating "jump back to the newest message" control, kept clear of the
+   input bar whether that bar is docked in-flow or overlaid over the chat */
+#scroll-to-bottom {
+    position: absolute;
+    left: 50%;
+    bottom: calc(var(--floating-input-height, 72px) + 18px);
+    transform: translateX(-50%);
+    z-index: 45;
+
+    width: 42px;
+    height: 42px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    border: 1px solid var(--border-color);
+    background: color-mix(in srgb, var(--bg-primary, #151515) 76%, transparent);
+    backdrop-filter: blur(8px) saturate(1.35);
+    -webkit-backdrop-filter: blur(8px) saturate(1.35);
+    color: var(--text-secondary);
+    cursor: pointer;
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
+
+    transition:
+        color 0.15s ease,
+        border-color 0.15s ease,
+        background-color 0.15s ease,
+        transform 0.15s ease;
+}
+
+#scroll-to-bottom svg {
+    width: 20px;
+    height: 20px;
+}
+
+#scroll-to-bottom:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+    transform: translate(-50%, -2px);
+}
+
+#scroll-to-bottom:active {
+    transform: translate(-50%, 0);
+}
+
+body.no-frosted #scroll-to-bottom {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: var(--bg-primary, #151515);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #scroll-to-bottom {
+        transition: none;
+    }
+
+    #scroll-to-bottom:hover,
+    #scroll-to-bottom:active {
+        transform: translateX(-50%);
+    }
+}
+
 #messages .turn.prompt-pinned:not(:has(.editing)) {
     position: sticky;
     top: 10px;

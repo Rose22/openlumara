@@ -247,6 +247,15 @@
     {{ extension_slot("below_chat_history") }}
 </div>
 
+<button id="scroll-to-bottom" type="button" x-show="!$store.ui.shouldScroll" x-cloak
+        @click="$store.ui.forceScrollToBottom('messages')"
+        title="Scroll to bottom" aria-label="Scroll to bottom">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14" />
+        <path stroke-linecap="round" stroke-linejoin="round" d="M19 12l-7 7-7-7" />
+    </svg>
+</button>
+
 {{ extension_slot("above_input_bar") }}
 
 <!-- invisible upload form -->

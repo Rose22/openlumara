@@ -59,7 +59,7 @@
 
 {% if config.get("enable_thinking_toggle") and config.get("enable_admin_settings") %}
 <div class="thinking-toggle" x-data="thinkingToggle({{ 'true' if core_config.get('model', 'enable_thinking', default=True) else 'false' }})" x-cloak>
-    <button type="button" :title="enabled ? 'Thinking on' : 'Thinking off'" :aria-pressed="enabled" :disabled="saving" @click="toggle()">
+    <button type="button" :title="enabled ? 'Thinking on' : 'Thinking off'" :aria-pressed="enabled" :aria-disabled="saving" @click="toggle()">
         <span class="icon-on" x-show="enabled">{% include 'svg/brain.svg' %}</span>
         <span class="icon-off" x-show="!enabled" x-cloak>{% include 'svg/brain_off.svg' %}</span>
     </button>

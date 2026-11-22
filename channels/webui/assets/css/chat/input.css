@@ -139,7 +139,7 @@
                 background: none;
                 border: none;
                 border-radius: var(--radius-sm);
-                color: var(--text-muted);
+                color: var(--text-secondary);
                 cursor: pointer;
                 transition: color 0.2s ease;
 
@@ -149,17 +149,9 @@
                     flex-shrink: 0;
                 }
 
-                &:hover {
-                    color: var(--text-primary);
-                }
-
+                &:hover,
                 &[aria-pressed="true"] {
-                    color: var(--text-primary);
-                }
-
-                &:disabled {
-                    opacity: 0.5;
-                    cursor: wait;
+                    color: var(--text-secondary);
                 }
             }
         }
@@ -194,10 +186,7 @@
                     outline: none;
                 }
 
-                &:disabled {
-                    opacity: 0.5;
-                    cursor: wait;
-                }
+
 
                 option {
                     background: var(--bg-primary);
