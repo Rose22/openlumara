@@ -99,7 +99,7 @@
                                  return $store.stream.state === 'idle' ? label.replace('Thinking..', 'Thoughts') : label;
                              }
                          }">
-                        <div class="live-turn-shell" x-stream-grow>
+                        <div class="live-turn-shell">
                             <template x-if="hasChain">
                                 <div class="agent-chain" :class="{ 'is-streaming': processing }">
                                     {% if not config.get('enable_chain_expansion') %}

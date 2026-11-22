@@ -497,13 +497,6 @@ async function handleWebSocketMessage(data) {
 
             streamFinalizing = true;
 
-            // release the grow-only pin before the chain folds, otherwise the
-            // held height becomes a blank gap behind the finalized answer
-            document.querySelectorAll('.live-turn-shell, .agent-chain').forEach(el => {
-                el.classList.add('stream-grow-released');
-                el.style.minHeight = '';
-            });
-
             const foldEl = document.querySelector('.agent-chain.is-streaming .agent-chain-body');
             if (foldEl && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
                 const foldMsgs = document.getElementById('messages');

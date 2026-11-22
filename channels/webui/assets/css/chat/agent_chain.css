@@ -305,10 +305,7 @@
     box-sizing: border-box;
 }
 
-.live-turn-shell > .live-answer {
-    flex: 1 1 auto;
-    min-height: 0;
-}
+
 
 .live-answer {
     min-width: 0;
