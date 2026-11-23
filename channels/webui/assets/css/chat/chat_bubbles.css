@@ -25,3 +25,25 @@
     backdrop-filter: blur(10px);
     box-shadow: none;
 }
+
+/* very subtle frosted glass (only while the setting is on): a barely
+   translucent tint and a gentle blur, so chat wallpaper or the pattern
+   shimmer faintly through the bubbles without hurting readability */
+body:not(.no-frosted) #messages.chat-bubbles .message.user {
+    background: color-mix(in srgb, var(--bg-message-user) 92%, transparent);
+    backdrop-filter: blur(6px) saturate(1.15);
+    -webkit-backdrop-filter: blur(6px) saturate(1.15);
+}
+
+body:not(.no-frosted) #messages.chat-bubbles .message.assistant {
+    background: color-mix(in srgb, var(--bg-message-ai) 92%, transparent);
+    backdrop-filter: blur(6px) saturate(1.15);
+    -webkit-backdrop-filter: blur(6px) saturate(1.15);
+}
+
+/* frosted glass off: bubbles go fully solid again */
+body.no-frosted #messages.chat-bubbles .message.user,
+body.no-frosted #messages.chat-bubbles .message.assistant {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}

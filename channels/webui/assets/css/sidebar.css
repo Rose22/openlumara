@@ -102,7 +102,6 @@ body:has(.sidebar-resizer:active) {
     padding: 7px 0;
     box-sizing: border-box;
     overflow: hidden;
-    background: var(--bg-primary);
 }
 
 .sidebar-tab-list {
@@ -188,7 +187,6 @@ body:has(.sidebar-resizer:active) {
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    background: var(--bg-primary);
 }
 
 @media (max-width: 768px), (orientation: portrait) and (max-width: 1024px) {
@@ -308,7 +306,6 @@ body:has(.sidebar-resizer:active) {
     overflow: hidden;
 
     gap: var(--gap);
-    background: var(--bg-primary);
 
     .masthead {
         flex-shrink: 0;

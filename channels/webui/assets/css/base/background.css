@@ -1,0 +1,99 @@
+/* ==========================================================================
+ *  User background image (settings > appearance, BACKGROUND_STORE)
+ *
+ *  The picture lives on a real #bg-layer element that the store creates:
+ *  inside #chat-window in chat mode, and body-level (position: fixed) in
+ *  page mode, where the app's own containers must stay layout-untouched.
+ *  The negative z-index paints it below all in-flow content; whichever
+ *  surfaces would hide it are made transparent. The store assigns
+ *  image/filter/inset inline (data URLs too large for custom properties),
+ *  this file handles the rest.
+ * ========================================================================== */
+
+/* chat mode: the layer lives inside #chat-window, so the window clips it
+   and hosts it as a stacking context (negative-z layer above the window's
+   own background, below its content) */
+html.has-bg.bg-chat #chat-window {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+}
+
+#bg-layer {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    z-index: -1;
+    pointer-events: none;
+    animation: bg-layer-in 0.4s ease;
+}
+
+/* page mode: the layer is a body-level, viewport-fixed sibling of the app
+   containers (which stay completely untouched layout-wise). It sits on the
+   root stacking context: above the canvas background, below everything in
+   flow - so the surfaces that would otherwise hide it go see-through. */
+html.has-bg.bg-page #bg-layer {
+    position: fixed;
+}
+
+html.has-bg.bg-page body,
+html.has-bg.bg-page #main-wrapper,
+html.has-bg.bg-page #chat-window {
+    background-color: transparent;
+}
+
+/* the sidebar floats over the background picture: frosted glass when the
+   setting is on (same treatment as the floating input bar), fully
+   see-through when it is off */
+html.has-bg.bg-page #sidebar {
+    background-color: color-mix(in srgb, var(--bg-primary) 45%, transparent);
+    backdrop-filter: blur(10px) saturate(1.25);
+    -webkit-backdrop-filter: blur(10px) saturate(1.25);
+}
+
+html.has-bg.bg-page body.no-frosted #sidebar {
+    background-color: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+/* sidebar internals that would otherwise sit as solid patches over the
+   picture (chat hover, selected chat, sticky day headers, search field
+   states, small button hovers, panel inputs) go translucent with a gentle
+   frost - only while the frosted glass setting is on */
+html.has-bg.bg-page body:not(.no-frosted) #sidebar #chat-list .item:hover,
+html.has-bg.bg-page body:not(.no-frosted) #sidebar #chat-list .item.active,
+html.has-bg.bg-page body:not(.no-frosted) #sidebar #chat-list .item.active:hover,
+html.has-bg.bg-page body:not(.no-frosted) #sidebar .sidebar-panel .item:hover,
+html.has-bg.bg-page body:not(.no-frosted) #sidebar .sidebar-panel .item.active {
+    background-color: color-mix(in srgb, var(--bg-secondary) 55%, transparent);
+    backdrop-filter: blur(5px) saturate(1.1);
+    -webkit-backdrop-filter: blur(5px) saturate(1.1);
+}
+
+html.has-bg.bg-page body:not(.no-frosted) #sidebar .day-header {
+    background-color: color-mix(in srgb, var(--bg-primary) 72%, transparent);
+    backdrop-filter: blur(6px) saturate(1.1);
+    -webkit-backdrop-filter: blur(6px) saturate(1.1);
+}
+
+html.has-bg.bg-page body:not(.no-frosted) #sidebar #chat-list .search .forge-field:focus-within,
+html.has-bg.bg-page body:not(.no-frosted) #sidebar #chat-list .search.creating .forge-field,
+html.has-bg.bg-page body:not(.no-frosted) #sidebar #chat-list .action-btn:hover,
+html.has-bg.bg-page body:not(.no-frosted) #sidebar #chat-list .search .filter-cap:hover,
+html.has-bg.bg-page body:not(.no-frosted) #sidebar .category-trigger:hover,
+html.has-bg.bg-page body:not(.no-frosted) #sidebar .category-trigger.open {
+    background-color: color-mix(in srgb, var(--bg-secondary) 55%, transparent);
+}
+
+@keyframes bg-layer-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #bg-layer {
+        animation: none;
+    }
+}

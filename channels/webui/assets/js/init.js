@@ -17,6 +17,7 @@ document.addEventListener('alpine:init', async () => {
     Alpine.store('stream', STREAM_STORE);
     Alpine.store('theme', THEME_STORE);
     Alpine.store('audio', AUDIO_STORE);
+    Alpine.store('background', BACKGROUND_STORE);
     Alpine.store('upload', UPLOAD_STORE);
     Alpine.store('htmlPreview', HTML_PREVIEW_STORE);
 
@@ -26,6 +27,9 @@ document.addEventListener('alpine:init', async () => {
     // load the audio settings from localStorage into the store, then push
     // them into the AudioManager (must run before any sound can play)
     Alpine.store('audio').init();
+
+    // restore the background image from IndexedDB and apply its layer
+    Alpine.store('background').init();
 
     // user-rebindable keyboard shortcuts (localStorage-backed)
     Alpine.store('keyboard', KEYBOARD_STORE);

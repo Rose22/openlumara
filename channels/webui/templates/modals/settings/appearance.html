@@ -94,6 +94,73 @@
             </template>
         </div>
 
+        <!-- Background Image -->
+        <div class="bg-section">
+            <h4>Background Image</h4>
+            <div class="item">
+                <div class="toggle-row">
+                    <label>Background image</label>
+                    <button class="toggle" type="button" :class="{ active: $store.background.enabled }"
+                            @click="$store.background.toggle()"></button>
+                </div>
+                <span class="description">Put a picture behind the interface. It stays readable by dimming it with the brightness slider, or blurring it into soft shapes.</span>
+            </div>
+
+            <div class="bg-settings" x-show="$store.background.enabled" x-cloak>
+                <!-- hidden native input; the styled buttons drive it -->
+                <input type="file" accept="image/*" x-ref="bgFileInput" x-show="false" x-cloak aria-hidden="true"
+                       @change="$store.background.handleUpload($event)">
+
+                <div class="bg-upload-row">
+                    <template x-if="$store.background.dataUrl">
+                        <img class="bg-thumb" :src="$store.background.dataUrl" alt="background preview">
+                    </template>
+                    <button type="button" class="bg-upload-btn" @click="$refs.bgFileInput.click()">
+                        {% include 'svg/upload.svg' %}
+                        <span x-text="$store.background.dataUrl ? 'Replace image' : 'Upload image'"></span>
+                    </button>
+                    <button type="button" class="bg-remove-btn" x-show="$store.background.dataUrl" x-cloak
+                            @click="$store.background.clear()" title="Remove the background image">
+                        {% include 'svg/trash.svg' %}
+                    </button>
+                </div>
+
+                <p class="error" x-show="$store.background.error" x-cloak x-text="$store.background.error"></p>
+
+                <div class="bg-mode-row" x-show="$store.background.dataUrl" x-cloak>
+                    <span class="slider-label">Fill area</span>
+                    <div class="bg-mode-toggle">
+                        <button type="button" :class="{ active: $store.background.mode === 'chat' }"
+                                @click="$store.background.setMode('chat')">Chat window</button>
+                        <button type="button" :class="{ active: $store.background.mode === 'page' }"
+                                @click="$store.background.setMode('page')">Entire page</button>
+                    </div>
+                </div>
+
+                <div class="setting-item" x-show="$store.background.dataUrl" x-cloak>
+                    <div class="slider-header">
+                        <span class="slider-label">Brightness</span>
+                        <span class="slider-value" x-text="$store.background.brightness + '%'"></span>
+                    </div>
+                    <input type="range" min="20" max="150"
+                           :value="$store.background.brightness"
+                           :style="'--fill: ' + (($store.background.brightness - 20) / 130 * 100) + '%'"
+                           @input="$store.background.setBrightness(parseInt($event.target.value))">
+                </div>
+
+                <div class="setting-item" x-show="$store.background.dataUrl" x-cloak>
+                    <div class="slider-header">
+                        <span class="slider-label">Blur</span>
+                        <span class="slider-value" x-text="$store.background.blur + 'px'"></span>
+                    </div>
+                    <input type="range" min="0" max="24"
+                           :value="$store.background.blur"
+                           :style="'--fill: ' + ($store.background.blur / 24 * 100) + '%'"
+                           @input="$store.background.setBlur(parseInt($event.target.value))">
+                </div>
+            </div>
+        </div>
+
         <!-- Typography Settings -->
         <div class="typography-section">
             <h4>Typography</h4>
