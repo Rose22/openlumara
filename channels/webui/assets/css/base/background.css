@@ -136,13 +136,13 @@ html.has-bg.bg-page body:not(.no-frosted) #sidebar {
     --src-bg-tertiary: var(--bg-tertiary);
 }
 
+/* --button-bg/--button-hover stay solid: themes pair them with
+   --button-text, and flattening only one half breaks the contrast */
 html.has-bg.bg-page body:not(.no-frosted) #sidebar .sidebar-panel {
     --bg-primary: color-mix(in srgb, var(--src-bg-primary) 72%, transparent);
     --bg-secondary: color-mix(in srgb, var(--src-bg-secondary) 55%, transparent);
     --bg-tertiary: color-mix(in srgb, var(--src-bg-tertiary) 72%, transparent);
     --bg-input: color-mix(in srgb, var(--src-bg-primary) 72%, transparent);
-    --button-bg: color-mix(in srgb, var(--src-bg-secondary) 65%, transparent);
-    --button-hover: color-mix(in srgb, var(--src-bg-secondary) 82%, transparent);
 }
 
 /* popovers born inside a panel float over arbitrary content; the git

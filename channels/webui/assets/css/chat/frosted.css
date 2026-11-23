@@ -134,6 +134,46 @@ body:not(.no-frosted) #sidebar .sidebar-panel .category-trigger {
     -webkit-backdrop-filter: saturate(1.35);
 }
 
+/* --- modals, command palette, global search ------------------------------- */
+
+/* opaque-value aliases for the modal-scope remap below (the modal boxes
+   are body-level fixed elements, outside #sidebar's own aliases) */
+body:not(.no-frosted) {
+    --src-bg-primary: var(--bg-primary);
+    --src-bg-secondary: var(--bg-secondary);
+    --src-bg-tertiary: var(--bg-tertiary);
+}
+
+/* glass shells for every modal-like floater. the variable remap (same
+   technique as the module panels in background.css) turns every
+   var()-based interior surface - modal headers, action bars, form fields,
+   kbd chips, buttons, result rows - translucent in one stroke; literals
+   stay as drawn. the overlays behind these already dim + blur the page,
+   so the shells show a pre-blurred backdrop even where a nested overlay
+   would make a own-pass blur moot */
+body:not(.no-frosted) :is(.modal, .confirm-modal, .cmd-palette, .global-search-modal-content) {
+    background: var(--frost-bg);
+    backdrop-filter: var(--frost-filter);
+    -webkit-backdrop-filter: var(--frost-filter);
+
+    /* NOTE: --button-bg/--button-hover deliberately NOT remapped: themes
+       pair those with --button-text (light-on-dark or dark-on-light);
+       flattening the background alone breaks the pairing. buttons keep
+       their solid theme colors, which is fine over glass. */
+    --bg-primary: color-mix(in srgb, var(--src-bg-primary) 72%, transparent);
+    --bg-secondary: color-mix(in srgb, var(--src-bg-secondary) 55%, transparent);
+    --bg-tertiary: color-mix(in srgb, var(--src-bg-tertiary) 72%, transparent);
+    --bg-input: color-mix(in srgb, var(--src-bg-primary) 72%, transparent);
+}
+
+/* the palette box sits INSIDE its overlay (a backdrop root), so its own
+   blur pass is moot - pre-blur the stage instead, matching the modal
+   overlay's blur */
+body:not(.no-frosted) .cmd-palette-overlay {
+    backdrop-filter: blur(8px) saturate(140%);
+    -webkit-backdrop-filter: blur(8px) saturate(140%);
+}
+
 /* --- pop-up menus ----------------------------------------------------------- */
 
 /* the sidebar's dropdowns/menus frost like the rest of the assembly. they
