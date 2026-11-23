@@ -46,7 +46,6 @@ document.addEventListener('alpine:init', async () => {
     // toggles .boxed when an element's content overflows its max-height,
     // so tool call values only get the soft background when they scroll
     Alpine.directive('box', (el, modifiers, { cleanup }) => cleanup(boxIfScrolls(el)));
-    Alpine.directive('stream-grow', Alpine.skipDuringClone((el, modifiers, { cleanup }) => cleanup(streamGrow(el))));
 
     // watches a flow marker outside a pinned turn for the pinned-prompt feature
     Alpine.directive('prompt-marker', (el, { expression }, { evaluateLater, cleanup }) => {

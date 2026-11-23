@@ -108,8 +108,8 @@
         </span>
     </div>
     {% if combined_stream %}
-    <!-- no collapse animation while streaming: the grow-only chain pin keeps
-         the outer height fixed, so an animated fold only shows as drift -->
+    <!-- no collapse animation while streaming: an animated fold on a
+         actively growing chain only shows as drift -->
     <template x-if="!collapsed">
     {% else %}
     <div x-show="!collapsed" x-collapse.duration.250>
