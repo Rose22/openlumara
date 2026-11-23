@@ -1,0 +1,93 @@
+/* ==========================================================================
+ *  Frosted Glass
+ *
+ *  every frosted surface in the webui, in one place:
+ *    - the floating input wrapper (see input.css / window.css)
+ *    - the upload queue riding above it (see upload.css)
+ *    - the slash-command popup (see autocomplete.css)
+ *    - the scroll-to-bottom button and the pinned prompt (see window.css)
+ *
+ *  the recipes live in custom properties, resolved at each usage: that makes
+ *  the frost-disabled fallback cascade-proof (body.no-frosted simply
+ *  re-points the variables, and no stylesheet-ordering can undo it).
+ *
+ *  toggle: localStorage frostedGlassEnabled -> body.no-frosted (init.js).
+ *  with frost off, every surface goes solid bg-primary and the chat shows
+ *  through nothing.
+ * ========================================================================== */
+
+:root {
+    /* one shared blur pass; per-surface tints */
+    --frost-filter: blur(6px) saturate(1.4);
+    --frost-bg: color-mix(in srgb, var(--bg-primary, #151515) 60%, transparent);
+    --frost-bg-button: color-mix(in srgb, var(--bg-primary, #151515) 76%, transparent);
+    --frost-bg-pinned: color-mix(in srgb, var(--bg-primary, #151515) 28%, transparent);
+}
+
+/* frosted glass disabled (settings toggle): overlays stay, they just go
+   fully opaque instead of blurring what scrolls beneath them. the pinned
+   prompt's solid stands in for its usual background (whatever it is:
+   chat-bubble tint or plain), so no per-variant override needed here */
+body.no-frosted {
+    --frost-filter: none;
+    --frost-bg: var(--bg-primary, #151515);
+    --frost-bg-button: var(--bg-primary, #151515);
+    --frost-bg-pinned: var(--bg-primary, #151515);
+}
+
+/* --- the floating input assembly ---------------------------------------- */
+
+/* docked mode never frosts (solid edge-to-edge bar), hence :not(.docked)
+   everywhere here. NOTE: nothing in this assembly may wear a clip-path or
+   mask ABOVE a frosted element - a clip-path ancestor becomes a backdrop
+   root in Chromium and silently drops the blur */
+
+#chat-window #input:not(.docked) .input-wrapper {
+    background: var(--frost-bg);
+    backdrop-filter: var(--frost-filter);
+    -webkit-backdrop-filter: var(--frost-filter);
+}
+
+/* the attached-files strip: same recipe as the wrapper it stacks onto, an
+   opaque queue would crack the glass effect mid-assembly */
+#chat-window #input:not(.docked) .upload-queue {
+    background: var(--frost-bg);
+    backdrop-filter: var(--frost-filter);
+    -webkit-backdrop-filter: var(--frost-filter);
+}
+
+/* the command popup frosts in both floating AND docked mode */
+#chat-window #input .autocomplete-dropdown {
+    background: var(--frost-bg);
+    backdrop-filter: var(--frost-filter);
+    -webkit-backdrop-filter: var(--frost-filter);
+}
+
+/* --- standalone overlays ------------------------------------------------- */
+
+/* "jump back to the newest message" button (structure in window.css) */
+#scroll-to-bottom {
+    background: var(--frost-bg-button);
+    backdrop-filter: var(--frost-filter);
+    -webkit-backdrop-filter: var(--frost-filter);
+}
+
+/* the sticky pinned prompt pill (structure in window.css). frost on top of
+   whatever its base background is: normally the semi-transparent tint
+   below, in frost-off mode --frost-bg-pinned's solid wins over it */
+#messages .turn.prompt-pinned:not(:has(.editing)) > .message-wrapper.user > .message.user {
+    background: var(--frost-bg-pinned);
+    backdrop-filter: var(--frost-filter);
+    -webkit-backdrop-filter: var(--frost-filter);
+}
+
+/* frost off, chat-bubbles mode: the bubble rule above outranks the pill
+   rule and would re-tint the pinned prompt - pin the solid explicitly.
+   the doubled class only needs to exist to match that rule's weight, it
+   never matches differently in practice (the only chat-bubbles element
+   with a prompt-pinned ancestor is itself a chat bubble) */
+body.no-frosted #messages.chat-bubbles.chat-bubbles .turn.prompt-pinned:not(:has(.editing)) > .message-wrapper.user > .message.user {
+    background: var(--bg-primary, #151515);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}

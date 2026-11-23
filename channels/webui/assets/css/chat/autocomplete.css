@@ -1,38 +1,45 @@
 /* ==========================================================================
  *  Slash-Command Autocomplete Dropdown (see js/components/command_autocomplete.js)
+ *  frost (background + backdrop-filter) lives in frosted.css
  *  ========================================================================== */
 
-/* anchored inside .input-wrapper, so it spans the input field exactly */
+/* a direct child of #input, glued to the wrapper's box by syncPos() so it
+   spans the input field exactly */
 /* the shared drop shadow: input wrapper (floating mode) and command popup
    use one variable, so the shadow reads as a single shape around the whole
    assembly. only defined here; the input's rules borrow it. */
 #autocomplete-anchor {
     --ac-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
 
+    /* a direct child of #input (sibling of .input-wrapper) so the frosted
+       popup samples the page backdrop instead of the wrapper's
+       backdrop-filter root. position/size are set inline by syncPos() in
+       command_autocomplete.js - this box tracks the wrapper exactly.
+       no clip-path/mask here, ever: it would become a backdrop root and
+       kill the popup's blur */
     position: absolute;
-    left: -1px;          /* cover the wrapper's side borders: exact match */
-    right: -1px;
-    bottom: 100%;        /* overlap the (hidden) top border: gap-free seam */
-    pointer-events: none;
     z-index: 60;
-
-    /* the seam with the input is borderless and same-colored, so a shadow
-       can never cast there without darkening the input bar (box-shadow has
-       no per-edge control). clip the popup layer dead at the seam instead:
-       shadow wraps top + sides only, in both floating and docked mode. */
-    clip-path: inset(-40px -20px 0 -20px);
 }
 
 #chat-window #input .autocomplete-dropdown {
+    /* hangs above the wrapper's top edge; the box is re-applied inline by
+       syncPos() on every change */
+    position: absolute;
+    left: 0;
+    margin-bottom: -1px;   /* paints over the wrapper's transparent seam edge */
     pointer-events: auto;
     width: 100%;
     /* fixed height: the popup never resizes as tabs/content change */
     height: 300px;
-    background: var(--bg-primary);
+
     border: 1px solid var(--border-color);
     border-bottom: none;   /* sits flush on the input's own top border */
     border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-    box-shadow: var(--ac-shadow);
+    /* seam-safe shadow: negative y-offset and an equal-and-opposite spread
+       pull the shadow's bottom edge up to the popup's own edge, so it can
+       never darken the input across the borderless seam (the old clip-path
+       did this by force, but killed the backdrop blur with it) */
+    box-shadow: 0 -8px 20px -10px rgba(0, 0, 0, 0.35);
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -47,7 +54,9 @@
     }
 
     /* the header is just the tab strip now. min-width: 0 lets it clamp to
-       the popup width, which is what makes the strip inside it scroll */
+       the popup width, which is what makes the strip inside it scroll.
+       solid by necessity: a translucent strip would expose sharp,
+       unblurred chat text here while the list below shows the frost */
     .autocomplete-header {
         flex: none;
         min-width: 0;

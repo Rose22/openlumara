@@ -46,9 +46,13 @@
         max-height: 100% !important;
     }
 
-    /* Ensure #messages fills remaining space and can scroll */
+    /* Ensure #messages fills remaining space and can scroll. sides/top
+       only: a shorthand here (even !important) used to wipe the bottom
+       padding that reserves room for the floating input overlay, leaving
+       the newest message unreachable behind it */
     #messages {
-        padding: 12px 8px !important;
+        padding-inline: 8px !important;
+        padding-top: 12px !important;
         min-height: 0 !important;
         flex-shrink: 0 !important;
     }
@@ -199,8 +203,10 @@
         padding: 12px 10px;
     }
 
+    /* sides only, same reason as the mobile block above: the floating
+       input's reserved bottom padding must survive */
     #messages {
-        padding: 8px 4px;
+        padding-inline: 4px;
     }
 
     .shortcuts-btn {

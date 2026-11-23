@@ -264,13 +264,15 @@
 
 {{ extension_slot("above_input_bar") }}
 
-<!-- invisible upload form -->
-{% if config.get('enable_file_upload') %}
-{% include 'chat/upload.html' %}
-{% endif %}
-
 <!-- input field -->
 <div id="input" {% if config.get('dock_input_bar') %}class="docked"{% endif %}>
+    <!-- invisible upload form. lives INSIDE the input bar: in floating mode
+         the bar is an overlay the chat scrolls beneath, and an upload queue
+         outside it would be buried under that overlay -->
+    {% if config.get('enable_file_upload') %}
+    {% include 'chat/upload.html' %}
+    {% endif %}
+
     <!-- steering queue: messages sent while the AI is busy -->
     <template x-if="$store.stream.state !== 'idle' && $store.stream.queued.length > 0">
         <div class="steering-queue">
@@ -284,11 +286,24 @@
     </template>
 
     <div class="input-wrapper">
-        <!-- slash-command autocomplete (see js/components/command_autocomplete.js) -->
-        <div id="autocomplete-anchor" x-data="commandAutocomplete()" x-cloak
+        {% include 'chat/input.html' %}
+    </div>
+
+    <!-- slash-command autocomplete (see js/components/command_autocomplete.js).
+         a direct child of #input - exactly where the frosted upload queue
+         lives - and deliberately NOT inside .input-wrapper: the wrapper's
+         backdrop-filter makes it a backdrop root for its descendants in
+         Chromium, so a frosted popup nested in it samples nothing and its
+         blur is silently dropped. same story for clip-path ancestors, so
+         there is none here either (the seam shadow is shaped geometrically
+         in autocomplete.css).
+
+         position:absolute is INLINE on purpose: even a stale cached JS/CSS
+         combo can never put this box (and its 300px popup) into page flow -->
+    <div id="autocomplete-anchor" x-data="commandAutocomplete()" x-cloak style="position: absolute; left: 0; bottom: 0; z-index: 60;">
+        <div class="autocomplete-dropdown" x-show="visible" style="position: absolute;"
              @click.outside="hide()"
-             x-effect="$el.parentElement.classList.toggle('ac-open', visible)">
-        <div class="autocomplete-dropdown" x-show="visible">
+             x-effect="$el.closest('#input').querySelector('.input-wrapper')?.classList.toggle('ac-open', visible); syncPos()">
             <div class="autocomplete-header">
                 <div class="autocomplete-tabs">
                     <template x-for="tab in tabs" :key="tab.category">
@@ -313,9 +328,6 @@
                 </template>
             </div>
         </div>
-    </div>
-
-    {% include 'chat/input.html' %}
     </div>
 </div>
 

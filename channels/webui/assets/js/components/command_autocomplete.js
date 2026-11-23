@@ -57,6 +57,45 @@ function commandAutocomplete() {
         init() {
             CMD_AC = this;
             this.load();
+
+            // the anchor lives outside .input-wrapper (a backdrop-filtered
+            // ancestor would become a backdrop root and kill the popup's
+            // frosted blur), so it must be glued to the wrapper's box by
+            // hand. anything that moves or resizes the wrapper (textarea
+            // autosize, the upload queue appearing, window resizes) resyncs.
+            const wrapper = this.$el.parentElement?.querySelector('.input-wrapper');
+
+            if (wrapper && typeof ResizeObserver !== 'undefined') {
+                this._posObserver = new ResizeObserver(() => this.syncPos());
+                this._posObserver.observe(wrapper);
+            }
+
+            window.addEventListener('resize', () => this.syncPos());
+        },
+
+        // glue the popup to the wrapper's box: the anchor mirrors the
+        // wrapper's BORDER box 1:1 within #input, and the dropdown hangs
+        // above the wrapper's top edge. measured fresh per sync, so
+        // autosize/queue/theme-width changes need no special casing.
+        syncPos() {
+            const input = this.$el.parentElement;
+            const wrapper = input?.querySelector('.input-wrapper');
+            const dropdown = this.$el.querySelector('.autocomplete-dropdown');
+            if (!wrapper || !dropdown) return;
+
+            const wr = wrapper.getBoundingClientRect();
+            const pr = input.getBoundingClientRect();
+
+            this.$el.style.left = (wr.left - pr.left) + 'px';
+            this.$el.style.width = wr.width + 'px';
+
+            dropdown.style.left = '0';
+            dropdown.style.width = '100%';
+            dropdown.style.bottom = (pr.bottom - wr.top) + 'px';
+            // the wrapper's top border is transparent while open, and a
+            // background can never paint into an ancestor's border area:
+            // overlap the seam by 1px so no slit survives
+            dropdown.style.marginBottom = '-1px';
         },
 
         async load() {

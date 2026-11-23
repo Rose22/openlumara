@@ -1,7 +1,42 @@
+/* lives inside #input (above the input wrapper), so in floating mode it
+   rides the overlay instead of being buried under it. the queue grows
+   #input itself, so the JS-tracked --floating-input-height (and with it
+   the chat's reserved bottom padding) adapts automatically.
+   (the frosted background lives in frosted.css) */
+#chat-window #input:not(.docked) .upload-queue {
+    width: var(--chat-content-width, 100%);
+    margin: 9px auto 0;
+}
+
+/* seam with the input wrapper, handled exactly like the command popup's
+   (see autocomplete.css): the wrapper drops its own top border + top radius
+   (input.css) so one shared line remains; the queue squares its bottom to
+   continue the sides straight down; and the queue takes over the wrapper's
+   drop shadow, clipped dead at the seam so it can't darken the input */
+/* (no overflow:clip on #input here: the command popup is its descendant
+   and would be clipped away. the 1px overlap paints over the seam instead) */
+#chat-window #input:not(.docked):has(.upload-queue) .upload-queue {
+    border-bottom: none;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    margin-bottom: -1px; /* paints over the wrapper's transparent seam edge */
+    box-shadow: var(--ac-shadow, 0 6px 20px rgba(0, 0, 0, 0.25));
+    clip-path: inset(-40px -20px 0 -20px);
+}
+
+/* docked: a flush full-width strip above the edge-to-edge input */
+#chat-window #input.docked .upload-queue {
+    width: 100%;
+    border-left: none;
+    border-right: none;
+    border-radius: 0;
+}
+
 .upload-queue {
     padding: 10px 16px;
     background: var(--bg-secondary);
-    border-top: 1px solid var(--border-color);
+    border: 1px solid var(--border-color);
+    border-bottom: none;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
     max-height: 140px;
     overflow-y: auto;
     transition: all 0.2s ease;

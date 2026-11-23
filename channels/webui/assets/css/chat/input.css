@@ -20,7 +20,8 @@
             border-radius: var(--radius-sm);
             margin-bottom: 9px;
             /* floating mode gets a drop shadow (shared with the command
-               popup via --ac-shadow, defined in autocomplete.css) */
+               popup via --ac-shadow, defined in autocomplete.css).
+               the floating frosted background lives in frosted.css */
             box-shadow: var(--ac-shadow, 0 6px 20px rgba(0, 0, 0, 0.25));
 
             /* while the command popup is open it rests on the input's top
@@ -48,19 +49,17 @@
                 border-bottom: none;
                 box-shadow: none;
 
-                /* docked = edge to edge: no side borders (matching the
-                   input). the seam clip lives on #autocomplete-anchor in
-                   autocomplete.css and covers this mode too */
-                #autocomplete-anchor {
-                    left: 0;
-                    right: 0;
+            }
 
-                    .autocomplete-dropdown {
-                        border-left: none;
-                        border-right: none;
-                        border-radius: 0;
-                    }
-                }
+            /* the popup now lives outside the wrapper (see index.html):
+               edge-to-edge here - overrides syncPos's inline -1px span.
+               no side borders (matching the input), square corners */
+            #autocomplete-anchor .autocomplete-dropdown {
+                left: 0 !important;
+                width: 100% !important;
+                border-left: none;
+                border-right: none;
+                border-radius: 0;
             }
 
             #upload {
@@ -72,13 +71,7 @@
             }
         }
 
-        &:not(.docked) {
-            .input-wrapper {
-                background: color-mix(in srgb, var(--bg-primary, #151515) 60%, transparent);
-                backdrop-filter: blur(6px) saturate(1.4);
-                -webkit-backdrop-filter: blur(6px) saturate(1.4);
-            }
-        }
+        /* the floating wrapper's frost lives in frosted.css */
 
         #upload {
             padding: 0;
