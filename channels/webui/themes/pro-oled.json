@@ -1,7 +1,7 @@
 {
   "dark": {
     "--bg-primary": "#000000",
-    "--bg-secondary": "#000000",
+    "--bg-secondary": "#010101",
     "--bg-tertiary": "#0a0a0a",
     "--bg-message-user": "#111111",
     "--bg-message-ai": "#000000",
