@@ -63,7 +63,17 @@
             <p class="audio-desc">How high or low the token tick sounds. Only applies to the generated sound, not to uploaded files.</p>
         </div>
 
-        <h4>Sound Effects</h4>
+        <h4><span>Sound Effects</span>
+            <button type="button" class="audio-icon-btn audio-reset-btn" @click="$store.audio.reset()"
+                    title="Reset audio settings: restore default volumes, enable nothing, remove all uploaded sounds">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="1 4 1 10 7 10"></polyline>
+                    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                </svg>
+                <span>Reset sounds</span>
+            </button>
+        </h4>
 
         <!-- Sound Files -->
         <template x-for="soundId in ['send_message', 'response_start', 'token', 'completion', 'reasoning_end', 'processing', 'typing']" :key="soundId">
@@ -118,18 +128,5 @@
             </div>
         </template>
 
-        <!-- Reset -->
-        <div class="audio-footer">
-            <p class="audio-desc">Everything here saves instantly to this browser &mdash; no Save button needed. Uploaded sound files live in this browser's local database.</p>
-            <button type="button" class="audio-danger-btn" @click="$store.audio.reset()"
-                    title="Restore default volumes, enable nothing, and remove all uploaded sounds">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
-                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="1 4 1 10 7 10"></polyline>
-                    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
-                </svg>
-                <span>Reset audio settings</span>
-            </button>
-        </div>
     </div>
 </template>

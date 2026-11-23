@@ -277,6 +277,19 @@
             h4:first-of-type {
                 margin-top: 4px;
             }
+
+            /* buttons placed inside an h4 sit at the far right edge of
+               the content area, vertically centered on the heading */
+            h4 {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            h4 > button {
+                margin-left: auto;
+                flex-shrink: 0;
+            }
         }
     }
 
