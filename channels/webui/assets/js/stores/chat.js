@@ -102,8 +102,15 @@ CHAT_STORE = {
      * visible. the turn keeps its full flow height while pinned (the min-height
      * reserve), so marker top + turn offsetHeight is its true flow bottom.
      */
+    // the strip of the scrollbox hidden behind the floating chat header
+    // (window.css runs #messages under it; --header-height fed by init.js)
+    headerInset(container) {
+        return parseFloat(getComputedStyle(container).getPropertyValue('--header-height')) || 0;
+    },
+
     userPromptInView(container) {
         const rect = container.getBoundingClientRect();
+        const visibleTop = rect.top + this.headerInset(container);
 
         for (const marker of container.querySelectorAll('.pin-marker')) {
             const turnEl = marker.nextElementSibling;
@@ -111,7 +118,7 @@ CHAT_STORE = {
             if (!turnEl.querySelector(':scope > .message-wrapper.user')) continue;
 
             const flowTop = marker.getBoundingClientRect().top;
-            if (flowTop < rect.bottom && flowTop + turnEl.offsetHeight > rect.top) return true;
+            if (flowTop < rect.bottom && flowTop + turnEl.offsetHeight > visibleTop) return true;
         }
 
         return false;
@@ -139,7 +146,8 @@ CHAT_STORE = {
         const container = document.getElementById('messages');
         if (!container) return;
 
-        if (marker.getBoundingClientRect().top > container.getBoundingClientRect().top) return;
+        // the visible top edge is the header's bottom, not the scrollport's
+        if (marker.getBoundingClientRect().top > container.getBoundingClientRect().top + this.headerInset(container)) return;
 
         // the pin only exists to keep context visible while the chat window
         // shows no user prompt of its own
@@ -219,7 +227,9 @@ CHAT_STORE = {
             return;
         }
 
-        const top = container.getBoundingClientRect().top;
+        // pin boundary is the header's bottom edge (the scrollport's top
+        // hides behind the floating header - see headerInset)
+        const top = container.getBoundingClientRect().top + this.headerInset(container);
 
         let activeIndex = null;
         let activeWrapper = null;
@@ -490,7 +500,7 @@ CHAT_STORE = {
         }
         if (lastUser !== -1) maxDrop = Math.min(maxDrop, lastUser);
 
-        const viewTop = messages.getBoundingClientRect().top;
+        const viewTop = messages.getBoundingClientRect().top + this.headerInset(messages);
 
         let drop = 0;
         for (let t = 0; t < turnEls.length; t++) {
@@ -991,6 +1001,11 @@ CHAT_STORE = {
 
     async renameChat(chat_id, newTitle) {
         await simpleApiPost(`/api/chat/rename/${chat_id}`, {title: newTitle});
+
+        // the header reads this.chat directly: keep it live so renaming the
+        // open chat updates instantly instead of going stale until next load
+        if (chat_id === this.selectedChat) { this.chat.title = newTitle; }
+
         await this.reloadChats();
     },
 
@@ -1279,6 +1294,13 @@ CHAT_STORE = {
     /* ----------------------
      * chat-specific getters
      * ----------------------- */
+    // chat name for the header, hard-capped at 150 chars (CSS handles
+    // soft truncation when it still doesn't fit the viewport)
+    headerTitle() {
+        const title = this.chat?.title || '';
+        return title.length > 150 ? `${title.slice(0, 150).trimEnd()}…` : title;
+    },
+
     get promptprogress() {
         // llama.cpp router model-load progress takes over the indicator
         // while a model is being swapped in, before prompt eval begins.

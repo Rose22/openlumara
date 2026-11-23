@@ -98,19 +98,6 @@ class Webui(core.channel.Channel, ui_extensions.UiExtensionsMixin):
             "description": "Because logins are disabled, you need protection from outside intruders (think of this like a firewall). Specify a list of IP ranges that are allowed to request private data from the webui's API. Clients in these ranges get full access while those coming from outside your network are refused. Set it to just your LAN's range (such as `192.168.0.0/24`) to tighten it, or to [] to only ever allow the machine itself.",
             "depends": {"require_login": False}
         },
-        "enable_chat_header": {
-            "description": "Whether to enable the header at the top of a chat. Disabling this removes access to all graphical controls, and strips the interface down to a very basic chat. You might want this for public instances!",
-            "default": True
-        },
-        "enable_title": {
-            "default": True,
-            "description": "Whether to show a fancy title in the header",
-            "depends": "enable_chat_header"
-        },
-        "title": {
-            "default": "OpenLumara",
-            "depends": {"enable_chat_header": True, "enable_title": True}
-        },
         "enable_model_switcher": {
             "description": "Whether to show a model dropdown in the header, so you can quickly switch models without opening the settings. Disabled on mobile due to lack of space.",
             "default": True,

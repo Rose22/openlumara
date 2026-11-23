@@ -2,19 +2,23 @@
     <div class="left">
         <!-- also shown on desktop while the sidebar is hidden (it now persists
              across reloads), so there is always a mouse path back to it -->
-        <button class="menu-btn" title="Toggle sidebar (Ctrl+B)" @click="$store.ui.toggleSidebar()"
-                x-show="$store.ui.isMobile || !$store.ui.showSidebar" x-cloak>
+        <template class="menu-btn" title="Toggle sidebar (Ctrl+B)" @click="$store.ui.toggleSidebar()"
+                x-if="$store.ui.isMobile || !$store.ui.showSidebar" x-cloak>
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
             </svg>
-        </button>
-        {% if config.get("enable_title") %}
-            <h1>{{ config.get("title") }}</h1>
-        {% endif %}
-
+        </template>
         <!-- extension slot: modules fill this via a left() macro in <module>/chat/header.html -->
         {{ extension_slot("left") }}
     </div>
+
+    <!-- the live chat name; CSS truncates with ellipsis when it can't
+         fit, :title keeps the full name reachable on hover. direct header
+         child between the equal-flex side containers: it sits screen-center
+         no matter how full either side is -->
+    <h1 class="chat-name" x-text="$store.chat.headerTitle()"
+        :title="$store.chat.chat.title" x-show="$store.chat.headerTitle()" x-cloak></h1>
+
     <div class="right">
         <!-- extension slot: modules fill this via a right() macro in <module>/chat/header.html -->
         {{ extension_slot("right") }}

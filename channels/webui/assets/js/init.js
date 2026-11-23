@@ -9,6 +9,29 @@ document.body.classList.toggle('no-frosted', localStorage.getItem('frostedGlassE
  * initializes Alpine and registers all the necessary stuff
  */
 document.addEventListener('alpine:init', async () => {
+    /*
+     * the chat header floats over the message scrollbox (window.css runs
+     * #messages under it) so its frost blurs the bubbles passing behind.
+     * a resize observer feeds the header's live height into
+     * --header-height, driving the overlap, the scroll padding and the
+     * pinned pill's stick offset - collapse to zero included. without JS
+     * the 0px fallback keeps the old flush layout.
+     */
+    const chatHeader = document.querySelector('header');
+
+    if (chatHeader) {
+        const pushHeaderHeight = () => {
+            const h = chatHeader.offsetHeight;
+            document.documentElement.style.setProperty('--header-height', `${h}px`);
+            // releases the header's min-height once its content is gone,
+            // so the collapse-to-zero state still works (see header.css)
+            document.body.classList.toggle('header-empty', h === 0);
+        };
+
+        pushHeaderHeight();
+        new ResizeObserver(pushHeaderHeight).observe(chatHeader);
+    }
+
     // these are all defined in js/stores/
     Alpine.store("system", SYSTEM_STORE);
     Alpine.store("ui", UI_STORE);

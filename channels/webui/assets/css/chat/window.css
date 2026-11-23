@@ -35,9 +35,16 @@
             visibility: hidden;
         }
         padding: 4px 20px;
+        /* the header floats over the chat (see header.css / init.js): the
+           scrollbox runs under it so bubbles blur behind its frost, and
+           this padding reserves the same strip so content at rest (and at
+           scrollTop 0) stays clear of it. --header-height tracks the live
+           header, including its collapse to zero */
+        padding-top: calc(4px + var(--header-height, 0px));
         flex-direction: column;
         gap: 4px;
         margin: 0 auto;
+        margin-top: calc(-1 * var(--header-height, 0px));
         margin-bottom: 7px;
         min-height: 0;
 
@@ -296,7 +303,9 @@
 
 #messages .turn.prompt-pinned:not(:has(.editing)) {
     position: sticky;
-    top: 10px;
+    /* stick below the floating header strip, not under it (see the
+       --header-height padding on #messages) */
+    top: calc(10px + var(--header-height, 0px));
     z-index: 20;
     pointer-events: none;
 }

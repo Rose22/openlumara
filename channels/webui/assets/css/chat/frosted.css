@@ -108,6 +108,27 @@ body:not(.no-frosted) #messages.chat-bubbles.chat-bubbles .turn.prompt-pinned:no
     background: none;
 }
 
+/* --- chat header --------------------------------------------------------- */
+
+/* same glass recipe as the sidebar's page-mode panel (see background.css):
+   45% tint, 10px blur, and the same soft drop-shadow seam - the header
+   blurs whatever scrolls beneath it (bubbles and picture alike). with
+   frost off the gate drops out and the header keeps its solid look.
+   the collapsed-to-zero case (all items x-show'd away) is unaffected: no
+   height, nothing to paint */
+body:not(.no-frosted) header {
+    top: 4px;
+    min-width: 200px;
+    width: fit-content;
+    margin: 0 auto;
+    padding: 7px;
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--bg-primary, #151515) 45%, transparent);
+    backdrop-filter: blur(10px) saturate(1.25);
+    -webkit-backdrop-filter: blur(10px) saturate(1.25);
+    box-shadow: var(--frost-drop-lg);
+}
+
 /* --- sidebar inputs -------------------------------------------------------- */
 
 /* every text-ish control inside module panels goes fully bare over the

@@ -6,7 +6,17 @@ header {
        height-wise and stays here. h1 is excluded so the titled header keeps
        its current rhythm. */
     padding: 0 12px;
-    background: none;
+    /* solid bg-primary by default (frost off); the frosted pass in
+       frosted.css overrides this with translucent glass while the
+       setting is on */
+    background: var(--bg-primary);
+
+    /* floats over the message scrollbox (window.css runs #messages under
+       it), so the frost blurs the bubbles actually passing behind -
+       same arrangement as the floating input bar at the bottom */
+    position: relative;
+    z-index: 41;
+
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -22,10 +32,17 @@ header {
         display: flex;
         align-items: center;
         gap: 14px;
+        // equal-grow side rails (basis 0): leftover space splits 50/50,
+        // centering the h1 between them on screen
+        flex: 1 1 0;
+        min-width: 0;
     }
     .right {
+        // the matching rail; controls hug its outer end
+        flex: 1 1 0;
         display: flex;
         align-items: center;
+        justify-content: flex-end;
         gap: 8px;
 
         .stream-state {
@@ -45,6 +62,10 @@ header {
         font-weight: 700;
         letter-spacing: -0.02em;
         color: var(--text-secondary);
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
         /*
         background: linear-gradient(135deg, var(--accent) 0%, var(--text-primary) 100%);
         -webkit-background-clip: text;
@@ -102,4 +123,12 @@ header {
             height: 20px;
         }
     }
+}
+
+/* min height whenever the header has content: items are only ~30px tall,
+   so without this the bar hugs them tightly. gated on NOT .header-empty
+   (class toggled by init.js's ResizeObserver) so the collapse-to-zero
+   state when every item is x-show'd away stays untouched */
+body:not(.header-empty) header {
+    min-height: 32px;
 }

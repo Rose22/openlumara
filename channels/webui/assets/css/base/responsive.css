@@ -60,7 +60,8 @@
        the newest message unreachable behind it */
     #messages {
         padding-inline: 8px !important;
-        padding-top: 12px !important;
+        /* the header's floating strip must survive this override too */
+        padding-top: calc(12px + var(--header-height, 0px)) !important;
         min-height: 0 !important;
         flex-shrink: 0 !important;
     }

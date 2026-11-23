@@ -49,8 +49,8 @@ html.has-bg.bg-page #chat-window {
 @media (min-width: 769px) {
 
 /* the sidebar floats over the background picture: frosted glass when the
-   setting is on (same treatment as the floating input bar), fully
-   see-through when it is off */
+   setting is on (same treatment as the floating input bar), a solid
+   bg-primary panel when it is off */
 html.has-bg.bg-page #sidebar {
     background-color: color-mix(in srgb, var(--bg-primary) 45%, transparent);
     backdrop-filter: blur(10px) saturate(1.25);
@@ -58,7 +58,7 @@ html.has-bg.bg-page #sidebar {
 }
 
 html.has-bg.bg-page body.no-frosted #sidebar {
-    background-color: transparent;
+    background-color: var(--bg-primary);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
 }
