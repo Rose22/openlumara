@@ -2,43 +2,100 @@
  *  Slash-Command Autocomplete Dropdown (see js/components/command_autocomplete.js)
  *  ========================================================================== */
 
+/* anchored inside .input-wrapper, so it spans the input field exactly */
+/* the shared drop shadow: input wrapper (floating mode) and command popup
+   use one variable, so the shadow reads as a single shape around the whole
+   assembly. only defined here; the input's rules borrow it. */
 #autocomplete-anchor {
+    --ac-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+
     position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 100%;
-    display: flex;
-    justify-content: center;
+    left: -1px;          /* cover the wrapper's side borders: exact match */
+    right: -1px;
+    bottom: 100%;        /* overlap the (hidden) top border: gap-free seam */
     pointer-events: none;
     z-index: 60;
+
+    /* the seam with the input is borderless and same-colored, so a shadow
+       can never cast there without darkening the input bar (box-shadow has
+       no per-edge control). clip the popup layer dead at the seam instead:
+       shadow wraps top + sides only, in both floating and docked mode. */
+    clip-path: inset(-40px -20px 0 -20px);
 }
 
 #chat-window #input .autocomplete-dropdown {
     pointer-events: auto;
-    width: var(--chat-content-width, calc(100% - 28px));
-    max-width: calc(100% - 28px);
-    max-height: 300px;
-    overflow-y: auto;
+    width: 100%;
+    /* fixed height: the popup never resizes as tabs/content change */
+    height: 300px;
     background: var(--bg-primary);
     border: 1px solid var(--border-color);
-    border-bottom: none;
+    border-bottom: none;   /* sits flush on the input's own top border */
     border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-    box-shadow: var(--shadow-medium);
+    box-shadow: var(--ac-shadow);
     display: flex;
     flex-direction: column;
-    scrollbar-width: thin;
+    overflow: hidden;
 
-    .autocomplete-category {
-        padding: 6px 12px;
-        font-size: 0.75rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        color: var(--text-muted);
-        background: var(--bg-tertiary);
+    /* the ONLY scroller in the popup: the header sits above it, outside the
+       scroll area, so nearest-neighbor scrollIntoView behaves predictably */
+    .autocomplete-list {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        scrollbar-width: thin;
+    }
+
+    /* the header is just the tab strip now */
+    .autocomplete-header {
+        flex: none;
+        background: var(--bg-secondary);
         border-bottom: 1px solid var(--border-color);
-        letter-spacing: 0.05em;
-        position: sticky;
-        top: 0;
+    }
+
+    .autocomplete-tabs {
+        display: flex;
+        align-items: stretch;
+        gap: 2px;
+        padding: 0 8px;
+        overflow-x: auto;
+        scrollbar-width: none;
+
+        .autocomplete-tab {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            cursor: pointer;
+            white-space: nowrap;
+            transition: color 0.15s ease, background 0.15s ease;
+
+            &:hover {
+                color: var(--text-primary);
+                background: var(--bg-tertiary);
+            }
+
+            &.active {
+                color: var(--accent);
+                border-bottom-color: var(--accent);
+                font-weight: 600;
+            }
+
+            .tab-count {
+                padding: 1px 6px;
+                font-size: 0.65rem;
+                color: var(--text-secondary);
+                background: var(--bg-primary);
+                border: 1px solid var(--border-color);
+                border-radius: 99px;
+            }
+        }
     }
 
     .autocomplete-item {
@@ -51,9 +108,16 @@
         font-size: 0.9rem;
         color: var(--text-primary);
 
+        &.spacer {
+            min-height: 14px;
+            padding-top: 4px;
+            padding-bottom: 4px;
+            cursor: default;
+        }
+
         &:hover,
         &.selected {
-            background: var(--button-hover);
+            background: var(--bg-secondary);
             color: var(--accent);
         }
 
@@ -87,10 +151,4 @@
     }
 }
 
-/* on mobile / docked the input bar spans the full width anyway */
-@media (max-width: 768px), (orientation: portrait) and (max-width: 1024px) {
-    #chat-window #input .autocomplete-dropdown {
-        width: 100%;
-        border-radius: 0;
-    }
-}
+

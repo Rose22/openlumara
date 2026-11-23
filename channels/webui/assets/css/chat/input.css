@@ -12,12 +12,28 @@
         padding: 0px 14px;
 
         .input-wrapper {
+            position: relative; /* anchor for the command autocomplete popup */
             display: flex;
             align-items: stretch;
             width: var(--chat-content-width);
             border: 1px solid var(--border-color);
             border-radius: var(--radius-sm);
             margin-bottom: 9px;
+            /* floating mode gets a drop shadow (shared with the command
+               popup via --ac-shadow, defined in autocomplete.css) */
+            box-shadow: var(--ac-shadow, 0 6px 20px rgba(0, 0, 0, 0.25));
+
+            /* while the command popup is open it rests on the input's top
+               border, so hide that edge (and square the top corners, so they
+               don't curve away from the popup's straight sides): one shared
+               line, no doubling. the popup wears the identical shadow from
+               here on, so the pair still reads as one shadowed shape. */
+            &.ac-open {
+                border-top-color: transparent;
+                border-top-left-radius: 0;
+                border-top-right-radius: 0;
+                box-shadow: none;
+            }
         }
 
         &.docked {
@@ -30,6 +46,21 @@
                 border-left: none;
                 border-right: none;
                 border-bottom: none;
+                box-shadow: none;
+
+                /* docked = edge to edge: no side borders (matching the
+                   input). the seam clip lives on #autocomplete-anchor in
+                   autocomplete.css and covers this mode too */
+                #autocomplete-anchor {
+                    left: 0;
+                    right: 0;
+
+                    .autocomplete-dropdown {
+                        border-left: none;
+                        border-right: none;
+                        border-radius: 0;
+                    }
+                }
             }
 
             #upload {

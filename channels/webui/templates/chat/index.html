@@ -277,30 +277,39 @@
         </div>
     </template>
 
-    <!-- slash-command autocomplete (see js/components/command_autocomplete.js) -->
-    <div id="autocomplete-anchor" x-data="commandAutocomplete()" x-cloak
-         @click.outside="hide()"
-         x-effect="watch($store.chat.user_input)">
+    <div class="input-wrapper">
+        <!-- slash-command autocomplete (see js/components/command_autocomplete.js) -->
+        <div id="autocomplete-anchor" x-data="commandAutocomplete()" x-cloak
+             @click.outside="hide()"
+             x-effect="watch($store.chat.user_input); $el.parentElement.classList.toggle('ac-open', visible)">
         <div class="autocomplete-dropdown" x-show="visible">
-            <template x-for="group in groups" :key="group.category">
-                <div>
-                    <div class="autocomplete-category" x-text="group.category"></div>
-                    <template x-for="cmd in group.cmds" :key="cmd.name">
-                        <div class="autocomplete-item"
-                             :class="{ 'selected': selectedName === cmd.name }"
-                             @click="accept()"
-                             @mouseenter="select(items.findIndex(i => i.name === cmd.name))">
-                            <span class="cmd-name" x-html="cmd.nameHtml"></span>
-                            <span class="cmd-desc" x-text="cmd.desc"></span>
-                        </div>
+            <div class="autocomplete-header">
+                <div class="autocomplete-tabs" x-show="tabs.length > 1" x-cloak>
+                    <template x-for="tab in tabs" :key="tab.category">
+                        <button type="button" class="autocomplete-tab"
+                                :class="{ 'active': activeTab === tab.category }"
+                                @click="pickTab(tab.category)">
+                            <span class="tab-name" x-text="tab.category"></span>
+                            <span class="tab-count" x-text="tab.count"></span>
+                        </button>
                     </template>
                 </div>
-            </template>
+            </div>
+            <div class="autocomplete-list" x-ref="list">
+                <template x-for="cmd in items" :key="cmd.name">
+                    <div class="autocomplete-item"
+                         :class="{ 'selected': selectedName === cmd.name, 'spacer': cmd.spacer }"
+                         @click="cmd.spacer || accept()"
+                         @mouseenter="cmd.spacer || select(items.indexOf(cmd))">
+                        <span class="cmd-name" x-html="cmd.nameHtml"></span>
+                        <span class="cmd-desc" x-text="cmd.desc"></span>
+                    </div>
+                </template>
+            </div>
         </div>
     </div>
 
-    <div class="input-wrapper">
-        {% include 'chat/input.html' %}
+    {% include 'chat/input.html' %}
     </div>
 </div>
 
