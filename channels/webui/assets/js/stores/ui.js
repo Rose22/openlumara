@@ -32,7 +32,6 @@ UI_STORE = {
     _pumpRaf: null,
     _pumpEl: null,
     _pumpLast: 0,
-    _pumpTarget: 0,
 
     _updateShouldScroll(el) {
         const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
@@ -42,7 +41,6 @@ UI_STORE = {
     _stopPump() {
         if (this._pumpRaf !== null) cancelAnimationFrame(this._pumpRaf);
         this._pumpRaf = null;
-        this._pumpTarget = 0;
         this._suppressScroll = false;
     },
 
@@ -55,25 +53,9 @@ UI_STORE = {
         if (!el) return false;
 
         const bottom = el.scrollHeight - el.clientHeight;
-
-        // One-way follow: growing content pulls the view along, but collapsing
-        // content must not drag the user toward a newly shortened bottom.
-        if (bottom < this._pumpTarget - 1) {
-            this._stopPump();
-            this._updateShouldScroll(el);
-            return false;
-        }
-
-        this._pumpTarget = Math.max(this._pumpTarget, bottom);
-
         const remaining = bottom - el.scrollTop;
-        if (remaining <= 1) {
-            if (bottom < el.scrollTop - 1) {
-                this._stopPump();
-                this._updateShouldScroll(el);
-                return false;
-            }
 
+        if (remaining <= 1) {
             el.scrollTo({ top: bottom, behavior: 'instant' });
             this._stopPump();
             this._updateShouldScroll(el);
@@ -107,14 +89,10 @@ UI_STORE = {
     },
 
     _pumpScrollToBottom(el) {
-        const bottom = Math.max(0, el.scrollHeight - el.clientHeight);
-
         if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
             this._stopPump();
-            if (bottom > el.scrollTop + 1) {
-                el.scrollTo({ top: bottom, behavior: 'instant' });
-            }
-            this._updateShouldScroll(el);
+            // instant: global scroll-behavior:smooth would animate this jump
+            el.scrollTo({ top: el.scrollHeight, behavior: 'instant' });
             return;
         }
 
@@ -131,14 +109,7 @@ UI_STORE = {
         this._suppressScroll = true;
         this._pumpEl = el;
 
-        if (bottom <= el.scrollTop + 1) {
-            this._suppressScroll = false;
-            this._updateShouldScroll(el);
-            return;
-        }
-
         if (this._pumpRaf === null) {
-            this._pumpTarget = bottom;
             // seed with the current time so the very first hop sees a real
             // frame-sized dt instead of "time since page load"
             this._pumpLast = performance.now();
@@ -414,18 +385,6 @@ UI_STORE = {
         }
     },
 
-    // while the live chain is capped it scrolls itself (x-auto-scroll);
-    // pumping the outer window at the same time makes the two scrollers
-    // fight, so the outer follow stands down until the chain breaks free.
-    // a live answer is outside the chain, so once the answer exists the
-    // outer window must follow it even if the process body is still scrollable
-    _chainOwnsScroll() {
-        const body = document.querySelector('.agent-chain.is-streaming .agent-chain-body');
-        if (!body) return false;
-        if (document.querySelector('.live-turn-shell .live-answer')) return false;
-        return body.scrollHeight > body.clientHeight + 1;
-    },
-
     async scrollToBottom(containerId = 'messages', instant = false) {
         if (!this.shouldScroll) return;
 
@@ -434,11 +393,6 @@ UI_STORE = {
 
         if (instant) {
             await this._jumpToBottom(el);
-            return;
-        }
-
-        if (this._chainOwnsScroll()) {
-            this._stopPump();
             return;
         }
 
