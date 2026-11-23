@@ -126,7 +126,17 @@
 }
 
 .setting-item {
-    margin-bottom: 16px;
+    padding: 6px;
+    margin-left: -6px;
+
+    &:hover {
+        background-color: var(--bg-secondary);
+        border-radius: var(--radius-sm);
+    }
+
+    .setting-child:hover {
+        border-radius: 0px !important;
+    }
 }
 
 .setting-item label {

@@ -69,9 +69,7 @@ html.has-bg.bg-page body.no-frosted #sidebar {
    frost - only while the frosted glass setting is on */
 html.has-bg.bg-page body:not(.no-frosted) #sidebar #chat-list .item:hover,
 html.has-bg.bg-page body:not(.no-frosted) #sidebar #chat-list .item.active,
-html.has-bg.bg-page body:not(.no-frosted) #sidebar #chat-list .item.active:hover,
-html.has-bg.bg-page body:not(.no-frosted) #sidebar .sidebar-panel .item:hover,
-html.has-bg.bg-page body:not(.no-frosted) #sidebar .sidebar-panel .item.active {
+html.has-bg.bg-page body:not(.no-frosted) #sidebar #chat-list .item.active:hover {
     background-color: color-mix(in srgb, var(--bg-secondary) 55%, transparent);
     backdrop-filter: blur(5px) saturate(1.1);
     -webkit-backdrop-filter: blur(5px) saturate(1.1);
@@ -86,10 +84,76 @@ html.has-bg.bg-page body:not(.no-frosted) #sidebar .day-header {
 html.has-bg.bg-page body:not(.no-frosted) #sidebar #chat-list .search .forge-field:focus-within,
 html.has-bg.bg-page body:not(.no-frosted) #sidebar #chat-list .search.creating .forge-field,
 html.has-bg.bg-page body:not(.no-frosted) #sidebar #chat-list .action-btn:hover,
-html.has-bg.bg-page body:not(.no-frosted) #sidebar #chat-list .search .filter-cap:hover,
+html.has-bg.bg-page body:not(.no-frosted) #sidebar #chat-list .search .filter-cap:hover {
+    background-color: color-mix(in srgb, var(--bg-secondary) 55%, transparent);
+}
+
+/* .category-trigger also lives inside module panels (characters), where
+   --bg-secondary is redefined below as already-translucent: read the
+   opaque alias here so both copies mix from the same source */
 html.has-bg.bg-page body:not(.no-frosted) #sidebar .category-trigger:hover,
 html.has-bg.bg-page body:not(.no-frosted) #sidebar .category-trigger.open {
+    background-color: color-mix(in srgb, var(--src-bg-secondary) 55%, transparent);
+}
+
+/* core's own remaining solid touches on the glass: the tabbar footer
+   buttons, the collapsed rail's active tab chip, and the forge create-row
+   hanging under the search line */
+html.has-bg.bg-page body:not(.no-frosted) #sidebar .sidebar-tabbar-footer .sidebar-tab:hover {
     background-color: color-mix(in srgb, var(--bg-secondary) 55%, transparent);
+}
+
+html.has-bg.bg-page body:not(.no-frosted) #sidebar.collapsed .sidebar-tab.active {
+    background-color: color-mix(in srgb, var(--bg-primary) 72%, transparent);
+}
+
+html.has-bg.bg-page body:not(.no-frosted) #sidebar.collapsed .sidebar-tab.active:hover {
+    background-color: color-mix(in srgb, var(--bg-secondary) 55%, transparent);
+}
+
+html.has-bg.bg-page body:not(.no-frosted) #sidebar #chat-list .search .forge-row {
+    background-color: color-mix(in srgb, var(--bg-secondary) 55%, transparent);
+}
+
+html.has-bg.bg-page body:not(.no-frosted) #sidebar #chat-list .search .forge-row:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--bg-tertiary) 72%, transparent);
+}
+
+/* module sidebar panels (coder, git, characters, memory, scheduler, ...)
+   paint their hovers, inputs and cards with the opaque theme variables,
+   which would sit on the glass as dead patches. their ext CSS loads AFTER
+   this file, so selector overrides lose at equal specificity - instead the
+   variables themselves are redefined scoped to the panel: custom properties
+   resolve at the usage site, so every module's var()-based surface turns
+   translucent instantly, now and for any future user module. the --src-*
+   aliases carry the untouched theme values (declaring them on #sidebar
+   keeps the definitions non-circular, since inheritance resolves them at
+   the parent). literal colors in module CSS are deliberately left alone:
+   intentional art (terminal screens, geocities' retro tab) stays as drawn. */
+html.has-bg.bg-page body:not(.no-frosted) #sidebar {
+    --src-bg-primary: var(--bg-primary);
+    --src-bg-secondary: var(--bg-secondary);
+    --src-bg-tertiary: var(--bg-tertiary);
+}
+
+html.has-bg.bg-page body:not(.no-frosted) #sidebar .sidebar-panel {
+    --bg-primary: color-mix(in srgb, var(--src-bg-primary) 72%, transparent);
+    --bg-secondary: color-mix(in srgb, var(--src-bg-secondary) 55%, transparent);
+    --bg-tertiary: color-mix(in srgb, var(--src-bg-tertiary) 72%, transparent);
+    --bg-input: color-mix(in srgb, var(--src-bg-primary) 72%, transparent);
+    --button-bg: color-mix(in srgb, var(--src-bg-secondary) 65%, transparent);
+    --button-hover: color-mix(in srgb, var(--src-bg-secondary) 82%, transparent);
+}
+
+/* popovers born inside a panel (coder's right-click menu, git's status-dot
+   tooltip) float over arbitrary content and must stay readable: re-solid
+   them from the aliases. the heavy prefix outranks their own module rules. */
+html.has-bg.bg-page body:not(.no-frosted) #sidebar .sidebar-panel .coder-menu {
+    background-color: var(--src-bg-tertiary);
+}
+
+html.has-bg.bg-page body:not(.no-frosted) #sidebar .sidebar-panel .git-badge::after {
+    background-color: var(--src-bg-primary);
 }
 
 }

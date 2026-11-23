@@ -7,7 +7,7 @@
         <h4>Levels</h4>
 
         <!-- Master Volume -->
-        <div class="audio-level">
+        <div class="audio-level setting-item">
             <div class="audio-slider-head">
                 <div class="audio-head-left">
                     <button type="button" class="audio-icon-btn" :class="{ muted: $store.audio.volume === 0 }"
@@ -38,7 +38,7 @@
         </div>
 
         <!-- Token Generation Volume -->
-        <div class="audio-level">
+        <div class="audio-level setting-item">
             <div class="audio-slider-head">
                 <span class="audio-label">Token Volume</span>
                 <span class="audio-value" x-text="Math.round($store.audio.tokenVolume * 100) + '%'"></span>
@@ -51,7 +51,7 @@
         </div>
 
         <!-- Token Generation Sound Frequency -->
-        <div class="audio-level">
+        <div class="audio-level setting-item">
             <div class="audio-slider-head">
                 <span class="audio-label">Token Pitch</span>
                 <span class="audio-value" x-text="$store.audio.tokenFreq + ' Hz'"></span>

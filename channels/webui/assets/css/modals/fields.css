@@ -1,10 +1,16 @@
 .modal {
     .item {
-        margin-bottom: 16px;
+        padding: 6px;
+        border-radius: var(--radius-sm);
+        margin-left: -6px;
 
         label {
             font-size: 0.9rem;
             color: var(--text-primary);
+        }
+
+        &:hover {
+            background-color: var(--bg-secondary);
         }
     }
 

@@ -613,7 +613,6 @@
 
     /* --- Hierarchical Settings --- */
     .setting-parent {
-        margin-bottom: 16px;
         position: relative;
         
         &:last-child {
