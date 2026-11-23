@@ -154,6 +154,18 @@ html.has-bg.bg-page body:not(.no-frosted) #sidebar .sidebar-panel .git-badge::af
 
 }
 
+/* page mode: AI message bubbles skip the backdrop blur - they span most
+   of the chat, so blurring the big fixed picture behind every response
+   smears it and costs real GPU time for barely a shimmer; the tint alone
+   carries the surface. user bubbles keep their blur (small surfaces where
+   the glass effect actually shows). the doubled .chat-bubbles only exists
+   to outrank the translucent variant in chat_bubbles.css */
+html.has-bg.bg-page body .message.assistant,
+html.has-bg.bg-page body #messages.chat-bubbles.chat-bubbles .message.assistant {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
 @keyframes bg-layer-in {
     from { opacity: 0; }
     to { opacity: 1; }
