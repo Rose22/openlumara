@@ -281,10 +281,10 @@
         <!-- slash-command autocomplete (see js/components/command_autocomplete.js) -->
         <div id="autocomplete-anchor" x-data="commandAutocomplete()" x-cloak
              @click.outside="hide()"
-             x-effect="watch($store.chat.user_input); $el.parentElement.classList.toggle('ac-open', visible)">
+             x-effect="$el.parentElement.classList.toggle('ac-open', visible)">
         <div class="autocomplete-dropdown" x-show="visible">
             <div class="autocomplete-header">
-                <div class="autocomplete-tabs" x-show="tabs.length > 1" x-cloak>
+                <div class="autocomplete-tabs">
                     <template x-for="tab in tabs" :key="tab.category">
                         <button type="button" class="autocomplete-tab"
                                 :class="{ 'active': activeTab === tab.category }"

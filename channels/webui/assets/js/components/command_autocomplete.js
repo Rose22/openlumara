@@ -22,6 +22,24 @@ let CMD_AC = null;
 
 function cmdAutocompleteInstance() { return CMD_AC; }
 
+/*
+ * Spacer rows only make sense BETWEEN two real matches: leading ones would
+ * dangle blank space above the first result and trailing ones below the
+ * last, so pruning them keeps matches flush at the top of the list.
+ */
+function trimSpacers(cmds) {
+    const out = [];
+
+    for (const cmd of cmds) {
+        if (cmd.spacer && (!out.length || out[out.length - 1].spacer)) continue;
+        out.push(cmd);
+    }
+
+    while (out.length && out[out.length - 1].spacer) { out.pop(); }
+
+    return out;
+}
+
 function commandAutocomplete() {
     return {
         prefix: "/",
@@ -35,7 +53,6 @@ function commandAutocomplete() {
         items: [],          // flattened cmds of the active tab (navigation space)
         selected: 0,
         selectedName: "",   // which row the highlight follows
-        justAccepted: false,  // suppress the popup right after a completion, until typing continues
 
         init() {
             CMD_AC = this;
@@ -61,8 +78,10 @@ function commandAutocomplete() {
             }
         },
 
-        // the single reactive entry point: wired to the input via x-effect,
-        // so it also reacts to programmatic changes (input history recall etc.)
+        // fired from the textarea's @input only: real keystrokes open the
+        // popup. deliberately NOT a reactive watcher - accept() mutates the
+        // input store, and a reactive reopen raced the hide() right after
+        // completion, leaving a blank popup that kept eating Enter presses.
         watch(text) {
             // load once on startup; on failure, retry on the next keystroke
             if (!this.loaded) {
@@ -74,13 +93,6 @@ function commandAutocomplete() {
 
             const value = (text ?? "").trim();
             if (!value.startsWith(this.prefix)) { this.hide(); return; }
-
-            // keep the popup closed right after a completion; a further
-            // keystroke (e.g. a space for subcommands) reopens it as usual
-            if (this.justAccepted) {
-                if (value === this.items[this.selected]?.name) return;
-                this.justAccepted = false;
-            }
 
             this.filter(value.slice(this.prefix.length).toLowerCase());
 
@@ -99,34 +111,65 @@ function commandAutocomplete() {
         },
 
         filter(typed) {
+            // pass 1: NAME matches only, everywhere. description matching is
+            // a pure fallback: the moment a real name matches, description-
+            // only results are irrelevant noise (/update must never share
+            // the list with ...hard because its help text mentions restart)
+            const names = [];
+            let anyNameHit = false;
+
+            for (const [category, cmds] of Object.entries(this.commands)) {
+                const matches = [];
+
+                for (const [name, desc] of Object.entries(cmds ?? {})) {
+                    if (!name || name.startsWith("__SPACER__")) continue;
+
+                    const lower = name.toLowerCase();
+                    const target = this.prefix + typed;
+
+                    // starts-with beats contains, shorter beats longer
+                    let score = null;
+                    if (lower.startsWith(target)) score = 200;
+                    else if (lower.includes(target)) score = 150;
+
+                    if (score !== null) {
+                        matches.push({ name, desc: desc || category, nameHtml: this.highlight(name, typed), score: score - lower.length * 0.01 });
+                    }
+                }
+
+                if (matches.length) {
+                    anyNameHit = true;
+                    // stable sort keeps equal-scored commands in their
+                    // original CMD_DEFS order
+                    matches.sort((a, b) => b.score - a.score);
+                    names.push({ category, count: matches.length, cmds: matches });
+                }
+            }
+
+            if (anyNameHit) { this.tabs = names; return; }
+
+            // pass 2 (only when nothing matches by name): search descriptions
             const tabs = [];
 
             for (const [category, cmds] of Object.entries(this.commands)) {
                 const matches = [];
-                let count = 0;
 
                 for (const [name, desc] of Object.entries(cmds ?? {})) {
-                    if (!name) continue;
+                    // CMD_DEFS marks section breaks with "__SPACER__N" keys;
+                    // other channels render them as blank lines. do the same:
+                    // a dead row, never selectable. NOTE: the marker is the
+                    // NAME, not an empty description - plenty of real
+                    // commands (e.g. /update) simply have no help text.
+                    if (!name || name.startsWith("__SPACER__")) continue;
 
-                    // CMD_DEFS uses "__SPACER__N" keys with empty descriptions
-                    // as section breaks; other channels render them as blank
-                    // lines. do the same: a dead row, never selectable.
-                    if (!desc) {
-                        matches.push({ name, desc: "", spacer: true });
-                        continue;
-                    }
-
-                    const lower = name.toLowerCase();
-                    const descLower = desc.toLowerCase();
-
-                    if (lower.startsWith(this.prefix + typed) || descLower.includes(typed)) {
-                        matches.push({ name, desc, nameHtml: this.highlight(name, typed) });
-                        count++;
+                    const descLower = (desc ?? "").toLowerCase();
+                    if (descLower.includes(typed)) {
+                        matches.push({ name, desc: desc || category, nameHtml: this.highlight(name, typed) });
                     }
                 }
 
-                if (count > 0) {
-                    tabs.push({ category, count, cmds: matches });
+                if (matches.length) {
+                    tabs.push({ category, count: matches.length, cmds: trimSpacers(matches) });
                 }
             }
 
@@ -223,7 +266,10 @@ function commandAutocomplete() {
             const cmd = this.items[this.selected];
             if (!cmd) return;
 
-            this.justAccepted = true;
+            // fill the input and close, period. the watch only runs on actual
+            // text changes, so the popup stays gone until the next keystroke
+            // (which is also how subcommands get offered again) and the next
+            // Enter belongs to send, never to this popup.
             Alpine.store("chat").user_input = cmd.name + " ";
             this.hide();
         },
@@ -237,8 +283,19 @@ function commandAutocomplete() {
             else if (e.key === "ArrowUp") { e.preventDefault(); e.stopPropagation(); this.move(-1); }
             else if (e.key === "ArrowRight") { e.preventDefault(); e.stopPropagation(); this.switchTab(1); }
             else if (e.key === "ArrowLeft") { e.preventDefault(); e.stopPropagation(); this.switchTab(-1); }
-            else if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); this.accept(); }
             else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); this.hide(); }
+            else if (e.key === "Enter") {
+                // Enter belongs to the popup only while it has something to
+                // complete. once the draft no longer matches any command
+                // (only-spacer matches, stale selection, ...), nothing may be
+                // claimed - the key falls through to send as if we weren't here
+                const cmd = this.items[this.selected];
+                if (!cmd || cmd.spacer) { this.hide(); return; }
+
+                e.preventDefault();
+                e.stopPropagation();
+                this.accept();
+            }
         }
     };
 }

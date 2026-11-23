@@ -27,6 +27,7 @@
     {% if config.get('enable_file_upload') %}
     @paste="$store.upload.pasteImage($event)"
     {% endif %}
+    @input="cmdAutocompleteInstance()?.watch($event.target.value)"
     @keydown.capture="cmdAutocompleteInstance()?.toggle($event)"
     @keydown.ctrl.up.prevent="$store.chat.historyPrev(); $autosize($el)"
     @keydown.ctrl.down.prevent="$store.chat.historyNext(); $autosize($el)"
