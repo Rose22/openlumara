@@ -23,6 +23,10 @@ document.addEventListener('alpine:init', async () => {
     // command palette (Ctrl+K), see components/command_palette.js
     Alpine.store('palette', PALETTE);
 
+    // load the audio settings from localStorage into the store, then push
+    // them into the AudioManager (must run before any sound can play)
+    Alpine.store('audio').init();
+
     // user-rebindable keyboard shortcuts (localStorage-backed)
     Alpine.store('keyboard', KEYBOARD_STORE);
     Alpine.store('keyboard').init();

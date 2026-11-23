@@ -21,28 +21,16 @@ const AudioManager = {
     processingChain: null,
     synthLPF: null,
 
-    enabledFlags: null,
     typingFreq: null,
     tokenFreq: null,
 
-    refreshSettings: function() {
-        // drop the cached enabled-flags so the next play() re-reads from storage
-        this.enabledFlags = null;
-    },
-
     isSoundEnabled: function(id) {
-        if (this.enabledFlags === null) {
-            const flags = {};
-            const ids = ['send_message', 'response_start', 'processing', 'typewriter',
-                         'typing', 'token', 'completion', 'reasoning_end'];
-            for (const sid of ids) {
-                let stored = null;
-                try { stored = localStorage.getItem(`${sid}SoundEnabled`); } catch (e) {}
-                flags[sid] = stored !== null ? stored === 'true' : this.SOUND_DEFAULTS[sid] !== false;
-            }
-            this.enabledFlags = flags;
-        }
-        return Boolean(this.enabledFlags[id]);
+        // the audio store owns the enabled-flags (loaded from localStorage at
+        // boot, live-updated by the settings UI); this fallback only answers
+        // before Alpine registers the store
+        const store = typeof Alpine !== 'undefined' ? Alpine.store('audio') : null;
+        if (store && store.sounds) return Boolean(store.sounds[`${id}SoundEnabled`]);
+        return this.SOUND_DEFAULTS[id] !== false;
     },
 
     getSynthLPF: function(ctx) {
@@ -103,9 +91,12 @@ const AudioManager = {
     // Initialize IndexedDB and AudioContext
     init: function() {
         return new Promise((resolve, reject) => {
-            // Load volume from storage
-            this.volume = parseFloat(localStorage.getItem('sfxVolume') || '1.0');
-            this.tokenVolume = parseFloat(localStorage.getItem('sfxTokenVolume') || '0.7');
+            // Load volume from storage (skip once the audio store has pushed
+            // a fresher value in, so a boot-time race can't clobber it)
+            if (localStorage.getItem('sfxVolume') !== null) {
+                this.volume = parseFloat(localStorage.getItem('sfxVolume'));
+            }
+            this.tokenVolume = parseFloat(localStorage.getItem('sfxTokenVolume') || '0.6');
 
             // 1. Open IndexedDB
             const request = indexedDB.open('TypewriterSoundsDB', 1);
@@ -118,8 +109,8 @@ const AudioManager = {
             request.onsuccess = async (event) => {
                 this.db = event.target.result;
 
-                // 2. Pre-load sounds from DB into memory
-                await this.loadSoundsFromDB();
+                // 2. Pre-load uploaded sounds into memory buffers
+                await this.loadFromStorage();
                 resolve();
             };
 
@@ -132,37 +123,74 @@ const AudioManager = {
         });
     },
 
-    // Load buffers from IndexedDB into memory
-    loadSoundsFromDB: async function() {
-        if (!this.db) return;
+    // Decode a base64 data URL into a raw ArrayBuffer
+    dataUrlToArrayBuffer: function(dataUrl) {
+        const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
+        const byteString = atob(base64);
+        const ab = new ArrayBuffer(byteString.length);
+        const ia = new Uint8Array(ab);
+        for (let i = 0; i < byteString.length; i++) {
+            ia[i] = byteString.charCodeAt(i);
+        }
+        return ab;
+    },
 
-        const load = (id) => {
+    // Load uploaded sound buffers into memory: IndexedDB first (uploads
+    // live there, quota-safe), falling back to old localStorage data-URL
+    // entries and migrating those into the DB
+    loadFromStorage: async function() {
+        const ids = ['send_message', 'response_start', 'processing', 'typewriter',
+                     'typing', 'token', 'completion', 'reasoning_end'];
+
+        const decodeInto = async (id, arrayBuffer) => {
+            try {
+                this.buffers[id] = await this.getAudioContext().decodeAudioData(arrayBuffer);
+                return true;
+            } catch (e) {
+                console.warn(`Failed to decode audio buffer for ${id}:`, e);
+                return false;
+            }
+        };
+
+        const loadFromDB = (id) => {
             return new Promise((resolve) => {
+                if (!this.db) { resolve(false); return; }
                 const transaction = this.db.transaction(['sounds'], 'readonly');
                 const store = transaction.objectStore('sounds');
                 const request = store.get(id);
 
                 request.onsuccess = async (event) => {
                     if (event.target.result && event.target.result.data) {
-                        const arrayBuffer = event.target.result.data;
-                        try {
-                            const buffer = await this.getAudioContext().decodeAudioData(arrayBuffer);
-                            this.buffers[id] = buffer;
-                        } catch (e) {
-                            console.warn(`Failed to decode audio buffer for ${id}:`, e);
-                        }
+                        resolve(await decodeInto(id, event.target.result.data));
+                        return;
                     }
-                    resolve();
+                    resolve(false);
                 };
-                request.onerror = () => resolve();
+                request.onerror = () => resolve(false);
             });
         };
 
-        await Promise.all([
-            load('send_message'), load('response_start'), load('typewriter'),
-            load('typing'), load('token'), load('completion'), load('reasoning_end'),
-            load('processing')
-        ]);
+        // migrate uploads stored as data URLs by older builds (these could
+        // silently fail the localStorage quota; the DB cannot)
+        const migrateFromLocalStorage = async (id) => {
+            let stored = null;
+            try { stored = localStorage.getItem(`${id}SoundData`); } catch (e) {}
+            if (!stored) return;
+
+            const ok = await decodeInto(id, this.dataUrlToArrayBuffer(stored));
+            if (ok && this.db) {
+                try {
+                    const transaction = this.db.transaction(['sounds'], 'readwrite');
+                    transaction.objectStore('sounds').put({ id, data: this.dataUrlToArrayBuffer(stored) });
+                } catch (e) {}
+            }
+            try { localStorage.removeItem(`${id}SoundData`); } catch (e) {}
+        };
+
+        await Promise.all(ids.map(async (id) => {
+            const found = await loadFromDB(id);
+            if (!found) await migrateFromLocalStorage(id);
+        }));
     },
 
     getAudioContext: function() {
@@ -178,10 +206,11 @@ const AudioManager = {
         return this.audioContext;
     },
 
+    // Sound-state setters: persistence belongs to the audio store (the sole
+    // localStorage writer), these only update the live audio state
     // Set volume (0.0 to 1.0)
     setVolume: function(vol) {
         this.volume = vol;
-        localStorage.setItem('sfxVolume', vol);
 
         // Update the master gain node immediately if it exists
         if (this.masterGainNode) {
@@ -190,15 +219,13 @@ const AudioManager = {
     },
     setTokenVolume: function(vol) {
         this.tokenVolume = vol;
-        localStorage.setItem('sfxTokenVolume', vol);
-
     },
     setTokenFreq: function(freq) {
         this.tokenFreq = freq;
-        localStorage.setItem('sfxTokenFreq', freq);
     },
 
-    // Save a file to IndexedDB
+    // Save an uploaded sound file to IndexedDB (and remember its name in
+    // localStorage so the settings UI can show it after a reload)
     saveFile: async function(id, file) {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -218,6 +245,8 @@ const AudioManager = {
 
                     // decodeAudioData returns a Promise, must be awaited
                     this.buffers[id] = await this.getAudioContext().decodeAudioData(arrayBuffer);
+
+                    try { localStorage.setItem(`${id}SoundName`, file.name); } catch (e) {}
                     resolve(true);
                 } catch (err) {
                     console.error('Error saving audio file:', err);
@@ -239,26 +268,62 @@ const AudioManager = {
         }
     },
 
-    // Load and cache audio from a Data URL (base64)
-    loadFromDataURL: function(id, dataUrl) {
-        return new Promise(async (resolve, reject) => {
+    // Load and cache audio from a Data URL (base64), persisting it to the DB.
+    // Kept as a compatibility door for modules; the settings UI uploads
+    // straight through saveFile instead.
+    loadFromDataURL: async function(id, dataUrl) {
+        const ab = this.dataUrlToArrayBuffer(dataUrl);
+        this.buffers[id] = await this.getAudioContext().decodeAudioData(ab);
+
+        if (this.db) {
             try {
-                // Strip data URI prefix if present (e.g., "data:audio/mp3;base64,")
-                const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
-                const byteString = atob(base64);
-                const ab = new ArrayBuffer(byteString.length);
-                const ia = new Uint8Array(ab);
-                for (let i = 0; i < byteString.length; i++) {
-                    ia[i] = byteString.charCodeAt(i);
-                }
-                const buffer = await this.getAudioContext().decodeAudioData(ab);
-                this.buffers[id] = buffer;
-                resolve(true);
-            } catch (err) {
-                console.error('Error decoding audio data URL:', err);
-                reject(err);
-            }
-        });
+                const transaction = this.db.transaction(['sounds'], 'readwrite');
+                transaction.objectStore('sounds').put({ id, data: ab });
+            } catch (e) {}
+        }
+        return true;
+    },
+
+    // Settings-page audition of a built-in sound: ignores the enabled flags
+    // and plays a short reference tone
+    previewSynth: function(id) {
+        const ctx = this.getAudioContext();
+        const t = ctx.currentTime;
+
+        const note = (freq, start, dur, volScale) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+            osc.connect(gain);
+            gain.connect(this.masterGainNode);
+            gain.gain.setValueAtTime(0, start);
+            gain.gain.linearRampToValueAtTime(0.25 * volScale, start + 0.004);
+            gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
+            osc.onended = () => { try { osc.disconnect(); gain.disconnect(); } catch (e) {} };
+            osc.start(start);
+            osc.stop(start + dur + 0.05);
+        };
+
+        if (id === 'token') {
+            note((this.tokenFreq || 9000) * 0.83, t, 0.09, Math.max(this.tokenVolume, 0.25));
+        } else if (id === 'typing') {
+            note(this.typingFreq || Number(localStorage.getItem('typingFreq')) || 440, t, 0.1, 1);
+        } else if (id === 'send_message') {
+            note(440, t, 0.22, 1);
+            note(330, t + 0.09, 0.22, 0.85);
+        } else if (id === 'response_start') {
+            note(330, t, 0.22, 1);
+            note(440, t + 0.09, 0.22, 0.85);
+        } else if (id === 'completion' || id === 'reasoning_end') {
+            note(220, t, 0.25, 1);
+            note(330, t + 0.11, 0.28, 0.9);
+            note(440, t + 0.22, 0.35, 0.8);
+        } else if (id === 'processing') {
+            note(196, t, 0.6, 1);
+        } else {
+            note(440, t, 0.2, 1);
+        }
     },
 
     // Resume the AudioContext immediately (fixes mobile autoplay policies)
@@ -489,12 +554,26 @@ const AudioManager = {
                 const source = ctx.createBufferSource();
                 source.buffer = buffer;
 
-                // Connect source directly to the cached master gain node.
-                // This avoids creating a new GainNode on every keystroke.
-                source.connect(this.masterGainNode);
+                // the token sound keeps its own volume setting even when
+                // it is a custom file, so route it through a scaled gain
+                let gain = null;
+                if (id === 'token') {
+                    this.resumeContext();
+                    gain = ctx.createGain();
+                    gain.gain.value = this.tokenVolume;
+                    gain.connect(this.masterGainNode);
+                    source.connect(gain);
+                } else {
+                    // plain sounds connect straight to the cached master
+                    // gain node, avoiding a new GainNode per keystroke
+                    source.connect(this.masterGainNode);
+                }
 
                 source.onended = () => {
-                    try { source.disconnect(); } catch (e) {}
+                    try {
+                        source.disconnect();
+                        if (gain) gain.disconnect();
+                    } catch (e) {}
                 };
 
                 source.start(0);

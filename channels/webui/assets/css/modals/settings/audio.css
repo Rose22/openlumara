@@ -1,0 +1,175 @@
+/* Audio settings page (modals/settings/audio.html) */
+
+/* --- level sliders (flat, like the appearance page) --- */
+.audio-level {
+    margin-bottom: 20px;
+}
+
+.audio-slider-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.audio-head-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.audio-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.audio-desc {
+    margin: 4px 0 0;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--text-secondary);
+}
+
+.audio-value {
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+/* filled portion of the range track (inline --fill from the template) */
+.audio-slider {
+    width: 100%;
+    height: 4px;
+    background: linear-gradient(to right, var(--accent) var(--fill, 0%), var(--border-color) var(--fill, 0%));
+}
+
+/* ghost icon buttons (mute / play / upload / clear) */
+.audio-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+}
+
+.audio-icon-btn:hover {
+    background: var(--button-bg);
+    color: var(--text-primary);
+}
+
+.audio-icon-btn:active svg {
+    transform: scale(0.88);
+}
+
+.audio-icon-btn.muted {
+    color: var(--accent);
+}
+
+.audio-icon-btn svg {
+    transition: transform 0.1s ease;
+}
+
+@keyframes audio-play-pulse {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.3); }
+    100% { transform: scale(1); }
+}
+
+.audio-icon-btn.playing svg {
+    animation: audio-play-pulse 0.45s ease;
+    color: var(--accent);
+}
+
+/* --- sound effect rows (outlined only: name + actions + toggle) --- */
+.audio-sound-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 14px;
+    margin-bottom: 8px;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+}
+
+.audio-sound-name {
+    flex: 1;
+    min-width: 0;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.audio-sound-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.audio-sound-card .toggle {
+    margin-left: 6px;
+}
+
+/* --- footer (reset) --- */
+.audio-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 8px;
+    padding: 12px 16px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+}
+
+.audio-footer .audio-desc {
+    margin: 0;
+}
+
+.audio-danger-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-family: var(--font-primary);
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+}
+
+.audio-danger-btn:hover {
+    border-color: var(--error);
+    color: var(--error);
+    background: var(--error-bg);
+}
+
+@media (max-width: 600px) {
+    .audio-footer {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}

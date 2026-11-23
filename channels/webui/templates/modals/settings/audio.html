@@ -1,74 +1,135 @@
 <!-- AUDIO SETTINGS -->
 <template x-if="activeCategory === 'audio' && !activeModule && !activeChannel">
-    <div>
-        <!-- Sound Effects Section -->
+    <div class="settings-section">
         <h3 class="section-title" x-text="$store.settings.categories.audio.title"></h3>
         <p class="section-desc" x-text="$store.settings.categories.audio.description"></p>
 
-        <hr>
+        <h4>Levels</h4>
 
-        <!-- Volume -->
-        <div class="item">
-            <div class="row">
-                <label class="label">Volume</label>
-                <input type="range" min="0" max="100" :value="$store.audio.volume*100"
-                       @input="$store.audio.setVolume(parseInt($event.target.value) / 100)">
-                <span class="label right" x-text="Math.round($store.audio.volume * 100) + '%'"></span>
+        <!-- Master Volume -->
+        <div class="audio-level">
+            <div class="audio-slider-head">
+                <div class="audio-head-left">
+                    <button type="button" class="audio-icon-btn" :class="{ muted: $store.audio.volume === 0 }"
+                            @click="$store.audio.toggleMute()"
+                            :title="$store.audio.volume === 0 ? 'Unmute' : 'Mute all interface sounds'">
+                        <svg x-show="$store.audio.volume > 0" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                            <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+                        </svg>
+                        <svg x-show="$store.audio.volume === 0" x-cloak xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                            <line x1="23" y1="9" x2="17" y2="15"></line>
+                            <line x1="17" y1="9" x2="23" y2="15"></line>
+                        </svg>
+                    </button>
+                    <span class="audio-label">Master Volume</span>
+                </div>
+                <span class="audio-value" x-text="Math.round($store.audio.volume * 100) + '%'"></span>
             </div>
+            <input type="range" class="audio-slider" min="0" max="100"
+                   :value="$store.audio.volume * 100"
+                   :style="'--fill: ' + ($store.audio.volume * 100) + '%'"
+                   @input="$store.audio.setVolume(parseInt($event.target.value) / 100)">
+            <p class="audio-desc">Overall loudness of all interface sounds.</p>
         </div>
 
         <!-- Token Generation Volume -->
-        <div class="item">
-            <div class="row">
-                <label class="label">Token Generation Volume</label>
-                <input type="range" min="0" max="100" :value="$store.audio.tokenVolume*100"
-                       @input="$store.audio.setTokenVolume(parseInt($event.target.value) / 100)">
-                <span class="label right" x-text="Math.round($store.audio.tokenVolume * 100) + '%'"></span>
+        <div class="audio-level">
+            <div class="audio-slider-head">
+                <span class="audio-label">Token Volume</span>
+                <span class="audio-value" x-text="Math.round($store.audio.tokenVolume * 100) + '%'"></span>
             </div>
+            <input type="range" class="audio-slider" min="0" max="100"
+                   :value="$store.audio.tokenVolume * 100"
+                   :style="'--fill: ' + ($store.audio.tokenVolume * 100) + '%'"
+                   @input="$store.audio.setTokenVolume(parseInt($event.target.value) / 100)">
+            <p class="audio-desc">Loudness of the soft tick that rides along with every streamed token.</p>
         </div>
 
         <!-- Token Generation Sound Frequency -->
-        <div class="item">
-            <div class="row">
-                <label class="label">Token Generation Sound Frequency</label>
-                <input type="range" min="100" max="9000" step="100" :value="$store.audio.tokenFreq"
-                       @input="$store.audio.setTokenFreq(parseInt($event.target.value))">
-                <span class="label right" x-text="$store.audio.tokenFreq + ' Hz'"></span>
+        <div class="audio-level">
+            <div class="audio-slider-head">
+                <span class="audio-label">Token Pitch</span>
+                <span class="audio-value" x-text="$store.audio.tokenFreq + ' Hz'"></span>
             </div>
+            <input type="range" class="audio-slider" min="100" max="9000" step="100"
+                   :value="$store.audio.tokenFreq"
+                   :style="'--fill: ' + (($store.audio.tokenFreq - 100) / 89) + '%'"
+                   @input="$store.audio.setTokenFreq(parseInt($event.target.value))">
+            <p class="audio-desc">How high or low the token tick sounds. Only applies to the generated sound, not to uploaded files.</p>
         </div>
 
+        <h4>Sound Effects</h4>
+
         <!-- Sound Files -->
-        <template x-for="soundId in ['send_message', 'response_start', 'processing', 'token', 'completion', 'reasoning_end']" :key="soundId">
-            <div class="item">
-                <div class="toggle-row">
-                    <label class="label" x-text="soundId.charAt(0).toUpperCase() + soundId.slice(1).replace('_', ' ',) + ' Sound'"></label>
-                    <button type="button" :class="['toggle', $store.audio.sounds[soundId + 'SoundEnabled'] === true ? 'toggle-on' : 'toggle-off']"
-                            @click="$store.audio.setSoundEnabled(soundId, !$store.audio.sounds[soundId + 'SoundEnabled'])">
+        <template x-for="soundId in ['send_message', 'response_start', 'token', 'completion', 'reasoning_end', 'processing', 'typing']" :key="soundId">
+            <div class="audio-sound-card"
+                 x-data="{ playing: false, flash() { this.playing = true; setTimeout(() => this.playing = false, 460); } }">
+                <span class="audio-sound-name" x-text="$store.audio.soundLabel(soundId)"></span>
+
+                <div class="audio-sound-actions">
+                    <!-- hidden native input; the styled button drives it -->
+                    <input type="file" accept="audio/*" x-ref="fileInput" x-show="false" x-cloak aria-hidden="true"
+                           @change="$store.audio.handleSoundUpload($event, soundId)">
+
+                    <button type="button" class="audio-icon-btn" @click="$refs.fileInput.click()"
+                            :title="$store.audio.sounds[soundId + 'SoundUploaded']
+                                ? 'Replace sound: ' + $store.audio.sounds[soundId + 'SoundName']
+                                : 'Upload a custom sound file for this event'">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                             :style="$store.audio.sounds[soundId + 'SoundUploaded'] ? 'color: var(--accent);' : ''">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                    </button>
+
+                    <button type="button" class="audio-icon-btn" :class="{ playing: playing }"
+                            x-show="$store.audio.sounds[soundId + 'SoundUploaded']" x-cloak
+                            @click="$store.audio.previewSound(soundId); flash()"
+                            title="Preview your uploaded sound">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polygon points="6 3 20 12 6 21 6 3"></polygon>
+                        </svg>
+                    </button>
+
+                    <button type="button" class="audio-icon-btn" x-show="$store.audio.sounds[soundId + 'SoundUploaded']" x-cloak
+                            @click="$store.audio.clearSound(soundId)"
+                            title="Remove the uploaded sound (falls back to the generated one)">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
                     </button>
                 </div>
 
-                <div class="item">
-                    <p class="description" x-text="$store.audio.sounds[soundId + 'SoundName'] || 'Using generated sound'"></p>
-                </div>
-
-                <div class="item">
-                    <input type="file" accept="audio/*" @change="$store.audio.handleSoundUpload($event, soundId)">
-                    <template x-if="$store.audio.sounds[soundId + 'SoundData']">
-                        <div class="actions" style="display: inline-flex; gap: 8px; vertical-align: middle;">
-                            <button type="button" class="btn" x-show="$store.audio.sounds[soundId + 'SoundData']"
-                                    @click="previewSound(soundId)">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                                </svg>
-                                <span>Play</span>
-                            </button>
-                            <button type="button" class="btn" @click="$store.audio.clearSound(soundId)">
-                                Clear
-                            </button>
-                        </template>
-                    </div>
-                </div>
+                <button type="button" class="toggle" role="switch"
+                        :aria-checked="$store.audio.sounds[soundId + 'SoundEnabled'] === true"
+                        :class="$store.audio.sounds[soundId + 'SoundEnabled'] === true ? 'toggle-on' : 'toggle-off'"
+                        @click="$store.audio.setSoundEnabled(soundId, !$store.audio.sounds[soundId + 'SoundEnabled'])">
+                </button>
             </div>
         </template>
+
+        <!-- Reset -->
+        <div class="audio-footer">
+            <p class="audio-desc">Everything here saves instantly to this browser &mdash; no Save button needed. Uploaded sound files live in this browser's local database.</p>
+            <button type="button" class="audio-danger-btn" @click="$store.audio.reset()"
+                    title="Restore default volumes, enable nothing, and remove all uploaded sounds">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="1 4 1 10 7 10"></polyline>
+                    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                </svg>
+                <span>Reset audio settings</span>
+            </button>
+        </div>
     </div>
 </template>
