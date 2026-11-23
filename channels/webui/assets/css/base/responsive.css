@@ -67,6 +67,11 @@
         z-index: 100;
         box-shadow: var(--shadow-strong);
 
+        /* explicit solid bg: page-mode blanks body's background and the
+           sidebar always inherited it from there; as a full-screen overlay
+           it must stay opaque over the background picture */
+        background-color: var(--bg-primary);
+
         /* full-width overlay on mobile */
         flex: 0 0 100% !important;
         min-width: 0 !important;
