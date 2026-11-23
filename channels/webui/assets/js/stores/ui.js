@@ -16,6 +16,9 @@ UI_STORE = {
     notice: null,
 
     shouldScroll: true,
+    // unlike shouldScroll (which tracks the tight auto-follow tolerance),
+    // this only turns true after a deliberate scroll-up
+    showScrollButton: false,
     scrollToTurnIndex: null,
 
     // transient feedback bubble for keyboard actions (see #kb-toast in index.html)
@@ -36,6 +39,10 @@ UI_STORE = {
     _updateShouldScroll(el) {
         const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
         this.shouldScroll = distFromBottom < this.scrollThreshold;
+
+        // the button only appears once the user has scrolled up a
+        // significant amount: at least most of a viewport above the bottom
+        this.showScrollButton = distFromBottom > Math.max(el.clientHeight * 0.75, 400);
     },
 
     _stopPump() {
@@ -408,6 +415,7 @@ UI_STORE = {
         if (!el) return;
 
         this.shouldScroll = true;
+        this.showScrollButton = false;
 
         await this._jumpToBottom(el);
     },
