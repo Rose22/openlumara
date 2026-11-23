@@ -1,11 +1,22 @@
 header {
-    padding: 6px 12px;
+    /* the vertical padding lives on the ITEMS (below), not the bar itself:
+       when Alpine's x-show hides every child, hidden items carry no margins
+       and the header collapses to true zero height - padding on the bar
+       would instead leave a hollow strip. horizontal padding is harmless
+       height-wise and stays here. h1 is excluded so the titled header keeps
+       its current rhythm. */
+    padding: 0 12px;
     background: none;
     display: flex;
     align-items: center;
     justify-content: space-between;
     flex-shrink: 0;
     overflow-x: hidden !important;
+
+    .left > :not(h1),
+    .right > :not(h1) {
+        margin-block: 6px;
+    }
 
     .left {
         display: flex;
