@@ -140,33 +140,87 @@
         }
     }
 
-    /* --- Range Sliders --- */
+    /* --- Range Sliders ---
+       filled portion of the track uses the --fill custom property
+       (a percentage), set inline by the templates; Firefox fills
+       natively via ::-moz-range-progress instead. */
     input[type="range"] {
-        height: 4px;
-        background: var(--border-color);
+        --thumb-size: 18px;
+        height: 6px;
+        background: linear-gradient(to right,
+            var(--accent) var(--fill, 0%),
+            var(--border-color) var(--fill, 0%));
         border-radius: var(--radius-full);
         outline: none;
+        cursor: pointer;
         -webkit-appearance: none;
         appearance: none;
+        transition: box-shadow 0.15s ease;
 
         &::-webkit-slider-thumb {
             -webkit-appearance: none;
-            width: 16px;
-            height: 16px;
+            width: var(--thumb-size);
+            height: var(--thumb-size);
             border-radius: 50%;
             background: var(--accent);
-            cursor: pointer;
-            box-shadow: 0 0 8px var(--accent-glow);
+            border: 3px solid var(--bg-primary);
+            box-shadow: 0 0 0 1px var(--border-color),
+                        0 2px 6px rgba(0, 0, 0, 0.35);
+            cursor: grab;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        &:hover::-webkit-slider-thumb {
+            box-shadow: 0 0 0 1px var(--accent),
+                        0 0 10px var(--accent-glow),
+                        0 2px 6px rgba(0, 0, 0, 0.35);
+        }
+
+        &:active::-webkit-slider-thumb {
+            cursor: grabbing;
+            box-shadow: 0 0 0 1px var(--accent),
+                        0 0 16px var(--accent-glow),
+                        0 2px 6px rgba(0, 0, 0, 0.35);
+        }
+
+        &:focus-visible::-webkit-slider-thumb {
+            box-shadow: 0 0 0 2px var(--accent),
+                        0 0 10px var(--accent-glow);
+        }
+
+        /* Firefox: the pseudo-track paints over the input's
+           gradient background, so give it its own fill there */
+        &::-moz-range-track {
+            height: 6px;
+            background: var(--border-color);
+            border-radius: var(--radius-full);
+        }
+
+        &::-moz-range-progress {
+            height: 6px;
+            background: var(--accent);
+            border-radius: var(--radius-full);
         }
 
         &::-moz-range-thumb {
-            width: 16px;
-            height: 16px;
+            width: calc(var(--thumb-size) - 2px);
+            height: calc(var(--thumb-size) - 2px);
             border-radius: 50%;
             background: var(--accent);
-            cursor: pointer;
-            border: none;
-            box-shadow: 0 0 8px var(--accent-glow);
+            border: 3px solid var(--bg-primary);
+            box-shadow: 0 0 0 1px var(--border-color),
+                        0 2px 6px rgba(0, 0, 0, 0.35);
+            cursor: grab;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        &:hover::-moz-range-thumb {
+            box-shadow: 0 0 0 1px var(--accent),
+                        0 0 10px var(--accent-glow);
+        }
+
+        &:active::-moz-range-thumb {
+            cursor: grabbing;
         }
     }
 

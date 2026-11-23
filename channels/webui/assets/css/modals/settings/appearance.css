@@ -166,15 +166,9 @@
     color: var(--text-muted);
 }
 
-/* Range sliders — width: 100% for settings context (thumb styles in fields.css) */
+/* Range sliders — width: 100% for settings context (all other slider styles in fields.css) */
 .setting-item input[type="range"] {
     width: 100%;
-    height: 4px;
-    background: var(--border-color);
-    border-radius: var(--radius-full);
-    outline: none;
-    -webkit-appearance: none;
-    appearance: none;
 }
 
 #step-display-mode {

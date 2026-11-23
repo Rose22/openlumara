@@ -142,6 +142,7 @@
                        x-model.number="fontSize" 
                        min="12" 
                        max="24"
+                       :style="'--fill: ' + ((fontSize - 12) / 12 * 100) + '%'"
                        @input="handleFontSize($event.target.value)">
             </div>
             
@@ -155,6 +156,7 @@
                        x-model.number="chatWidth" 
                        min="20" 
                        max="100"
+                       :style="'--fill: ' + ((chatWidth - 20) / 80 * 100) + '%'"
                        @input="handleChatWidth($event.target.value)">
             </div>
 
@@ -218,6 +220,7 @@
                        min="50"
                        max="1000"
                        step="50"
+                       :style="'--fill: ' + ((tokenFadeMs - 50) / 950 * 100) + '%'"
                        @input="handleTokenFadeSpeed($event.target.value)"
                 >
             </div>
