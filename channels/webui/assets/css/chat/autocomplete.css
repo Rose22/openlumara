@@ -46,9 +46,11 @@
         scrollbar-width: thin;
     }
 
-    /* the header is just the tab strip now */
+    /* the header is just the tab strip now. min-width: 0 lets it clamp to
+       the popup width, which is what makes the strip inside it scroll */
     .autocomplete-header {
         flex: none;
+        min-width: 0;
         background: var(--bg-secondary);
         border-bottom: 1px solid var(--border-color);
     }
@@ -58,8 +60,15 @@
         align-items: stretch;
         gap: 2px;
         padding: 0 8px;
+        min-width: 0;
         overflow-x: auto;
+        overscroll-behavior-x: contain;
         scrollbar-width: none;
+        scroll-behavior: smooth;
+
+        &::-webkit-scrollbar {
+            display: none;
+        }
 
         .autocomplete-tab {
             display: inline-flex;

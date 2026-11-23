@@ -186,6 +186,18 @@ function commandAutocomplete() {
             this.activeTab = next.category;
             this.items = next.cmds;
             this.select(0);
+            this.scrollActiveTabIntoView();
+        },
+
+        // when the strip overflows horizontally, arrow-cycling must keep the
+        // active tab visible. inline-only: block scrolling would steal the
+        // command list's own scroll position.
+        scrollActiveTabIntoView() {
+            Alpine.nextTick(() => {
+                const strip = this.$el.querySelector(".autocomplete-tabs");
+                strip?.querySelector(".autocomplete-tab.active")
+                    ?.scrollIntoView({ block: "nearest", inline: "nearest" });
+            });
         },
 
         pickTab(category) {
@@ -195,6 +207,7 @@ function commandAutocomplete() {
             this.activeTab = category;
             this.items = tab.cmds;
             this.select(0);
+            this.scrollActiveTabIntoView();
         },
 
         // <mark> the typed part inside the command name. both sides are
