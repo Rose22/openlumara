@@ -32,8 +32,11 @@
    without a picture the bubbles keep their solid message-bg colors - a
    8% see-through into a flat background is pure readability loss for
    nothing - and the blur is skipped entirely */
+/* the fill lives in the frosted.css pseudo (dimmed gradient + darkening
+   scrim - color-mix can't handle the gradient bg, so no per-mix alpha);
+   the element itself stays transparent so the blur underneath survives */
 html.has-bg body:not(.no-frosted) #messages.chat-bubbles .message.user {
-    background: color-mix(in srgb, var(--bg-message-user) 92%, transparent);
+    background: none;
     backdrop-filter: blur(6px) saturate(1.15);
     -webkit-backdrop-filter: blur(6px) saturate(1.15);
 }
