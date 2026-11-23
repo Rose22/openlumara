@@ -213,9 +213,7 @@
     left: 0;
     right: 0;
     z-index: 40;
-    background: color-mix(in srgb, var(--bg-primary, #151515) 60%, transparent);
-    backdrop-filter: blur(6px) saturate(1.4);
-    -webkit-backdrop-filter: blur(6px) saturate(1.4);
+    background: none;
 }
 
 /* solid controls inside the frosted wrapper would break the effect */

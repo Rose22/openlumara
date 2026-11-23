@@ -72,6 +72,14 @@
             }
         }
 
+        &:not(.docked) {
+            .input-wrapper {
+                background: color-mix(in srgb, var(--bg-primary, #151515) 60%, transparent);
+                backdrop-filter: blur(6px) saturate(1.4);
+                -webkit-backdrop-filter: blur(6px) saturate(1.4);
+            }
+        }
+
         #upload {
             padding: 0;
             width: 48px;
