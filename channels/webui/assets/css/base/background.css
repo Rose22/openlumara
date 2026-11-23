@@ -145,13 +145,9 @@ html.has-bg.bg-page body:not(.no-frosted) #sidebar .sidebar-panel {
     --button-hover: color-mix(in srgb, var(--src-bg-secondary) 82%, transparent);
 }
 
-/* popovers born inside a panel (coder's right-click menu, git's status-dot
-   tooltip) float over arbitrary content and must stay readable: re-solid
-   them from the aliases. the heavy prefix outranks their own module rules. */
-html.has-bg.bg-page body:not(.no-frosted) #sidebar .sidebar-panel .coder-menu {
-    background-color: var(--src-bg-tertiary);
-}
-
+/* popovers born inside a panel float over arbitrary content; the git
+   status-dot tooltip stays solid for readability (coder's menu got its own
+   frost pass in frosted.css). the heavy prefix outranks module rules. */
 html.has-bg.bg-page body:not(.no-frosted) #sidebar .sidebar-panel .git-badge::after {
     background-color: var(--src-bg-primary);
 }

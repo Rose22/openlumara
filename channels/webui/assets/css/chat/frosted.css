@@ -22,6 +22,9 @@
     --frost-bg: color-mix(in srgb, var(--bg-primary, #151515) 60%, transparent);
     --frost-bg-button: color-mix(in srgb, var(--bg-primary, #151515) 76%, transparent);
     --frost-bg-pinned: color-mix(in srgb, var(--bg-primary, #151515) 28%, transparent);
+    /* hovered/selected row inside a frosted surface (command popup list):
+       same wash recipe the sidebar chat-list uses for its glass hovers */
+    --frost-bg-highlight: color-mix(in srgb, var(--bg-secondary, #1e1e24) 55%, transparent);
 }
 
 /* frosted glass disabled (settings toggle): overlays stay, they just go
@@ -33,6 +36,7 @@ body.no-frosted {
     --frost-bg: var(--bg-primary, #151515);
     --frost-bg-button: var(--bg-primary, #151515);
     --frost-bg-pinned: var(--bg-primary, #151515);
+    --frost-bg-highlight: var(--bg-secondary, #1e1e24);
 }
 
 /* --- the floating input assembly ---------------------------------------- */
@@ -90,4 +94,60 @@ body.no-frosted #messages.chat-bubbles.chat-bubbles .turn.prompt-pinned:not(:has
     background: var(--bg-primary, #151515);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
+}
+
+/* --- sidebar inputs -------------------------------------------------------- */
+
+/* every text-ish control inside module panels goes fully bare over the
+   glass (like the chat-list search line): background and border melt away,
+   the text simply rides the sidebar's frost; a soft glass tint marks focus
+   (same cue as the forge-field). checkbox/radio and the shell's invisible
+   capture input are skipped; native <select> drop-down lists are OS-painted
+   and can never be restyled, only the box. frost off -> untouched: fields
+   keep their original bordered solid look. */
+body:not(.no-frosted) #sidebar .sidebar-panel :is(input:not([type="checkbox"]):not([type="radio"]), textarea, select):not(.term-capture) {
+    background-color: color-mix(in srgb, var(--bg-primary, #151515) 35%, transparent);
+    border-color: transparent;
+    backdrop-filter: saturate(1.35);
+    -webkit-backdrop-filter: saturate(1.35);
+}
+
+body:not(.no-frosted) #sidebar .sidebar-panel :is(input:not([type="checkbox"]):not([type="radio"]), textarea, select):not(.term-capture):focus {
+    background-color: var(--frost-bg-highlight);
+}
+
+/* the chat-list search line gets the same recess; its focus/create tint
+   from background.css still layers over this (heavier selector) */
+body:not(.no-frosted) #sidebar #chat-list .search .forge-field {
+    background-color: color-mix(in srgb, var(--bg-primary, #151515) 35%, transparent);
+    backdrop-filter: saturate(1.35);
+    -webkit-backdrop-filter: saturate(1.35);
+}
+
+/* fake selects inside module panels (characters' category/character
+   pickers are .category-trigger buttons, not <select>) get the same look;
+   the hover/open washes in background.css still outrank this */
+body:not(.no-frosted) #sidebar .sidebar-panel .category-trigger {
+    background-color: color-mix(in srgb, var(--bg-primary, #151515) 35%, transparent);
+    border-color: transparent;
+    backdrop-filter: saturate(1.35);
+    -webkit-backdrop-filter: saturate(1.35);
+}
+
+/* --- pop-up menus ----------------------------------------------------------- */
+
+/* the sidebar's dropdowns/menus frost like the rest of the assembly. they
+   teleport to body, so they sample the raw page backdrop; coder's context
+   menu lives inside the panel (a backdrop-filtered ancestor in page-image
+   mode may flatten its blur to a tint - the translucency always holds).
+   with frost disabled these rules simply don't match and the menus keep
+   their original solid look. */
+body:not(.no-frosted) .category-menu,
+body:not(.no-frosted) .filter-menu,
+body:not(.no-frosted) .chat-action-menu,
+body:not(.no-frosted) .tag-popup,
+body:not(.no-frosted) #sidebar .coder-menu {
+    background: var(--frost-bg);
+    backdrop-filter: var(--frost-filter);
+    -webkit-backdrop-filter: var(--frost-filter);
 }

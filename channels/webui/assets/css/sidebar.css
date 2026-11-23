@@ -993,7 +993,7 @@ body:has(.sidebar-resizer:active) {
         cursor: pointer;
 
         &:hover:not(:disabled) {
-            background: var(--bg-tertiary, #2a2a2a);
+            background: var(--frost-bg-highlight);
         }
 
         &:disabled {
@@ -1193,7 +1193,7 @@ body:has(.sidebar-resizer:active) {
     gap: 0.5rem;
 
     &:hover {
-        background: var(--bg-tertiary, #2a2a2a);
+        background: var(--frost-bg-highlight);
     }
 }
 
@@ -1321,7 +1321,7 @@ body:has(.sidebar-resizer:active) {
         }
 
         &:hover {
-            background: var(--bg-tertiary, #2a2a2a);
+            background: var(--frost-bg-highlight);
         }
     }
 
@@ -1368,7 +1368,7 @@ body:has(.sidebar-resizer:active) {
         }
 
         &:hover {
-            background: var(--bg-tertiary);
+            background: var(--frost-bg-highlight);
         }
 
         &.danger {

@@ -133,9 +133,12 @@
             cursor: default;
         }
 
+        /* glass wash (see frosted.css): the popup behind is frosted, an
+           opaque row would cut a dead stripe through it. frost off ->
+           the variable falls back to the old solid secondary */
         &:hover,
         &.selected {
-            background: var(--bg-secondary);
+            background: var(--frost-bg-highlight);
             color: var(--accent);
         }
 
