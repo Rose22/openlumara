@@ -46,6 +46,14 @@
         max-height: 100% !important;
     }
 
+    /* the chat-content-width slider (messages, input bar, upload queue) is
+       pointless on phones: content always goes edge to edge. the store
+       writes the var INLINE on <html> (see stores/theming.js), so this is
+       the only way a stylesheet can outrank it */
+    html {
+        --chat-content-width: 100% !important;
+    }
+
     /* Ensure #messages fills remaining space and can scroll. sides/top
        only: a shorthand here (even !important) used to wipe the bottom
        padding that reserves room for the floating input overlay, leaving
