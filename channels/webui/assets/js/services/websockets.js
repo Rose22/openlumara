@@ -501,6 +501,10 @@ async function handleWebSocketMessage(data) {
             if (foldEl && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
                 const foldMsgs = document.getElementById('messages');
                 foldEl.style.overflow = 'hidden';
+                // the height ratchet (x-height-ratchet) would floor this fold at
+                // its pinned peak - this IS the intended final collapse, so
+                // release the pin up front
+                foldEl.style.minHeight = '';
                 const fold = foldEl.animate(
                     [{ height: foldEl.offsetHeight + 'px' }, { height: '0px' }],
                     { duration: 250, easing: 'ease-in-out', fill: 'forwards' }

@@ -47,6 +47,12 @@ document.addEventListener('alpine:init', async () => {
     // so tool call values only get the soft background when they scroll
     Alpine.directive('box', (el, modifiers, { cleanup }) => cleanup(boxIfScrolls(el)));
 
+    // keeps a scroll container at its tallest-so-far height while the
+    // expression is true (capped by its CSS max-height), releasing it back
+    // to content height once false (see directives/height_ratchet.js)
+    Alpine.directive('height-ratchet', (el, { expression }, { evaluateLater, effect, cleanup }) =>
+        heightRatchet(el, evaluateLater(expression), effect, cleanup));
+
     // watches a flow marker outside a pinned turn for the pinned-prompt feature
     Alpine.directive('prompt-marker', (el, { expression }, { evaluateLater, cleanup }) => {
         const run = evaluateLater(expression);

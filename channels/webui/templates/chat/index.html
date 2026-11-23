@@ -112,7 +112,7 @@
                                         <span class="activity" x-show="collapsed && lastLabel" x-text="'(' + lastLabel + ')'"></span>
                                     </div>
                                     <template x-if="!collapsed">
-                                        <div class="agent-chain-body" x-auto-scroll>
+                                        <div class="agent-chain-body" x-auto-scroll x-height-ratchet="$store.stream.state !== 'idle'">
                                             <template x-for="(step, stepIndex) in turn.steps" :key="stepIndex">
                                                 <div class="chain-station">
                                                     <div class="chain-rail"><div class="chain-dot"></div></div>

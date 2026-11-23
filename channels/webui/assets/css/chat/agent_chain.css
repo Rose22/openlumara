@@ -75,9 +75,6 @@
     &.is-streaming .agent-chain-body {
         max-height: 60vh;
         overflow-y: auto;
-        overscroll-behavior: contain;
-        scrollbar-width: none;
-        overflow-anchor: auto;
 
         &::-webkit-scrollbar {
             display: none;
