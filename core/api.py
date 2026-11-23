@@ -74,6 +74,9 @@ class APIClient():
         # origin of the API when it's a llama.cpp router. enables the model load progress feed.
         self._router_origin = None
 
+        # track whether the server supports llamacpp exclusive features such as prompt processing progress reporting
+        self._extras_rejected = False
+
     # -------------------
     # HTTP plumbing
     # -------------------
@@ -281,6 +284,7 @@ class APIClient():
             # clear per-session state
             self._ssl_ctx = None
             self._router_origin = None
+            self._extras_rejected = False
 
             self.connected = False
 
@@ -309,20 +313,21 @@ class APIClient():
             if not parsed.scheme or not parsed.netloc:
                 return
 
-            origin = f"{parsed.scheme}://{parsed.netloc}"
-            status, body = await self._http_get(f"{origin}/models", timeout_total=5.0)
+            url_path = ""
+            if parsed.path:
+                url_path = str(parsed.path)
 
-            if status != 200:
-                return
+            origin = f"{parsed.scheme}://{parsed.netloc}{url_path}"
+            status, body_text = await self._http_get(f"{origin}/models", timeout_total=5.0)
+            body = json.loads(body_text) if status == 200 else {}
 
-            body = json.loads(body)
             entries = body.get("data")
 
             if isinstance(entries, list) and any(isinstance(e, dict) and "status" in e for e in entries):
                 self._router_origin = origin
 
         except Exception as e:
-            pass
+            self.manager.log("core", core.detail_error(e))
 
     async def _watch_model_load(self, model_name, queue):
         """reads the llamacpp router's /models/sse feed while a model loads"""
@@ -454,13 +459,14 @@ class APIClient():
             "stream": stream,
             "temperature": core.config.get("model", {}).get("temperature", 0.7),
             "max_completion_tokens": core.config.get("api", {}).get("max_output_tokens", 8192),
-            
-            # llamacpp-specific extras
-            "chat_template_kwargs": {
-                "enable_thinking": core.config.get("model", "enable_thinking", default=use_thinking)
-            },
-            "return_progress": True
         }
+
+        # send llamacpp-specific extra args
+        if not self._extras_rejected:
+            req["chat_template_kwargs"] = {
+                "enable_thinking": core.config.get("model", "enable_thinking", default=use_thinking)
+            }
+            req["return_progress"] = True
 
         if tools:
             req["tools"] = tools
@@ -562,6 +568,14 @@ class APIClient():
                     break
 
                 except (APIHTTPError, aiohttp.ClientError, asyncio.TimeoutError) as e:
+                    # check if the server accepts llamacpp-specific args
+                    if (isinstance(e, APIHTTPError) and e.status == 400
+                            and "return_progress" in req):
+                        req.pop("return_progress", None)
+                        req.pop("chat_template_kwargs", None)
+                        self._extras_rejected = True
+                        continue
+
                     if attempt >= self.MAX_API_ATTEMPTS or not self._is_retryable_error(e) or self.cancel_request:
                         raise
 
