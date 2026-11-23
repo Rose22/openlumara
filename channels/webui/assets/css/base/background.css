@@ -43,6 +43,11 @@ html.has-bg.bg-page #chat-window {
     background-color: transparent;
 }
 
+/* desktop only: on mobile the sidebar is a slide-over on top of the chat
+   and keeps its solid background (the mobile rules in sidebar.css load
+   after this file and win anyway) */
+@media (min-width: 769px) {
+
 /* the sidebar floats over the background picture: frosted glass when the
    setting is on (same treatment as the floating input bar), fully
    see-through when it is off */
@@ -85,6 +90,8 @@ html.has-bg.bg-page body:not(.no-frosted) #sidebar #chat-list .search .filter-ca
 html.has-bg.bg-page body:not(.no-frosted) #sidebar .category-trigger:hover,
 html.has-bg.bg-page body:not(.no-frosted) #sidebar .category-trigger.open {
     background-color: color-mix(in srgb, var(--bg-secondary) 55%, transparent);
+}
+
 }
 
 @keyframes bg-layer-in {
