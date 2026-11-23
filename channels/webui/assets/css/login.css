@@ -73,5 +73,38 @@
       margin-bottom: 1rem;
       font-size: 0.9rem;
     }
+
+    .password-wrap {
+      position: relative;
+
+      input {
+        padding-right: 2.75rem;
+      }
+    }
+
+    .pw-toggle {
+      position: absolute;
+      right: 6px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 32px;
+      height: 32px;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: none;
+      border-radius: 6px;
+      color: var(--text-muted, #999);
+      cursor: pointer;
+
+      &:hover {
+        opacity: 1;
+        color: var(--accent, #00d4ff);
+        background: var(--bg-input, #222);
+      }
+    }
   }
 }

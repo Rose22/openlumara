@@ -53,6 +53,45 @@
         }
     }
 
+    /* --- Secret (password-masked) inputs --- */
+    .secret-input-wrap {
+        position: relative;
+        width: 100%;
+
+        &.has-toggle input {
+            padding-right: 42px;
+        }
+
+        .reveal-toggle {
+            position: absolute;
+            right: 6px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 30px;
+            height: 30px;
+            padding: 0;
+            border: none;
+            border-radius: var(--radius-sm);
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: color 0.15s, background 0.15s;
+
+            &:hover {
+                color: var(--text-primary);
+                background: var(--bg-tertiary);
+            }
+
+            &.revealed,
+            &:active {
+                color: var(--accent);
+            }
+        }
+    }
+
     /* --- Textarea --- */
     textarea {
         width: 100%;

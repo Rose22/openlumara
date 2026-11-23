@@ -29,7 +29,13 @@
                 </div>
                 <div class="form-group">
                     <label for="password">Password</label>
-                    <input type="password" id="password" name="password" x-model="password" required>
+                    <div class="password-wrap">
+                        <input type="password" id="password" name="password" x-model="password" required>
+                        <button type="button" id="pw-toggle" class="pw-toggle" title="Reveal password" aria-label="Reveal password" tabindex="-1">
+                            <span class="icon-eye">{% include 'svg/eye.svg' %}</span>
+                            <span class="icon-eye-off" style="display:none;">{% include 'svg/eye_off.svg' %}</span>
+                        </button>
+                    </div>
                 </div>
 
                 {{ extension_slot("before_signin_button") }}
@@ -40,5 +46,22 @@
             </form>
         </div>
     </div>
+    <script>
+        // reveal toggle for the password field (vanilla JS: login page has no Alpine build)
+        (() => {
+            const btn = document.getElementById('pw-toggle');
+            const input = document.getElementById('password');
+            const eye = btn.querySelector('.icon-eye');
+            const eyeOff = btn.querySelector('.icon-eye-off');
+            btn.addEventListener('click', () => {
+                const reveal = input.type === 'password';
+                input.type = reveal ? 'text' : 'password';
+                eye.style.display = reveal ? 'none' : '';
+                eyeOff.style.display = reveal ? '' : 'none';
+                btn.title = reveal ? 'Hide password' : 'Reveal password';
+                btn.setAttribute('aria-label', btn.title);
+            });
+        })();
+    </script>
 </body>
 </html>
