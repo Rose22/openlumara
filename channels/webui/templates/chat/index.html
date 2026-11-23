@@ -82,7 +82,13 @@
 
             <template x-if="turn.live === true">
                 <div class="message-wrapper assistant">
+                    <!-- the height ratchet pins the whole bubble at its peak while
+                         streaming: the chain and answer keep their natural sizes
+                         (answer always flush under the newest step), collapses
+                         never shrink the page-flow element (no scroll jump), and
+                         freed space trails as padding at the bubble's bottom -->
                     <div class="message assistant"
+                         x-height-ratchet="$store.stream.state !== 'idle'"
                          x-data="{
                              {% if config.get('enable_chain_expansion') %}
                              collapsed: localStorage.getItem('collapseChainDefault') === 'true',
@@ -112,7 +118,7 @@
                                         <span class="activity" x-show="collapsed && lastLabel" x-text="'(' + lastLabel + ')'"></span>
                                     </div>
                                     <template x-if="!collapsed">
-                                        <div class="agent-chain-body" x-auto-scroll x-height-ratchet="$store.stream.state !== 'idle'">
+                                        <div class="agent-chain-body" x-auto-scroll>
                                             <template x-for="(step, stepIndex) in turn.steps" :key="stepIndex">
                                                 <div class="chain-station">
                                                     <div class="chain-rail"><div class="chain-dot"></div></div>

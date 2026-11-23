@@ -501,6 +501,11 @@ async function handleWebSocketMessage(data) {
             if (foldEl && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
                 const foldMsgs = document.getElementById('messages');
                 foldEl.style.overflow = 'hidden';
+                // the bubble-level height ratchet (x-height-ratchet) would floor
+                // this fold at its pinned peak - this IS the intended final
+                // collapse, so release the pin up front
+                const foldBubble = foldEl.closest('.message.assistant');
+                if (foldBubble) { foldBubble.style.minHeight = ''; }
                 // the height ratchet (x-height-ratchet) would floor this fold at
                 // its pinned peak - this IS the intended final collapse, so
                 // release the pin up front
