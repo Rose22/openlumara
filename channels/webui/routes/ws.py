@@ -17,7 +17,7 @@ def register(app, channel):
         # check the origin of the request and reject if it's foreign
         ws_origin = websocket.headers.get("origin")
         if ws_origin and channel._origin_allowed(ws_origin, host_header=websocket.headers.get("host") or "") is False:
-            channel.log(channel.name, f"websocket handshake rejected: foreign origin '{ws_origin}' (expected host '{channel.host}', port {channel.port}) - if this webui runs behind a proxy/tunnel, add that origin to the 'extra_allowed_origins' setting")
+            channel.log(channel.name, f"websocket handshake rejected! foreign origin '{ws_origin}'. if this webui runs behind a proxy/tunnel, add your origin address to the allowed_domains setting")
             await websocket.close(code=4003, reason="Foreign origin")
             return
 

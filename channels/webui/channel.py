@@ -88,6 +88,10 @@ class Webui(core.channel.Channel, ui_extensions.UiExtensionsMixin):
             "default": None,
             "depends": {"network_mode": "custom"}
         },
+        "allowed_domains": {
+            "default": [],
+            "description": "Domains/addresses that are allowed to connect to the webui. This always includes the domain you've set in network mode by default, but you can add more here! Use a format like `your-domain`, `your-domain:8080` or `https://your-domain:8080`"
+        },
         "port": {
             "description": "What port to run the WebUI on. Set this to 80 to be able to access it like a normal website, and anything else to access it on that port (for example http://yourdomain.org:3000)",
             "default": 3000
@@ -170,10 +174,6 @@ class Webui(core.channel.Channel, ui_extensions.UiExtensionsMixin):
             "description": "How many days to stay logged in for",
             "default": 30,
             "depends": "require_login"
-        },
-        "extra_allowed_origins": {
-            "default": [],
-            "description": "Extra origins allowed to open WebSockets to this webui. You NEED this when OpenLumara sits behind a reverse proxy or HTTPS tunnel (e.g. https://mybox:8443 fronting 127.0.0.1:3000): the browser sends that public URL as the Origin, which no longer matches the bound host/port, and every websocket gets rejected. Scheme-less entries like \"crystal-ai:8006\" match that host+port over any scheme. Exact matches only - no wildcards."
         }
     }
 
@@ -200,7 +200,7 @@ class Webui(core.channel.Channel, ui_extensions.UiExtensionsMixin):
 
         # allow extra allowed origins, for if you use a custom domain name
         # otherwise, the websocket will refuse the connection
-        for spec in (self.config.get("extra_allowed_origins") or []):
+        for spec in (self.config.get("allowed_domains") or []):
             if not isinstance(spec, str) or not spec.strip():
                 continue
                 
@@ -221,7 +221,7 @@ class Webui(core.channel.Channel, ui_extensions.UiExtensionsMixin):
             ):
                 spec_port = None
                 
-            if spec_port != origin_port:
+            if spec_port and spec_port != origin_port:
                 continue
             if has_scheme and parsed_spec.scheme != parsed.scheme:
                 continue
@@ -387,6 +387,16 @@ Edit the config file for this, or use /config
 
         self.log("webui", f"Starting WebUI on {self.url}")
 
+        # check which domains are allowed to connect
+        allowed_domains = []
+        for allowed_domain in self.config.get("allowed_domains"):
+            spec = allowed_domain.strip().lower().rstrip("/")
+            has_scheme = "://" in spec
+            parsed_spec = urllib.parse.urlsplit(spec if has_scheme else "//" + spec)
+            spec_host = (parsed_spec.hostname or "").lower()
+
+            allowed_domains.append(spec_host)
+
         # serve the app using uvicorn
         config = uvicorn.Config(
             self.app,
@@ -395,7 +405,7 @@ Edit the config file for this, or use /config
 
             # this makes it work in situations where https and http content are served mixed
             proxy_headers=True,
-            forwarded_allow_ips = "127.0.0.1",
+            forwarded_allow_ips = [self.host, *allowed_domains],
 
             ws_ping_interval=20,
             ws_ping_timeout=90,
