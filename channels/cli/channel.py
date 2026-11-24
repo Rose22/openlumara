@@ -75,17 +75,43 @@ LEXER_BY_EXT = {
     "php": "php", "txt": "text",
 }
 
-def tail_text(text, max_lines):
-    """last max_lines lines of text, with a .. marker when lines were dropped.
-    max_lines of 0 means show everything."""
+def tail_lines(text, max_lines):
+    """last max_lines lines of text, with a .. marker when lines were
+    dropped. max_lines of 0 means show everything."""
     if not text:
         return ""
-    
+
     lines = text.rstrip().splitlines()
     if max_lines and len(lines) > max_lines:
         return ".." + "\n" + "\n".join(lines[-max_lines:])
-    
+
     return "\n".join(lines)
+
+def tail_text(text, max_chars):
+    """last max_chars characters of text as WHOLE lines (dropping lines
+    from the top until it fits), with a .. marker when lines were dropped.
+    Never cuts mid-line, so indented previews stay aligned.
+    max_chars of 0 means show everything."""
+    if not text:
+        return ""
+
+    lines = text.rstrip().splitlines()
+    if not max_chars:
+        return "\n".join(lines)
+
+    kept = []
+    total = 0
+    for ln in reversed(lines):
+        total += len(ln) + 1
+        if total > max_chars and kept:
+            break
+        kept.append(ln)
+
+    kept.reverse()
+    if len(kept) < len(lines):
+        return "..\n" + "\n".join(kept)
+
+    return "\n".join(kept)
 
 SENTENCE_SPLIT = re.compile(r"(?<=[.!?\u2026])\s+")
 
@@ -111,11 +137,15 @@ def thought_snippet(text, limit=80):
     return head.rstrip() + "\u2026"
 
 class StepTreeView:
-    # live previews stay short so the live area never balloons past the screen
-    LIVE_REASONING_LINES = 5
-    LIVE_CONTENT_LINES = 5
-    LIVE_FINAL_LINES = 12
-    LIVE_ARG_LINES = 6
+    # live previews stay short so the live area never balloons past the
+    # screen. budgets are in characters, not lines (like the discord
+    # channel's CHUNK_SIZE), so long single lines get trimmed too
+    LIVE_REASONING_CHARS = 800
+    LIVE_CONTENT_CHARS = 800
+    LIVE_ARG_CHARS = 200
+    # final answers are trimmed by line count, scaled to the viewport
+    LIVE_FINAL_MIN_LINES = 6
+    LIVE_FINAL_VIEWPORT_FRACTION = 0.5
 
     def __init__(self, channel):
         self.channel = channel
@@ -192,9 +222,11 @@ class StepTreeView:
         line = rich.text.Text("  🔧 ")
         line.append(name, style="bold red" if failed else "bold")
 
-        summary = meta.get("summary") or ""
-        if summary and (done or self.channel.config.get("stream_tool_calls")):
-            line.append(summary, style="dim")
+        # never show the summary while the call is still streaming
+        if done:
+            summary = meta.get("summary") or ""
+            if summary:
+                line.append(summary, style="dim")
 
         result = meta.get("result_summary") or ""
         if result:
@@ -202,6 +234,8 @@ class StepTreeView:
         elif not done:
             line.append(" ..", style=self.channel._get_accent_color())
 
+        # the header must never wrap past the terminal edge
+        line.truncate(max(self.channel.console.width - 1, 8), overflow="ellipsis")
         return line
 
     def _syntax(self, tool_id, path, code):
@@ -254,7 +288,7 @@ class StepTreeView:
             else:
                 text = str(value)
 
-            shown = tail_text(text, self.LIVE_ARG_LINES)
+            shown = tail_text(text, self.LIVE_ARG_CHARS)
 
             # code args get their own highlighted block under the label,
             # framed in a rounded border in the accent color
@@ -322,15 +356,23 @@ class StepTreeView:
         tool_calls = step.get("tool_calls") or []
         if len(tool_calls) == 1:
             meta = tool_calls[0].get("_metadata") or {}
-            summary = meta.get("summary") or ""
-            
-            if summary:
-                segments.append((" " + summary, "dim"))
+
+            # like the tool line: no summary while the call is still streaming
+            if meta.get("response") is not None:
+                summary = meta.get("summary") or ""
+                if summary:
+                    segments.append((" " + summary, "dim"))
+
             result = meta.get("result_summary") or ""
-            
             if result:
                 segments.append(("  \u2192 " + result, "dim green"))
         return segments, mods
+
+    def _reasoning_block(self, text):
+            # the indent lives in Padding, not in the text, so blank lines keep
+            # the same styled left gutter as content lines
+            body = rich.text.Text(text.rstrip(), style="dim italic")
+            return rich.padding.Padding(body, (0, 0, 0, 5))
 
     def _step_lines(self, step, live):
         accent = self.channel._get_accent_color()
@@ -354,13 +396,16 @@ class StepTreeView:
                 style = (style + " " if style else "") + accent
             header.append(text, style=style)
 
-        # module chips pinned to the right edge of the terminal; the left
-        # part is ellipsis-truncated (and padded) to make room for them
+        # the header must never wrap past the terminal edge. module chips
+        # are pinned to the right; the left part is ellipsis-truncated
+        # (and padded) to make room for them
         if mods:
             right_len = len(mods) + 1
             avail = self.channel.console.width - right_len
             header.truncate(max(avail, 8), overflow="ellipsis", pad=True)
             header.append(" " + mods, style="dim")
+        else:
+            header.truncate(max(self.channel.console.width - 1, 8), overflow="ellipsis")
 
         lines = [header]
 
@@ -371,11 +416,13 @@ class StepTreeView:
         if live:
             # only the open (tail) step stays expanded
             if is_tail:
-                if show_reasoning and reasoning.strip():
-                    for ln in tail_text(reasoning, self.LIVE_REASONING_LINES).splitlines():
-                        lines.append(rich.text.Text("     " + ln, style="dim italic"))
+                # reasoning collapses the moment the model commits to a
+                # tool call: the thinking is over, the args are the story now
+                has_toolcalls = bool(step.get("tool_calls"))
+                if show_reasoning and reasoning.strip() and not has_toolcalls:
+                    lines.append(self._reasoning_block(tail_text(reasoning, self.LIVE_REASONING_CHARS)))
                 if content.strip():
-                    md = self._md(("step", step.get("step")), tail_text(content, self.LIVE_CONTENT_LINES))
+                    md = self._md(("step", step.get("step")), tail_text(content, self.LIVE_CONTENT_CHARS))
                     lines.append(rich.padding.Padding(md, (0, 0, 0, 4)))
 
                 for tool, tool_line in zip(step.get("tool_calls") or [], tool_lines):
@@ -387,14 +434,20 @@ class StepTreeView:
             return lines
 
         if show_reasoning and reasoning.strip():
-            for ln in reasoning.rstrip().splitlines():
-                lines.append(rich.text.Text("     " + ln, style="dim italic"))
+            lines.append(self._reasoning_block(reasoning))
         if content.strip():
             md = self._md(("step", step.get("step")), content.rstrip())
             lines.append(rich.padding.Padding(md, (0, 0, 0, 4)))
         if step.get("status") == "failed":
             lines.extend(tool_lines)
         return lines
+
+    def final_line_budget(self):
+        # the final answer preview keeps this many lines, measured from the
+        # viewport height. the settled step tree above it takes the rest;
+        # _fit_viewport has the final say on what's actually visible
+        height = self.channel.console.height or 24
+        return max(int(height * self.LIVE_FINAL_VIEWPORT_FRACTION), self.LIVE_FINAL_MIN_LINES)
 
     def render(self, live=True):
         cache_key = None
@@ -417,11 +470,12 @@ class StepTreeView:
                 content = message.get("content") or ""
                 if not content.strip():
                     continue
+                budget = self.final_line_budget()
                 if message.get("is_cmd"):
-                    for ln in tail_text(content, self.LIVE_FINAL_LINES).splitlines():
+                    for ln in tail_lines(content, budget).splitlines():
                         lines.append(rich.text.Text(ln))
                 else:
-                    lines.append(self._md(("final", i), tail_text(content, self.LIVE_FINAL_LINES)))
+                    lines.append(self._md(("final", i), tail_lines(content, budget)))
 
         if not lines:
             return rich.text.Text("")
