@@ -12,8 +12,7 @@
     'user_modules': 'svg/wrench.svg',
     'your_skills': 'svg/download.svg',
     'system_prompt': 'svg/thought_bubble.svg',
-    'system_logs': 'svg/clipboard.svg',
-    'system_updates': 'svg/regenerate.svg'
+    'system_logs': 'svg/clipboard.svg'
 } %}
 <aside class="sidebar" x-show="activeCategory">
     <nav class="nav">
@@ -75,6 +74,16 @@
         <hr>
 
         {{ extension_slot("buttons") }}
+
+        <button
+            :class="{ active: activeNavCategory === 'system_updates', 'update-available': $store.system.update.anyUpdates }"
+            @click="await switchCategory('system_updates')"
+            class="item"
+        >
+            <span class="item-icon">{% include 'svg/regenerate.svg' %}</span>
+            <span x-text="$store.settings.categories?.system_updates?.title || 'Updates'"></span>
+            <span class="update-dot" x-show="$store.system.update.anyUpdates" x-cloak></span>
+        </button>
 
         <button 
             class="item" 
