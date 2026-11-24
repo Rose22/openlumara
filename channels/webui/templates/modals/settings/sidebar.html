@@ -89,6 +89,7 @@
                 class="item"
                 @click="if(confirm('Log out?')) window.location.href='/logout'"
             >
+                <span class="item-icon">{% include 'svg/logout.svg' %}</span>
                 <span>Logout</span>
             </button>
         {% endif %}
