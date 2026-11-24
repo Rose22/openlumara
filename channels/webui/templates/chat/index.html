@@ -143,9 +143,12 @@
                                  agent chain. It can be visually adjacent, but it is never a
                                  step/station in the Process body. -->
                             <template x-for="(message, messageIndex) in (turn.final_messages ?? [])" :key="'final-'+messageIndex">
-                                <div class="live-answer">
-                                    {% include 'chat/turns/assistant_stream.html' %}
-                                </div>
+                                <!-- messages flagged _metadata.hide are never painted -->
+                                <template x-if="!message._metadata?.hide">
+                                    <div class="live-answer">
+                                        {% include 'chat/turns/assistant_stream.html' %}
+                                    </div>
+                                </template>
                             </template>
                         </div>
                     </div>
@@ -217,7 +220,10 @@
                         </template>
 
                         <template x-for="(message, messageIndex) in turn.final_messages ?? []" :key="'final-'+messageIndex">
-                            {% include 'chat/turns/assistant_history.html' %}
+                            <!-- messages flagged _metadata.hide are never painted -->
+                            <template x-if="!message._metadata?.hide">
+                                {% include 'chat/turns/assistant_history.html' %}
+                            </template>
                         </template>
                     </div>
 

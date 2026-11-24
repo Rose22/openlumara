@@ -60,7 +60,7 @@ class Messages:
         # if no index is specified, just return the entire message history
         return self.data
 
-    async def add(self, message: dict, cmd=False, ghost = False):
+    async def add(self, message: dict, cmd=False, ghost = False, hide = False):
         """add message to current chat"""
         # make a copy so we don't modify the original reference
         new_message = message.copy()
@@ -83,6 +83,10 @@ class Messages:
         # ghost messages are invisible to the AI
         if ghost:
             new_message["_metadata"]["ghost"] = True
+
+        # use the hide flag to hide messages from the UI. needs to be implemented by a channel, most included channels support it
+        if hide:
+            new_message["_metadata"]["hide"] = True
 
         if cmd:
             # if the message is a command (or command response), mark it as such
