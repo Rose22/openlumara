@@ -157,8 +157,8 @@ class Module:
         """Triggers when the assistant sends a message"""
         pass
 
-    async def on_file_to_block(self, filename: str, file_data: bytes):
-        """This method will turn an uploaded file into a content block if it returns one (defaults to None). Returning a block replaces the built-in handling for that file, so a module can take over extraction (PDFs, audio transcription, etc). Return None to let the built-in handlers do their thing."""
+    async def on_upload(self, filename: str, file_data: bytes):
+        """This method will turn an uploaded file into a content block if it returns one. Returning a block replaces the built-in handling for that file, so a module can take over extraction (PDFs, audio transcription, etc). Return None to let the built-in handlers do their thing."""
         return None
 
     async def on_install(self):

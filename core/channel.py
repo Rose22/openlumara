@@ -562,16 +562,15 @@ class Channel:
         return {"role": "user", "content": message}
 
     async def _module_file_to_block(self, filename: str, file_data: bytes):
-        """ask modules whether one of them wants to turn an uploaded file into a content block.
-        the first block returned wins, None (the default) lets the built-in handlers do their thing."""
+        """let modules replace multimodal content blocks with their own processed versions"""
         for module_name, module in self.manager.modules.items():
             try:
-                if asyncio.iscoroutinefunction(module.on_file_to_block):
-                    block = await module.on_file_to_block(filename, file_data)
+                if asyncio.iscoroutinefunction(module.on_upload):
+                    block = await module.on_upload(filename, file_data)
                 else:
-                    block = module.on_file_to_block(filename, file_data)
+                    block = module.on_upload(filename, file_data)
             except Exception as e:
-                self.log("module error", f"{module_name}: in on_file_to_block(): {core.detail_error(e)}")
+                self.log("module error", f"{module_name}: in on_upload(): {core.detail_error(e)}")
                 continue
 
             if block:
