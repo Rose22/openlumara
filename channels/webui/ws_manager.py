@@ -173,7 +173,11 @@ class WebSocketManager:
         finally:
             # always finalize the stream, no matter what
             await self.broadcast({
-                "type": "stream_complete"
+                "type": "stream_complete",
+                # -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
+                # the history revision this stream ended at, so clients can
+                # tell whether their local view is already in sync
+                "revision": getattr(self.channel.context.chat.messages, "revision", None),
             })
             await self.set_stream_state("idle")
 

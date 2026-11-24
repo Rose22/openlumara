@@ -74,18 +74,45 @@ class TailFadeTimeline {
     }
 }
 
-// text nodes in document order, skipping code-block buttons and any tail
-// spans we already wrapped during this paint
-function collectTextNodes(node) {
-    const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
-    const nodes = [];
-    let tn;
-    while ((tn = walker.nextNode())) {
-        const parent = tn.parentElement;
-        if (!parent || parent.closest('.copy-btn, .preview-btn') || parent.closest('.token-fade')) continue;
-        nodes.push(tn);
-    }
-    return nodes;
+// -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
+// the LAST text nodes in document order - walked backwards from the
+// element's end and stopped once needChars are covered, so a streamed
+// paint pays for the fade window (a few hundred chars) instead of the
+// whole message. skipping rules match the old full-subtree walk:
+// code-block buttons and already-wrapped spans.
+function collectTailTextNodes(root, needChars) {
+    const out = [];
+    let collected = 0;
+
+    const visit = (node) => {
+        if (collected >= needChars) return true;
+
+        if (node.nodeType === Node.TEXT_NODE) {
+            const parent = node.parentElement;
+            if (!parent || parent.closest('.copy-btn, .preview-btn') || parent.closest('.token-fade')) return false;
+            out.push(node);
+            collected += node.nodeValue.length;
+            return collected >= needChars;
+        }
+        if (node.nodeType !== Node.ELEMENT_NODE) return false;
+        if (node.classList.contains('copy-btn') || node.classList.contains('preview-btn') || node.classList.contains('token-fade')) return false;
+
+        for (let i = node.childNodes.length - 1; i >= 0; i--) {
+            if (visit(node.childNodes[i])) return true;
+        }
+        return false;
+    };
+
+    visit(root);
+    out.reverse();
+    return out;
+}
+
+// total chars of the batches that still have to be wrapped
+function batchCharCount(batches) {
+    let need = 0;
+    for (const b of batches) need += b.count;
+    return need;
 }
 
 // wrap the last `count` chars in a .token-fade span with the given elapsed

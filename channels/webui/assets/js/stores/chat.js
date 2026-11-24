@@ -55,6 +55,15 @@ CHAT_STORE = {
 
     dayGroups: [],
     chatLimit: 10,
+
+    // -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
+    // history revision counter as the backend reported it on the last load;
+    // stream_complete carries it too, so clients know when they're in sync
+    serverRevision: null,
+
+    // reload burst control: one fetch in flight, at most one queued behind
+    _reloadInFlight: false,
+    _reloadQueued: false,
     dayFetchGen: 0,
 
     moveChatTarget: null,
@@ -108,17 +117,55 @@ CHAT_STORE = {
         return parseFloat(getComputedStyle(container).getPropertyValue('--header-height')) || 0;
     },
 
-    userPromptInView(container) {
-        const rect = container.getBoundingClientRect();
-        const visibleTop = rect.top + this.headerInset(container);
+    /*
+     * -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
+     * cached flow positions of the pin markers: turn index ->
+     * {flowTop, height}. markers only exist on user turns. measured once
+     * per window (and after invalidating events), so the throttled scroll
+     * path resolves the pin with pure arithmetic instead of a forced
+     * layout read per marker.
+     */
+    _markerPos: new Map(),
 
-        for (const marker of container.querySelectorAll('.pin-marker')) {
+    invalidateMarkerPositions() {
+        this._markerPos.clear();
+    },
+
+    _ensureMarkerPos(container) {
+        const markers = container.querySelectorAll('.pin-marker');
+        if (this._markerPos.size === markers.length) return this._markerPos;
+
+        const scrollTop = container.scrollTop;
+        const fresh = new Map();
+        for (const marker of markers) {
             const turnEl = marker.nextElementSibling;
             if (!turnEl || !turnEl.matches('.turn')) continue;
             if (!turnEl.querySelector(':scope > .message-wrapper.user')) continue;
 
-            const flowTop = marker.getBoundingClientRect().top;
-            if (flowTop < rect.bottom && flowTop + turnEl.offsetHeight > visibleTop) return true;
+            const idx = Number(turnEl.dataset.turnIndex);
+            if (!Number.isFinite(idx)) continue;
+
+            fresh.set(idx, {
+                turnEl: turnEl,
+                flowTop: marker.getBoundingClientRect().top + scrollTop,
+                height: turnEl.offsetHeight,
+            });
+        }
+
+        this._markerPos = fresh;
+        return fresh;
+    },
+
+    userPromptInView(container) {
+        const positions = this._ensureMarkerPos(container);
+        if (positions.size === 0) return false;
+
+        const scrollTop = container.scrollTop;
+        const viewTop = scrollTop + this.headerInset(container);
+        const viewBottom = scrollTop + container.clientHeight;
+
+        for (const pos of positions.values()) {
+            if (pos.flowTop < viewBottom && pos.flowTop + pos.height > viewTop) return true;
         }
 
         return false;
@@ -126,6 +173,17 @@ CHAT_STORE = {
 
     updatePromptPin(turnIndex, intersecting, marker) {
         if (intersecting) {
+            // -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
+            // refreshing this marker's cached position as it enters view
+            // keeps the cache self-healing after layout shifts that never
+            // fire a window resize (sidebar toggle, pane resizes)
+            const cached = this._markerPos.get(turnIndex);
+            if (cached) {
+                const scroller = document.getElementById('messages');
+                if (scroller) cached.flowTop = marker.getBoundingClientRect().top + scroller.scrollTop;
+                if (cached.turnEl && cached.turnEl.isConnected) cached.height = cached.turnEl.offsetHeight;
+            }
+
             if (this.pinnedTurnIndex !== turnIndex) return;
 
             this.pinnedTurnIndex = null;
@@ -147,7 +205,10 @@ CHAT_STORE = {
         if (!container) return;
 
         // the visible top edge is the header's bottom, not the scrollport's
-        if (marker.getBoundingClientRect().top > container.getBoundingClientRect().top + this.headerInset(container)) return;
+        // (cached marker flow position - see _ensureMarkerPos)
+        const entry = this._ensureMarkerPos(container).get(turnIndex);
+        const markerFlowTop = entry ? entry.flowTop : marker.getBoundingClientRect().top + container.scrollTop;
+        if (markerFlowTop - container.scrollTop > container.getBoundingClientRect().top + this.headerInset(container)) return;
 
         // the pin only exists to keep context visible while the chat window
         // shows no user prompt of its own
@@ -228,29 +289,32 @@ CHAT_STORE = {
         }
 
         // pin boundary is the header's bottom edge (the scrollport's top
-        // hides behind the floating header - see headerInset)
-        const top = container.getBoundingClientRect().top + this.headerInset(container);
+        // hides behind the floating header - see headerInset), expressed in
+        // flow coordinates to match the cached marker positions
+        const boundary = container.scrollTop + container.getBoundingClientRect().top + this.headerInset(container);
 
         let activeIndex = null;
         let activeWrapper = null;
 
-        for (const marker of container.querySelectorAll('.pin-marker')) {
-            if (marker.getBoundingClientRect().top > top) continue;
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
+        // pure arithmetic over the cached marker positions: the pin belongs
+        // to the NEWEST user turn whose flow position sits above the top
+        // edge (deciding by turn index, not map insertion order)
+        for (const [idx, pos] of this._ensureMarkerPos(container)) {
+            if (pos.flowTop > boundary) continue;
 
-            // the turn is the marker's next sibling. do NOT bind an index
-            // attribute onto the marker itself: a reactive attribute on the
-            // same element as x-prompt-marker makes Alpine re-run the
-            // directive and respawn its observer on every update.
-            const turnEl = marker.nextElementSibling;
-            if (!turnEl || !turnEl.matches('.turn') || turnEl.querySelector('.editing')) continue;
-
-            const idx = Number(turnEl.dataset.turnIndex);
+            const turnEl = pos.turnEl && pos.turnEl.isConnected
+                ? pos.turnEl
+                : container.querySelector(`[data-turn-index="${idx}"]`);
+            if (!turnEl || turnEl.querySelector('.editing')) continue;
 
             const wrapper = turnEl.querySelector(':scope > .message-wrapper.user');
             if (!wrapper) continue;
 
-            activeIndex = idx;
-            activeWrapper = wrapper;
+            if (activeIndex === null || idx > activeIndex) {
+                activeIndex = idx;
+                activeWrapper = wrapper;
+            }
         }
 
         if (activeIndex === this.pinnedTurnIndex) return;
@@ -342,6 +406,9 @@ CHAT_STORE = {
     },
 
     resetWindow() {
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
+        this.invalidateMarkerPositions();
+
         this.turnHistory = [];
         this.turnStart = 0;
         this.totalTurns = 0;
@@ -361,6 +428,10 @@ CHAT_STORE = {
     },
 
     applyTurnPage(result, merge) {
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
+        // the window (re)rendered: cached marker flow positions are stale
+        this.invalidateMarkerPositions();
+
         const incoming = result.turn_history ?? [];
         const page = result.turn_page ?? {};
         const start = typeof page.start === 'number' ? page.start : Math.max(0, incoming.length - this.turnPageSize);
@@ -518,8 +589,15 @@ CHAT_STORE = {
             // sticky). dropping it earlier leaves the response region above
             // with no prompt left to pin.
             if (turnEl.querySelector(':scope > .message-wrapper.user')) {
-                const nextUser = turnEls.slice(t + 1).find(e => e.querySelector(':scope > .message-wrapper.user'));
-                const nextMarker = nextUser ? nextUser.previousElementSibling : null;
+                // forward scan for the next user turn (no array copy per
+                // candidate, unlike the old slice().find())
+                let nextMarker = null;
+                for (let u = t + 1; u < turnEls.length; u++) {
+                    if (turnEls[u].querySelector(':scope > .message-wrapper.user')) {
+                        nextMarker = turnEls[u].previousElementSibling;
+                        break;
+                    }
+                }
 
                 if (!nextMarker || nextMarker.getBoundingClientRect().top >= viewTop) break;
             }
@@ -540,6 +618,10 @@ CHAT_STORE = {
 
     _dropPrefixTurns(drop) {
         if (drop <= 0) return;
+
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
+        // dropping the prefix shifts every remaining flow position
+        this.invalidateMarkerPositions();
 
         if (this.pinnedTurnIndex !== null && this.pinnedTurnIndex - this.turnStart < drop) {
             this.clearPromptPin();
@@ -633,6 +715,7 @@ CHAT_STORE = {
         this.chat = result;
         this.selectedChat = chatId;
         this.selectedCategory = result.category;
+        if (typeof result.revision === 'number') this.serverRevision = result.revision;
         this.applyTurnPage(result, false);
         this.currentTokenUsage = result.token_usage;
 
@@ -1102,6 +1185,7 @@ CHAT_STORE = {
         this.chat = result;
         this.selectedChat = result.id;
         this.selectedCategory = result.category;
+        if (typeof result.revision === 'number') this.serverRevision = result.revision;
 
         this.applyTurnPage(result, true);
 
@@ -1109,6 +1193,30 @@ CHAT_STORE = {
             await this.reloadCategories();
             await this.reloadChats(true);
             await this.ensureChatVisible(result.id);
+        }
+    },
+
+    /*
+     * -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
+     * coalesced reloadChat for the burst of triggers around a single turn
+     * (user message, stream end, queue flush): one fetch runs, everything
+     * arriving meanwhile collapses into exactly one follow-up fetch.
+     */
+    async queueReloadChat() {
+        if (this._reloadInFlight) {
+            this._reloadQueued = true;
+            return;
+        }
+
+        this._reloadInFlight = true;
+        try {
+            await this.reloadChat();
+            while (this._reloadQueued) {
+                this._reloadQueued = false;
+                await this.reloadChat();
+            }
+        } finally {
+            this._reloadInFlight = false;
         }
     },
 
@@ -1398,4 +1506,11 @@ CHAT_STORE = {
             remaining_str: (processed > 0 && remaining > 0) ? `(ETA: ${Math.ceil(remaining)}s)` : `(ETA: ...)`
         };
     }
-}
+};
+
+// -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
+// a resize reflows the whole document: cached marker flow positions die
+// with it and get re-measured lazily on the next pin check
+window.addEventListener('resize', () => {
+    try { Alpine.store('chat').invalidateMarkerPositions(); } catch (err) { /* pre-alpine: nothing cached */ }
+});

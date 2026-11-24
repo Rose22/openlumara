@@ -17,6 +17,9 @@ class Context:
         # prompt cache invalidation debugging
         self._prompt_cache_state = {}
 
+        # cached get_size() breakdown
+        self._size_cache = {"key": None, "size": None}
+
         # UI-agnostic chat history system - save/load context windows from save file!
         self.chat = core.chat.Chat(self.channel)
 
@@ -390,6 +393,7 @@ Hard rules:
                 self.chat.data[self.chat.current]["token_usage"] = 0
                 self.chat.data[self.chat.current]["token_usage_mark"] = 0
                 self.using_api_token_data = False
+            self.invalidate_size_cache()
 
             return response
         except Exception as e:
@@ -398,11 +402,32 @@ Hard rules:
         finally:
             self.compressing = False
 
+    def invalidate_size_cache(self):
+        """drops the cached get_size() breakdown (model/tool/config changes)"""
+        self._size_cache = {"key": None, "size": None}
+
     async def get_size(self):
         """basically just a fancy display of current token use, used by the `/status` command, and can optionally be used by other parts of the framework"""
-
-        # measure all parts from a single trimmed context build so the breakdown sums to what is actually sent to the API.
         max_context = int(core.config.get("api", "max_context"))
+
+        messages = self.chat.messages
+        try:
+            cache_key = (
+                self.chat.get("id"),
+                messages.revision,
+                self.model_name,
+                len(self.channel.manager.tools or []),
+                max_context,
+            )
+        except AttributeError:
+            cache_key = None
+
+        if (
+            cache_key is not None
+            and self._size_cache["key"] == cache_key
+            and self._size_cache["size"] is not None
+        ):
+            return self._size_cache["size"]
 
         full = await self.get()
         if not full:
@@ -421,23 +446,24 @@ Hard rules:
         hist_msgs = full[len(sys_msgs): len(full) - len(end_msgs)]
 
         # now we count the tokens for each part of the context
-        sysprompt_size_tokens = await self.count_tokens(sys_msgs)
-        sysprompt_size_words = len(str(sys_msgs).split())
-
-        message_hist_size_words = len(str(hist_msgs).split())
-
-        histend_size_tokens = await self.count_tokens(end_msgs)
-        histend_size_words = len(str(end_msgs).split()) if end_msgs else 0
-
-        tool_array_size_tokens = await self.count_tokens(self.channel.manager.tools)
-        tool_array_size_words = len(str(self.channel.manager.tools).split())
+        sysprompt_size_tokens, sysprompt_size_words = self._count_data(sys_msgs)
+        histend_size_tokens, histend_size_words = self._count_data(end_msgs) if end_msgs else (0, 0)
+        tool_array_size_tokens, tool_array_size_words = self._count_data(self.channel.manager.tools or [])
+        message_hist_size_words = self._count_data(hist_msgs)[1]
 
         # get amount of tools active
-        tools_amount = len(self.channel.manager.tools)
+        tools_amount = len(self.channel.manager.tools or [])
 
         combined_size_words = tool_array_size_words + sysprompt_size_words + message_hist_size_words + histend_size_words
 
-        token_usage = await self.get_total_tokens()
+        chat_data = self.chat.data[self.chat.current] if self.chat.current is not None else {}
+        api_base = int(chat_data.get("token_usage", 0))
+        mark = int(chat_data.get("token_usage_mark", 0))
+        if api_base > 0 and mark > 0:
+            token_usage = await self.get_total_tokens()
+        else:
+            token_usage = self._count_data(full)[0] + tool_array_size_tokens
+
         pct_full = round((token_usage / max_context) * 100)
 
         # count how often this chat has been compacted, based on the number of
@@ -452,7 +478,7 @@ Hard rules:
 
         message_hist_size_tokens = max(token_usage - sysprompt_size_tokens - histend_size_tokens - tool_array_size_tokens, 0)
 
-        return {
+        size = {
             "max_context": max_context,
             "total_tokens": token_usage,
             "percent_full": pct_full,
@@ -463,6 +489,10 @@ Hard rules:
             "message_history": {"tokens": message_hist_size_tokens, "words": message_hist_size_words},
             "end_prompt": {"tokens": histend_size_tokens, "words": histend_size_words}
         }
+
+        if cache_key is not None:
+            self._size_cache = {"key": cache_key, "size": size}
+        return size
 
     def _count_text_tokens(self, text: str) -> int:
         """does the actual token-counting by counting characters"""
@@ -487,6 +517,7 @@ Hard rules:
             chat_data["token_usage_mark"] = 0
 
         self.using_api_token_data = True
+        self.invalidate_size_cache()
 
         await self.chat.save()
 
@@ -524,22 +555,13 @@ Hard rules:
 
         return num_tokens
 
-    async def count_tokens(self, data):
-        """
-        the function that gets called all over the framework to count the token usage of any data.
-        converts the data into a json string, then uses _count_text_tokens() to do the actual counting
-        """
-        num_tokens = 0
-
-        if isinstance(data, core.api.APIError):
-            return 0
-
+    def _count_data(self, data):
         try:
             if isinstance(data, list):
                 # this is likely an array of messages
                 # count only the text tokens, since API's exempt multimodal content from token limits
 
-                # first i coded this function by hand using a for loop that copied each message and stripped it of any non-text content, 
+                # first i coded this function by hand using a for loop that copied each message and stripped it of any non-text content,
                 # then i asked my local AI for a more compact and performance friendly way to do it.
                 # now that's a good way to use AI coding, imho :)
                 # thanks Qwen3.6-35B!
@@ -555,7 +577,17 @@ Hard rules:
         except Exception as e:
             raise Exception(f"Error while counting tokens: {core.detail_error(e)}")
 
-        num_tokens = self._count_text_tokens(data_str)
+        return self._count_text_tokens(data_str), len(data_str.split())
+
+    async def count_tokens(self, data):
+        """
+        the function that gets called all over the framework to count the token usage of any data.
+        converts the data into a json string, then uses _count_text_tokens() to do the actual counting
+        """
+        if isinstance(data, core.api.APIError):
+            return 0
+
+        num_tokens, _words = self._count_data(data)
         return num_tokens
 
     def _fingerprint_context(self, context):

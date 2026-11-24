@@ -38,8 +38,9 @@ async def _turns_page(channel, before, limit):
     the absolute index `before` (exclusive). before=None means the newest page.
 
     -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
-    channel.group_history() caches its result in core (invalidated by the
-    history file's mtime), so paging up no longer regroups per request."""
+    channel.group_history() caches its result in core, validated against the
+    message revision counter (appends only re-group the trailing turn), so
+    paging up and per-message reloads no longer regroup per request."""
     history = await channel.group_history()
     total = len(history)
 
@@ -75,6 +76,7 @@ def register(app, channel):
         chat = dict(channel.context.chat.get())
         chat.update(_page_info(page, start, total))
         chat["token_usage"] = await channel.context.get_total_tokens()
+        chat["revision"] = getattr(channel.context.chat.messages, "revision", None)
 
         await channel.websocket_manager.push_context_update()
         return utils.api_result(chat, success=True)
@@ -90,6 +92,7 @@ def register(app, channel):
         chat.update(_page_info(page, start, total))
 
         chat["token_usage"] = await channel.context.get_total_tokens()
+        chat["revision"] = getattr(channel.context.chat.messages, "revision", None)
         return utils.api_result(chat)
 
     @app.get("/api/chat/turns")

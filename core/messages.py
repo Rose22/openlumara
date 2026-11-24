@@ -14,14 +14,15 @@ class Messages:
         self.path = os.path.join(self.chat.path, "history", self.chat.get("id"))
         self.data = core.storage.StorageList(self.path, "json")
 
-        # -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
-        # chat histories are written on every message: dump them compact
-        # (no indent) for smaller files and faster serialization.
+        # whether to use indentation in the json or not (saves disk space)
         self.data.pretty = False
 
-        # bumped on every mutation of the history; handy for caches that
-        # need cheap invalidation within one loaded chat
+        # bumped on every mutation of the history, for use with caching
         self.revision = 0
+
+        # lowest message index touched by an edit/delete since the last
+        # grouping; None means every change since then was a pure append
+        self.mutated_below = None
 
         # for index in range(len(self.data) - 1, -1, -1):
         #     chat = self.data[index]

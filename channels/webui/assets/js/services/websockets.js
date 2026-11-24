@@ -191,7 +191,8 @@ async function handleWebSocketMessage(data) {
             stream.userMsg = data.message;
 
             // reload chat from backend so that the new user message shows up
-            await chat.reloadChat();
+            // (queued: collapses with the reload that follows stream end)
+            await chat.queueReloadChat();
 
             // force scroll to bottom
             await ui.forceScrollToBottom();
@@ -510,6 +511,11 @@ async function handleWebSocketMessage(data) {
              * this prevents UI flicker that comes from re-rendering the entire turn history
              */
 
+            // -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
+            // the turn we just assembled locally is the server's final
+            // state for this revision; keep the tracker honest
+            if (typeof data.revision === 'number') chat.serverRevision = data.revision;
+
             streamFinalizing = true;
 
             const foldEl = document.querySelector('.agent-chain.is-streaming .agent-chain-body');
@@ -582,7 +588,7 @@ async function handleWebSocketMessage(data) {
             await ui.scrollToBottom('messages');
 
             // and finally, sync back up with the backend
-            await chat.reloadChat();
+            await chat.queueReloadChat();
             await chat.reloadChats();
 
             await ui.scrollToBottom('messages');

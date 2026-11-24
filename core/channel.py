@@ -49,7 +49,7 @@ class Channel:
         self._last_cmd_was_temporary = False
 
         # cache group_history() results
-        self._grouped_history_cache = {"key": None, "turns": None}
+        self._grouped_history_cache = {"key": None, "turns": None, "count": 0}
 
         self.queued_message = None # used for mid-stream steering of the AI's next action
         self.sending_message = False # used to track whether the channel is currently sending/streaming a message
@@ -1350,24 +1350,41 @@ class Channel:
         for displaying message history in the same grouped turns format
         """
         messages = self.context.chat.messages
+        chat_id = self.context.chat.get("id")
 
-        cache_key = None
-        try:
-            cache_key = (
-                self.context.chat.get("id"),
-                len(messages.data),
-                os.path.getmtime(messages.data.path),
-            )
-        except (OSError, AttributeError):
-            # group is not cached
-            pass
+        if chat_id is None or messages.revision is None:
+            return await self.turncollector.group_history(await messages.get())
 
         cache = self._grouped_history_cache
-        if cache_key is not None and cache["turns"] is not None and cache["key"] == cache_key:
+
+        # same revision and no mid-history mutation: nothing changed
+        if (cache["turns"] is not None and cache["key"] == (chat_id, messages.revision)
+                and messages.mutated_below is None):
             return cache["turns"]
 
-        turns = await self.turncollector.group_history(await messages.get())
+        data = await messages.get()
+        turns = None
 
-        # cache the grouped history so that it loads instantly when re-fetched
-        self._grouped_history_cache = {"key": cache_key, "turns": turns if cache_key is not None else None}
+        if (cache["turns"] is not None and cache["key"][0] == chat_id
+                and messages.mutated_below is None and len(data) >= cache["count"]):
+            if cache["turns"] and cache["turns"][-1]["role"] == "assistant":
+                boundary = cache["turns"][-1]["first_message_index"]
+                prefix = cache["turns"][:-1]
+            else:
+                boundary = cache["count"]
+                prefix = cache["turns"]
+
+            tail = await self.turncollector.group_history(data[boundary:], offset=boundary)
+            turns = prefix + tail
+
+        if turns is None:
+            # no usable cache, a chat switch, or a mid-history mutation
+            turns = await self.turncollector.group_history(data)
+
+        messages.mutated_below = None
+        self._grouped_history_cache = {
+            "key": (chat_id, messages.revision),
+            "turns": turns,
+            "count": len(data),
+        }
         return turns

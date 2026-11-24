@@ -105,7 +105,7 @@ class TurnCollector:
         except Exception:
             return ""
 
-    async def group_history(self, history):
+    async def group_history(self, history, offset=0):
         """
         Groups all finalized messages from history into turns.
         Returns a list of turn objects.
@@ -113,7 +113,7 @@ class TurnCollector:
         turns = []
         current_assistant_turn = None
 
-        for index, msg in enumerate(history):
+        for index, msg in enumerate(history, start=offset):
             msg = dict(msg)
 
             role = msg.get('role')
