@@ -14,6 +14,15 @@ class Messages:
         self.path = os.path.join(self.chat.path, "history", self.chat.get("id"))
         self.data = core.storage.StorageList(self.path, "json")
 
+        # -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
+        # chat histories are written on every message: dump them compact
+        # (no indent) for smaller files and faster serialization.
+        self.data.pretty = False
+
+        # bumped on every mutation of the history; handy for caches that
+        # need cheap invalidation within one loaded chat
+        self.revision = 0
+
         # for index in range(len(self.data) - 1, -1, -1):
         #     chat = self.data[index]
         #     messages = chat.get("messages", [])
@@ -34,7 +43,9 @@ class Messages:
         """saves data and updates the chat's timestamp"""
 
         await self.chat.update_timestamp()
-        return self.data.save()
+        # history dump on a worker thread: a big chat's serialization must
+        # never block the event loop (streams included)
+        return await self.data.save_async()
 
     async def get(self, index = None):
         """get message history of current chat"""
@@ -98,6 +109,9 @@ class Messages:
 
         self.data.append(new_message)
 
+        # -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
+        self.revision += 1
+
         index = len(self.data) - 1
         await self.save()
         return True
@@ -108,11 +122,13 @@ class Messages:
             return False
 
         self.data[index] = message
+        self.revision += 1
         await self.save()
 
     async def delete(self, index: int):
         """delete message from current chat"""
         self.data.pop(index)
+        self.revision += 1
         index = len(self.data) - 1
         await self.save()
 
@@ -129,11 +145,13 @@ class Messages:
         new_messages = self.data[:index]
 
         self.data.load(new_messages)
+        self.revision += 1
         await self.save()
         return True
 
     async def clear(self):
         self.data.clear()
+        self.revision += 1
         return True
 
     async def get_last_message_with_role(self, role: str, cutoff_index: int = None):

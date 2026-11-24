@@ -1,6 +1,7 @@
 import core
 import os
 import json
+import asyncio
 import yaml
 import msgpack
 import regex as re
@@ -48,6 +49,11 @@ class StorageList(list):
 
         # create path if it doesnt exist
         os.makedirs(os.path.dirname(self.path), exist_ok=True)
+
+        # -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
+        # when False, json is dumped compact (no indent): smaller files and
+        # much faster serialization. set on large stores like chat histories.
+        self.pretty = True
 
         # cache for change detection
         self._last_modified = 0.0
@@ -128,7 +134,8 @@ class StorageList(list):
 
         match self.type:
             case "json":
-                self._write(json.dumps(self, indent=2))
+                # -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
+                self._write(json.dumps(self, indent=2 if self.pretty else None))
             case "yaml":
                 self._write(yaml.safe_dump(self, default_flow_style=False, sort_keys=False, allow_unicode=True))
             case "msgpack":
@@ -139,6 +146,12 @@ class StorageList(list):
 
         # update mtime after saving so we know our cache is fresh
         self._update_mtime()
+
+    # -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
+    async def save_async(self):
+        """serialize + write on a worker thread so the event loop never stalls
+        on large stores. returns save()'s result"""
+        return await asyncio.to_thread(self.save)
 
     def load(self, data=None):
         """load content from file or data argument"""
@@ -202,6 +215,10 @@ class StorageDict(dict):
         # this is mainly for the config, so that we can still make changes in temporary mode
         # but who knows what it might be needed for in the future
         self.override_temporary = override_temporary
+
+        # -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
+        # when False, json is dumped compact (no indent). see StorageList.
+        self.pretty = True
 
         # cache for change detection
         self._last_modified = 0.0
@@ -351,7 +368,8 @@ class StorageDict(dict):
 
         match self.type:
             case "json":
-                self._write(json.dumps(dict(self), indent=2))
+                # -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
+                self._write(json.dumps(dict(self), indent=2 if self.pretty else None))
             case "yaml":
                 self._write(yaml.safe_dump(dict(self), default_flow_style=False, sort_keys=False, allow_unicode=True))
             case "markdown":
@@ -434,6 +452,11 @@ class StorageDict(dict):
 
         # update mtime after saving so we know our cache is fresh
         self._update_mtime()
+
+    # -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
+    async def save_async(self):
+        """serialize + write on a worker thread. see StorageList.save_async"""
+        return await asyncio.to_thread(self.save)
 
     def load(self, data=None):
         """load content from file or data argument"""

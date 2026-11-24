@@ -582,7 +582,8 @@ CHAT_STORE = {
         this.applyTurnPage(result, true);
         this.currentTokenUsage = result.token_usage;
 
-        await this.reloadChats();
+        // initial load: the tag list has never been fetched
+        await this.reloadChats(true);
 
         // ensure the chat exists in the visible sidebar list before scrolling
         await this.ensureChatVisible(this.selectedChat);
@@ -832,26 +833,54 @@ CHAT_STORE = {
         // stale: a newer reload superseded this one
         if (gen !== this.dayFetchGen) { return; }
 
-        this.dayGroups = (groupList ?? []).map(g => ({
-            key: g.key,
-            label: g.label,
-            count: g.count,
-            chats: [],
-            offset: 0,
-            hasMore: g.count > 0,
-            loading: false,
-            loaded: false
-        }));
+        const incoming = groupList ?? [];
 
-        const onTab = g => !this.isGroupCollapsed(g) && this.groupTab(g.key) === this.timeTab;
+        // -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
+        // structural diff: when the same groups with the same counts come
+        // back (the common case: a message just landed in the open chat),
+        // keep the existing group objects instead of tearing the whole
+        // sidebar list down, and re-fetch only the groups that could have
+        // changed (the one holding the selected chat + today's group).
+        const sameStructure = this.dayGroups.length > 0 &&
+            this.dayGroups.length === incoming.length &&
+            this.dayGroups.every((g, i) => g.key === incoming[i].key && g.count === incoming[i].count);
+
+        if (sameStructure) {
+            for (const g of this.dayGroups) {
+                const touched = g.key === this.todayKey() ||
+                    g.chats.some(c => c.id === this.selectedChat);
+                if (!touched) continue;
+
+                g.chats = [];
+                g.offset = 0;
+                g.hasMore = g.count > 0;
+                g.loaded = false;
+            }
+        } else {
+            this.dayGroups = incoming.map(g => ({
+                key: g.key,
+                label: g.label,
+                count: g.count,
+                chats: [],
+                offset: 0,
+                hasMore: g.count > 0,
+                loading: false,
+                loaded: false
+            }));
+        }
+
+        // only groups that were (re)set need a first page; untouched groups
+        // keep their loaded chats
+        const needsFetch = g => !g.loaded && g.hasMore &&
+            !this.isGroupCollapsed(g) && this.groupTab(g.key) === this.timeTab;
 
         await Promise.all(
-            this.dayGroups.filter(onTab).map(g => this.loadDayChats(g))
+            this.dayGroups.filter(needsFetch).map(g => this.loadDayChats(g))
         );
 
         await Alpine.nextTick();
         await Promise.all(
-            this.dayGroups.filter(onTab).map(g => this.ensureDayChatsFilled(g))
+            this.dayGroups.filter(needsFetch).map(g => this.ensureDayChatsFilled(g))
         );
     },
 
@@ -934,8 +963,14 @@ CHAT_STORE = {
         this.searchLoading = false;
     },
 
-    async reloadChats() {
-        await this.loadTags();
+    /*
+     * -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
+     * refreshTags=true also reloads the (category-scoped) tag list. Only
+     * needed when chats/tags themselves changed; message-finished refreshes
+     * skip it, cutting the post-turn sidebar cost to the day fetches.
+     */
+    async reloadChats(refreshTags = false) {
+        if (refreshTags) { await this.loadTags(); }
         await this.reloadDayGroups();
 
         // refresh search results alongside, so renames/deletes (which
@@ -993,7 +1028,7 @@ CHAT_STORE = {
 
         this.collapsedDays[this.todayKey()] = false;
 
-        await this.reloadChats();
+        await this.reloadChats(true);
         await this.reloadChat();
 
         document.getElementById('user-input')?.focus();
@@ -1018,7 +1053,7 @@ CHAT_STORE = {
         }
 
         await this.reloadCategories();
-        await this.reloadChats();
+        await this.reloadChats(true);
     },
 
     async deleteChat(chat_id) {
@@ -1035,7 +1070,7 @@ CHAT_STORE = {
                 : (cats[0] ?? 'general');
         }
 
-        await this.reloadChats();
+        await this.reloadChats(true);
     },
 
     async deleteCategory(name) {
@@ -1047,7 +1082,7 @@ CHAT_STORE = {
             this.selectedCategory = 'general';
         }
 
-        await this.reloadChats();
+        await this.reloadChats(true);
         await this.reloadChat();
     },
 
@@ -1072,7 +1107,7 @@ CHAT_STORE = {
 
         if (result.category !== prevCategory) {
             await this.reloadCategories();
-            await this.reloadChats();
+            await this.reloadChats(true);
             await this.ensureChatVisible(result.id);
         }
     },
@@ -1101,8 +1136,9 @@ CHAT_STORE = {
 
         this.selectedCategory = category;
         // reloadChats() re-runs the sidebar search when active, so the
-        // results are already re-scoped to the new category after this
-        await this.reloadChats();
+        // results are already re-scoped to the new category after this.
+        // the tag list is category-scoped, so it needs a refresh here
+        await this.reloadChats(true);
     },
 
     async clearInput() {

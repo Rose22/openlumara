@@ -130,18 +130,29 @@ class WebSocketManager:
         self.webui_ready = True
 
     async def broadcast(self, message: dict):
-        """broadcast a websocket event to all connected clients"""
-        disconnected = []
-        for connection in self.active_connections:
+        """broadcast a websocket event to all connected clients.
+
+        -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
+        sends run concurrently: one stalled client (backgrounded tab, full
+        socket buffer) used to hold up delivery to every other client for up
+        to SEND_TIMEOUT seconds per broadcast event."""
+        async def _send(connection):
             try:
                 if connection.client_state == starlette.websockets.WebSocketState.CONNECTED:
                     await asyncio.wait_for(
                         connection.send_json(message), timeout=self.SEND_TIMEOUT
                     )
             except Exception:
-                disconnected.append(connection)
+                return connection
+            return None
 
-        for conn in disconnected:
+        results = await asyncio.gather(
+            *(_send(connection) for connection in list(self.active_connections))
+        )
+
+        for conn in results:
+            if conn is None:
+                continue
             self.disconnect(conn)
             try:
                 await asyncio.wait_for(conn.close(), timeout=2)

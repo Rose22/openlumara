@@ -26,8 +26,10 @@ def highlight_query(text, query):
     escaped_text = html_lib.escape(str(text), quote=True)
     if not query:
         return escaped_text
-    
-    candidates = [str(query).strip()] + core.search.normalize_words(query)
+
+    # cap the candidate list so a long query can't build a pathological
+    # regex that gets re-run per result
+    candidates = ([str(query).strip()] + core.search.normalize_words(query))[:12]
     pattern = "|".join(dict.fromkeys(
         re.escape(html_lib.escape(c, quote=True)) for c in candidates if c
     ))

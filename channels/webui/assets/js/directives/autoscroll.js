@@ -23,6 +23,12 @@ function autoScroll(el) {
   let pumpRaf = null;
   let pumpLast = 0;
 
+  // -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
+  // last observed content height: DOM mutations that don't change it (text
+  // rewraps, class flips) must not kick off a pump that would force a fresh
+  // layout read every frame for nothing
+  let lastHeight = -1;
+
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
   const checkBottom = () => {
@@ -99,6 +105,11 @@ function autoScroll(el) {
 
   const observer = new MutationObserver(() => {
     if (!isAtBottom) return;
+
+    // gate: only chase when the content actually grew since the last look
+    const height = el.scrollHeight;
+    if (height === lastHeight && pumpRaf === null) return;
+    lastHeight = height;
 
     if (reducedMotion.matches) {
       el.scrollTo({ top: el.scrollHeight, behavior: 'instant' });

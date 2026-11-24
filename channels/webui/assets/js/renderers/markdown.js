@@ -136,6 +136,73 @@ function renderMarkdown(text, live = false) {
 // turn ever get cached, since their content can't change anymore.
 const _mdCache = new WeakMap();
 
+// -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
+/*
+ * live-stream tail split. while a message streams, its content is
+ * append-only, so re-running marked + DOMPurify + hljs over the ENTIRE
+ * text each paint gets expensive as long messages grow. we cut at the
+ * last blank-line boundary that is provably outside a code fence, cache
+ * the rendered HTML for everything before the cut, and only re-run the
+ * pipeline over the tail each paint.
+ *
+ * below LIVE_SPLIT_MIN_CHARS a plain full render is cheaper than the
+ * bookkeeping; boundaries only get accepted when they advance the cached
+ * prefix by LIVE_SPLIT_MIN_STEP chars, so the tail stays chunk-sized
+ * instead of churn per frame.
+ */
+const LIVE_SPLIT_MIN_CHARS = 20000;
+const LIVE_SPLIT_MIN_STEP = 8192;
+
+const _liveSplitCache = new WeakMap();
+
+// count fence marker lines within [from, to); accepted cuts always sit at
+// a line start, so the scan range never splits a line
+function _countFenceLines(text, from, to) {
+    let count = 0;
+    const re = /^ {0,3}(?:`{3,}|~{3,})/gm;
+    re.lastIndex = from;
+    let m;
+    while ((m = re.exec(text)) !== null && m.index < to) count++;
+    return count;
+}
+
+function renderMarkdownStream(message) {
+    const content = message.content || '';
+    if (content.length < LIVE_SPLIT_MIN_CHARS) return renderMarkdown(content, true);
+
+    let st = _liveSplitCache.get(message);
+
+    // reset on shrink (regenerate/edit) or whenever the already-rendered
+    // prefix no longer matches
+    if (st && (content.length < st.cut ||
+        content.slice(Math.max(0, st.cut - 32), st.cut) !== st.marker)) {
+        st = null;
+    }
+    if (!st) st = { cut: 0, html: '', parity: 0, marker: '' };
+    _liveSplitCache.set(message, st);
+
+    // walk blank-line boundaries back from the end; accept the newest one
+    // that is far enough ahead and lands outside any code fence
+    let p = content.lastIndexOf('\n\n');
+    while (p > 0) {
+        const cut = p + 2;
+        if (cut - st.cut < LIVE_SPLIT_MIN_STEP) break;
+
+        const fences = _countFenceLines(content, st.cut, cut);
+        if ((st.parity + fences) % 2 === 0) {
+            st.html += renderMarkdown(content.slice(st.cut, cut), false);
+            st.cut = cut;
+            st.parity = 0;
+            st.marker = content.slice(Math.max(0, cut - 32), cut);
+            break;
+        }
+
+        p = content.lastIndexOf('\n\n', p - 1);
+    }
+
+    return st.html + renderMarkdown(content.slice(st.cut), true);
+}
+
 /*
  * renderMarkdown, but smart about when it actually does the work.
  *
@@ -156,12 +223,14 @@ function renderMarkdownFor(message, live, raw) {
         if (cached && cached.source === content && Boolean(raw) === Boolean(cached.raw)) return cached.html;
     }
 
-    // -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-09-15) status:reviewed
+    // -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
     // raw mode: plain escaped text, no markdown pipeline at all.
     // live mode: full pipeline including hljs - affordable now that the
     // per-block cache means only the still-growing block gets highlighted,
-    // and the directive throttles live paints to ~8fps.
-    const html = raw ? escapeHtml(content) : renderMarkdown(content, Boolean(live));
+    // long messages additionally use the cached-prefix stream split, and
+    // the directive coalesces live paints to one per frame.
+    const html = raw ? escapeHtml(content)
+        : (live ? renderMarkdownStream(message) : renderMarkdown(content, false));
 
     if (!live && content && html.length <= 2 * 1024 * 1024) {
         _mdCache.set(message, { source: content, html, raw: Boolean(raw) });

@@ -48,6 +48,9 @@ class Channel:
         self.commands = core.commands.Commands(self)
         self._last_cmd_was_temporary = False
 
+        # cache group_history() results
+        self._grouped_history_cache = {"key": None, "turns": None}
+
         self.queued_message = None # used for mid-stream steering of the AI's next action
         self.sending_message = False # used to track whether the channel is currently sending/streaming a message
         
@@ -1346,4 +1349,25 @@ class Channel:
         takes a list of messages and turns it into turns that are identical to the ones shown by get_turns_stream()
         for displaying message history in the same grouped turns format
         """
-        return await self.turncollector.group_history(await self.context.chat.messages.get())
+        messages = self.context.chat.messages
+
+        cache_key = None
+        try:
+            cache_key = (
+                self.context.chat.get("id"),
+                len(messages.data),
+                os.path.getmtime(messages.data.path),
+            )
+        except (OSError, AttributeError):
+            # group is not cached
+            pass
+
+        cache = self._grouped_history_cache
+        if cache_key is not None and cache["turns"] is not None and cache["key"] == cache_key:
+            return cache["turns"]
+
+        turns = await self.turncollector.group_history(await messages.get())
+
+        # cache the grouped history so that it loads instantly when re-fetched
+        self._grouped_history_cache = {"key": cache_key, "turns": turns if cache_key is not None else None}
+        return turns

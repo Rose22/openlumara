@@ -23,6 +23,10 @@ class Chat:
         self.current = None
         self.current_save_path = core.get_data_path(os.path.join(self.path, f"current"))
 
+        # -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
+        # (sort key, sorted list) cache for get_all()
+        self._get_all_cache = None
+
     async def autoload(self):
         """loads the last used chat if applicable, otherwise it creates a new chat. basically the class's async constructor"""
         # chat autoresume
@@ -428,7 +432,10 @@ class Chat:
         if self.current is None:
             raise Exception("No chat is currently loaded!")
 
-        turns = await self.channel.turncollector.group_history(await self.messages.get())
+        # -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
+        # route through the channel's cached grouping: export is read-only
+        # over the turns, so it can share the snapshot
+        turns = await self.channel.group_history()
 
         turn_export = []
         for turn in turns:
@@ -609,7 +616,19 @@ class Chat:
 
     def get_all(self):
         """returns all chats in the storage, sorted by updated date (most recent first)"""
-        return sorted(self.data, key=lambda c: c.get("updated", ""), reverse=True)
+        # -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
+        # cache the sorted order: only the count and the newest "updated"
+        # stamp feed into the sort, so re-sort only when those change.
+        # renames/category edits mutate the dicts in place, which the cached
+        # list reflects automatically since it holds the same references.
+        key = (len(self.data), max((c.get("updated") or "" for c in self.data), default=""))
+        cache = self._get_all_cache
+        if cache is not None and cache[0] == key:
+            return cache[1]
+
+        sorted_chats = sorted(self.data, key=lambda c: c.get("updated", ""), reverse=True)
+        self._get_all_cache = (key, sorted_chats)
+        return sorted_chats
 
     def get_categories(self):
         collected_categories = []
