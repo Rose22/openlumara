@@ -2202,6 +2202,138 @@ class Coder(core.module.Module):
         text = raw.decode("utf-8", "replace")
         return {"diff": text, "rows": self._parse_split_diff(text), "target": target}
 
+    # -- AI GENERATED CODE (Qwen3.8 Flash Next) :: 2026-11-24 harness:openlumara
+    # branch-vs-branch diff: pick any two refs (local or remote-tracking) and
+    # see the differing files + per-file diffs between them. ref names arrive
+    # from the client, so each one is shape-checked, verified to exist, and
+    # pinned to a commit SHA before it can ever reach a diff command.
+
+    _git_ref_shape = regex.compile(r"^[A-Za-z0-9][A-Za-z0-9._/@+-]*$")
+
+    async def _resolve_git_ref(self, root: str, ref: str):
+        """validates a ref name and resolves it to a commit sha.
+        returns (sha, None) on success, (None, error) on failure."""
+        ref = (ref or "").strip()
+        if not self._git_ref_shape.match(ref):
+            return None, f"invalid ref name: {ref}"
+        ok, out = await self._run_git(root, "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}")
+        sha = (out or "").strip()
+        if not ok or not regex.match(r"^[0-9a-fA-F]{7,40}$", sha):
+            return None, f"could not resolve ref: {ref}"
+        return sha, None
+
+    @webui.route("git_refs")
+    async def _route_git_refs(self, body=None, query=None):
+        """every ref a branch diff can point at: local branches plus
+        remote-tracking branches (symbolic origin/HEAD pointers excluded)."""
+        sandbox = (query or {}).get("sandbox", "")
+        subpath = (query or {}).get("subpath", "")
+
+        if not sandbox:
+            return self.result("no sandbox given", success=False)
+
+        try:
+            root = await self._git_root(sandbox, subpath)
+        except Exception as e:
+            return self.result(str(e), success=False)
+
+        ok, _ = await self._run_git(root, "rev-parse", "--is-inside-work-tree")
+        if not ok:
+            return self.result("this folder is not a git repository", success=False)
+
+        ok_b, b_out = await self._run_git(root, "branch", "--format=%(refname:short)")
+        local = [b.strip() for b in b_out.split("\n") if b.strip()] if ok_b else []
+
+        ok_r, r_out = await self._run_git(root, "branch", "-r", "--format=%(refname:short)")
+        remote = []
+        if ok_r:
+            for line in r_out.split("\n"):
+                r = line.strip()
+                if r and "->" not in r:
+                    remote.append(r)
+
+        return {"local": local, "remote": remote}
+
+    @webui.route("git_branch_files")
+    async def _route_git_branch_files(self, body=None, query=None):
+        """files (with line counts) differing between two refs, plus the
+        commit counts in each direction. refs are resolved to SHAs here,
+        never trusted as given."""
+        sandbox = (query or {}).get("sandbox", "")
+        subpath = (query or {}).get("subpath", "")
+        base_ref = (query or {}).get("base", "")
+        head_ref = (query or {}).get("head", "")
+
+        if not sandbox or not base_ref or not head_ref:
+            return self.result("sandbox, base and head are all required", success=False)
+
+        try:
+            root = await self._git_root(sandbox, subpath)
+        except Exception as e:
+            return self.result(str(e), success=False)
+
+        base_sha, err = await self._resolve_git_ref(root, base_ref)
+        if not base_sha:
+            return self.result(err, success=False)
+        head_sha, err = await self._resolve_git_ref(root, head_ref)
+        if not head_sha:
+            return self.result(err, success=False)
+
+        rc, raw = await self._run_git_bytes(root, "diff", "--numstat", "--no-renames", base_sha, head_sha)
+        if rc != 0:
+            return self.result(raw.decode("utf-8", "replace").strip() or "git diff failed", success=False)
+
+        files = []
+        for line in raw.decode("utf-8", "replace").splitlines():
+            parts = line.split("\t")
+            if len(parts) < 3:
+                continue
+            files.append({"path": parts[2], "added": parts[0], "removed": parts[1]})
+
+        ahead = behind = 0
+        ok, out = await self._run_git(root, "rev-list", "--count", f"{base_sha}..{head_sha}")
+        if ok and out.strip().isdigit():
+            ahead = int(out.strip())
+        ok, out = await self._run_git(root, "rev-list", "--count", f"{head_sha}..{base_sha}")
+        if ok and out.strip().isdigit():
+            behind = int(out.strip())
+
+        return {"files": files, "ahead": ahead, "behind": behind}
+
+    @webui.route("git_branch_file_diff")
+    async def _route_git_branch_file_diff(self, body=None, query=None):
+        """unified + split diff of one file between two refs"""
+        sandbox = (query or {}).get("sandbox", "")
+        subpath = (query or {}).get("subpath", "")
+        base_ref = (query or {}).get("base", "")
+        head_ref = (query or {}).get("head", "")
+        rel_path = (query or {}).get("path", "")
+
+        if not sandbox or not base_ref or not head_ref or not rel_path:
+            return self.result("sandbox, base, head and path are all required", success=False)
+
+        try:
+            root = await self._git_root(sandbox, subpath)
+            self._check_git_paths(root, [rel_path])
+        except Exception as e:
+            return self.result(str(e), success=False)
+
+        base_sha, err = await self._resolve_git_ref(root, base_ref)
+        if not base_sha:
+            return self.result(err, success=False)
+        head_sha, err = await self._resolve_git_ref(root, head_ref)
+        if not head_sha:
+            return self.result(err, success=False)
+
+        abs_path = os.path.normpath(os.path.join(root, rel_path))
+        rc, raw = await self._run_git_bytes(root, "diff", base_sha, head_sha, "--", abs_path)
+        if rc != 0:
+            return self.result(raw.decode("utf-8", "replace").strip() or "git diff failed", success=False)
+
+        text = raw.decode("utf-8", "replace")
+        return {"diff": text if text.strip() else "(no changes)", "rows": self._parse_split_diff(text)}
+
+
     @webui.route("git_push", method="POST", admin_only=True)
     async def _route_git_push(self, body=None, query=None):
         if self.config.get("read-only"):

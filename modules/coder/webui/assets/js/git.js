@@ -42,6 +42,14 @@ const GIT_PANEL = {
     _currentBranch: "",
     // conflicts
     conflicts: [],
+    // -- AI GENERATED CODE (Qwen3.8 Flash Next) :: 2026-11-24 harness:openlumara
+    // branch-vs-branch compare modal: base..head over local + remote refs
+    bd: {
+        refs: { local: [], remote: [] },
+        base: "", head: "",
+        files: [], ahead: 0, behind: 0, loading: false, error: "",
+        openPath: "", lines: [], rows: [], diffLoading: false,
+    },
 
 
     async refresh(force = false) {
@@ -684,6 +692,146 @@ const GIT_PANEL = {
         }
 
         return { adds, dels };
+    },
+
+    /* -- AI GENERATED CODE (Qwen3.8 Flash Next) :: 2026-11-24 harness:openlumara
+       branch-vs-branch compare: pick any two refs (local or remote) and see
+       what differs. The backend re-validates both names and pins them to
+       SHAs before diffing (git_branch_files / git_branch_file_diff). # */
+    async openBranchDiff() {
+        this.bd.error = "";
+        try {
+            const params = `sandbox=${encodeURIComponent(this.sandbox)}&subpath=${encodeURIComponent(this.subpath)}`;
+            const d = await simpleApiFetch("/api/ext/coder/git_refs?" + params);
+            this.bd.refs = { local: d.local || [], remote: d.remote || [] };
+        } catch (e) {
+            this.bd.error = this.errorText(e);
+        }
+
+        const all = [...this.bd.refs.local, ...this.bd.refs.remote];
+        if (all.length) {
+            // keep earlier picks when they still exist; otherwise default to
+            // current branch vs its most likely comparison target
+            if (!this.bd.head || !all.includes(this.bd.head)) {
+                this.bd.head = all.includes(this.branch) ? this.branch : all[0];
+            }
+            if (!this.bd.base || !all.includes(this.bd.base) || this.bd.base === this.bd.head) {
+                const others = all.filter(r => r !== this.bd.head);
+                const fav = ["main", "master", "origin/main", "origin/master"];
+                this.bd.base =
+                    others.find(r => fav.includes(r)) ||
+                    others.find(r => !r.includes("/")) ||
+                    others[0] ||
+                    "";
+            }
+        }
+
+        Alpine.store("ui").openModal("git_branch_diff");
+        if (this.bd.base && this.bd.head && this.bd.base !== this.bd.head) this.loadBranchFiles();
+    },
+
+    async loadBranchFiles() {
+        this.bd.error = "";
+        this.bd.files = [];
+        this.bd.ahead = 0;
+        this.bd.behind = 0;
+        this.bd.openPath = "";
+        this.bd.lines = [];
+        this.bd.rows = [];
+        if (!this.bd.base || !this.bd.head || this.bd.base === this.bd.head) return;
+
+        this.bd.loading = true;
+        try {
+            const params = `sandbox=${encodeURIComponent(this.sandbox)}&subpath=${encodeURIComponent(this.subpath)}` +
+                `&base=${encodeURIComponent(this.bd.base)}&head=${encodeURIComponent(this.bd.head)}`;
+            const d = await simpleApiFetch("/api/ext/coder/git_branch_files?" + params);
+            this.bd.files = d.files || [];
+            this.bd.ahead = d.ahead || 0;
+            this.bd.behind = d.behind || 0;
+        } catch (e) {
+            this.bd.error = this.errorText(e);
+        } finally {
+            this.bd.loading = false;
+        }
+    },
+
+    swapBranches() {
+        const b = this.bd.base;
+        this.bd.base = this.bd.head;
+        this.bd.head = b;
+        this.loadBranchFiles();
+    },
+
+    async toggleBranchFile(path) {
+        if (this.bd.openPath === path) {
+            this.bd.openPath = "";
+            this.bd.lines = [];
+            this.bd.rows = [];
+            return;
+        }
+        this.bd.openPath = path;
+        this.bd.lines = [];
+        this.bd.rows = [];
+        this.bd.diffLoading = true;
+        try {
+            const params = `sandbox=${encodeURIComponent(this.sandbox)}&subpath=${encodeURIComponent(this.subpath)}` +
+                `&base=${encodeURIComponent(this.bd.base)}&head=${encodeURIComponent(this.bd.head)}` +
+                `&path=${encodeURIComponent(path)}`;
+            const d = await simpleApiFetch("/api/ext/coder/git_branch_file_diff?" + params);
+            // the user may have switched files or refs mid-flight
+            if (this.bd.openPath !== path) return;
+            this.bd.lines = String(d.diff || "(no changes)").split("\n");
+            this.bd.rows = d.rows || [];
+        } catch (e) {
+            if (this.bd.openPath !== path) return;
+            this.bd.lines = [this.errorText(e)];
+            this.bd.rows = [];
+        } finally {
+            if (this.bd.openPath === path) this.bd.diffLoading = false;
+        }
+    },
+
+    // open the file in the coder editor with the branch diff highlighted
+    // (same handoff as editPending; if the working tree no longer matches
+    // either ref, the marks just point at lines that already moved on)
+    async openBranchFile(path) {
+        const panel = Alpine.store("coderPanel");
+        if (!panel) return;
+
+        let lines = [];
+        if (this.bd.openPath === path && this.bd.lines.length) {
+            lines = this.bd.lines;
+        } else {
+            try {
+                const params = `sandbox=${encodeURIComponent(this.sandbox)}&subpath=${encodeURIComponent(this.subpath)}` +
+                    `&base=${encodeURIComponent(this.bd.base)}&head=${encodeURIComponent(this.bd.head)}` +
+                    `&path=${encodeURIComponent(path)}`;
+                const d = await simpleApiFetch("/api/ext/coder/git_branch_file_diff?" + params);
+                lines = String(d.diff || "").split("\n");
+            } catch (e) {
+                lines = []; // no highlights is no reason to refuse opening the file
+            }
+        }
+
+        // compare paths are repo-relative; the editor wants sandbox-relative
+        const full = this.subpath ? this.subpath + "/" + path : path;
+
+        let marks = null;
+        const p = this.parseDiffPoints(lines);
+        if (p.adds.length || p.dels.length) {
+            marks = { adds: p.adds, dels: p.dels, label: this.bd.base + " \u2192 " + this.bd.head };
+        }
+
+        if (panel.sandbox !== this.sandbox) {
+            panel.sandbox = this.sandbox;
+            panel.onSandboxChange();
+        }
+
+        panel.openFile({ path: full }, 0, marks);
+    },
+
+    closeBranchDiff() {
+        Alpine.store("ui").closeModal();
     },
 
     errorText(e) {

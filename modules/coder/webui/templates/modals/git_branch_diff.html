@@ -1,0 +1,124 @@
+{# -- AI GENERATED CODE (Qwen3.8 Flash Next) :: 2026-11-24 harness:openlumara
+   compare-two-branches modal: pick a base and a head ref (local branches +
+   remote-tracking branches), see the files that differ with +/- stats,
+   expand a file into its diff (split on desktop, unified on mobile), and
+   open any file in the coder editor with the branch diff highlighted.
+   opened via $store.gitPanel.openBranchDiff(). #}
+<template x-if="$store.ui.currentModal === 'git_branch_diff' && $store.gitPanel" x-cloak>
+    <div class="modal git-branch-diff-modal" :class="{ reviewing: $store.gitPanel.bd.openPath }" @keydown.escape.window="$store.gitPanel.closeBranchDiff()">
+        <div class="header">
+            <h2 class="coder-editor-title">
+                <span>compare branches</span>
+                <span class="git-ro-tag" x-text="$store.gitPanel.bd.base || '?'" title="base"></span>
+                <span class="gbd-arrow">&rarr;</span>
+                <span class="git-ro-tag head" x-text="$store.gitPanel.bd.head || '?'" title="head"></span>
+            </h2>
+            <button class="close" @click="$store.gitPanel.closeBranchDiff()" aria-label="Close branch compare">&times;</button>
+        </div>
+
+        <div class="git-branch-diff-body">
+            <div class="gbd-controls">
+                <div class="gbd-picker">
+                    <label for="gbd-base">base</label>
+                    <select id="gbd-base" class="coder-select" aria-label="Base branch" x-model="$store.gitPanel.bd.base" @change="$store.gitPanel.loadBranchFiles()">
+                        <optgroup label="local">
+                            <template x-for="r in $store.gitPanel.bd.refs.local" :key="'lb' + r">
+                                <option :value="r" x-text="r"></option>
+                            </template>
+                        </optgroup>
+                        <optgroup label="remote">
+                            <template x-for="r in $store.gitPanel.bd.refs.remote" :key="'rb' + r">
+                                <option :value="r" x-text="r"></option>
+                            </template>
+                        </optgroup>
+                    </select>
+                </div>
+                <button type="button" class="gbd-swap" title="Swap base and head" aria-label="Swap branches" @click="$store.gitPanel.swapBranches()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+                </button>
+                <div class="gbd-picker">
+                    <label for="gbd-head">head</label>
+                    <select id="gbd-head" class="coder-select" aria-label="Head branch" x-model="$store.gitPanel.bd.head" @change="$store.gitPanel.loadBranchFiles()">
+                        <optgroup label="local">
+                            <template x-for="r in $store.gitPanel.bd.refs.local" :key="'lh' + r">
+                                <option :value="r" x-text="r"></option>
+                            </template>
+                        </optgroup>
+                        <optgroup label="remote">
+                            <template x-for="r in $store.gitPanel.bd.refs.remote" :key="'rh' + r">
+                                <option :value="r" x-text="r"></option>
+                            </template>
+                        </optgroup>
+                    </select>
+                </div>
+            </div>
+
+            <div class="gbd-summary" x-show="!$store.gitPanel.bd.loading && $store.gitPanel.bd.base !== $store.gitPanel.bd.head">
+                <span><span class="num" x-text="$store.gitPanel.bd.ahead"></span> commits in <b x-text="$store.gitPanel.bd.head"></b> not in <b x-text="$store.gitPanel.bd.base"></b></span>
+                <span class="gbd-dot">&middot;</span>
+                <span><span class="num" x-text="$store.gitPanel.bd.behind"></span> the other way</span>
+                <span class="gbd-dot">&middot;</span>
+                <span><span class="num" x-text="$store.gitPanel.bd.files.length"></span> files differ</span>
+            </div>
+
+            <div class="gbd-empty" x-show="$store.gitPanel.bd.loading">loading diff..</div>
+            <div class="gbd-empty" x-show="!$store.gitPanel.bd.loading && $store.gitPanel.bd.base === $store.gitPanel.bd.head">pick two different refs to compare</div>
+            <div class="gbd-empty" x-show="!$store.gitPanel.bd.loading && !$store.gitPanel.bd.files.length && $store.gitPanel.bd.base !== $store.gitPanel.bd.head && !$store.gitPanel.bd.error">no file differences</div>
+
+            <template x-for="f in $store.gitPanel.bd.files" :key="f.path">
+                <div class="gbd-file">
+                    <div class="gbd-file-head">
+                        <button type="button"
+                                class="gbd-file-row"
+                                :class="{ active: $store.gitPanel.bd.openPath === f.path }"
+                                @click="$store.gitPanel.toggleBranchFile(f.path)">
+                            <span class="twisty" x-text="$store.gitPanel.bd.openPath === f.path ? '\u25be' : '\u25b8'"></span>
+                            <span class="path" x-text="f.path"></span>
+                            <span class="stats">
+                                <span class="stat add" x-text="f.added === '-' ? 'bin' : '+' + f.added"></span>
+                                <span class="stat del" x-show="f.added !== '-'" x-text="'-' + f.removed"></span>
+                            </span>
+                        </button>
+                        {# open in the coder editor with the branch diff highlighted #}
+                        <button type="button"
+                                class="gbd-edit-btn"
+                                title="Open this file in the coder"
+                                aria-label="Open file in coder"
+                                @click="$store.gitPanel.openBranchFile(f.path)">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                                <path d="m15 5 4 4" />
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="gbd-diff" x-show="$store.gitPanel.bd.openPath === f.path">
+                        <div class="gbd-diff-status" x-show="$store.gitPanel.bd.diffLoading">loading diff..</div>
+                        <template x-if="!$store.gitPanel.bd.diffLoading">
+                            <div>
+                                <pre class="gbd-diff-body git-diff-unified"><template x-for="(line, i) in $store.gitPanel.bd.lines" :key="i"><div class="git-diff-line" :class="{ add: line.startsWith('+') && !line.startsWith('+++'), del: line.startsWith('-') && !line.startsWith('---'), hunk: line.startsWith('@@'), meta: line.startsWith('+++') || line.startsWith('---') }" x-text="line || ' '"></div></template></pre>
+                                <div class="git-split-body git-diff-split">
+                                    <div class="gbd-diff-status" x-show="!$store.gitPanel.bd.rows.length">(no text changes)</div>
+                                    <table class="git-split-table" x-show="$store.gitPanel.bd.rows.length">
+                                        <colgroup><col class="ln-col"><col class="code-col"><col class="ln-col"><col class="code-col"></colgroup>
+                                        <tbody>
+                                            <template x-for="(row, i) in $store.gitPanel.bd.rows" :key="i">
+                                                <tr :class="'split-' + row.type">
+                                                    <td class="ln" x-text="row.old_num || ''"></td>
+                                                    <td class="code" x-text="row.old_text || ' '"></td>
+                                                    <td class="ln" x-text="row.new_num || ''"></td>
+                                                    <td class="code" x-text="row.new_text || ' '"></td>
+                                                </tr>
+                                            </template>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </template>
+
+            <div class="gbd-error" x-show="$store.gitPanel.bd.error" x-text="$store.gitPanel.bd.error"></div>
+        </div>
+    </div>
+</template>

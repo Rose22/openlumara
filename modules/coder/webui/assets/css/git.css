@@ -993,3 +993,335 @@
     border-color: #ff5f7a;
     color: #fff;
 }
+
+/* -- AI GENERATED CODE (Qwen3.8 Flash Next) :: 2026-11-24 harness:openlumara
+   ---- branch-vs-branch compare modal ---- # */
+
+.git-branch-diff-modal {
+    width: min(720px, 94vw);
+}
+
+/* widens while a file diff is open, same trick as the push review */
+.git-branch-diff-modal.reviewing {
+    width: min(1080px, 96vw);
+}
+
+.git-branch-diff-modal .coder-editor-title {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+    font-size: 13px;
+}
+
+.git-branch-diff-modal .git-ro-tag {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 20px;
+    border: 1px solid rgba(0, 212, 255, 0.4);
+    color: var(--accent, #00d4ff);
+    letter-spacing: 0.04em;
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: "JetBrains Mono", Menlo, Consolas, monospace;
+}
+
+.git-branch-diff-modal .git-ro-tag.head {
+    border-color: rgba(186, 134, 255, 0.45);
+    color: #ba86ff;
+}
+
+.git-branch-diff-modal .gbd-arrow {
+    flex: 0 0 auto;
+    color: var(--text-secondary, #999);
+}
+
+.git-branch-diff-body {
+    padding: 12px 14px 14px;
+    max-height: min(78vh, 720px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    font-size: 12px;
+}
+
+.gbd-controls {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.gbd-picker {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.gbd-picker label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-secondary, #999);
+}
+
+/* .coder-select styling lives scoped to .git-panel: replicate for the modal */
+.git-branch-diff-modal .coder-select {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 7px 10px;
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+    border-radius: var(--radius-sm, 8px);
+    background: var(--bg-primary, rgba(0, 0, 0, 0.15));
+    color: var(--text-primary, #eee);
+    font-size: 12px;
+    font-family: "JetBrains Mono", Menlo, Consolas, monospace;
+}
+
+.git-branch-diff-modal .coder-select:focus {
+    outline: none;
+    border-color: var(--accent, #00d4ff);
+}
+
+.gbd-swap {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+    border-radius: var(--radius-sm, 8px);
+    background: transparent;
+    color: var(--text-secondary, #999);
+    cursor: pointer;
+    transition: color 0.12s ease, border-color 0.12s ease;
+}
+
+.gbd-swap:hover {
+    color: var(--accent, #00d4ff);
+    border-color: var(--accent, #00d4ff);
+}
+
+.gbd-swap svg {
+    width: 14px;
+    height: 14px;
+}
+
+.gbd-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 8px;
+    color: var(--text-secondary, #bbb);
+    margin-bottom: 10px;
+    line-height: 1.4;
+}
+
+.gbd-summary .num {
+    font-family: "JetBrains Mono", Menlo, Consolas, monospace;
+    font-weight: 600;
+    color: var(--accent, #00d4ff);
+}
+
+.gbd-summary b {
+    font-family: "JetBrains Mono", Menlo, Consolas, monospace;
+    font-weight: 500;
+    color: var(--text-primary, #ddd);
+}
+
+.gbd-dot {
+    color: var(--text-secondary, #666);
+}
+
+.gbd-empty {
+    padding: 14px 8px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-secondary, #999);
+}
+
+.gbd-error {
+    border: 1px solid rgba(255, 95, 122, 0.4);
+    background: rgba(255, 95, 122, 0.08);
+    color: #ff8095;
+    border-radius: 7px;
+    padding: 8px 10px;
+    margin-top: 10px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: "JetBrains Mono", Menlo, Consolas, monospace;
+    font-size: 11px;
+}
+
+.gbd-file-head {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.gbd-file-head .gbd-file-row {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.gbd-file-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 8px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text, #ddd);
+    font-size: 12px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.gbd-file-row:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.gbd-file-row.active {
+    background: rgba(0, 212, 255, 0.08);
+}
+
+.gbd-file-row .twisty {
+    flex: 0 0 auto;
+    width: 12px;
+    font-size: 10px;
+    color: var(--text-secondary, #999);
+}
+
+.gbd-file-row .path {
+    flex: 1 1 auto;
+    font-family: "JetBrains Mono", Menlo, Consolas, monospace;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.gbd-file-row .stats {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 6px;
+    font-family: "JetBrains Mono", Menlo, Consolas, monospace;
+    font-size: 11px;
+}
+
+.gbd-file-row .stat.add {
+    color: #3fdc97;
+}
+
+.gbd-file-row .stat.del {
+    color: #ff8095;
+}
+
+/* open-in-coder pencil: sibling of the row button, revealed on hover but
+   always tappable on touch screens (same pattern as the push modal) */
+.gbd-edit-btn {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 24px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-secondary, #999);
+    cursor: pointer;
+    opacity: 0.45;
+    transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+
+.gbd-edit-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.gbd-file:hover .gbd-edit-btn,
+.gbd-edit-btn:focus-visible {
+    opacity: 1;
+}
+
+.gbd-edit-btn:hover {
+    background: rgba(0, 212, 255, 0.1);
+    color: var(--accent, #00d4ff);
+}
+
+.gbd-diff {
+    border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+    border-radius: 7px;
+    background: rgba(0, 0, 0, 0.18);
+    max-height: 340px;
+    overflow: auto;
+    margin: 2px 0 8px;
+}
+
+/* the split view brings its own scroller: let the gbd-diff container own it */
+.gbd-diff .git-split-body {
+    max-height: none;
+    overflow: visible;
+}
+
+.gbd-diff-status {
+    padding: 10px 12px;
+    font-size: 11px;
+    color: var(--text-secondary, #999);
+}
+
+.gbd-diff-body {
+    margin: 0;
+    padding: 10px 12px 12px;
+    font-family: "JetBrains Mono", "Fira Code", Menlo, Consolas, monospace;
+    font-size: 11px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+    tab-size: 4;
+}
+
+.gbd-diff .git-diff-line {
+    padding: 0 6px;
+    border-radius: 3px;
+}
+
+.gbd-diff .git-diff-line.add {
+    background: rgba(40, 200, 64, 0.1);
+    color: #3fdc97;
+}
+
+.gbd-diff .git-diff-line.del {
+    background: rgba(255, 95, 122, 0.1);
+    color: #ff8095;
+}
+
+.gbd-diff .git-diff-line.hunk {
+    color: var(--accent, #00d4ff);
+    opacity: 0.75;
+    margin-top: 4px;
+}
+
+.gbd-diff .git-diff-line.meta {
+    color: var(--text-secondary, #999);
+}
+
+/* stacked pickers on narrow screens */
+@media (max-width: 768px) {
+    .gbd-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .gbd-swap {
+        align-self: center;
+    }
+}
