@@ -116,7 +116,7 @@ SYSTEM_STORE = {
 
         this.update.updating = true;
         // full-screen overlay while the update script runs server-side
-        this.restart("Updating OpenLumara.. the server restarts automatically when it finishes");
+        this.restart("Updating OpenLumara.. the server will restart when finished");
 
         let data = null;
         try {
@@ -152,10 +152,10 @@ SYSTEM_STORE = {
 
     async updateAll() {
         if (!this.update.anyUpdates || this.update.updating) return;
-        if (!confirm('Update OpenLumara and all installed modules/channels with available updates? The server will restart automatically when it finishes.')) return;
+        if (!confirm('Update OpenLumara and all outdated modules/channels? The server will restart automatically when it finishes.')) return;
 
         this.update.updating = true;
-        this.restart("Updating everything.. the server restarts automatically when it finishes");
+        this.restart("Updating everything.. the server will restart when finished");
 
         let resp = null;
         try {
