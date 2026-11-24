@@ -47,6 +47,8 @@ const GIT_PANEL = {
     bd: {
         refs: { local: [], remote: [] },
         base: "", head: "",
+        // subfolder filter: "" = whole repo, else repo-relative folder
+        dir: "", dirs: [],
         files: [], ahead: 0, behind: 0, loading: false, error: "",
         openPath: "", lines: [], rows: [], diffLoading: false,
     },
@@ -726,8 +728,34 @@ const GIT_PANEL = {
             }
         }
 
+        // folder list follows the head ref: fire-and-forget alongside files
+        this.loadBranchDirs();
         Alpine.store("ui").openModal("git_branch_diff");
         if (this.bd.base && this.bd.head && this.bd.base !== this.bd.head) this.loadBranchFiles();
+    },
+
+    // folders present in the head commit, for the subfolder filter. a
+    // selection that no longer exists in the new head falls back to the
+    // whole repo.
+    async loadBranchDirs() {
+        if (!this.bd.head) {
+            this.bd.dirs = [];
+            return;
+        }
+        try {
+            const params = `sandbox=${encodeURIComponent(this.sandbox)}&subpath=${encodeURIComponent(this.subpath)}` +
+                `&ref=${encodeURIComponent(this.bd.head)}`;
+            const d = await simpleApiFetch("/api/ext/coder/git_dirs?" + params);
+            this.bd.dirs = d.dirs || [];
+        } catch (e) {
+            this.bd.dirs = [];
+        }
+        if (this.bd.dir && !this.bd.dirs.includes(this.bd.dir)) this.bd.dir = "";
+    },
+
+    onHeadChange() {
+        this.loadBranchDirs();
+        this.loadBranchFiles();
     },
 
     async loadBranchFiles() {
@@ -742,8 +770,9 @@ const GIT_PANEL = {
 
         this.bd.loading = true;
         try {
-            const params = `sandbox=${encodeURIComponent(this.sandbox)}&subpath=${encodeURIComponent(this.subpath)}` +
+            let params = `sandbox=${encodeURIComponent(this.sandbox)}&subpath=${encodeURIComponent(this.subpath)}` +
                 `&base=${encodeURIComponent(this.bd.base)}&head=${encodeURIComponent(this.bd.head)}`;
+            if (this.bd.dir) params += `&dir=${encodeURIComponent(this.bd.dir)}`;
             const d = await simpleApiFetch("/api/ext/coder/git_branch_files?" + params);
             this.bd.files = d.files || [];
             this.bd.ahead = d.ahead || 0;

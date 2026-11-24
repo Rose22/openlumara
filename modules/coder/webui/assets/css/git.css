@@ -1070,6 +1070,11 @@
     color: var(--text-secondary, #999);
 }
 
+/* folder paths run longer than branch names: give the filter more room */
+.gbd-dir {
+    flex: 1.5 1 0;
+}
+
 /* .coder-select styling lives scoped to .git-panel: replicate for the modal */
 .git-branch-diff-modal .coder-select {
     width: 100%;

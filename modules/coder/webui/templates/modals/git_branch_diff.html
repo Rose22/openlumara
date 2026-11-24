@@ -38,7 +38,7 @@
                 </button>
                 <div class="gbd-picker">
                     <label for="gbd-head">head</label>
-                    <select id="gbd-head" class="coder-select" aria-label="Head branch" x-model="$store.gitPanel.bd.head" @change="$store.gitPanel.loadBranchFiles()">
+                    <select id="gbd-head" class="coder-select" aria-label="Head branch" x-model="$store.gitPanel.bd.head" @change="$store.gitPanel.onHeadChange()">
                         <optgroup label="local">
                             <template x-for="r in $store.gitPanel.bd.refs.local" :key="'lh' + r">
                                 <option :value="r" x-text="r"></option>
@@ -51,6 +51,16 @@
                         </optgroup>
                     </select>
                 </div>
+                {# subfolder filter: folders straight from the head commit's tree #}
+                <div class="gbd-picker gbd-dir">
+                    <label for="gbd-dir">within</label>
+                    <select id="gbd-dir" class="coder-select" aria-label="Subfolder filter" x-model="$store.gitPanel.bd.dir" @change="$store.gitPanel.loadBranchFiles()">
+                        <option value="">(whole repo)</option>
+                        <template x-for="d in $store.gitPanel.bd.dirs" :key="d">
+                            <option :value="d" x-text="d"></option>
+                        </template>
+                    </select>
+                </div>
             </div>
 
             <div class="gbd-summary" x-show="!$store.gitPanel.bd.loading && $store.gitPanel.bd.base !== $store.gitPanel.bd.head">
@@ -59,11 +69,15 @@
                 <span><span class="num" x-text="$store.gitPanel.bd.behind"></span> the other way</span>
                 <span class="gbd-dot">&middot;</span>
                 <span><span class="num" x-text="$store.gitPanel.bd.files.length"></span> files differ</span>
+                <span class="gbd-dot" x-show="$store.gitPanel.bd.dir">&middot;</span>
+                <span x-show="$store.gitPanel.bd.dir">within <b x-text="$store.gitPanel.bd.dir"></b></span>
             </div>
 
             <div class="gbd-empty" x-show="$store.gitPanel.bd.loading">loading diff..</div>
             <div class="gbd-empty" x-show="!$store.gitPanel.bd.loading && $store.gitPanel.bd.base === $store.gitPanel.bd.head">pick two different refs to compare</div>
-            <div class="gbd-empty" x-show="!$store.gitPanel.bd.loading && !$store.gitPanel.bd.files.length && $store.gitPanel.bd.base !== $store.gitPanel.bd.head && !$store.gitPanel.bd.error">no file differences</div>
+            <div class="gbd-empty" x-show="!$store.gitPanel.bd.loading && !$store.gitPanel.bd.files.length && $store.gitPanel.bd.base !== $store.gitPanel.bd.head && !$store.gitPanel.bd.error">
+                <span x-text="$store.gitPanel.bd.dir ? 'no differences within ' + $store.gitPanel.bd.dir : 'no file differences'"></span>
+            </div>
 
             <template x-for="f in $store.gitPanel.bd.files" :key="f.path">
                 <div class="gbd-file">

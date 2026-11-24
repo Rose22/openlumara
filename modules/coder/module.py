@@ -2263,12 +2263,17 @@ class Coder(core.module.Module):
         subpath = (query or {}).get("subpath", "")
         base_ref = (query or {}).get("base", "")
         head_ref = (query or {}).get("head", "")
+        # optional repo-relative subfolder filter: the diff only covers
+        # that subtree. validated + absolute, never trusted as given.
+        dir_filter = (query or {}).get("dir", "").strip().strip("/")
 
         if not sandbox or not base_ref or not head_ref:
             return self.result("sandbox, base and head are all required", success=False)
 
         try:
             root = await self._git_root(sandbox, subpath)
+            if dir_filter:
+                self._check_git_paths(root, [dir_filter])
         except Exception as e:
             return self.result(str(e), success=False)
 
@@ -2279,7 +2284,8 @@ class Coder(core.module.Module):
         if not head_sha:
             return self.result(err, success=False)
 
-        rc, raw = await self._run_git_bytes(root, "diff", "--numstat", "--no-renames", base_sha, head_sha)
+        spec = ["--", os.path.normpath(os.path.join(root, dir_filter))] if dir_filter else []
+        rc, raw = await self._run_git_bytes(root, "diff", "--numstat", "--no-renames", base_sha, head_sha, *spec)
         if rc != 0:
             return self.result(raw.decode("utf-8", "replace").strip() or "git diff failed", success=False)
 
@@ -2332,6 +2338,41 @@ class Coder(core.module.Module):
 
         text = raw.decode("utf-8", "replace")
         return {"diff": text if text.strip() else "(no changes)", "rows": self._parse_split_diff(text)}
+
+    @webui.route("git_dirs")
+    async def _route_git_dirs(self, body=None, query=None):
+        """every folder that exists in a ref, for the compare modal's
+        subfolder filter. read from the commit tree itself, not the working
+        tree, so the choices match whatever ref is being compared."""
+        sandbox = (query or {}).get("sandbox", "")
+        subpath = (query or {}).get("subpath", "")
+        ref = (query or {}).get("ref", "")
+
+        if not sandbox or not ref:
+            return self.result("sandbox and ref are both required", success=False)
+
+        try:
+            root = await self._git_root(sandbox, subpath)
+        except Exception as e:
+            return self.result(str(e), success=False)
+
+        sha, err = await self._resolve_git_ref(root, ref)
+        if not sha:
+            return self.result(err, success=False)
+
+        # -r recurses, -d keeps it to the tree entries themselves
+        rc, raw = await self._run_git_bytes(root, "ls-tree", "-r", "-d", "--name-only", sha)
+        if rc != 0:
+            return self.result(raw.decode("utf-8", "replace").strip() or "git ls-tree failed", success=False)
+
+        dirs = []
+        for line in raw.decode("utf-8", "replace").splitlines():
+            d = line.strip().rstrip("/")
+            if d:
+                dirs.append(d)
+                if len(dirs) >= 2000:
+                    break
+        return {"dirs": dirs}
 
 
     @webui.route("git_push", method="POST", admin_only=True)
