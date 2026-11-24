@@ -22,6 +22,9 @@ class Modules(core.module.Module):
             self.disabled_tools.append("toggle")
 
     async def on_system_prompt(self):
+        if not self.config.get("insert_system_prompt"):
+            return None
+
         if core.config.get("model", "dynamic_tool_loading"):
             # if dynamic tool loading is on, the list of enabled modules gets sent in the tool prompt
             # so don't send a duplicate in the system prompt
