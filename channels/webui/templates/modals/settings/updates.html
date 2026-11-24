@@ -6,10 +6,16 @@
             <span x-text="$store.system.update.error"></span>
         </div>
 
-        <!-- first check still in flight -->
         <div class="update-message info" x-show="!$store.system.update.status && $store.system.update.checking">
             <span>Checking for updates..</span>
         </div>
+
+        <button type="button" class="update-btn"
+                x-show="!$store.system.update.status && !$store.system.update.checking"
+                x-cloak
+                @click="$store.system.checkForUpdates()">
+            <span>Check now</span>
+        </button>
 
         <template x-if="$store.system.update.status">
             <div class="update-card">
@@ -67,6 +73,13 @@
                 </div>
             </div>
         </template>
+
+        <div class="toggle-row update-auto-row">
+            <label for="auto-update-check">Check for updates automatically</label>
+            <button id="auto-update-check" class="toggle" type="button"
+                    :class="{ active: autoUpdateCheck }"
+                    @click="handleAutoUpdateCheckToggle()"></button>
+        </div>
 
         <template x-for="group in [
                 { label: 'Modules', items: $store.system.update.entries.filter(e => e.type === 'module') },

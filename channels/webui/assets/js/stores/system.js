@@ -25,6 +25,10 @@ SYSTEM_STORE = {
         },
     },
 
+    autoCheckEnabled() {
+        return localStorage.getItem('autoUpdateCheck') !== 'false';
+    },
+
     async checkForUpdates() {
         if (this.update.checking || this.update.updating) return;
         this.update.checking = true;

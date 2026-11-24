@@ -106,6 +106,7 @@ function settingsModal() {
         // 'Step display mode' dropdown: default | thinking | steps.
         stepDisplayMode: localStorage.getItem('stepDisplayMode') || 'default',
         tokenFadeMs: localStorage.getItem('tokenFadeMs') || '750',
+        autoUpdateCheck: localStorage.getItem('autoUpdateCheck') !== 'false',
 
         get activeNavCategory() {
             return this.activeModule ? 'modules' : 
@@ -141,9 +142,7 @@ function settingsModal() {
             if (!window.ADMIN_SETTINGS_DISABLED) {
                 await Alpine.store('settings').load();
 
-                // fire off the git update check in the background so the
-                // Updates page shows fresh remote status without a click
-                Alpine.store('system').checkForUpdates();
+                if (this.autoUpdateCheck) Alpine.store('system').checkForUpdates();
             }
         },
 
@@ -397,6 +396,13 @@ function settingsModal() {
         handleStepDisplayModeChange(mode) {
             this.stepDisplayMode = mode;
             localStorage.setItem('stepDisplayMode', mode);
+        },
+
+        handleAutoUpdateCheckToggle() {
+            this.autoUpdateCheck = !this.autoUpdateCheck;
+            localStorage.setItem('autoUpdateCheck', this.autoUpdateCheck);
+
+            if (this.autoUpdateCheck) Alpine.store('system').checkForUpdates();
         },
 
         handleTokenFadeSpeed(ms) {

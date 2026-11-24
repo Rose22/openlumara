@@ -131,7 +131,7 @@ document.addEventListener('alpine:init', async () => {
     // background update check so the settings gear can badge before the
     // modal is ever opened; delayed so it never competes with page load
     // (each repo check does its own git fetch)
-    if (!window.ADMIN_SETTINGS_DISABLED) {
+    if (!window.ADMIN_SETTINGS_DISABLED && SYSTEM_STORE.autoCheckEnabled()) {
         setTimeout(() => Alpine.store('system').checkForUpdates(), 4000);
     }
 

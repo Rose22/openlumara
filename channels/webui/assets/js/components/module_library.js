@@ -53,7 +53,7 @@ function repoManager(kind) {
 
             // the remote check hits the network for every installed repo,
             // so it runs after the cards are up and never delays them
-            if (this.kind === 'module' || this.kind === 'channel') {
+            if ((this.kind === 'module' || this.kind === 'channel') && Alpine.store('system').autoCheckEnabled()) {
                 this.checkUpdates();
             }
         },
