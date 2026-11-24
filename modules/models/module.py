@@ -36,8 +36,6 @@ class Models(core.module.Module):
             current_model = self.manager.API.get_model()
             output += f"Current model: {current_model}"
 
-        current_model = self.manager.API.get_model()
-        
         if self.config.get("insert_available_models_into_system_prompt"):
             if not self.models:
                 try:
@@ -51,11 +49,8 @@ class Models(core.module.Module):
             if len(self.models) > 1:
                 output += f"\n\nModels you can switch to using the models_switch() toolcall: "
                 output += ", ".join(self.models)
-        else:
-            self.header = "current model"
-            output = current_model
 
-        return output
+        return output or None
 
     async def _load_models(self):
         if not self.models:
