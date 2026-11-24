@@ -32,7 +32,6 @@ SETTINGS_STORE = {
     },
 
     get sortedCategories() {
-        // system_updates renders as a fixed button above Restart Server instead
         return Object.entries(this.categories)
             .filter(([cat]) => cat !== 'system_updates')
             .sort(([a, catA], [b, catB]) => (catA.order || 0) - (catB.order || 0));

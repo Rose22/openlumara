@@ -6,8 +6,6 @@ let serverShutdownSeen = false;
 let wsClosedAt = null;
 
 let wsHeartbeatTimer = null;
-// -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
-// tracked reconnect timer so only one retry chain can ever be in flight
 let wsReconnectTimer = null;
 window.wsLastRx = Date.now();
 
@@ -20,9 +18,6 @@ let streamFinalizing = false;
 
 
 async function connectWebSocket() {
-    // -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
-    // a fresh attempt is starting: clear the in-flight flag so this socket's
-    // own close/error events get processed normally
     wsReconnecting = false;
 
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -120,9 +115,6 @@ async function connectWebSocket() {
 }
 
 async function scheduleWsReconnect() {
-    // -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
-    // dedupe on the timer: without this, overlapping close/error paths could
-    // fork parallel reconnect chains that each pile on sockets and reloads
     if (wsReconnectTimer !== null) return;
 
     wsReconnecting = true;
@@ -191,7 +183,6 @@ async function handleWebSocketMessage(data) {
             stream.userMsg = data.message;
 
             // reload chat from backend so that the new user message shows up
-            // (queued: collapses with the reload that follows stream end)
             await chat.queueReloadChat();
 
             // force scroll to bottom
@@ -203,18 +194,12 @@ async function handleWebSocketMessage(data) {
 
         case "turn_step":
         case "turn_final": {
-            // step-based stream. stream.turn is an object once a turn is
-            // in flight, so `.length` can never answer "do I own one?" -
-            // and a reconnect replay used to answer it wrong, creating a
-            // second live turn beside the one already in the window
             const isLive = (t) => t && t.live === true;
 
             if (!isLive(stream.turn)) {
                 const last = chat.turnHistory[chat.turnHistory.length - 1];
 
                 if (isLive(last) && (last.steps ?? []).length > 0) {
-                    // a live turn already on screen (mid-stream reload or
-                    // replay after refresh): adopt it instead of cloning it
                     stream.turn = last;
                 }
                 else {
@@ -229,7 +214,6 @@ async function handleWebSocketMessage(data) {
                 }
             }
             else if (!chat.turnHistory.includes(stream.turn)) {
-                // we own a live turn a chat reload dropped off the window
                 chat.turnHistory.push(stream.turn);
             }
 
@@ -511,9 +495,6 @@ async function handleWebSocketMessage(data) {
              * this prevents UI flicker that comes from re-rendering the entire turn history
              */
 
-            // -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
-            // the turn we just assembled locally is the server's final
-            // state for this revision; keep the tracker honest
             if (typeof data.revision === 'number') chat.serverRevision = data.revision;
 
             streamFinalizing = true;
@@ -522,14 +503,8 @@ async function handleWebSocketMessage(data) {
             if (foldEl && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
                 const foldMsgs = document.getElementById('messages');
                 foldEl.style.overflow = 'hidden';
-                // the bubble-level height ratchet (x-height-ratchet) would floor
-                // this fold at its pinned peak - this IS the intended final
-                // collapse, so release the pin up front
                 const foldBubble = foldEl.closest('.message.assistant');
                 if (foldBubble) { foldBubble.style.minHeight = ''; }
-                // the height ratchet (x-height-ratchet) would floor this fold at
-                // its pinned peak - this IS the intended final collapse, so
-                // release the pin up front
                 foldEl.style.minHeight = '';
                 const fold = foldEl.animate(
                     [{ height: foldEl.offsetHeight + 'px' }, { height: '0px' }],

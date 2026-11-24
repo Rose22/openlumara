@@ -25,9 +25,6 @@ const AudioManager = {
     tokenFreq: null,
 
     isSoundEnabled: function(id) {
-        // the audio store owns the enabled-flags (loaded from localStorage at
-        // boot, live-updated by the settings UI); this fallback only answers
-        // before Alpine registers the store
         const store = typeof Alpine !== 'undefined' ? Alpine.store('audio') : null;
         if (store && store.sounds) return Boolean(store.sounds[`${id}SoundEnabled`]);
         return this.SOUND_DEFAULTS[id] !== false;
@@ -91,8 +88,6 @@ const AudioManager = {
     // Initialize IndexedDB and AudioContext
     init: function() {
         return new Promise((resolve, reject) => {
-            // Load volume from storage (skip once the audio store has pushed
-            // a fresher value in, so a boot-time race can't clobber it)
             if (localStorage.getItem('sfxVolume') !== null) {
                 this.volume = parseFloat(localStorage.getItem('sfxVolume'));
             }
@@ -109,7 +104,6 @@ const AudioManager = {
             request.onsuccess = async (event) => {
                 this.db = event.target.result;
 
-                // 2. Pre-load uploaded sounds into memory buffers
                 await this.loadFromStorage();
                 resolve();
             };
@@ -123,7 +117,6 @@ const AudioManager = {
         });
     },
 
-    // Decode a base64 data URL into a raw ArrayBuffer
     dataUrlToArrayBuffer: function(dataUrl) {
         const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
         const byteString = atob(base64);
@@ -135,9 +128,6 @@ const AudioManager = {
         return ab;
     },
 
-    // Load uploaded sound buffers into memory: IndexedDB first (uploads
-    // live there, quota-safe), falling back to old localStorage data-URL
-    // entries and migrating those into the DB
     loadFromStorage: async function() {
         const ids = ['send_message', 'response_start', 'processing', 'typewriter',
                      'typing', 'token', 'completion', 'reasoning_end'];
@@ -170,8 +160,6 @@ const AudioManager = {
             });
         };
 
-        // migrate uploads stored as data URLs by older builds (these could
-        // silently fail the localStorage quota; the DB cannot)
         const migrateFromLocalStorage = async (id) => {
             let stored = null;
             try { stored = localStorage.getItem(`${id}SoundData`); } catch (e) {}
@@ -206,8 +194,6 @@ const AudioManager = {
         return this.audioContext;
     },
 
-    // Sound-state setters: persistence belongs to the audio store (the sole
-    // localStorage writer), these only update the live audio state
     // Set volume (0.0 to 1.0)
     setVolume: function(vol) {
         this.volume = vol;
@@ -224,8 +210,6 @@ const AudioManager = {
         this.tokenFreq = freq;
     },
 
-    // Save an uploaded sound file to IndexedDB (and remember its name in
-    // localStorage so the settings UI can show it after a reload)
     saveFile: async function(id, file) {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -268,9 +252,6 @@ const AudioManager = {
         }
     },
 
-    // Load and cache audio from a Data URL (base64), persisting it to the DB.
-    // Kept as a compatibility door for modules; the settings UI uploads
-    // straight through saveFile instead.
     loadFromDataURL: async function(id, dataUrl) {
         const ab = this.dataUrlToArrayBuffer(dataUrl);
         this.buffers[id] = await this.getAudioContext().decodeAudioData(ab);
@@ -284,8 +265,6 @@ const AudioManager = {
         return true;
     },
 
-    // Settings-page audition of a built-in sound: ignores the enabled flags
-    // and plays a short reference tone
     previewSynth: function(id) {
         const ctx = this.getAudioContext();
         const t = ctx.currentTime;
@@ -554,8 +533,6 @@ const AudioManager = {
                 const source = ctx.createBufferSource();
                 source.buffer = buffer;
 
-                // the token sound keeps its own volume setting even when
-                // it is a custom file, so route it through a scaled gain
                 let gain = null;
                 if (id === 'token') {
                     this.resumeContext();
@@ -564,8 +541,6 @@ const AudioManager = {
                     gain.connect(this.masterGainNode);
                     source.connect(gain);
                 } else {
-                    // plain sounds connect straight to the cached master
-                    // gain node, avoiding a new GainNode per keystroke
                     source.connect(this.masterGainNode);
                 }
 

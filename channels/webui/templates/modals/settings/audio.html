@@ -6,7 +6,6 @@
 
         <h4>Levels</h4>
 
-        <!-- Master Volume -->
         <div class="audio-level setting-item">
             <div class="audio-slider-head">
                 <div class="audio-head-left">
@@ -82,7 +81,6 @@
                 <span class="audio-sound-name" x-text="$store.audio.soundLabel(soundId)"></span>
 
                 <div class="audio-sound-actions">
-                    <!-- hidden native input; the styled button drives it -->
                     <input type="file" accept="audio/*" x-ref="fileInput" x-show="false" x-cloak aria-hidden="true"
                            @change="$store.audio.handleSoundUpload($event, soundId)">
 

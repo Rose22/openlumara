@@ -97,11 +97,7 @@ function settingsModal() {
         tokenFadeEnabled: localStorage.getItem('tokenFadeEnabled') !== 'false',
         // start the live processing chain collapsed (localStorage; default off)
         collapseChainDefault: localStorage.getItem('collapseChainDefault') === 'true',
-        // keep the last user prompt pinned to the top while its response is
-        // in view (localStorage; default on)
         pinnedPromptsEnabled: localStorage.getItem('pinnedPromptsEnabled') !== 'false',
-        // blur + translucent tint on the pinned prompt and floating input bar
-        // (localStorage; default on)
         frostedGlassEnabled: localStorage.getItem('frostedGlassEnabled') !== 'false',
         // 'Step display mode' dropdown: default | thinking | steps.
         stepDisplayMode: localStorage.getItem('stepDisplayMode') || 'default',
@@ -118,8 +114,6 @@ function settingsModal() {
             this.themeFamily = Alpine.store('theme').family;
             this.themeMode = Alpine.store('theme').mode;
 
-            // the command palette (or anything else) can aim the modal at a
-            // specific page through the ui store before opening it
             const aimed = Alpine.store('ui').settingsCategory;
             this.activeCategory = (aimed && Alpine.store('settings').categories?.[aimed])
                 ? aimed

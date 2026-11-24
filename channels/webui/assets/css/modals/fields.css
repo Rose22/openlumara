@@ -59,7 +59,6 @@
         }
     }
 
-    /* --- Secret (password-masked) inputs --- */
     .secret-input-wrap {
         position: relative;
         width: 100%;
@@ -146,10 +145,6 @@
         }
     }
 
-    /* --- Range Sliders ---
-       filled portion of the track uses the --fill custom property
-       (a percentage), set inline by the templates; Firefox fills
-       natively via ::-moz-range-progress instead. */
     input[type="range"] {
         --thumb-size: 18px;
         height: 6px;
@@ -194,8 +189,6 @@
                         0 0 10px var(--accent-glow);
         }
 
-        /* Firefox: the pseudo-track paints over the input's
-           gradient background, so give it its own fill there */
         &::-moz-range-track {
             height: 6px;
             background: var(--border-color);

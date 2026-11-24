@@ -1,6 +1,4 @@
-/* Audio settings page (modals/settings/audio.html) */
 
-/* --- level sliders (flat, like the appearance page) --- */
 .audio-level {
     margin-bottom: 20px;
 }
@@ -40,12 +38,10 @@
     white-space: nowrap;
 }
 
-/* audio sliders inherit the shared range styles (incl. the --fill track) from fields.css */
 .audio-slider {
     width: 100%;
 }
 
-/* ghost icon buttons (mute / play / upload / clear) */
 .audio-icon-btn {
     display: inline-flex;
     align-items: center;
@@ -90,7 +86,6 @@
     color: var(--accent);
 }
 
-/* --- sound effect rows (outlined only: name + actions + toggle) --- */
 .audio-sound-card {
     display: flex;
     align-items: center;
@@ -124,7 +119,6 @@
     margin-left: 6px;
 }
 
-/* reset action sitting in the Sound Effects header */
 .audio-reset-btn {
     width: auto;
     gap: 6px;

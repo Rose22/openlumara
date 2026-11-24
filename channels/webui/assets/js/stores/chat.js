@@ -16,9 +16,6 @@ function mergeTurnPage(existing, existingStart, incoming, incomingStart) {
 
     const result = keptPrefix.concat(merged);
 
-    // exactly one live turn may exist, always as the tail: a mid-stream
-    // reload used to leave a stale copy behind (often at the head of the
-    // window), rendering a duplicate agent chain inside an older message
     const liveTails = existing.filter(t => t && t.live === true);
     const live = liveTails.length > 0 ? liveTails[liveTails.length - 1] : null;
 
@@ -56,12 +53,8 @@ CHAT_STORE = {
     dayGroups: [],
     chatLimit: 10,
 
-    // -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
-    // history revision counter as the backend reported it on the last load;
-    // stream_complete carries it too, so clients know when they're in sync
     serverRevision: null,
 
-    // reload burst control: one fetch in flight, at most one queued behind
     _reloadInFlight: false,
     _reloadQueued: false,
     dayFetchGen: 0,
@@ -88,43 +81,16 @@ CHAT_STORE = {
     editingMessageIndex: null,
     editContent: '',
 
-    /*
-     * the user turn currently pinned to the top of the message view.
-     * updated from the flow markers in chat/index.html via x-prompt-marker:
-     * a turn pins itself once it scrolls out through the top edge, and
-     * unpins the moment it scrolls back into view. switching is event-driven
-     * (fires only on intersection changes), never per-frame.
-     */
     pinnedTurnIndex: null,
     pinnedPromptHeight: 0,
 
-    // a turn that just unpinned keeps its height reserve for the duration of
-    // the grow animation, so removing it can't make the turn snap to one
-    // line and then grow back (a collapse-then-grow jolt).
     releasingTurnIndex: null,
     _releaseTimer: null,
 
-    /*
-     * is any user turn currently overlapping the messages viewport? measured
-     * via the pin markers, which always track the turn's true flow position:
-     * a pinned turn is sticky, so its own bounding rect always reports it as
-     * visible. the turn keeps its full flow height while pinned (the min-height
-     * reserve), so marker top + turn offsetHeight is its true flow bottom.
-     */
-    // the strip of the scrollbox hidden behind the floating chat header
-    // (window.css runs #messages under it; --header-height fed by init.js)
     headerInset(container) {
         return parseFloat(getComputedStyle(container).getPropertyValue('--header-height')) || 0;
     },
 
-    /*
-     * -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
-     * cached flow positions of the pin markers: turn index ->
-     * {flowTop, height}. markers only exist on user turns. measured once
-     * per window (and after invalidating events), so the throttled scroll
-     * path resolves the pin with pure arithmetic instead of a forced
-     * layout read per marker.
-     */
     _markerPos: new Map(),
 
     invalidateMarkerPositions() {
@@ -173,10 +139,6 @@ CHAT_STORE = {
 
     updatePromptPin(turnIndex, intersecting, marker) {
         if (intersecting) {
-            // -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
-            // refreshing this marker's cached position as it enters view
-            // keeps the cache self-healing after layout shifts that never
-            // fire a window resize (sidebar toggle, pane resizes)
             const cached = this._markerPos.get(turnIndex);
             if (cached) {
                 const scroller = document.getElementById('messages');
@@ -198,29 +160,15 @@ CHAT_STORE = {
 
         if (!this.pinnedPromptsEnabled()) return;
 
-        // leaving, but which way? only pin prompts that left through the
-        // TOP edge - a marker leaving through the bottom means we scrolled
-        // up to older messages, where pinning would be wrong.
         const container = document.getElementById('messages');
         if (!container) return;
 
-        // the visible top edge is the header's bottom, not the scrollport's
-        // (cached marker flow position - see _ensureMarkerPos)
         const entry = this._ensureMarkerPos(container).get(turnIndex);
         const markerFlowTop = entry ? entry.flowTop : marker.getBoundingClientRect().top + container.scrollTop;
         if (markerFlowTop - container.scrollTop > container.getBoundingClientRect().top + this.headerInset(container)) return;
 
-        // the pin only exists to keep context visible while the chat window
-        // shows no user prompt of its own
         if (this.userPromptInView(container)) return;
 
-        /*
-         * a prompt can only take the pin if it's NEWER than the current one.
-         * every marker reports its initial intersection on its own schedule
-         * (on load, and again when older pages get prepended), so "last
-         * callback wins" would let an older prompt steal the pin - turn
-         * index is what decides, not callback order.
-         */
         if (this.pinnedTurnIndex !== null && turnIndex <= this.pinnedTurnIndex) return;
 
         const turnEl = container.querySelector(`[data-turn-index="${turnIndex}"]`);
@@ -229,8 +177,6 @@ CHAT_STORE = {
         const wrapper = turnEl.querySelector(':scope > .message-wrapper.user');
         if (!wrapper) return;
 
-        // reserve the full height BEFORE the class is applied so collapsing
-        // the bubble to a single line doesn't yank the response upward
         this.pinnedPromptHeight = wrapper.offsetHeight;
         this.pinnedTurnIndex = turnIndex;
     },
@@ -239,7 +185,6 @@ CHAT_STORE = {
         return localStorage.getItem('pinnedPromptsEnabled') !== 'false';
     },
 
-    // grow the pinned prompt back open, then drop the pin entirely
     clearPromptPin() {
         if (this.pinnedTurnIndex === null) return;
 
@@ -253,11 +198,6 @@ CHAT_STORE = {
         }, 350);
     },
 
-    /*
-     * throttled entry point from ui.onScroll (itself throttled at 100ms),
-     * coalesced into one frame. pure measurement, so it stays correct even
-     * when no marker ever reported the position change.
-     */
     schedulePromptPinRecompute() {
         if (this._pinRecomputeQueued) return;
 
@@ -268,38 +208,20 @@ CHAT_STORE = {
         });
     },
 
-    /*
-     * resolves the pin by measuring every marker at once: the pin belongs to
-     * the NEWEST user turn that sits above the top edge. needed because
-     * IntersectionObserver only reports state CHANGES: on load the chat is
-     * rendered at the top and then jumped to the bottom, during which only
-     * markers near the top fire (pinning an older prompt), while markers
-     * that were below the fold and are now above it never report anything.
-     * called after anchored loads (see anchorToBottom), not per-frame.
-     */
     recomputePromptPin() {
         const container = document.getElementById('messages');
         if (!container) return;
 
-        // the pin only shows while no user prompt is in view at all; once
-        // any real prompt is on screen the sticky duplicate is redundant
         if (!this.pinnedPromptsEnabled() || this.userPromptInView(container)) {
             this.clearPromptPin();
             return;
         }
 
-        // pin boundary is the header's bottom edge (the scrollport's top
-        // hides behind the floating header - see headerInset), expressed in
-        // flow coordinates to match the cached marker positions
         const boundary = container.scrollTop + container.getBoundingClientRect().top + this.headerInset(container);
 
         let activeIndex = null;
         let activeWrapper = null;
 
-        // -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
-        // pure arithmetic over the cached marker positions: the pin belongs
-        // to the NEWEST user turn whose flow position sits above the top
-        // edge (deciding by turn index, not map insertion order)
         for (const [idx, pos] of this._ensureMarkerPos(container)) {
             if (pos.flowTop > boundary) continue;
 
@@ -406,7 +328,6 @@ CHAT_STORE = {
     },
 
     resetWindow() {
-        // -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
         this.invalidateMarkerPositions();
 
         this.turnHistory = [];
@@ -428,8 +349,6 @@ CHAT_STORE = {
     },
 
     applyTurnPage(result, merge) {
-        // -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
-        // the window (re)rendered: cached marker flow positions are stale
         this.invalidateMarkerPositions();
 
         const incoming = result.turn_history ?? [];
@@ -467,11 +386,6 @@ CHAT_STORE = {
                 return;
             }
 
-            // pure prepend: native scroll anchoring keeps the viewport exactly
-            // where it is while older content appears above it. this requires
-            // #messages to NOT set overflow-anchor: none (see chat/window.css);
-            // any manual scrollTop correction layered on top would double-move
-            // and reintroduce the jump.
             this.turnHistory = turns.concat(this.turnHistory);
             this.turnStart = result.start;
             this.totalTurns = result.total;
@@ -552,8 +466,6 @@ CHAT_STORE = {
         const turnEls = [...messages.querySelectorAll('#messages > .turn-block .turn')];
         if (turnEls.length < 2) return;
 
-        // keep a cushion above the viewport top so unloading never drags
-        // the older-turns loader back into its prefetch margin
         const keepAbove = Math.max(this.olderTriggerPx * 2 + 200, 600);
         const cutLine = messages.getBoundingClientRect().top - keepAbove;
 
@@ -562,9 +474,6 @@ CHAT_STORE = {
             maxDrop = Math.min(maxDrop, this.turnHistory.length - 1);
         }
 
-        // never unload past the newest user turn: it owns the response that
-        // may be filling the viewport below it, and the pinned-prompt feature
-        // needs its marker in the DOM long after it scrolled out the top
         let lastUser = -1;
         for (let i = this.turnHistory.length - 1; i >= 0; i--) {
             if (this.turnHistory[i]?.role === 'user') { lastUser = i; break; }
@@ -583,14 +492,7 @@ CHAT_STORE = {
 
             if (turnEl.getBoundingClientRect().bottom >= cutLine) break;
 
-            // pin handover: a user turn must stay loaded until the next newer
-            // user turn's flow position has crossed the viewport top (its
-            // marker tracks the true position even while that turn is pinned
-            // sticky). dropping it earlier leaves the response region above
-            // with no prompt left to pin.
             if (turnEl.querySelector(':scope > .message-wrapper.user')) {
-                // forward scan for the next user turn (no array copy per
-                // candidate, unlike the old slice().find())
                 let nextMarker = null;
                 for (let u = t + 1; u < turnEls.length; u++) {
                     if (turnEls[u].querySelector(':scope > .message-wrapper.user')) {
@@ -609,8 +511,6 @@ CHAT_STORE = {
         this._dropPrefixTurns(drop);
         this._lastUnloadAt = performance.now();
 
-        // no scrollTop compensation needed: native scroll anchoring holds
-        // the visual position while the prefix elements disappear
         Alpine.nextTick(() => {
             Alpine.store('ui')._updateShouldScroll(messages);
         });
@@ -619,8 +519,6 @@ CHAT_STORE = {
     _dropPrefixTurns(drop) {
         if (drop <= 0) return;
 
-        // -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
-        // dropping the prefix shifts every remaining flow position
         this.invalidateMarkerPositions();
 
         if (this.pinnedTurnIndex !== null && this.pinnedTurnIndex - this.turnStart < drop) {
@@ -664,7 +562,6 @@ CHAT_STORE = {
         this.applyTurnPage(result, true);
         this.currentTokenUsage = result.token_usage;
 
-        // initial load: the tag list has never been fetched
         await this.reloadChats(true);
 
         // ensure the chat exists in the visible sidebar list before scrolling
@@ -692,10 +589,6 @@ CHAT_STORE = {
             await ui.forceScrollToBottom();
             await this.fillViewport();
 
-            // markers that started below the fold never report their jump to
-            // above the top edge (IO only fires on state changes, and their
-            // state stayed 'not intersecting'), so resolve the pin by hand
-            // once the anchored scroll has landed
             requestAnimationFrame(() => this.recomputePromptPin());
         } finally {
             el.classList.remove('anchor-hidden');
@@ -918,12 +811,6 @@ CHAT_STORE = {
 
         const incoming = groupList ?? [];
 
-        // -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
-        // structural diff: when the same groups with the same counts come
-        // back (the common case: a message just landed in the open chat),
-        // keep the existing group objects instead of tearing the whole
-        // sidebar list down, and re-fetch only the groups that could have
-        // changed (the one holding the selected chat + today's group).
         const sameStructure = this.dayGroups.length > 0 &&
             this.dayGroups.length === incoming.length &&
             this.dayGroups.every((g, i) => g.key === incoming[i].key && g.count === incoming[i].count);
@@ -952,8 +839,6 @@ CHAT_STORE = {
             }));
         }
 
-        // only groups that were (re)set need a first page; untouched groups
-        // keep their loaded chats
         const needsFetch = g => !g.loaded && g.hasMore &&
             !this.isGroupCollapsed(g) && this.groupTab(g.key) === this.timeTab;
 
@@ -1046,12 +931,6 @@ CHAT_STORE = {
         this.searchLoading = false;
     },
 
-    /*
-     * -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
-     * refreshTags=true also reloads the (category-scoped) tag list. Only
-     * needed when chats/tags themselves changed; message-finished refreshes
-     * skip it, cutting the post-turn sidebar cost to the day fetches.
-     */
     async reloadChats(refreshTags = false) {
         if (refreshTags) { await this.loadTags(); }
         await this.reloadDayGroups();
@@ -1120,8 +999,6 @@ CHAT_STORE = {
     async renameChat(chat_id, newTitle) {
         await simpleApiPost(`/api/chat/rename/${chat_id}`, {title: newTitle});
 
-        // the header reads this.chat directly: keep it live so renaming the
-        // open chat updates instantly instead of going stale until next load
         if (chat_id === this.selectedChat) { this.chat.title = newTitle; }
 
         await this.reloadChats();
@@ -1196,12 +1073,6 @@ CHAT_STORE = {
         }
     },
 
-    /*
-     * -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
-     * coalesced reloadChat for the burst of triggers around a single turn
-     * (user message, stream end, queue flush): one fetch runs, everything
-     * arriving meanwhile collapses into exactly one follow-up fetch.
-     */
     async queueReloadChat() {
         if (this._reloadInFlight) {
             this._reloadQueued = true;
@@ -1244,8 +1115,6 @@ CHAT_STORE = {
 
         this.selectedCategory = category;
         // reloadChats() re-runs the sidebar search when active, so the
-        // results are already re-scoped to the new category after this.
-        // the tag list is category-scoped, so it needs a refresh here
         await this.reloadChats(true);
     },
 
@@ -1280,10 +1149,6 @@ CHAT_STORE = {
                     }))
                 );
             } catch (err) {
-                // -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
-                // a failed read must not hang or eat the draft: restore the
-                // input (attached files are still in the store) so the send
-                // can simply be retried
                 console.error('attachment read failed:', err);
                 this.user_input = text;
                 if (!wasSteering) {
@@ -1335,7 +1200,6 @@ CHAT_STORE = {
         ? msg.content.filter((b, i) => b?.type === 'text' && b.text && !filenames[i]).map(b => b.text).join('\n\n')
         : msg.content;
 
-      // resolves to whether the write to the clipboard succeeded
       return navigator.clipboard.writeText(text)
         .then(() => {
             return true;
@@ -1452,8 +1316,6 @@ CHAT_STORE = {
     /* ----------------------
      * chat-specific getters
      * ----------------------- */
-    // chat name for the header, hard-capped at 150 chars (CSS handles
-    // soft truncation when it still doesn't fit the viewport)
     headerTitle() {
         const title = this.chat?.title || '';
         return title.length > 150 ? `${title.slice(0, 150).trimEnd()}…` : title;
@@ -1508,9 +1370,6 @@ CHAT_STORE = {
     }
 };
 
-// -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
-// a resize reflows the whole document: cached marker flow positions die
-// with it and get re-measured lazily on the next pin check
 window.addEventListener('resize', () => {
-    try { Alpine.store('chat').invalidateMarkerPositions(); } catch (err) { /* pre-alpine: nothing cached */ }
+    try { Alpine.store('chat').invalidateMarkerPositions(); } catch (err) {  }
 });

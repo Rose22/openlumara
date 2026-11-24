@@ -38,9 +38,6 @@ function repoManager(kind) {
         audit: null,
         auditLineHeight: 19,
 
-        // per-entry git update status (name -> {update_available, behind,
-        // commit, remote_commit, note}); filled in the background by
-        // checkUpdates, never blocks the initial card render
         updateStatus: {},
         checkingUpdates: false,
 
@@ -51,8 +48,6 @@ function repoManager(kind) {
         async init() {
             await this.refresh();
 
-            // the remote check hits the network for every installed repo,
-            // so it runs after the cards are up and never delays them
             if ((this.kind === 'module' || this.kind === 'channel') && Alpine.store('system').autoCheckEnabled()) {
                 this.checkUpdates();
             }
@@ -148,12 +143,9 @@ function repoManager(kind) {
             return entry ? this.repoLabel(entry) : '';
         },
 
-        // ---- remote update detection (shares the Updates tab's endpoint) ----
         async checkUpdates(force = false) {
             if (this.checkingUpdates) return;
 
-            // opening Settings already runs this exact check: reuse its
-            // results when they are fresh instead of refetching every repo
             const sys = Alpine.store('system').update;
             if (!force && sys.checkedAt && Date.now() - sys.checkedAt < 60000) {
                 const byName = {};
@@ -173,7 +165,6 @@ function repoManager(kind) {
                 }
                 this.updateStatus = byName;
             } catch (err) {
-                // status badges are best-effort: the cards stay fully usable
             } finally {
                 this.checkingUpdates = false;
             }
@@ -375,7 +366,6 @@ function repoManager(kind) {
                 if (data.up_to_date) {
                     this.flash(data.message, 'success');
                     await this.refresh();
-                    // the status we hold may claim an update; re-check quietly
                     this.checkUpdates();
                 } else {
                     // new code came in: reboot straight away, nothing to acknowledge

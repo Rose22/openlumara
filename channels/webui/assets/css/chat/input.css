@@ -12,23 +12,15 @@
         padding: 0px 14px;
 
         .input-wrapper {
-            position: relative; /* anchor for the command autocomplete popup */
+            position: relative; 
             display: flex;
             align-items: stretch;
             width: var(--chat-content-width);
             border: 1px solid var(--border-color);
             border-radius: var(--radius-sm);
             margin-bottom: 9px;
-            /* floating mode gets a drop shadow (shared with the command
-               popup via --ac-shadow, defined in autocomplete.css).
-               the floating frosted background lives in frosted.css */
             box-shadow: var(--ac-shadow, 0 6px 20px rgba(0, 0, 0, 0.25));
 
-            /* while the command popup is open it rests on the input's top
-               border, so hide that edge (and square the top corners, so they
-               don't curve away from the popup's straight sides): one shared
-               line, no doubling. the popup wears the identical shadow from
-               here on, so the pair still reads as one shadowed shape. */
             &.ac-open {
                 border-top-color: transparent;
                 border-top-left-radius: 0;
@@ -51,9 +43,6 @@
 
             }
 
-            /* the popup now lives outside the wrapper (see index.html):
-               edge-to-edge here - overrides syncPos's inline -1px span.
-               no side borders (matching the input), square corners */
             #autocomplete-anchor .autocomplete-dropdown {
                 left: 0 !important;
                 width: 100% !important;
@@ -71,7 +60,6 @@
             }
         }
 
-        /* the floating wrapper's frost lives in frosted.css */
 
         #upload {
             padding: 0;

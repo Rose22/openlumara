@@ -74,12 +74,6 @@ class TailFadeTimeline {
     }
 }
 
-// -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
-// the LAST text nodes in document order - walked backwards from the
-// element's end and stopped once needChars are covered, so a streamed
-// paint pays for the fade window (a few hundred chars) instead of the
-// whole message. skipping rules match the old full-subtree walk:
-// code-block buttons and already-wrapped spans.
 function collectTailTextNodes(root, needChars) {
     const out = [];
     let collected = 0;
@@ -108,7 +102,6 @@ function collectTailTextNodes(root, needChars) {
     return out;
 }
 
-// total chars of the batches that still have to be wrapped
 function batchCharCount(batches) {
     let need = 0;
     for (const b of batches) need += b.count;

@@ -1,41 +1,13 @@
-/*
- * Command palette registry.
- *
- * Single source of truth for the actions the palette (js/components/command_palette.js)
- * can reach. Nothing about the command list is hardcoded into the palette UI:
- * the registry assembles it fresh every time the palette opens, from:
- *
- *   1. core commands    - defined below (guarded by runtime state, so they
- *                         disappear when the feature they drive is off)
- *   2. keyboard actions - every rebindable action in SHORTCUT_DEFS, using the
- *                         shared handlers from utils/keyboard_shortcuts.js
- *   3. settings         - one "Open <page>" command per settings category,
- *                         plus one per module/channel page
- *   4. sidebar tabs     - the chat-list tab plus every module-contributed panel
- *   5. DOM discovery    - any element marked with a `data-cmd` attribute
- *   6. modules          - window.openlumaraCommands.add({...}) from any webui
- *                         extension script
- *
- * A command: { id, label, run, group?, icon?, hint?, priority?, keyId? }
- * keyId links it to a keyboard-store action so its binding shows as a <kbd>.
- */
 
 const CMD_SOURCES = [];
 
-// commands registered at runtime by modules, keyed by id
 const CMD_EXTRA = {};
 
-/*
- * register a command from anywhere (modules use window.openlumaraCommands).
- * re-registering an id replaces the previous definition.
- */
 function registerCommand(cmd) {
     if (!cmd || !cmd.id || typeof cmd.run !== 'function' || !cmd.label) return;
     CMD_EXTRA[cmd.id] = cmd;
 }
 
-// the fuzzy matcher shared by the palette: null = no match.
-// substring hits beat subsequence hits, word-start hits beat mid-word ones.
 function cmdMatchScore(query, label) {
     if (!query) return 1;
 
@@ -48,7 +20,6 @@ function cmdMatchScore(query, label) {
         return 200 - idx + (wordStart ? 40 : 0) + (l.length - q.length < 8 ? 15 : 0);
     }
 
-    // subsequence walk: every query char must appear, in order
     let score = 50;
     let pos = -1;
     for (const ch of q) {
@@ -61,7 +32,6 @@ function cmdMatchScore(query, label) {
     return score > 0 ? score : null;
 }
 
-// -- 1. core commands ---------------------------------------------------------
 
 function coreCommands() {
     const S = () => Alpine.store('settings');
@@ -69,9 +39,6 @@ function coreCommands() {
     const C = () => Alpine.store('chat');
     const streamIdle = () => Alpine.store('stream').state === 'idle';
 
-    // opening a settings page: the modal is a component, so aim it through the
-    // ui store (openModal's optional category arg); this fallback drives the
-    // live component directly for whatever reason the store arg went unread
     const openSettings = async (cat) => {
         if (window.ADMIN_SETTINGS_DISABLED) { U().toast('Admin settings are disabled'); return; }
 
@@ -117,7 +84,6 @@ function coreCommands() {
             id: 'move_chat', label: 'Move current chat to category', group: 'Chat', icon: 'folder',
             enabled: () => Boolean(C().selectedChat),
             run: async () => {
-                // the modal drives itself off the chat object, like the sidebar menu does
                 const chat = C();
                 for (const group of chat.visibleGroups()) {
                     const found = (group.chats ?? []).find(c => c.id === chat.selectedChat);
@@ -174,7 +140,6 @@ function coreCommands() {
         {
             id: 'open_logs', label: 'System logs', group: 'System', icon: 'clipboard',
             enabled: () => !window.ADMIN_SETTINGS_DISABLED,
-            // logs are a settings page (system_logs), not a modal of their own
             run: () => openSettings('system_logs')
         },
         {
@@ -200,7 +165,6 @@ function coreCommands() {
         });
     }
 
-    // -- 3. settings pages: one command per category, plus module/channel pages
     if (!window.ADMIN_SETTINGS_DISABLED) {
         for (const [cat, data] of Object.entries(S().categories ?? {})) {
             list.push({
@@ -222,7 +186,6 @@ function coreCommands() {
             }
         }
 
-        // -- model switching: the palette lazily pulls the cached model list
         const models = S().cachedModels;
         if (Array.isArray(models) && models.length > 0) {
             const current = S().categories?.model?.settings?.name?.value || '';
@@ -253,7 +216,6 @@ async function openModuleSettings(cat, item) {
     });
 }
 
-// mirrors components/model_switcher.js so header dropdown and palette agree
 async function setModelCommand(name) {
     try {
         await simpleApiPost('/api/model/set', { name });
@@ -264,11 +226,6 @@ async function setModelCommand(name) {
     }
 }
 
-/*
- * drive the sidebar item's inline rename flow (same one the "..." menu uses),
- * falling back to a prompt when the item isn't rendered (collapsed group,
- * different category tab).
- */
 async function startRenameSelectedChat() {
     const chat = Alpine.store('chat');
     const el = document.getElementById('chat-' + chat.selectedChat);
@@ -288,12 +245,10 @@ async function startRenameSelectedChat() {
     if (title && title.trim()) await chat.renameChat(chat.selectedChat, title.trim());
 }
 
-// the login template never ships the palette, so a baked flag lookup is enough
 function login_enabled_palette() {
     return document.body.hasAttribute('data-login-enabled');
 }
 
-// -- 2. keyboard actions ------------------------------------------------------
 
 const CMD_KB_GROUPS = {
     scroll_up: 'Chat view', scroll_down: 'Chat view',
@@ -314,8 +269,6 @@ const CMD_KB_ICONS = {
 function keyboardCommands() {
     const handlers = shortcutHandlers();
 
-    // command_palette lists itself via nothing; global_search/toggle_sidebar
-    // have nicer core commands that link the binding themselves
     return Object.entries(handlers)
         .filter(([id]) => !['command_palette', 'global_search', 'toggle_sidebar'].includes(id))
         .map(([id, handler]) => {
@@ -333,7 +286,6 @@ function keyboardCommands() {
         });
 }
 
-// -- 4. sidebar tabs ----------------------------------------------------------
 
 function sidebarTabCommands() {
     const U = () => Alpine.store('ui');
@@ -341,7 +293,7 @@ function sidebarTabCommands() {
 
     for (const btn of document.querySelectorAll('.sidebar-tab-list .sidebar-tab[data-tab]')) {
         const tab = btn.dataset.tab;
-        if (tab === '') continue;  // handled by the core "show chats" command
+        if (tab === '') continue;  
 
         const label = (btn.getAttribute('title') || tab).trim();
         list.push({
@@ -358,16 +310,6 @@ function sidebarTabCommands() {
     return list;
 }
 
-// -- 5. DOM discovery -----------------------------------------------------------
-/*
- * elements declare themselves palette commands with a data-cmd attribute:
- *
- *   <button data-cmd="My Thing" data-cmd-group="MyModule" data-cmd-icon="✨" ...>
- *
- * the element's own click handler runs, so anything clickable can become
- * reachable without registering anything in JS. scanned live on every palette
- * open, so elements added later are picked up too.
- */
 const CMD_SCAN_ROOTS = ['#main-wrapper header', '#main-wrapper .sidebar-shell', '#main-wrapper #input'];
 
 function domCommands() {
@@ -393,7 +335,6 @@ function domCommands() {
     return list;
 }
 
-// -- assembly -------------------------------------------------------------------
 
 function collectCommands() {
     const sources = [
@@ -416,9 +357,8 @@ function collectCommands() {
         }
 
         for (const cmd of cmds ?? []) {
-            if (byId.has(cmd.id)) continue;  // first source wins
+            if (byId.has(cmd.id)) continue;  
 
-            // enabled() commands quietly drop out when their feature is off
             if (cmd.enabled) {
                 try {
                     if (!cmd.enabled()) continue;
@@ -427,7 +367,6 @@ function collectCommands() {
                 }
             }
 
-            // labels may be functions (state-dependent text): resolve once
             if (typeof cmd.label === 'function') {
                 try { cmd.label = cmd.label(); } catch (err) { continue; }
             }
@@ -439,7 +378,6 @@ function collectCommands() {
     return [...byId.values()];
 }
 
-// modules: window.openlumaraCommands.add({ id, label, run, group?, icon?, hint?, enabled? })
 window.openlumaraCommands = {
     add: registerCommand,
     remove: (id) => { delete CMD_EXTRA[id]; },

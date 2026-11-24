@@ -176,7 +176,6 @@
     color: var(--text-muted);
 }
 
-/* Range sliders — width: 100% for settings context (all other slider styles in fields.css) */
 .setting-item input[type="range"] {
     width: 100%;
 }
@@ -185,7 +184,6 @@
     width: 30% !important;
 }
 
-/* --- Background image settings --- */
 .bg-section {
     margin-bottom: 22px;
 }
@@ -210,7 +208,6 @@
     gap: 10px;
 }
 
-/* dashed dropzone-style upload button */
 .bg-upload-btn {
     flex: 1;
     display: inline-flex;

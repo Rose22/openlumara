@@ -1,12 +1,3 @@
-/*
- * Command palette (Ctrl+K by default, rebindable under Settings -> Keyboard).
- *
- * A VS Code-style quick launcher that reaches any action in the webui. The
- * command list is never hardcoded here: it is rebuilt from the registry in
- * utils/command_registry.js every time the palette opens, so keyboard actions,
- * settings pages, module panels and data-cmd elements are always in sync with
- * what actually exists right now.
- */
 
 const PALETTE_RECENTS_KEY = 'commandPaletteRecents';
 const PALETTE_MAX_RESULTS = 60;
@@ -14,8 +5,6 @@ const PALETTE_MAX_RESULTS = 60;
 const PALETTE = {
     visible: false,
     query: '',
-    // activeIndex points into rows, not a separate flat list: one index,
-    // one rendered list, nothing left to drift out of sync
     activeIndex: 0,
     rows: [],
     recents: [],
@@ -37,8 +26,6 @@ const PALETTE = {
             this.recents = [];
         }
 
-        // the model list is only fetched on demand elsewhere; pull it in the
-        // background so the next palette open can offer model switches
         if (!window.ADMIN_SETTINGS_DISABLED) {
             const settings = Alpine.store('settings');
             if (!settings.cachedModels || settings.cachedModels.length === 0) {
@@ -77,7 +64,6 @@ const PALETTE = {
                 const score = cmdMatchScore(q, cmd.label);
                 if (score === null) continue;
 
-                // recently-run commands climb a little, low-priority ones sink
                 const recency = this.recents.indexOf(cmd.id);
                 const bonus = recency === -1 ? 0 : 30 - recency * 3;
 
@@ -95,7 +81,6 @@ const PALETTE = {
         this.activeIndex = this.firstSelectable();
     },
 
-    // order commands per group (recents first on the empty-query view)
     grouped(commands) {
         const rank = c => {
             const i = this.recents.indexOf(c.id);
@@ -122,7 +107,6 @@ const PALETTE = {
         return [...groups.entries()].map(([label, items]) => ({ label, items }));
     },
 
-    // headers become their own rows so a single x-for renders the whole list
     rowsFor(groups, withHeaders) {
         const rows = [];
         for (const group of groups) {
@@ -141,8 +125,6 @@ const PALETTE = {
         return i === -1 ? 0 : i;
     },
 
-    // how many rows fit in the visible list (min 2) - the PageUp/PageDown
-    // hop. measured live so it follows whatever the viewport allows.
     pageStep() {
         const list = document.getElementById('cmd-list');
         if (!list || !this.rows.length) return 5;
@@ -154,8 +136,6 @@ const PALETTE = {
     _lastMove: 0,
 
     move(delta) {
-        // belt and braces: even if the key event somehow gets delivered
-        // twice, a burst of moves within one frame counts as one step
         const now = performance.now();
         if (now - this._lastMove < 50) return;
         this._lastMove = now;
@@ -163,8 +143,6 @@ const PALETTE = {
         const selectable = this.rows.some(r => !r.header);
         if (!selectable) return;
 
-        // single steps wrap around like VS Code; a page-sized hop clamps at
-        // the ends instead of flying past the top/bottom
         const paging = Math.abs(delta) > 1;
         let i = this.activeIndex;
 
@@ -208,8 +186,6 @@ const PALETTE = {
         this.runItem(this.rows[this.activeIndex]?.cmd);
     },
 
-    // binding badge: keyboard commands show their own key, core commands that
-    // share an action id with the keyboard store show that one
     keyFor(cmd) {
         const kb = Alpine.store('keyboard');
         const id = cmd.keyId ?? cmd.id;

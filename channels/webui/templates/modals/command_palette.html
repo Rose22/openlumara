@@ -1,10 +1,4 @@
-<!-- Command palette (Ctrl+K) -->
 
-<!--
-    icon sprite: every palette icon name resolves to a node in this hidden
-    block, which x-cmd-icon clones into the row. existing ui icons are reused
-    straight from templates/svg; palette-specific ones are the cmd_*.svg files.
--->
 <div id="cmd-icons" aria-hidden="true">
     <span data-cmdi="add">{% include 'svg/add.svg' %}</span>
     <span data-cmdi="trash">{% include 'svg/trash.svg' %}</span>
@@ -60,12 +54,6 @@
             </div>
 
             <div class="cmd-list" id="cmd-list">
-                <!--
-                    one flat x-for: headers are rows too. a nested x-for under
-                    x-if re-renders whole groups when keys churn, which let the
-                    highlight visibly jump past categories; with a single list,
-                    row === index always.
-                -->
                 <template x-for="(row, i) in $store.palette.rows" :key="row.id">
                     <div class="cmd-row">
                         <div class="cmd-group-label" x-show="row.header" x-text="row.label"></div>

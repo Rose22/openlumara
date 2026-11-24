@@ -9,22 +9,12 @@ document.body.classList.toggle('no-frosted', localStorage.getItem('frostedGlassE
  * initializes Alpine and registers all the necessary stuff
  */
 document.addEventListener('alpine:init', async () => {
-    /*
-     * the chat header floats over the message scrollbox (window.css runs
-     * #messages under it) so its frost blurs the bubbles passing behind.
-     * a resize observer feeds the header's live height into
-     * --header-height, driving the overlap, the scroll padding and the
-     * pinned pill's stick offset - collapse to zero included. without JS
-     * the 0px fallback keeps the old flush layout.
-     */
     const chatHeader = document.querySelector('header');
 
     if (chatHeader) {
         const pushHeaderHeight = () => {
             const h = chatHeader.offsetHeight;
             document.documentElement.style.setProperty('--header-height', `${h}px`);
-            // releases the header's min-height once its content is gone,
-            // so the collapse-to-zero state still works (see header.css)
             document.body.classList.toggle('header-empty', h === 0);
         };
 
@@ -44,17 +34,12 @@ document.addEventListener('alpine:init', async () => {
     Alpine.store('upload', UPLOAD_STORE);
     Alpine.store('htmlPreview', HTML_PREVIEW_STORE);
 
-    // command palette (Ctrl+K), see components/command_palette.js
     Alpine.store('palette', PALETTE);
 
-    // load the audio settings from localStorage into the store, then push
-    // them into the AudioManager (must run before any sound can play)
     Alpine.store('audio').init();
 
-    // restore the background image from IndexedDB and apply its layer
     Alpine.store('background').init();
 
-    // user-rebindable keyboard shortcuts (localStorage-backed)
     Alpine.store('keyboard', KEYBOARD_STORE);
     Alpine.store('keyboard').init();
 
@@ -78,20 +63,14 @@ document.addEventListener('alpine:init', async () => {
     // so tool call values only get the soft background when they scroll
     Alpine.directive('box', (el, modifiers, { cleanup }) => cleanup(boxIfScrolls(el)));
 
-    // keeps a scroll container at its tallest-so-far height while the
-    // expression is true (capped by its CSS max-height), releasing it back
-    // to content height once false (see directives/height_ratchet.js)
     Alpine.directive('height-ratchet', (el, { expression }, { evaluateLater, effect, cleanup }) =>
         heightRatchet(el, evaluateLater(expression), effect, cleanup));
 
-    // watches a flow marker outside a pinned turn for the pinned-prompt feature
     Alpine.directive('prompt-marker', (el, { expression }, { evaluateLater, cleanup }) => {
         const run = evaluateLater(expression);
         cleanup(promptMarker(el, (intersecting) => run(() => {}, { scope: { intersecting } })));
     });
 
-    // clones a command palette icon (see the #cmd-icons sprite) into the row,
-    // re-resolving whenever the expression changes
     Alpine.directive('cmd-icon', (el, { expression }, { evaluate }) => {
         el.replaceChildren();
 
@@ -128,9 +107,6 @@ document.addEventListener('alpine:init', async () => {
     // fetch any relevant system data (like system logs, max context, etc)
     await Alpine.store('system').loadData();
 
-    // background update check so the settings gear can badge before the
-    // modal is ever opened; delayed so it never competes with page load
-    // (each repo check does its own git fetch)
     if (!window.ADMIN_SETTINGS_DISABLED && SYSTEM_STORE.autoCheckEnabled()) {
         setTimeout(() => Alpine.store('system').checkForUpdates(), 4000);
     }

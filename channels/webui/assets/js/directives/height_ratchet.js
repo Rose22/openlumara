@@ -1,11 +1,3 @@
-/* alpine.js directive that ratchets a scroll container's height while the
- * watched expression is true: the container may grow with its content but
- * never shrink below its tallest so far; once the expression turns false it
- * releases to plain content height. The ratchet itself is capped by the
- * element's own CSS max-height and by the chat viewport, so an expanded
- * chain can never leave a taller-than-screen empty bubble behind.
- * usage: x-height-ratchet="$store.stream.state !== 'idle'"
- */
 function heightRatchet(el, getActive, effect, cleanup) {
   let peak = 0;
   let ro = null;
@@ -28,8 +20,6 @@ function heightRatchet(el, getActive, effect, cleanup) {
   };
 
   const record = () => {
-    // Keep the stored peak itself viewport-capped. Otherwise a later resize
-    // could resurrect a multi-screen pin from an old unbounded peak.
     peak = Math.min(Math.max(peak, el.clientHeight), capPx());
     apply();
   };
@@ -56,8 +46,6 @@ function heightRatchet(el, getActive, effect, cleanup) {
     record();
   };
 
-  // evaluateLater returns a getter that delivers its value through a
-  // callback - calling it INSIDE the effect is also what tracks the store
   effect(() => {
     getActive((active) => {
       if (active) {

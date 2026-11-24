@@ -69,10 +69,6 @@
         flex-shrink: 0;
     }
 
-    /* content-visibility skips rendering for stations outside the viewport
-       (it ignores the capped body scroller), making a skipped station report
-       its contain-intrinsic-size placeholder instead of its real height -
-       which corrupts any measurement of the live chain */
     &.is-streaming .chain-station {
         content-visibility: visible;
         contain: none;
@@ -254,8 +250,6 @@
         font-size: 0.85rem;
     }
 
-    /* The provisional answer used to ride in the chain as a station.
-       It now lives outside the chain as .live-answer. */
 
     .chain-end {
         display: flex;
@@ -274,8 +268,6 @@
     }
 }
 
-/* provisional answer for the live turn. It is a sibling of the agent chain,
-   not a chain station, so it must restore the normal message typography. */
 .live-turn-shell {
     display: flex;
     flex-direction: column;

@@ -48,13 +48,6 @@
     <!-- historical turns -->
     <template x-for="(turn, idx) in $store.chat.turnHistory" :key="$store.chat.turnStart + idx">
         <div class="turn-block" x-data="{ get turnIndex() { return $store.chat.turnStart + idx } }">
-            <!--
-                flow marker for the pinned-prompt feature. it must live
-                outside the turn itself: while pinned, the turn is sticky, so
-                an observer on it always sees it as visible and the pin
-                toggles in a loop. this 1px marker stays in normal flow, so
-                its intersection tracks the turn's real position.
-            -->
             <template x-if="turn.role === 'user'">
                 <div class="pin-marker" x-prompt-marker="$store.chat.updatePromptPin(turnIndex, intersecting, $el)"></div>
             </template>
@@ -79,11 +72,6 @@
 
             <template x-if="turn.live === true">
                 <div class="message-wrapper assistant">
-                    <!-- the height ratchet pins the whole bubble at its peak while
-                         streaming: the chain and answer keep their natural sizes
-                         (answer always flush under the newest step), collapses
-                         never shrink the page-flow element (no scroll jump), and
-                         freed space trails as padding at the bubble's bottom -->
                     <div class="message assistant"
                          x-height-ratchet="$store.stream.state !== 'idle'"
                          x-data="{
@@ -139,11 +127,7 @@
                                 </div>
                             </template>
 
-                            <!-- The provisional answer stays semantically separate from the
-                                 agent chain. It can be visually adjacent, but it is never a
-                                 step/station in the Process body. -->
                             <template x-for="(message, messageIndex) in (turn.final_messages ?? [])" :key="'final-'+messageIndex">
-                                <!-- messages flagged _metadata.hide are never painted -->
                                 <template x-if="!message._metadata?.hide">
                                     <div class="live-answer">
                                         {% include 'chat/turns/assistant_stream.html' %}
@@ -220,7 +204,6 @@
                         </template>
 
                         <template x-for="(message, messageIndex) in turn.final_messages ?? []" :key="'final-'+messageIndex">
-                            <!-- messages flagged _metadata.hide are never painted -->
                             <template x-if="!message._metadata?.hide">
                                 {% include 'chat/turns/assistant_history.html' %}
                             </template>
@@ -269,9 +252,6 @@
 
 <!-- input field -->
 <div id="input" {% if config.get('dock_input_bar') %}class="docked"{% endif %}>
-    <!-- invisible upload form. lives INSIDE the input bar: in floating mode
-         the bar is an overlay the chat scrolls beneath, and an upload queue
-         outside it would be buried under that overlay -->
     {% if config.get('enable_file_upload') %}
     {% include 'chat/upload.html' %}
     {% endif %}
@@ -292,17 +272,6 @@
         {% include 'chat/input.html' %}
     </div>
 
-    <!-- slash-command autocomplete (see js/components/command_autocomplete.js).
-         a direct child of #input - exactly where the frosted upload queue
-         lives - and deliberately NOT inside .input-wrapper: the wrapper's
-         backdrop-filter makes it a backdrop root for its descendants in
-         Chromium, so a frosted popup nested in it samples nothing and its
-         blur is silently dropped. same story for clip-path ancestors, so
-         there is none here either (the seam shadow is shaped geometrically
-         in autocomplete.css).
-
-         position:absolute is INLINE on purpose: even a stale cached JS/CSS
-         combo can never put this box (and its 300px popup) into page flow -->
     <div id="autocomplete-anchor" x-data="commandAutocomplete()" x-cloak style="position: absolute; left: 0; bottom: 0; z-index: 60;">
         <div class="autocomplete-dropdown" x-show="visible" style="position: absolute;"
              @click.outside="hide()"

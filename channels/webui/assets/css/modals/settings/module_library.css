@@ -31,7 +31,6 @@
         margin: 6px 0 10px 0;
     }
 
-    /* "update available" pill on module/channel cards (next to the repo note) */
     .card-update-badge {
         display: inline-flex;
         align-items: center;
@@ -48,13 +47,11 @@
         cursor: default;
     }
 
-    /* the update icon button lights up while an update is pending */
     .library-btn.icon.update-available {
         border-color: var(--accent);
         color: var(--accent);
     }
 
-    /* busy feedback: the reload icon spins while its card works */
     .icon-spin {
         display: inline-flex;
 

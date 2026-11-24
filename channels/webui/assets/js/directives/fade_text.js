@@ -68,10 +68,6 @@ function fadeTextRender(el, { expression }, { evaluateLater, effect, cleanup }, 
                 return;
             }
 
-            // -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
-            // total rendered chars: plain text is the source string itself
-            // (textContent was just assigned); html uses one native
-            // textContent read instead of a per-node JS walk
             const total = asHtml ? el.textContent.length : value.length;
 
             const now = performance.now();
@@ -83,7 +79,6 @@ function fadeTextRender(el, { expression }, { evaluateLater, effect, cleanup }, 
 
             const batches = timeline.record(total, now);
             if (!shrank && batches.length) {
-                // only the tail nodes the batches actually reach
                 const nodes = collectTailTextNodes(el, batchCharCount(batches) + 64);
                 for (const b of batches) wrapTailChars(nodes, b.count, b.delay);
             }

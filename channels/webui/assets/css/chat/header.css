@@ -1,19 +1,7 @@
 header {
-    /* the vertical padding lives on the ITEMS (below), not the bar itself:
-       when Alpine's x-show hides every child, hidden items carry no margins
-       and the header collapses to true zero height - padding on the bar
-       would instead leave a hollow strip. horizontal padding is harmless
-       height-wise and stays here. h1 is excluded so the titled header keeps
-       its current rhythm. */
     padding: 0 12px;
-    /* solid bg-primary by default (frost off); the frosted pass in
-       frosted.css overrides this with translucent glass while the
-       setting is on */
     background: var(--bg-primary);
 
-    /* floats over the message scrollbox (window.css runs #messages under
-       it), so the frost blurs the bubbles actually passing behind -
-       same arrangement as the floating input bar at the bottom */
     position: relative;
     z-index: 41;
 
@@ -125,10 +113,6 @@ header {
     }
 }
 
-/* min height whenever the header has content: items are only ~30px tall,
-   so without this the bar hugs them tightly. gated on NOT .header-empty
-   (class toggled by init.js's ResizeObserver) so the collapse-to-zero
-   state when every item is x-show'd away stays untouched */
 body:not(.header-empty) header {
     min-height: 32px;
 }

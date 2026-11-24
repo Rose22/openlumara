@@ -1,4 +1,3 @@
-/* Updates page in the settings modal: git remote status + update trigger */
 @keyframes update-spin {
     to { transform: rotate(360deg); }
 }
@@ -27,7 +26,6 @@
             color: var(--error);
         }
 
-        /* failure line inside an entry row: tighter than the panel banner */
         &.inline {
             margin: 6px 0 0 0;
             padding: 6px 10px;
@@ -236,7 +234,6 @@
     }
 }
 
-/* --- update-available badges outside the panel: sidebar entries --- */
 .update-dot {
     width: 8px;
     height: 8px;
@@ -266,7 +263,6 @@
     }
 }
 
-/* phones: the card stacks so actions get full width */
 @media (max-width: 768px), (orientation: portrait) and (max-width: 1024px) {
     .updates-panel .update-card {
         flex-direction: column;

@@ -54,9 +54,6 @@
                                 </div>
                             </template>
 
-                            <!-- the response only ever renders in a card the user
-                                 opened deliberately: streamed results must never
-                                 paint before the auto-collapse lands -->
                             <template x-if="tool._metadata?.response && (userOpen === true || $store.stream.state === 'idle')">
                                 <div class="response-row" x-data="{
                                          get parsed() {

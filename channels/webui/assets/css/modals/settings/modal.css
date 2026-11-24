@@ -262,8 +262,6 @@
                 min-height: 100%;
             }
 
-            /* subheadings on the custom pages (appearance, audio, ...):
-               a rule line under them, room above and below */
             h4 {
                 margin: 26px 0 14px;
                 padding-bottom: 8px;
@@ -278,8 +276,6 @@
                 margin-top: 4px;
             }
 
-            /* buttons placed inside an h4 sit at the far right edge of
-               the content area, vertically centered on the heading */
             h4 {
                 display: flex;
                 align-items: center;

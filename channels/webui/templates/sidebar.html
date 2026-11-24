@@ -59,8 +59,6 @@
                     <span class="update-dot" x-show="$store.system.update.anyUpdates" x-cloak></span>
                 </button>
             {% endif %}
-            <!-- mobile-only dismiss: the footer sits flush right in the
-                 horizontal tab bar, so this lands on the far right -->
             <button type="button" class="sidebar-tab sidebar-close-btn" x-show="$store.ui.isMobile" x-cloak
                 aria-label="Close sidebar" title="Close sidebar"
                 @click="$store.ui.showSidebar = false">

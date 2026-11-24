@@ -94,7 +94,6 @@
             </template>
         </div>
 
-        <!-- Background Image -->
         <div class="bg-section">
             <h4>Background Image</h4>
             <div class="item">
@@ -107,7 +106,6 @@
             </div>
 
             <div class="bg-settings" x-show="$store.background.enabled" x-cloak>
-                <!-- hidden native input; the styled buttons drive it -->
                 <input type="file" accept="image/*" x-ref="bgFileInput" x-show="false" x-cloak aria-hidden="true"
                        @change="$store.background.handleUpload($event)">
 

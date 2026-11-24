@@ -1,39 +1,12 @@
-/* ==========================================================================
- *  Frosted Glass
- *
- *  every frosted surface in the webui, in one place:
- *    - the floating input wrapper (see input.css / window.css)
- *    - the upload queue riding above it (see upload.css)
- *    - the slash-command popup (see autocomplete.css)
- *    - the scroll-to-bottom button and the pinned prompt (see window.css)
- *    - the border -> soft-drop-shadow pass over all chrome (end of file)
- *
- *  the recipes live in custom properties, resolved at each usage: that makes
- *  the frost-disabled fallback cascade-proof (body.no-frosted simply
- *  re-points the variables, and no stylesheet-ordering can undo it).
- *
- *  toggle: localStorage frostedGlassEnabled -> body.no-frosted (init.js).
- *  with frost off, every surface goes solid bg-primary and the chat shows
- *  through nothing.
- * ========================================================================== */
 
 :root {
-    /* one shared blur pass; per-surface tints */
     --frost-filter: blur(6px) saturate(1.4);
     --frost-bg: color-mix(in srgb, var(--bg-primary, #151515) 60%, transparent);
     --frost-bg-button: color-mix(in srgb, var(--bg-primary, #151515) 76%, transparent);
-    /* frost-off fallback pairing only - the frost-on pill rides the pseudo
-       fill (see end of file) */
     --frost-bg-pinned: color-mix(in srgb, var(--bg-primary, #151515) 28%, transparent);
-    /* hovered/selected row inside a frosted surface (command popup list):
-       same wash recipe the sidebar chat-list uses for its glass hovers */
     --frost-bg-highlight: color-mix(in srgb, var(--bg-secondary, #1e1e24) 55%, transparent);
 }
 
-/* frosted glass disabled (settings toggle): overlays stay, they just go
-   fully opaque instead of blurring what scrolls beneath them. the pinned
-   prompt's solid stands in for its usual background (whatever it is:
-   chat-bubble tint or plain), so no per-variant override needed here */
 body.no-frosted {
     --frost-filter: none;
     --frost-bg: var(--bg-primary, #151515);
@@ -42,12 +15,7 @@ body.no-frosted {
     --frost-bg-highlight: var(--bg-secondary, #1e1e24);
 }
 
-/* --- the floating input assembly ---------------------------------------- */
 
-/* docked mode never frosts (solid edge-to-edge bar), hence :not(.docked)
-   everywhere here. NOTE: nothing in this assembly may wear a clip-path or
-   mask ABOVE a frosted element - a clip-path ancestor becomes a backdrop
-   root in Chromium and silently drops the blur */
 
 #chat-window #input:not(.docked) .input-wrapper {
     background: var(--frost-bg);
@@ -55,67 +23,42 @@ body.no-frosted {
     -webkit-backdrop-filter: var(--frost-filter);
 }
 
-/* the attached-files strip: same recipe as the wrapper it stacks onto, an
-   opaque queue would crack the glass effect mid-assembly */
 #chat-window #input:not(.docked) .upload-queue {
     background: var(--frost-bg);
     backdrop-filter: var(--frost-filter);
     -webkit-backdrop-filter: var(--frost-filter);
 }
 
-/* the command popup frosts in both floating AND docked mode */
 #chat-window #input .autocomplete-dropdown {
     background: var(--frost-bg);
     backdrop-filter: var(--frost-filter);
     -webkit-backdrop-filter: var(--frost-filter);
 }
 
-/* --- standalone overlays ------------------------------------------------- */
 
-/* "jump back to the newest message" button (structure in window.css) */
 #scroll-to-bottom {
     background: var(--frost-bg-button);
     backdrop-filter: var(--frost-filter);
     -webkit-backdrop-filter: var(--frost-filter);
 }
 
-/* the sticky pinned prompt pill (structure in window.css). transparent by
-   itself: the fill comes from the bubble pseudo (see end of file) at a
-   lighter opacity than normal bubbles - see-through glass that still
-   blurs what passes beneath it. frost-off mode re-pins a solid below */
 #messages .turn.prompt-pinned:not(:has(.editing)) > .message-wrapper.user > .message.user {
     background: none;
     backdrop-filter: var(--frost-filter);
     -webkit-backdrop-filter: var(--frost-filter);
 }
 
-/* frost off, chat-bubbles mode: the bubble rule above outranks the pill
-   rule and would re-tint the pinned prompt - pin the solid explicitly.
-   the doubled class only needs to exist to match that rule's weight, it
-   never matches differently in practice (the only chat-bubbles element
-   with a prompt-pinned ancestor is itself a chat bubble) */
 body.no-frosted #messages.chat-bubbles.chat-bubbles .turn.prompt-pinned:not(:has(.editing)) > .message-wrapper.user > .message.user {
     background: var(--bg-primary, #151515);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
 }
 
-/* chat-bubbles mode pins the pill with window.css's own 28% user-bg mix
-   (it outranks the flat rule above) - switched off here too, so the pill
-   rides the pseudo fill like every other user message (that 28% rule was
-   invalid with gradient user-bg themes anyway) */
 body:not(.no-frosted) #messages.chat-bubbles.chat-bubbles .turn.prompt-pinned:not(:has(.editing)) > .message-wrapper.user > .message.user {
     background: none;
 }
 
-/* --- chat header --------------------------------------------------------- */
 
-/* same glass recipe as the sidebar's page-mode panel (see background.css):
-   45% tint, 10px blur, and the same soft drop-shadow seam - the header
-   blurs whatever scrolls beneath it (bubbles and picture alike). with
-   frost off the gate drops out and the header keeps its solid look.
-   the collapsed-to-zero case (all items x-show'd away) is unaffected: no
-   height, nothing to paint */
 body:not(.no-frosted) header {
     top: 4px;
     min-width: 200px;
@@ -129,15 +72,7 @@ body:not(.no-frosted) header {
     box-shadow: var(--frost-drop-lg);
 }
 
-/* --- sidebar inputs -------------------------------------------------------- */
 
-/* every text-ish control inside module panels goes fully bare over the
-   glass (like the chat-list search line): background and border melt away,
-   the text simply rides the sidebar's frost; a soft glass tint marks focus
-   (same cue as the forge-field). checkbox/radio and the shell's invisible
-   capture input are skipped; native <select> drop-down lists are OS-painted
-   and can never be restyled, only the box. frost off -> untouched: fields
-   keep their original bordered solid look. */
 body:not(.no-frosted) #sidebar .sidebar-panel :is(input:not([type="checkbox"]):not([type="radio"]), textarea, select):not(.term-capture) {
     background-color: color-mix(in srgb, var(--bg-primary, #151515) 35%, transparent);
     border-color: transparent;
@@ -149,17 +84,12 @@ body:not(.no-frosted) #sidebar .sidebar-panel :is(input:not([type="checkbox"]):n
     background-color: var(--frost-bg-highlight);
 }
 
-/* the chat-list search line gets the same recess; its focus/create tint
-   from background.css still layers over this (heavier selector) */
 body:not(.no-frosted) #sidebar #chat-list .search .forge-field {
     background-color: color-mix(in srgb, var(--bg-primary, #151515) 35%, transparent);
     backdrop-filter: saturate(1.35);
     -webkit-backdrop-filter: saturate(1.35);
 }
 
-/* fake selects inside module panels (characters' category/character
-   pickers are .category-trigger buttons, not <select>) get the same look;
-   the hover/open washes in background.css still outrank this */
 body:not(.no-frosted) #sidebar .sidebar-panel .category-trigger {
     background-color: color-mix(in srgb, var(--bg-primary, #151515) 35%, transparent);
     border-color: transparent;
@@ -167,54 +97,30 @@ body:not(.no-frosted) #sidebar .sidebar-panel .category-trigger {
     -webkit-backdrop-filter: saturate(1.35);
 }
 
-/* --- modals, command palette, global search ------------------------------- */
 
-/* opaque-value aliases for the modal-scope remap below (the modal boxes
-   are body-level fixed elements, outside #sidebar's own aliases) */
 body:not(.no-frosted) {
     --src-bg-primary: var(--bg-primary);
     --src-bg-secondary: var(--bg-secondary);
     --src-bg-tertiary: var(--bg-tertiary);
 }
 
-/* glass shells for every modal-like floater. the variable remap (same
-   technique as the module panels in background.css) turns every
-   var()-based interior surface - modal headers, action bars, form fields,
-   kbd chips, buttons, result rows - translucent in one stroke; literals
-   stay as drawn. the overlays behind these already dim + blur the page,
-   so the shells show a pre-blurred backdrop even where a nested overlay
-   would make a own-pass blur moot */
 body:not(.no-frosted) :is(.modal, .confirm-modal, .cmd-palette, .global-search-modal-content) {
     background: var(--frost-bg);
     backdrop-filter: var(--frost-filter);
     -webkit-backdrop-filter: var(--frost-filter);
 
-    /* NOTE: --button-bg/--button-hover deliberately NOT remapped: themes
-       pair those with --button-text (light-on-dark or dark-on-light);
-       flattening the background alone breaks the pairing. buttons keep
-       their solid theme colors, which is fine over glass. */
     --bg-primary: color-mix(in srgb, var(--src-bg-primary) 72%, transparent);
     --bg-secondary: color-mix(in srgb, var(--src-bg-secondary) 55%, transparent);
     --bg-tertiary: color-mix(in srgb, var(--src-bg-tertiary) 72%, transparent);
     --bg-input: color-mix(in srgb, var(--src-bg-primary) 72%, transparent);
 }
 
-/* the palette box sits INSIDE its overlay (a backdrop root), so its own
-   blur pass is moot - pre-blur the stage instead, matching the modal
-   overlay's blur */
 body:not(.no-frosted) .cmd-palette-overlay {
     backdrop-filter: blur(8px) saturate(140%);
     -webkit-backdrop-filter: blur(8px) saturate(140%);
 }
 
-/* --- pop-up menus ----------------------------------------------------------- */
 
-/* the sidebar's dropdowns/menus frost like the rest of the assembly. they
-   teleport to body, so they sample the raw page backdrop; coder's context
-   menu lives inside the panel (a backdrop-filtered ancestor in page-image
-   mode may flatten its blur to a tint - the translucency always holds).
-   with frost disabled these rules simply don't match and the menus keep
-   their original solid look. */
 body:not(.no-frosted) .category-menu,
 body:not(.no-frosted) .filter-menu,
 body:not(.no-frosted) .chat-action-menu,
@@ -225,53 +131,26 @@ body:not(.no-frosted) #sidebar .coder-menu {
     -webkit-backdrop-filter: var(--frost-filter);
 }
 
-/* ==========================================================================
- *  Borders melt into soft drop shadows
- *
- *  with frost on, chrome drops its hard 1px outlines: bordered surfaces
- *  (sidebar, modals, message bubbles, selected rows, menus, buttons) float
- *  on a soft generic shadow instead (plain translucent black, like the
- *  theme's own shadow recipes).
- *  hover/focus accent borders are state cues, not paint, and survive.
- *
- *  the gate is :where()-wrapped on purpose: it costs zero specificity, so
- *  each rule below only ever beats its OWN base declaration (mirrored
- *  selector + one body element) and can never outrank the base files'
- *  :hover/:focus/.state variants. mirrored chains matter for the same
- *  reason (a short selector would lose to a deep base rule).
- *
- *  left alone on purpose: input fields (they keep their bordered, recessed
- *  look), one-sided dividers (modal headers/action bars, time-tabs, nav
- *  rules), spinners, slider tracks, semantic borders (accent/error/notice,
- *  dashed empty-states) and text-level chips.
- * ========================================================================== */
 
 body:not(.no-frosted) {
-    /* one generic shadow color (translucent black, as in the themes' own
-       --shadow-* recipes) behind every melted border */
     --frost-shadow: rgba(0, 0, 0, 0.35);
     --frost-drop-sm: 0 2px 8px -2px var(--frost-shadow);
     --frost-drop: 0 6px 16px -3px var(--frost-shadow);
     --frost-drop-lg: 0 12px 30px -6px var(--frost-shadow);
 }
 
-/* --- sidebar -------------------------------------------------------------- */
 
-/* the sidebar's seam against the chat (the collapsed rail has no border) */
 body:where(:not(.no-frosted)) #sidebar:not(.collapsed) {
     border-right-color: transparent;
     box-shadow: var(--frost-drop-lg);
 }
 
-/* the selected chat row (+ its hover twin, which repaints the same line) */
 body:where(:not(.no-frosted)) #chat-list .chats .item.active,
 body:where(:not(.no-frosted)) #chat-list .chats .item.active:hover {
     border-color: transparent;
     box-shadow: var(--frost-drop-sm);
 }
 
-/* filter-menu switches/tag chips and the forge-row kbd cap
-   (.fm-switch.on / .fm-chip.selected keep their accent borders) */
 body:where(:not(.no-frosted)) .filter-menu .fm-switch,
 body:where(:not(.no-frosted)) .filter-menu .fm-chip,
 body:where(:not(.no-frosted)) .forge-row .forge-kbd {
@@ -279,14 +158,11 @@ body:where(:not(.no-frosted)) .forge-row .forge-kbd {
     box-shadow: var(--frost-drop-sm);
 }
 
-/* core menus: keep their built-in black shadow, add the frost drop
-   (coder's context menu keeps its module's own styling) */
 body:where(:not(.no-frosted)) :is(.category-menu, .filter-menu, .chat-action-menu, .tag-popup) {
     border-color: transparent;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25), var(--frost-drop);
 }
 
-/* --- chat header ------------------------------------------------------------ */
 
 body:where(:not(.no-frosted)) header .right .stream-state,
 body:where(:not(.no-frosted)) header .btn,
@@ -295,10 +171,7 @@ body:where(:not(.no-frosted)) header .menu-btn {
     box-shadow: var(--frost-drop-sm);
 }
 
-/* --- input assembly ----------------------------------------------------------- */
 
-/* floating wrapper + upload queue both read --ac-shadow, so redefining it
-   lifts the whole stacked assembly in one stroke */
 body:where(:not(.no-frosted)) #chat-window #input:not(.docked) {
     --ac-shadow: 0 6px 20px rgba(0, 0, 0, 0.25), var(--frost-drop);
 }
@@ -308,17 +181,14 @@ body:where(:not(.no-frosted)) .upload-queue {
     border-color: transparent;
 }
 
-/* docked bar keeps its solid body, loses the outline, gains an up-edge shadow */
 body:where(:not(.no-frosted)) #chat-window #input.docked .input-wrapper {
     box-shadow: 0 -6px 16px var(--frost-shadow);
 }
 
-/* the token-bar-hidden top line is the input's edge over the chat */
 body.token-bar-hidden:not(.no-frosted) #chat-window #input {
     border-top-color: transparent;
 }
 
-/* the popup carries its own copy; the negative spread keeps it seam-safe */
 body:where(:not(.no-frosted)) #chat-window #input .autocomplete-dropdown {
     border-color: transparent;
     box-shadow:
@@ -331,15 +201,12 @@ body:where(:not(.no-frosted)) #scroll-to-bottom {
     box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18), var(--frost-drop);
 }
 
-/* --- modal shells --------------------------------------------------------------- */
 
-/* settings-modal is a .modal; the confirm dialog and palette ride along */
 body:where(:not(.no-frosted)) :is(.modal, .confirm-modal, .cmd-palette) {
     border-color: transparent;
     box-shadow: var(--shadow-strong), var(--frost-drop-lg);
 }
 
-/* the global search box has no border - just the same lifted edge */
 body:where(:not(.no-frosted)) .global-search-modal-content {
     box-shadow: var(--shadow-strong), var(--frost-drop-lg);
 }
@@ -349,8 +216,6 @@ body:where(:not(.no-frosted)) .settings-modal .close-prompt .prompt-box {
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4), var(--frost-drop-lg);
 }
 
-/* every button in those shells - the accent variants (.confirm, .save,
-   .actions button:nth-child(2)) outrank this and keep their borders */
 body:where(:not(.no-frosted)) .modal .close,
 body:where(:not(.no-frosted)) .confirm-modal .btn,
 body:where(:not(.no-frosted)) .actions button,
@@ -364,8 +229,6 @@ body:where(:not(.no-frosted)) .global-search-close {
     box-shadow: var(--frost-drop-sm);
 }
 
-/* cards and fieldset containers. input fields are deliberately exempt
-   from this whole pass: fields keep their bordered, recessed look */
 body:where(:not(.no-frosted)) .modal .unified-card,
 body:where(:not(.no-frosted)) .modal .array-field,
 body:where(:not(.no-frosted)) .settings-modal .group,
@@ -376,7 +239,6 @@ body:where(:not(.no-frosted)) .library-audit-modal {
     box-shadow: var(--frost-drop);
 }
 
-/* kbd chips and the module-library buttons */
 body:where(:not(.no-frosted)) .cmd-kbd,
 body:where(:not(.no-frosted)) .cmd-footer kbd,
 body:where(:not(.no-frosted)) .module-library .library-btn,
@@ -387,33 +249,18 @@ body:where(:not(.no-frosted)) .module-library .library-message.info {
     box-shadow: var(--frost-drop-sm);
 }
 
-/* selected settings-nav item: the inset ring becomes a floating pill */
 body:where(:not(.no-frosted)) .settings-modal .body .sidebar .nav .item.active {
     box-shadow: var(--frost-drop-sm);
 }
 
-/* --- message bubbles ------------------------------------------------------------ */
 
-/* the flat-mode assistant has no visible surface and stays shadowless;
-   the pending message's dashed outline is a state cue and the pinned pill
-   already wears its own frost shadow (its ID-deep rule outranks these) */
 
-/* the user bubble: flat mode was a bare bordered shell, so melting the
-   border needs the theme's own user-message background behind it - the
-   shadow only reads as depth under a filled surface. (the picture-mode
-   translucent variant in chat_bubbles.css has the ID-deep selector and
-   still outranks this) */
 body:where(:not(.no-frosted)) .message-wrapper .message.user:not(.pending) {
     background: none;
     border-color: transparent;
     box-shadow: var(--frost-drop);
 }
 
-/* the actual fill rides a behind-content pseudo dimmed with opacity: the
-   only gradient-safe way to get true transparency (color-mix rejects
-   gradients, and fading the element itself would fade the text too).
-   text stays fully opaque; whatever sits underneath shows through at
-   ~18%, blurred by the element's own backdrop-filter */
 body:where(:not(.no-frosted)) .message-wrapper .message.user:not(.pending)::before {
     content: '';
     position: absolute;
@@ -423,9 +270,6 @@ body:where(:not(.no-frosted)) .message-wrapper .message.user:not(.pending)::befo
     opacity: 0.82;
 }
 
-/* the pinned pill rides the same fill, but lighter: it should read as
-   see-through glass floating over the chat, with the blur + shadow
-   carrying legibility instead of the fill */
 body:where(:not(.no-frosted)) #messages .turn.prompt-pinned:not(:has(.editing)) > .message-wrapper.user > .message.user::before {
     opacity: 0.6;
 }

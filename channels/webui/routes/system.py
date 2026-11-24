@@ -42,11 +42,6 @@ def register(app, channel):
     async def get_logs():
         return utils.api_result(channel.logs)
 
-    # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-11-23) harness:openlumara
-    # slash-command autocomplete (ported from the old webui): the frontend
-    # needs the configured prefix plus the full command list, so it can show
-    # suggestions while the user types. not admin-only: any chat user can
-    # run these commands anyway.
     @app.get("/api/command_prefix")
     async def get_command_prefix():
         return utils.api_result(core.config.get("core", "cmd_prefix"))
@@ -56,7 +51,6 @@ def register(app, channel):
         return utils.api_result(core.commands.get_commands(channel.manager.modules))
 
     # ----------------------------
-    # Updates (git-based, mirrors the updater module)
     # ----------------------------
     async def _run_git(*args, timeout=90):
         """runs git in the repo root; returns (returncode, stdout, stderr)"""
@@ -94,7 +88,6 @@ def register(app, channel):
 
         data["is_repo"] = True
 
-        # best-effort: on a failed fetch we still compare against the cached remote ref
         rc, _, _ = await _run_git("fetch", "origin")
         fetch_failed = rc != 0
 
@@ -131,7 +124,6 @@ def register(app, channel):
             "update_available": False, "note": None,
         }
 
-        # best-effort: on a failed fetch we still compare against the cached remote ref
         rc, _, _ = await channel.manager.module_manager._run_git(git, ["-C", folder, "fetch", "origin"])
         fetch_failed = rc != 0
 
@@ -219,10 +211,8 @@ def register(app, channel):
             "message": message,
         })
 
-    # shared between concurrent presses so the update script only ever runs once
     update_lock = asyncio.Lock()
 
-    # -- AI GENERATED CODE (Qwen3.8-Flash-Next) :: (2026-11-24) harness:openlumara
     @app.post("/api/system/update")
     async def trigger_update():
         """runs the update script (same as the updater module's /update command), then hard-restarts"""

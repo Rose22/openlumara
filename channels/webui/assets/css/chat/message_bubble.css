@@ -19,11 +19,6 @@
         max-width: var(--message-max-width, 75%);
         width: fit-content;
 
-        /* backdrop blur only pays off when something is actually visible
-           behind the surface: reserved for background-picture mode. the
-           selector is fatter than the bare .has-bg so the bubble-mode
-           frost in chat_bubbles.css (equal base specificity, later file)
-           can still override it */
         backdrop-filter: none;
 
         /* the edit textarea fills the relative width (100%) */
@@ -273,9 +268,6 @@
     }
 }
 
-/* with a background picture on, translucent things behind messages are
-   real again - restore the blur (chat mode: the picture sits inside
-   #chat-window, so no bg-page qualifier needed) */
 html.has-bg .message-wrapper .message {
     backdrop-filter: blur(10px);
 }

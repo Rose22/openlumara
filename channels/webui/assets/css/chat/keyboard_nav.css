@@ -1,11 +1,4 @@
-/* ==========================================================================
- *  Keyboard Navigation
- *  ========================================================================== */
 
-/* flash on the turn jumped to with Alt+PageUp/PageDown.
- * drawn as an outline ring, never a background fill: the message bubbles
- * inside the turn are opaque and would swallow a background tint. outline is
- * used instead of border so the ring never changes the turn's box size. */
 .turn.kb-turn-highlight {
     animation: kbTurnFlash 1.2s ease-out;
     border-radius: var(--radius-md, 12px);
@@ -16,11 +9,7 @@
     100%    { outline: 2px solid transparent; outline-offset: 5px; }
 }
 
-/* .kb-nav-target is deliberately unstyled: it is the class the turn-jump
- * handler anchors "previous/next" off, purely a JS marker. the only visible
- * feedback for a jump is the kbTurnFlash animation above, and it fades out. */
 
-/* transient feedback bubble for keyboard actions (see $store.ui.toast) */
 #kb-toast {
     position: fixed;
     bottom: 96px;

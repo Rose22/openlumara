@@ -1,54 +1,39 @@
-/* -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
-   skip layout & painting for off-screen content. `auto` keeps the content
-   findable via find-in-page and scrollable; contain-intrinsic-size with the
-   auto keyword remembers each element's last rendered size, so scrollbars
-   and native scroll anchoring stay stable across the skipping. */
 
-/* chat turns: of the loaded window only a handful are ever on screen.
-   pinned turns stay exempt - their sticky prompt must keep rendering */
 .turn:not(.prompt-pinned) {
     content-visibility: auto;
     contain-intrinsic-size: auto 400px;
 }
 
-/* sidebar day groups: collapsed weeks and distant history skip their rows */
 .day-group {
     content-visibility: auto;
     contain-intrinsic-size: auto 300px;
 }
 
-/* global search can list every chat in the archive */
 .global-search-result {
     content-visibility: auto;
     contain-intrinsic-size: auto 70px;
 }
 
-/* system logs: long-running servers keep thousands of entries in the box */
 .system-logs .entry {
     content-visibility: auto;
     contain-intrinsic-size: auto 28px;
 }
 
-/* modules / user-modules list cards (markdown descriptions included) */
 .unified-card {
     content-visibility: auto;
     contain-intrinsic-size: auto 90px;
 }
 
-/* installed repos in the skills / module libraries */
 .library-item {
     content-visibility: auto;
     contain-intrinsic-size: auto 80px;
 }
 
-/* settings lists and module drilldowns; nested parents skip whole subtrees */
 .setting-item {
     content-visibility: auto;
     contain-intrinsic-size: auto 70px;
 }
 
-/* inside a partially visible tall turn: long agent chains and expanded
-   tool cards far from the viewport skip painting until approached */
 .chain-station {
     content-visibility: auto;
     contain-intrinsic-size: auto 60px;

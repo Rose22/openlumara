@@ -391,7 +391,6 @@ Edit the config file for this, or use /config
 
         self.log("webui", f"Starting WebUI on {self.url}")
 
-        # check which domains are allowed to connect
         allowed_domains = []
         for allowed_domain in self.config.get("allowed_domains"):
             spec = allowed_domain.strip().lower().rstrip("/")

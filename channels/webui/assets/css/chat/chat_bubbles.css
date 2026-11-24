@@ -26,15 +26,6 @@
     box-shadow: none;
 }
 
-/* very subtle frosted glass, ONLY while a background picture is actually
-   on (the one thing worth shimmering through the bubbles) and the frosted
-   setting is enabled: a barely translucent tint and a gentle blur.
-   without a picture the bubbles keep their solid message-bg colors - a
-   8% see-through into a flat background is pure readability loss for
-   nothing - and the blur is skipped entirely */
-/* the fill lives in the frosted.css pseudo (dimmed gradient + darkening
-   scrim - color-mix can't handle the gradient bg, so no per-mix alpha);
-   the element itself stays transparent so the blur underneath survives */
 html.has-bg body:not(.no-frosted) #messages.chat-bubbles .message.user {
     background: none;
     backdrop-filter: blur(6px) saturate(1.15);
@@ -47,7 +38,6 @@ html.has-bg body:not(.no-frosted) #messages.chat-bubbles .message.assistant {
     -webkit-backdrop-filter: blur(6px) saturate(1.15);
 }
 
-/* no picture (or frosted glass off): fully solid, no backdrop work */
 html:not(.has-bg) #messages.chat-bubbles .message.assistant,
 body.no-frosted #messages.chat-bubbles .message.assistant {
     backdrop-filter: none;

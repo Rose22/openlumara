@@ -21,13 +21,6 @@
         background-size: var(--bg-pattern-size);
         */
 
-        /* native scroll anchoring (the browser default) stays ENABLED here:
-           it is what keeps the viewport perfectly still when older turns
-           are prepended above it (and when far-off turns are dropped below
-           it). setting `overflow-anchor: none` disables that and forces
-           error-prone manual scrollTop compensation - do not re-add it.
-           descendants that should never act as the anchor can still opt out
-           individually with `overflow-anchor: none`. */
 
         /* kept invisible (but laid out, so heights still measure) while a
            freshly loaded chat is scrolled to its end */
@@ -35,11 +28,6 @@
             visibility: hidden;
         }
         padding: 4px 20px;
-        /* the header floats over the chat (see header.css / init.js): the
-           scrollbox runs under it so bubbles blur behind its frost, and
-           this padding reserves the same strip so content at rest (and at
-           scrollTop 0) stays clear of it. --header-height tracks the live
-           header, including its collapse to zero */
         padding-top: calc(4px + var(--header-height, 0px));
         flex-direction: column;
         gap: 4px;
@@ -183,17 +171,10 @@
     --floating-input-height: 72px;
 }
 
-/* x-for needs a single root; display:contents keeps it from becoming a box,
-   so the marker and the turn stay direct flex children of #messages and the
-   pinned turn keeps its full stick range */
 #messages .turn-block {
     display: contents;
 }
 
-/* invisible flow marker tracking each user turn's true position for the
-   pinned-prompt observer. as an extra flex child it adds one net 4px gap
-   plus its own pixel, cancelled by this negative margin so spacing is
-   unchanged. */
 #messages .pin-marker {
     flex: none;
     height: 1px;
@@ -208,8 +189,6 @@
     transition: opacity 0.2s ease, height 0.3s ease;
 }
 
-/* floating (non-docked) input bar: an overlay surface the chat scrolls
-   beneath, with the same frosted-glass treatment as the pinned prompt */
 #chat-window:has(#input:not(.docked)) #messages {
     padding-bottom: calc(var(--floating-input-height) + 12px);
 }
@@ -223,17 +202,10 @@
     background: none;
 }
 
-/* solid controls inside the frosted wrapper would break the effect
-   (paired with the wrapper's frost in frosted.css) */
 #chat-window #input:not(.docked) #user-input {
     background: transparent;
 }
 
-/* upload queue stacked above the floating input: same seamless-seam trick
-   as the command popup (see autocomplete.css) - the wrapper drops its top
-   border and top radius so one shared line remains; the queue squares its
-   bottom, overlaps the seam by 1px, and wears the top corners plus the
-   clipped shadow (see upload.css) */
 #chat-window #input:not(.docked):has(.upload-queue) .input-wrapper {
     border-top-color: transparent;
     border-top-left-radius: 0;
@@ -241,10 +213,7 @@
     box-shadow: none;
 }
 
-/* all frosted-glass surfaces and the frost-disabled fallback: frosted.css */
 
-/* floating "jump back to the newest message" control, kept clear of the
-   input bar whether that bar is docked in-flow or overlaid over the chat */
 #scroll-to-bottom {
     position: absolute;
     left: 50%;
@@ -260,7 +229,6 @@
     justify-content: center;
 
     border: 1px solid var(--border-color);
-    /* frosted (see frosted.css) */
     background: var(--frost-bg-button);
     backdrop-filter: var(--frost-filter);
     -webkit-backdrop-filter: var(--frost-filter);
@@ -303,8 +271,6 @@
 
 #messages .turn.prompt-pinned:not(:has(.editing)) {
     position: sticky;
-    /* stick below the floating header strip, not under it (see the
-       --header-height padding on #messages) */
     top: calc(10px + var(--header-height, 0px));
     z-index: 20;
     pointer-events: none;
@@ -322,7 +288,6 @@
     max-width: 30% !important;
     white-space: nowrap;
     text-overflow: ellipsis;
-    /* frosted (see frosted.css) */
     background: var(--frost-bg-pinned);
     backdrop-filter: var(--frost-filter);
     -webkit-backdrop-filter: var(--frost-filter);

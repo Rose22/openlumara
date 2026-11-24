@@ -84,7 +84,6 @@ def register(app, channel):
 
         channel.manager.API.set_model(name)
 
-        # -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
         channel.context.invalidate_size_cache()
         await channel.websocket_manager.push_context_update()
         return utils.api_result({"name": name}, success=True)
@@ -166,7 +165,6 @@ def register(app, channel):
         if old_webui != new_webui:
             await channel.websocket_manager.broadcast({"type": "refresh_page"})
 
-        # -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
         channel.context.invalidate_size_cache()
         await channel.websocket_manager.push_context_update()
 
@@ -183,7 +181,6 @@ def register(app, channel):
         except core.api.APIError as e:
             return utils.api_result(str(e), success=False)
 
-        # -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
         channel.context.invalidate_size_cache()
         await channel.websocket_manager.push_context_update()
 

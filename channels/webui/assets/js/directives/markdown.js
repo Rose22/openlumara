@@ -51,9 +51,6 @@ function markdownRender(el, { expression }, { evaluateLater, effect, cleanup }) 
             // NOTE: [] is truthy, must check length - otherwise a disabled
             // fade still pays for the full subtree walk every frame
             if (batches && batches.length) {
-                // -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
-                // tail-bounded collection: only the nodes the batches
-                // actually reach get walked, not the whole subtree
                 const nodes = collectTailTextNodes(el, batchCharCount(batches) + 64);
                 // newest batch first; wrapTailChars skips already-wrapped
                 // nodes, so successive calls peel further back from the tail

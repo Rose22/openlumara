@@ -22,7 +22,6 @@
             </div>
         </template>
 
-        <!-- Text/URL (auto-masked when the field name hints at a secret) -->
         <template x-if="
             (setting.type === 'text' || setting.type === 'url')
             &&
@@ -204,7 +203,6 @@
             </div>
         </template>
 
-        <!-- API key field (always password-masked, with reveal toggle) -->
         <template x-if="setting.type === 'api_key'">
             <div class="row" x-data="{ revealed: false }">
                 <label x-text="setting.title"></label>

@@ -136,27 +136,11 @@ function renderMarkdown(text, live = false) {
 // turn ever get cached, since their content can't change anymore.
 const _mdCache = new WeakMap();
 
-// -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
-/*
- * live-stream tail split. while a message streams, its content is
- * append-only, so re-running marked + DOMPurify + hljs over the ENTIRE
- * text each paint gets expensive as long messages grow. we cut at the
- * last blank-line boundary that is provably outside a code fence, cache
- * the rendered HTML for everything before the cut, and only re-run the
- * pipeline over the tail each paint.
- *
- * below LIVE_SPLIT_MIN_CHARS a plain full render is cheaper than the
- * bookkeeping; boundaries only get accepted when they advance the cached
- * prefix by LIVE_SPLIT_MIN_STEP chars, so the tail stays chunk-sized
- * instead of churn per frame.
- */
 const LIVE_SPLIT_MIN_CHARS = 20000;
 const LIVE_SPLIT_MIN_STEP = 8192;
 
 const _liveSplitCache = new WeakMap();
 
-// count fence marker lines within [from, to); accepted cuts always sit at
-// a line start, so the scan range never splits a line
 function _countFenceLines(text, from, to) {
     let count = 0;
     const re = /^ {0,3}(?:`{3,}|~{3,})/gm;
