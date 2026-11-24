@@ -82,6 +82,10 @@ class StableDiffusion(core.module.Module):
             "description": "Like the global prompt, but for the negative prompt",
             "default": ""
         },
+        "insert_categories_into_system_prompt": {
+            "description": "Whether to add the list of available stable diffusion categories to the system prompt. Makes the AI aware of which categories are available to categorize your images into.",
+            "default": True
+        },
         'output_folder': {
             'description': 'Folder where generated images are saved and served from',
             'default': '~/gen_images'
@@ -266,10 +270,11 @@ class StableDiffusion(core.module.Module):
         if sysprompt:
             output.append(f"When generating images using stable diffusion, follow these instructions exactly: {sysprompt}")
 
-        cats = self._image_categories()
-        if len(cats) > 1:
-            output.append("Available categories to categorise generated images into: {}".format(
-                ", ".join(cats)))
+        if self.config.get("insert_categories_into_system_prompt"):
+            cats = self._image_categories()
+            if len(cats) > 1:
+                output.append("Available categories to categorise generated images into: {}".format(
+                    ", ".join(cats)))
 
         if not output:
             return None
