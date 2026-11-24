@@ -96,6 +96,10 @@ class ExampleModule(core.module.Module):
         """Will inject whatever string you return here into the user's message. Very useful for adding extra data that should persist in history. For example, when injecting timestamps, instead of using the end prompt for it (which would only show the AI what time it currently is), it can now give the AI a sense of when every message was sent."""
         pass
 
+    async def on_file_to_block(self, filename: str, file_data: bytes):
+        """Runs for every uploaded file, before the framework turns it into a message block. Return a content block here to take over that file yourself (PDFs, audio transcription, etc), or None to let the framework handle it as usual. The first module that returns a block wins, and an error here is logged and ignored instead of breaking the upload."""
+        return None
+
     async def on_install(self):
         """This runs after the module's dependencies are installed by the framework's auto-installer. Use it for post-installation hooks"""
         pass
