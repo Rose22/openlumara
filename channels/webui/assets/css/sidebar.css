@@ -257,8 +257,17 @@ body:has(.sidebar-resizer:active) {
         margin-top: 0;
         margin-left: auto;
         padding-top: 0;
-        padding-left: 6px;
+        padding-left: 8px;
         width: auto;
+        gap: 0;
+        /* dashed hairline splitting the footer buttons from the tab row */
+        border-left: 1px dashed color-mix(in srgb, var(--border-color) 75%, transparent);
+    }
+
+    .sidebar-tabbar-footer .sidebar-tab {
+        /* the 44px square is mostly dead padding around a 20px icon:
+           narrow the box, keep the full-height touch target */
+        width: 34px;
     }
 
     .sidebar-tab {
