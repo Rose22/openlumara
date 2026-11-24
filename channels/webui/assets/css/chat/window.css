@@ -193,6 +193,10 @@
     padding-bottom: calc(var(--floating-input-height) + 12px);
 }
 
+#chat-window:has(#input.docked) > #messages {
+    margin-bottom: 0;
+}
+
 #chat-window #input:not(.docked) {
     position: absolute;
     bottom: 0;
