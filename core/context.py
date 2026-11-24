@@ -544,8 +544,8 @@ Hard rules:
                 # now that's a good way to use AI coding, imho :)
                 # thanks Qwen3.6-35B!
                 cleaned_messages = [
-                    {**msg, "content": [item for item in (msg.get("content") or []) if item.get("type") == "text"]}
-                    if isinstance(msg.get("content"), list)
+                    {**msg, "content": [item for item in (msg.get("content") or []) if isinstance(item, dict) and item.get("type") == "text"]}
+                    if isinstance(msg, dict) and isinstance(msg.get("content"), list)
                     else msg
                     for msg in data
                 ]

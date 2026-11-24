@@ -495,11 +495,13 @@ class Channel:
             if not file_data:
                 continue
 
-            block = await self._module_file_to_block(filename, file_data)
-            if block is not None:
-                content_blocks.append(block)
-                filenames.append(filename)
-                continue
+            # let module hooks process files in their own way
+            blocks = await self._module_process_upload(filename, file_data)
+            if blocks:
+                for module_name, block in blocks:
+                    content_blocks.append(block)
+                    filenames.append(f"{filename} (processed by {module_name})")
+            continue
 
             mime_type = self._sniff_mime(file_data)
 
@@ -561,22 +563,25 @@ class Channel:
 
         return {"role": "user", "content": message}
 
-    async def _module_file_to_block(self, filename: str, file_data: bytes):
+    async def _module_process_upload(self, filename: str, file_data: bytes):
         """let modules replace multimodal content blocks with their own processed versions"""
+        block_mods = []
+
         for module_name, module in self.manager.modules.items():
             try:
                 if asyncio.iscoroutinefunction(module.on_upload):
                     block = await module.on_upload(filename, file_data)
+                    if block:
+                        block_mods.append((module_name, block))
                 else:
                     block = module.on_upload(filename, file_data)
+                    if block:
+                        block_mods.append((module_name, block))
             except Exception as e:
                 self.log("module error", f"{module_name}: in on_upload(): {core.detail_error(e)}")
                 continue
 
-            if block:
-                return block
-
-        return None
+        return block_mods
 
     def format_message(self, orig_message: dict):
         formatted = ""
