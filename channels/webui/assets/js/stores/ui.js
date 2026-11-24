@@ -1,5 +1,6 @@
 const _interruptBound = new WeakSet();
 
+// support phones and portrait-view on tablets
 window.isMobileViewport = () =>
     window.innerWidth <= 768 ||
     (window.matchMedia('(orientation: portrait)').matches && window.innerWidth <= 1024);

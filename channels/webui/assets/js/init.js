@@ -9,19 +9,6 @@ document.body.classList.toggle('no-frosted', localStorage.getItem('frostedGlassE
  * initializes Alpine and registers all the necessary stuff
  */
 document.addEventListener('alpine:init', async () => {
-    const chatHeader = document.querySelector('header');
-
-    if (chatHeader) {
-        const pushHeaderHeight = () => {
-            const h = chatHeader.offsetHeight;
-            document.documentElement.style.setProperty('--header-height', `${h}px`);
-            document.body.classList.toggle('header-empty', h === 0);
-        };
-
-        pushHeaderHeight();
-        new ResizeObserver(pushHeaderHeight).observe(chatHeader);
-    }
-
     // these are all defined in js/stores/
     Alpine.store("system", SYSTEM_STORE);
     Alpine.store("ui", UI_STORE);
@@ -33,14 +20,13 @@ document.addEventListener('alpine:init', async () => {
     Alpine.store('background', BACKGROUND_STORE);
     Alpine.store('upload', UPLOAD_STORE);
     Alpine.store('htmlPreview', HTML_PREVIEW_STORE);
-
     Alpine.store('palette', PALETTE);
-
+    
     Alpine.store('audio').init();
-
     Alpine.store('background').init();
-
+    
     Alpine.store('keyboard', KEYBOARD_STORE);
+    
     Alpine.store('keyboard').init();
 
     // start the browser notification system
@@ -63,14 +49,19 @@ document.addEventListener('alpine:init', async () => {
     // so tool call values only get the soft background when they scroll
     Alpine.directive('box', (el, modifiers, { cleanup }) => cleanup(boxIfScrolls(el)));
 
+    // make sure message bubbles only ever grow during a stream, never shrink
+    // makes frequent automatic collapsing and expanding of steps and toolcalls look seamless
     Alpine.directive('height-ratchet', (el, { expression }, { evaluateLater, effect, cleanup }) =>
         heightRatchet(el, evaluateLater(expression), effect, cleanup));
 
+    // pinned prompt (which shows the user message above the assistant message currently being viewed)
+    // as a sticky element floating above the assistant message
     Alpine.directive('prompt-marker', (el, { expression }, { evaluateLater, cleanup }) => {
         const run = evaluateLater(expression);
         cleanup(promptMarker(el, (intersecting) => run(() => {}, { scope: { intersecting } })));
     });
 
+    // icons for the command palette
     Alpine.directive('cmd-icon', (el, { expression }, { evaluate }) => {
         el.replaceChildren();
 
@@ -107,6 +98,7 @@ document.addEventListener('alpine:init', async () => {
     // fetch any relevant system data (like system logs, max context, etc)
     await Alpine.store('system').loadData();
 
+    // check for updates
     if (!window.ADMIN_SETTINGS_DISABLED && SYSTEM_STORE.autoCheckEnabled()) {
         setTimeout(() => Alpine.store('system').checkForUpdates(), 4000);
     }

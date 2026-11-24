@@ -35,12 +35,7 @@ def _page_info(turns, start, total):
 
 async def _turns_page(channel, before, limit):
     """groups the whole history, then slices out the page of turns ending at
-    the absolute index `before` (exclusive). before=None means the newest page.
-
-    -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
-    channel.group_history() caches its result in core, validated against the
-    message revision counter (appends only re-group the trailing turn), so
-    paging up and per-message reloads no longer regroup per request."""
+    the absolute index `before` (exclusive). before=None means the newest page."""
     history = await channel.group_history()
     total = len(history)
 
