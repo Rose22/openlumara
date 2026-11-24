@@ -82,10 +82,22 @@ class APIClient():
     # -------------------
     def _api_headers(self):
         """auth headers for calls to the API"""
+        headers = {}
+
         key = core.config.get("api", "key")
         if key:
-            return {"Authorization": f"Bearer {key}"}
-        return {}
+            headers["Authorization"] = f"Bearer {key}"
+
+        # mark this request as coming from OpenLumara
+        headers["X-OpenLumara"] = "true"
+
+        # add the chat ID to the request
+        if hasattr(self.manager, "channel") and self.manager.channel:
+            chat_id = self.manager.channel.context.chat.get("id") or None
+            if chat_id:
+                headers["X-OpenLumara-Chat-ID"] = str(chat_id)
+
+        return headers
 
     def _json_headers(self):
         headers = self._api_headers()
