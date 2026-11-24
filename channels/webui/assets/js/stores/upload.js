@@ -11,11 +11,26 @@ const UPLOAD_STORE = {
         this.files.splice(index, 1);
     },
 
+    // -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
+    // ArrayBuffer + chunked btoa instead of a data-URL: the old path held the
+    // full data URL AND its split() copy alive per file (~2.7x file size of
+    // transient garbage); this touches the bytes once and keeps only the
+    // base64 result. now also rejects on read failure - the old promise hung
+    // forever, freezing send with the draft already cleared.
     readFileAsBase64(file) {
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
             const reader = new FileReader();
-            reader.onload = () => resolve(reader.result.split(",")[1]);
-            reader.readAsDataURL(file);
+            reader.onload = () => {
+                const bytes = new Uint8Array(reader.result);
+                const CHUNK = 0x8000;
+                let binary = '';
+                for (let i = 0; i < bytes.length; i += CHUNK) {
+                    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+                }
+                resolve(btoa(binary));
+            };
+            reader.onerror = () => reject(reader.error);
+            reader.readAsArrayBuffer(file);
         });
     },
 

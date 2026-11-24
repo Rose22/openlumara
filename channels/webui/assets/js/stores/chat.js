@@ -1128,12 +1128,26 @@ CHAT_STORE = {
         let files = null;
 
         if (uploadStore.files.length > 0) {
-            files = await Promise.all(
-                uploadStore.files.map(async (file) => ({
-                    name: file.name,
-                    data: await uploadStore.readFileAsBase64(file)
-                }))
-            );
+            try {
+                files = await Promise.all(
+                    uploadStore.files.map(async (file) => ({
+                        name: file.name,
+                        data: await uploadStore.readFileAsBase64(file)
+                    }))
+                );
+            } catch (err) {
+                // -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
+                // a failed read must not hang or eat the draft: restore the
+                // input (attached files are still in the store) so the send
+                // can simply be retried
+                console.error('attachment read failed:', err);
+                this.user_input = text;
+                if (!wasSteering) {
+                    Alpine.store("stream").state = 'idle';
+                }
+                Alpine.store("ui").toast('Failed to read an attached file - nothing was sent.');
+                return;
+            }
         }
 
         AudioManager.play("send_message");

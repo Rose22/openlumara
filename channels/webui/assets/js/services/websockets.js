@@ -6,6 +6,9 @@ let serverShutdownSeen = false;
 let wsClosedAt = null;
 
 let wsHeartbeatTimer = null;
+// -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
+// tracked reconnect timer so only one retry chain can ever be in flight
+let wsReconnectTimer = null;
 window.wsLastRx = Date.now();
 
 // intended to be used to queue up messages for sending to the backend in case the
@@ -17,6 +20,11 @@ let streamFinalizing = false;
 
 
 async function connectWebSocket() {
+    // -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
+    // a fresh attempt is starting: clear the in-flight flag so this socket's
+    // own close/error events get processed normally
+    wsReconnecting = false;
+
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const token = window.apiToken || '';
     const tokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
@@ -112,8 +120,15 @@ async function connectWebSocket() {
 }
 
 async function scheduleWsReconnect() {
+    // -- AI GENERATED CODE (Qwen3.8-Flash-Next-Gufo) :: (2026-11-24) harness:openlumara
+    // dedupe on the timer: without this, overlapping close/error paths could
+    // fork parallel reconnect chains that each pile on sockets and reloads
+    if (wsReconnectTimer !== null) return;
+
+    wsReconnecting = true;
     console.log(`attempting to reconnect to websocket..`);
-    setTimeout(function () {
+    wsReconnectTimer = setTimeout(function () {
+        wsReconnectTimer = null;
         connectWebSocket();
     }, 1000);
 }
