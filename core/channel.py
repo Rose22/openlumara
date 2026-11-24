@@ -501,7 +501,7 @@ class Channel:
                 for module_name, block in blocks:
                     content_blocks.append(block)
                     filenames.append(f"{filename} (processed by {module_name})")
-            continue
+                continue
 
             mime_type = self._sniff_mime(file_data)
 
