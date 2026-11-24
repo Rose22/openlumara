@@ -22,3 +22,39 @@
     content-visibility: auto;
     contain-intrinsic-size: auto 70px;
 }
+
+/* system logs: long-running servers keep thousands of entries in the box */
+.system-logs .entry {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 28px;
+}
+
+/* modules / user-modules list cards (markdown descriptions included) */
+.unified-card {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 90px;
+}
+
+/* installed repos in the skills / module libraries */
+.library-item {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 80px;
+}
+
+/* settings lists and module drilldowns; nested parents skip whole subtrees */
+.setting-item {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 70px;
+}
+
+/* inside a partially visible tall turn: long agent chains and expanded
+   tool cards far from the viewport skip painting until approached */
+.chain-station {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 60px;
+}
+
+.tool-call-card {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 48px;
+}
