@@ -26,6 +26,7 @@ import prompt_toolkit.auto_suggest
 import rich
 import rich.console
 import rich.text
+import rich.cells
 import rich.status
 import rich.box
 import rich.panel
@@ -87,31 +88,37 @@ def tail_lines(text, max_lines):
 
     return "\n".join(lines)
 
-def tail_text(text, max_chars):
-    """last max_chars characters of text as WHOLE lines (dropping lines
-    from the top until it fits), with a .. marker when lines were dropped.
-    Never cuts mid-line, so indented previews stay aligned.
-    max_chars of 0 means show everything."""
+def crop_line(ln, max_cells):
+    """hard-crop a line to max_cells terminal cells (never wraps it),
+    keeping the TAIL: in a stream the freshest content is at the end of
+    the last line, so the window slides instead of pinning the start.
+    A .. prefix marks where the line was cut"""
+    if not max_cells or rich.cells.cell_len(ln) <= max_cells:
+        return ln
+
+    if max_cells <= 2:
+        return rich.cells.split_text(ln, rich.cells.cell_len(ln) - max_cells)[1]
+
+    # split_text keeps graphemes whole (a wide glyph caught by the cut
+    # becomes spaces, never half a character)
+    tail = rich.cells.split_text(ln, rich.cells.cell_len(ln) - (max_cells - 2))[1]
+    return ".." + tail.lstrip()
+
+def window_text(text, max_lines, max_line_cells=0):
+    """last max_lines lines (fixed height once filled, .. marked), with
+    every line hard-cropped to max_line_cells cells so nothing wraps.
+    discord's streaming preview: lines govern height, cells govern width"""
     if not text:
         return ""
 
     lines = text.rstrip().splitlines()
-    if not max_chars:
-        return "\n".join(lines)
+    if max_lines and len(lines) > max_lines:
+        lines = [".."] + lines[-max_lines:]
 
-    kept = []
-    total = 0
-    for ln in reversed(lines):
-        total += len(ln) + 1
-        if total > max_chars and kept:
-            break
-        kept.append(ln)
+    if max_line_cells:
+        lines = [crop_line(ln, max_line_cells) for ln in lines]
 
-    kept.reverse()
-    if len(kept) < len(lines):
-        return "..\n" + "\n".join(kept)
-
-    return "\n".join(kept)
+    return "\n".join(lines)
 
 SENTENCE_SPLIT = re.compile(r"(?<=[.!?\u2026])\s+")
 
@@ -137,12 +144,13 @@ def thought_snippet(text, limit=80):
     return head.rstrip() + "\u2026"
 
 class StepTreeView:
-    # live previews stay short so the live area never balloons past the
-    # screen. budgets are in characters, not lines (like the discord
-    # channel's CHUNK_SIZE), so long single lines get trimmed too
-    LIVE_REASONING_CHARS = 800
-    LIVE_CONTENT_CHARS = 800
-    LIVE_ARG_CHARS = 200
+    # live previews keep a FIXED line count once filled (stable height),
+    # with lines cropped so they never wrap and add height anyway -
+    # same trick as the discord channel's reasoning stream
+    LIVE_REASONING_LINES = 5
+    LIVE_CONTENT_LINES = 5
+    LIVE_ARG_LINES = 6
+    LIVE_LINE_MIN_CELLS = 120
     # final answers are trimmed by line count, scaled to the viewport
     LIVE_FINAL_MIN_LINES = 6
     LIVE_FINAL_VIEWPORT_FRACTION = 0.5
@@ -288,7 +296,7 @@ class StepTreeView:
             else:
                 text = str(value)
 
-            shown = tail_text(text, self.LIVE_ARG_CHARS)
+            shown = window_text(text, self.LIVE_ARG_LINES, self._line_cells(14))
 
             # code args get their own highlighted block under the label,
             # framed in a rounded border in the accent color
@@ -368,11 +376,16 @@ class StepTreeView:
                 segments.append(("  \u2192 " + result, "dim green"))
         return segments, mods
 
+    def _line_cells(self, reserve):
+        # cells available per line after a renderable's horizontal reserve.
+        # floored, so a narrow terminal still shows usable content
+        return max(self.channel.console.width - reserve, self.LIVE_LINE_MIN_CELLS)
+
     def _reasoning_block(self, text):
-            # the indent lives in Padding, not in the text, so blank lines keep
-            # the same styled left gutter as content lines
-            body = rich.text.Text(text.rstrip(), style="dim italic")
-            return rich.padding.Padding(body, (0, 0, 0, 5))
+        # the indent lives in Padding, not in the text, so blank lines keep
+        # the same styled left gutter as content lines
+        body = rich.text.Text(text.rstrip(), style="dim italic", overflow="crop")
+        return rich.padding.Padding(body, (0, 0, 0, 5))
 
     def _step_lines(self, step, live):
         accent = self.channel._get_accent_color()
@@ -420,9 +433,11 @@ class StepTreeView:
                 # tool call: the thinking is over, the args are the story now
                 has_toolcalls = bool(step.get("tool_calls"))
                 if show_reasoning and reasoning.strip() and not has_toolcalls:
-                    lines.append(self._reasoning_block(tail_text(reasoning, self.LIVE_REASONING_CHARS)))
+                    preview = window_text(reasoning, self.LIVE_REASONING_LINES, self._line_cells(5))
+                    lines.append(self._reasoning_block(preview))
                 if content.strip():
-                    md = self._md(("step", step.get("step")), tail_text(content, self.LIVE_CONTENT_CHARS))
+                    preview = window_text(content, self.LIVE_CONTENT_LINES, self._line_cells(4))
+                    md = self._md(("step", step.get("step")), preview)
                     lines.append(rich.padding.Padding(md, (0, 0, 0, 4)))
 
                 for tool, tool_line in zip(step.get("tool_calls") or [], tool_lines):
