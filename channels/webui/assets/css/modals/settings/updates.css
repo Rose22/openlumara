@@ -232,6 +232,36 @@
     }
 }
 
+/* --- update-available badges outside the panel: sidebar entries --- */
+.update-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 6px var(--accent-glow);
+    flex-shrink: 0;
+    pointer-events: none;
+}
+
+.sidebar-tab.update-available {
+    color: var(--accent);
+    position: relative;
+}
+
+.sidebar-tab .update-dot {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+}
+
+.settings-modal .sidebar .item.update-available {
+    color: var(--accent);
+
+    .update-dot {
+        margin-left: auto;
+    }
+}
+
 /* phones: the card stacks so actions get full width */
 @media (max-width: 768px), (orientation: portrait) and (max-width: 1024px) {
     .updates-panel .update-card {

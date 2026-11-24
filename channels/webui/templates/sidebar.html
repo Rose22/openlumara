@@ -52,9 +52,11 @@
         <div class="sidebar-tabbar-footer">
             {{ extension_slot('sidebar_bottom') }}
             {% if config.get("enable_admin_settings") %}
-                <button type="button" class="sidebar-tab footer-btn" title="Settings"
+                <button type="button" class="sidebar-tab footer-btn" :class="{ 'update-available': $store.system.update.anyUpdates }"
+                    :title="$store.system.update.anyUpdates ? 'Settings - updates available' : 'Settings'"
                     @click="await $store.ui.openModal('settings')">
                     {% include 'svg/gear.svg' %}
+                    <span class="update-dot" x-show="$store.system.update.anyUpdates" x-cloak></span>
                 </button>
             {% endif %}
         </div>

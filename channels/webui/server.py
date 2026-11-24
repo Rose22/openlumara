@@ -38,6 +38,7 @@ ADMIN_ONLY_ENDPOINTS = [
     "/api/system/update",
     "/api/system/entry_updates",
     "/api/system/entry_update",
+    "/api/system/update_all",
     
     "/api/libraries/status",
     "/api/libraries/stage",

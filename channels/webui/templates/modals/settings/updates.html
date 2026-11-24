@@ -57,6 +57,13 @@
                             :disabled="$store.system.update.updating">
                         <span x-text="$store.system.update.updating ? 'Updating..' : 'Update now'"></span>
                     </button>
+                    <button type="button" class="update-btn primary"
+                            x-show="$store.system.update.anyUpdates && $store.system.update.entries.some(e => e.update_available)"
+                            x-cloak
+                            @click="$store.system.updateAll()"
+                            :disabled="$store.system.update.updating">
+                        <span x-text="$store.system.update.updating ? 'Updating..' : 'Update All'"></span>
+                    </button>
                 </div>
             </div>
         </template>

@@ -23,8 +23,8 @@
                     <hr class="nav-divider">
                 </template>
 
-                <button 
-                    :class="{ active: activeNavCategory === cat }"
+                <button
+                    :class="{ active: activeNavCategory === cat, 'update-available': cat === 'system_updates' && $store.system.update.anyUpdates }"
                     @click="await switchCategory(cat)"
                     class="item"
                 >
@@ -34,6 +34,7 @@
                         {%- endfor %}
                     </span>
                     <span x-text="data.title"></span>
+                    <span class="update-dot" x-show="cat === 'system_updates' && $store.system.update.anyUpdates" x-cloak></span>
                 </button>
 
                 <!-- Module/Channel sub-lists -->

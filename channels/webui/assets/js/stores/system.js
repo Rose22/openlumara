@@ -18,6 +18,11 @@ SYSTEM_STORE = {
         // when the entry statuses were last fetched: the repo panels reuse
         // these results within a minute instead of refetching every repo
         checkedAt: null,
+
+        get anyUpdates() {
+            return Boolean(this.status && this.status.update_available)
+                || (this.entries || []).some(e => e.update_available);
+        },
     },
 
     async checkForUpdates() {
@@ -142,6 +147,46 @@ SYSTEM_STORE = {
             this.update.updating = false;
             this.restarting = false;
             this.update.error = data;
+        }
+    },
+
+    async updateAll() {
+        if (!this.update.anyUpdates || this.update.updating) return;
+        if (!confirm('Update OpenLumara and all installed modules/channels with available updates? The server will restart automatically when it finishes.')) return;
+
+        this.update.updating = true;
+        this.restart("Updating everything.. the server restarts automatically when it finishes");
+
+        let resp = null;
+        try {
+            resp = await (await fetch("/api/system/update_all", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: "{}"
+            })).json();
+        } catch (e) {
+            // server died mid-request while restarting: keep the overlay up,
+            // the websocket reconnect reloads the page. socket still open
+            // means this was a real failure.
+            if (window.socket && window.socket.readyState === WebSocket.OPEN) {
+                this.update.updating = false;
+                this.restarting = false;
+                this.update.error = typeof e === 'string' ? e : 'Update failed';
+                this.checkForUpdates();
+            }
+            return;
+        }
+
+        // structured response = nothing needed the restart after all:
+        // lift the overlay and show whatever failed; a string response is
+        // the update script's output, restart is underway, overlay stays.
+        if (resp && resp.data && typeof resp.data === 'object') {
+            this.update.updating = false;
+            this.restarting = false;
+            if ((resp.data.failed || []).length) {
+                this.update.error = 'Some updates failed: ' + resp.data.failed.join(' | ');
+            }
+            this.checkForUpdates();
         }
     },
 

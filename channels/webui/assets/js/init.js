@@ -128,6 +128,13 @@ document.addEventListener('alpine:init', async () => {
     // fetch any relevant system data (like system logs, max context, etc)
     await Alpine.store('system').loadData();
 
+    // background update check so the settings gear can badge before the
+    // modal is ever opened; delayed so it never competes with page load
+    // (each repo check does its own git fetch)
+    if (!window.ADMIN_SETTINGS_DISABLED) {
+        setTimeout(() => Alpine.store('system').checkForUpdates(), 4000);
+    }
+
     // fetch current chat
     try {
         await Alpine.store('chat').load();

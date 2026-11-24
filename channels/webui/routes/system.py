@@ -254,6 +254,55 @@ def register(app, channel):
 
         return utils.api_result(output)
 
+    @app.post("/api/system/update_all")
+    async def update_all():
+        """pulls every installed module/channel repo, then OpenLumara itself (which restarts); restarts once if only entries changed"""
+        if update_lock.locked():
+            return utils.api_result("An update is already running.", success=False)
+
+        core_res = await update_check()
+        core_available = bool(core_res.get("success") and (core_res.get("data") or {}).get("update_available"))
+
+        mm = channel.manager.module_manager
+        updated, failed = [], []
+        entry_changed = False
+        for item in mm.list_installed():
+            if item["type"] not in ("module", "channel") or not item.get("git"):
+                continue
+
+            name = item["name"]
+            try:
+                success, message, kind, changed = await mm.update_entry(name)
+            except Exception as e:
+                failed.append(f"{name}: {core.detail_error(e)}")
+                continue
+
+            if not success:
+                failed.append(f"{name}: {message}")
+                continue
+
+            if changed:
+                updated.append(name)
+                entry_changed = True
+                pkg = "user_channels" if kind == "channel" else "user_modules"
+                try:
+                    await core.modules.install_module_deps(__import__(pkg), name, channel.manager)
+                except Exception as e:
+                    channel.log("webui", f"dependency install failed for {name}: {core.detail_error(e)}")
+
+        channel.log("webui", f"update all: updated {updated or 'nothing'}"
+                             f"{'; failed: ' + '; '.join(failed) if failed else ''}"
+                             f"; core {'updating' if core_available else 'up to date'}")
+
+        if core_available:
+            return await trigger_update()
+
+        if entry_changed:
+            async with update_lock:
+                await channel.manager.restart(hard=True)
+
+        return utils.api_result({"updated": updated, "failed": failed})
+
     # -- POST
     @app.post("/api/system/restart")
     async def restart_server():
