@@ -31,6 +31,38 @@
         margin: 6px 0 10px 0;
     }
 
+    /* "update available" pill on module/channel cards (next to the repo note) */
+    .card-update-badge {
+        display: inline-flex;
+        align-items: center;
+        margin-left: 8px;
+        padding: 1px 9px;
+        border: 1px solid var(--accent);
+        border-radius: 99px;
+        background: var(--button-bg);
+        color: var(--button-text);
+        font-size: 11px;
+        font-weight: 500;
+        white-space: nowrap;
+        vertical-align: middle;
+        cursor: default;
+    }
+
+    /* the update icon button lights up while an update is pending */
+    .library-btn.icon.update-available {
+        border-color: var(--accent);
+        color: var(--accent);
+    }
+
+    /* busy feedback: the reload icon spins while its card works */
+    .icon-spin {
+        display: inline-flex;
+
+        &.spinning {
+            animation: library-spin 0.9s linear infinite;
+        }
+    }
+
 
     /* buttons: same visual language as the settings footer, but local */
     .library-btn {

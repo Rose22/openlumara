@@ -47,14 +47,22 @@
                         <div class="info" @click="activeModule = module">
                             <span type="button" class="btn" x-text="formatLabel(module)"></span>
                             <p class="description" x-html="renderMarkdown($store.settings.categories[activeCategory].descriptions[module]) || ''"></p>
-                            <p class="library-note" x-show="repoNameOf(module)" x-text="repoNameOf(module)" title="comes from this repo"></p>
+                            <p class="library-note" x-show="repoNameOf(module)" title="comes from this repo">
+                                <span x-text="repoNameOf(module)"></span>
+                                <span class="card-update-badge" x-show="hasUpdate(module)" x-cloak
+                                      :title="statusTitle(module)">update available</span>
+                            </p>
                         </div>
                         <template x-if="isGitContent(module)">
                             <div class="git-card-actions">
-                                <button type="button" class="library-btn icon" @click="updateContent(module)"
+                                <button type="button" class="library-btn icon"
+                                        :class="{ 'update-available': hasUpdate(module) }"
+                                        @click="updateContent(module)"
                                         :disabled="busyName !== null"
-                                        :title="busyName === module ? 'Working..' : 'Update from its repo'">
-                                    {% include 'svg/reload.svg' %}
+                                        :title="busyName === module ? 'Working..' : statusTitle(module)">
+                                    <span class="icon-spin" :class="{ spinning: busyName === module }">
+                                        {% include 'svg/reload.svg' %}
+                                    </span>
                                 </button>
                                 <button type="button" class="library-btn danger icon" @click="uninstallContent(module)"
                                         :disabled="busyName !== null" title="Uninstall">

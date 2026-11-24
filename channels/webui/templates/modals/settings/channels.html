@@ -38,14 +38,22 @@
                     <div class="info" @click="activeChannel = channel">
                         <span type="button" class="channel-name-btn" x-text="formatLabel(channel)"></span>
                         <p class="description" x-html="renderMarkdown($store.settings.categories[activeCategory].descriptions[channel]) || ''"></p>
-                        <p class="library-note" x-show="repoNameOf(channel)" x-text="repoNameOf(channel)" title="comes from this repo"></p>
+                        <p class="library-note" x-show="repoNameOf(channel)" title="comes from this repo">
+                            <span x-text="repoNameOf(channel)"></span>
+                            <span class="card-update-badge" x-show="hasUpdate(channel)" x-cloak
+                                  :title="statusTitle(channel)">update available</span>
+                        </p>
                     </div>
                     <template x-if="isGitContent(channel)">
                         <div class="git-card-actions">
-                            <button type="button" class="library-btn icon" @click="updateContent(channel)"
+                            <button type="button" class="library-btn icon"
+                                    :class="{ 'update-available': hasUpdate(channel) }"
+                                    @click="updateContent(channel)"
                                     :disabled="busyName !== null"
-                                    :title="busyName === channel ? 'Working..' : 'Update from its repo'">
-                                {% include 'svg/reload.svg' %}
+                                    :title="busyName === channel ? 'Working..' : statusTitle(channel)">
+                                <span class="icon-spin" :class="{ spinning: busyName === channel }">
+                                    {% include 'svg/reload.svg' %}
+                                </span>
                             </button>
                             <button type="button" class="library-btn danger icon" @click="uninstallContent(channel)"
                                     :disabled="busyName !== null" title="Uninstall">

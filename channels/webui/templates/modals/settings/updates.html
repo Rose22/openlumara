@@ -1,0 +1,122 @@
+<template x-if="activeCategory === 'system_updates' && !activeModule && !activeChannel">
+    <div class="section updates-panel">
+        <h3 class="section-title">Updates</h3>
+
+        <div class="update-message error" x-show="$store.system.update.error" x-cloak>
+            <span x-text="$store.system.update.error"></span>
+        </div>
+
+        <!-- first check still in flight -->
+        <div class="update-message info" x-show="!$store.system.update.status && $store.system.update.checking">
+            <span>Checking for updates..</span>
+        </div>
+
+        <template x-if="$store.system.update.status">
+            <div class="update-card">
+                <div class="update-card-main">
+                    <div class="update-card-header">
+                        <span class="update-item-label">OpenLumara</span>
+                        <span class="update-badge"
+                              :class="{
+                                  'ok': !$store.system.update.status.update_available && !$store.system.update.status.note,
+                                  'available': $store.system.update.status.update_available,
+                                  'warn': !!$store.system.update.status.note
+                              }"
+                              x-text="
+                                  $store.system.update.status.note ? 'Unknown' :
+                                  ($store.system.update.status.update_available ? 'Update available' : 'Up to date')">
+                        </span>
+                    </div>
+
+                    <p class="update-detail" x-show="$store.system.update.status.branch">
+                        <span x-text="$store.system.update.status.branch"></span> @
+                        <code x-text="$store.system.update.status.commit"></code>
+                        <template x-if="$store.system.update.status.update_available">
+                            <span class="update-remote">→ <code x-text="$store.system.update.status.remote_commit"></code>
+                                (<span x-text="$store.system.update.status.behind"></span> commit<span x-show="$store.system.update.status.behind != 1">s</span> behind)</span>
+                        </template>
+                        <template x-if="$store.system.update.status.ahead > 0">
+                            <span class="update-remote">· <span x-text="$store.system.update.status.ahead"></span> local commit<span x-show="$store.system.update.status.ahead != 1">s</span> ahead</span>
+                        </template>
+                    </p>
+
+                    <p class="update-note" x-show="$store.system.update.status.note" x-text="$store.system.update.status.note"></p>
+                </div>
+
+                <div class="update-card-actions">
+                    <button type="button" class="update-btn"
+                            @click="$store.system.checkForUpdates()"
+                            :disabled="$store.system.update.checking || $store.system.update.updating || $store.system.update.entries.some(e => e.updating)">
+                        <span class="spinner tiny" x-show="$store.system.update.checking" x-cloak></span>
+                        <span x-text="$store.system.update.checking ? 'Checking..' : 'Check again'"></span>
+                    </button>
+                    <button type="button" class="update-btn primary"
+                            x-show="$store.system.update.status.update_available"
+                            x-cloak
+                            @click="$store.system.performUpdate()"
+                            :disabled="$store.system.update.updating">
+                        <span x-text="$store.system.update.updating ? 'Updating..' : 'Update now'"></span>
+                    </button>
+                </div>
+            </div>
+        </template>
+
+        <template x-for="group in [
+                { label: 'Modules', items: $store.system.update.entries.filter(e => e.type === 'module') },
+                { label: 'Channels', items: $store.system.update.entries.filter(e => e.type === 'channel') }
+            ]" :key="group.label">
+            <template x-if="group.items.length">
+                <div class="update-entries">
+                    <h4 class="update-entries-title" x-text="group.label"></h4>
+
+                    <template x-for="entry in group.items" :key="entry.name">
+                        <div class="update-entry">
+                            <div class="update-entry-main">
+                                <div class="update-entry-header">
+                                    <span class="update-entry-name" x-text="entry.name"></span>
+                                    <template x-if="!entry.error">
+                                        <span class="update-badge"
+                                              :class="{
+                                                  'ok': !entry.update_available && !entry.note,
+                                                  'available': entry.update_available,
+                                                  'warn': !!entry.note
+                                              }"
+                                              x-text="
+                                                  entry.note ? 'Unknown' :
+                                                  (entry.update_available ? 'Update available' : 'Up to date')">
+                                        </span>
+                                    </template>
+                                </div>
+
+                                <p class="update-detail" x-show="entry.library">
+                                    <span class="update-remote" x-text="entry.library"></span>
+                                    <template x-if="entry.commit">
+                                        <span class="update-remote">· @ <code x-text="entry.commit"></code>
+                                            <template x-if="entry.update_available">
+                                                → <code x-text="entry.remote_commit"></code>
+                                                (<span x-text="entry.behind"></span> commit<span x-show="entry.behind != 1">s</span> behind)
+                                            </template>
+                                        </span>
+                                    </template>
+                                </p>
+
+                                <p class="update-note" x-show="entry.note" x-text="entry.note"></p>
+                                <p class="update-message error inline" x-show="entry.error" x-cloak>
+                                    <span x-text="entry.error"></span>
+                                </p>
+                            </div>
+
+                            <button type="button" class="update-btn primary"
+                                    x-show="entry.update_available && !entry.error"
+                                    x-cloak
+                                    :disabled="entry.updating || $store.system.update.updating"
+                                    @click="$store.system.updateEntry(entry)">
+                                <span x-text="entry.updating ? 'Updating..' : 'Update'"></span>
+                            </button>
+                        </div>
+                    </template>
+                </div>
+            </template>
+        </template>
+    </div>
+</template>

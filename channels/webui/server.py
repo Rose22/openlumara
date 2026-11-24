@@ -34,6 +34,10 @@ ADMIN_ONLY_ENDPOINTS = [
     "/api/system/logs",
     "/api/system/restart",
     "/api/system/context_size",
+    "/api/system/update_check",
+    "/api/system/update",
+    "/api/system/entry_updates",
+    "/api/system/entry_update",
     
     "/api/libraries/status",
     "/api/libraries/stage",

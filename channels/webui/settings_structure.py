@@ -168,6 +168,12 @@ def build_settings_structure(original_data, module_info, core_sections, skills_e
         "order": 100,
         "isThemeCategory": True,
     }
+    categories["system_updates"] = {
+        "title": "Updates",
+        "description": "Check the git remote for new versions and update OpenLumara",
+        "order": 101,
+        "isThemeCategory": True,
+    }
     categories["system_logs"] = {
         "title": "System Logs",
         "description": "Peek into the great unknown",

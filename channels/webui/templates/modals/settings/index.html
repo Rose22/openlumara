@@ -67,11 +67,14 @@
                         <!-- SYSTEM LOGS -->
                         {% include 'modals/settings/logs.html' %}
 
+                        <!-- UPDATES -->
+                        {% include 'modals/settings/updates.html' %}
+
                         {{ extension_slot("settings_page") }}
                         
                         <!-- ALL OTHER $store.settings.categories (core and so on) -->
                         <template x-if="!activeModule && !activeChannel && 
-                                         !['appearance', 'audio', 'keyboard', 'modules', 'user_modules', 'channels', 'user_channels', 'your_skills', 'system_prompt', 'system_logs'].includes(activeCategory) && 
+                                         !['appearance', 'audio', 'keyboard', 'modules', 'user_modules', 'channels', 'user_channels', 'your_skills', 'system_prompt', 'system_logs', 'system_updates'].includes(activeCategory) && 
                                          activeCategory">
                             <div class="section">
                                 <h3 class="section-title" x-text="$store.settings.categories[activeCategory].title"></h3>

@@ -140,6 +140,10 @@ function settingsModal() {
             // always pull fresh settings from the backend on every open
             if (!window.ADMIN_SETTINGS_DISABLED) {
                 await Alpine.store('settings').load();
+
+                // fire off the git update check in the background so the
+                // Updates page shows fresh remote status without a click
+                Alpine.store('system').checkForUpdates();
             }
         },
 
