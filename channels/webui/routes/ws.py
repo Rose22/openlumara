@@ -59,6 +59,8 @@ def register(app, channel):
                     data = json.loads(data_text)
                     msg_type = data.get("type")
 
+                    # channel.log("webui ws debug", f"{msg_type}: {data}")
+
                     match msg_type:
                         case "ping":
                             # keepalive ping

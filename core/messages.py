@@ -40,6 +40,11 @@ class Messages:
         #             if key not in chat.keys():
         #                 self.data[index][key] = default_value
 
+    def note_mutation_at(self, index: int):
+        """forces the turn group cache to refresh from (index) onward"""
+        if self.mutated_below is None or index < self.mutated_below:
+            self.mutated_below = index
+
     async def save(self):
         """saves data and updates the chat's timestamp"""
 
@@ -128,10 +133,14 @@ class Messages:
 
         self.data[index] = message
         self.revision += 1
+
+        self.note_mutation_at(index)
         await self.save()
 
     async def delete(self, index: int):
         """delete message from current chat"""
+        self.note_mutation_at(index)
+
         self.data.pop(index)
         self.revision += 1
         index = len(self.data) - 1
@@ -149,12 +158,16 @@ class Messages:
         # return all messages up to (but not including) the target message
         new_messages = self.data[:index]
 
+        self.note_mutation_at(index)
+
         self.data.load(new_messages)
         self.revision += 1
         await self.save()
         return True
 
     async def clear(self):
+        self.note_mutation_at(0)
+
         self.data.clear()
         self.revision += 1
         return True
