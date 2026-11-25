@@ -24,6 +24,10 @@ document.addEventListener('alpine:init', async () => {
     
     Alpine.store('audio').init();
     Alpine.store('background').init();
+
+    // app-wide file-drop guard so drops that miss the chat window don't
+    // navigate the browser away from it (see UPLOAD_STORE.init)
+    if (document.body.hasAttribute('data-file-upload')) Alpine.store('upload').init();
     
     Alpine.store('keyboard', KEYBOARD_STORE);
     

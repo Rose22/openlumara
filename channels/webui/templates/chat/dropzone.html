@@ -1,0 +1,12 @@
+<!--
+    file drop overlay: fills the chat window while a file is dragged over it.
+    pointer-events are disabled so the drag events always target the window itself.
+-->
+<div class="drop-overlay" x-show="$store.upload.dragging" x-cloak x-transition.opacity.duration.150ms aria-hidden="true">
+    <div class="drop-overlay-card">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+        </svg>
+        <span>Drop files to attach them</span>
+    </div>
+</div>

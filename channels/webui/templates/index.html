@@ -85,7 +85,7 @@
 
         {{ extension_slot("head") }}
     </head>
-    <body{% if login_enabled %} data-login-enabled{% endif %}>
+    <body{% if login_enabled %} data-login-enabled{% endif %}{% if config.get('enable_file_upload') %} data-file-upload{% endif %}>
         <!-- 
             we use alpine stores for data access across the app,
             as putting every possible thing in one massive data object was no fun
@@ -124,7 +124,16 @@
                         @dblclick="$store.ui.resetSidebarWidth()"></div>
                 {% endif %}
 
-                <section id="chat-window">
+                <section id="chat-window"
+                    {% if config.get('enable_file_upload') %}
+                    @dragenter="$store.upload.onDragEnter($event)"
+                    @dragover="$store.upload.onDragOver($event)"
+                    @dragleave="$store.upload.onDragLeave($event)"
+                    @drop="$store.upload.onDrop($event)"
+                    {% endif %}>
+                    {% if config.get('enable_file_upload') %}
+                    {% include 'chat/dropzone.html' %}
+                    {% endif %}
                     {% include 'chat/index.html' %}
                 </section>
 
