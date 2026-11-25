@@ -180,7 +180,11 @@ class Shell(core.module.Module):
     async def on_system_prompt(self):
         prompt = "".join(self._get_setup())
 
-        if "coder" in self.manager.modules:
+        if (
+            "coder" in self.manager.modules
+            and
+            self.config.get("sandbox_path") not in self.manager.modules["coder"].config.get("sandbox_paths")
+        ):
             prompt += "\nNOTE: shell sandbox is NOT coder sandbox. they are seperate."
 
     def _resolve_dockerfile_path(self, dockerfile_path):
