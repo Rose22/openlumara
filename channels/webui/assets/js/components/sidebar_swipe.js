@@ -1,13 +1,19 @@
 /*
- * mobile edge-swipe for the sidebar: a rightward drag starting against the
- * left screen edge opens it, a leftward drag starting at the right edge
+ * mobile edge-swipe for the sidebar: a rightward drag starting near the
+ * left screen edge opens it, a leftward drag starting near the right edge
  * closes it. commit requires either dragging past 1/3 of the screen or
  * releasing with a horizontal flick (>0.45 px/ms over the newest stretch).
  * vertical scrolls and diagonal flukes are never hijacked (1.2x horizontal
  * dominance required before the gesture locks).
+ *
+ * the OS reserves roughly the first 20-24px of each screen edge for its own
+ * back gesture, and touches starting in that strip get stolen (we receive a
+ * touchcancel). the grab band therefore reaches well INSIDE the strip: a
+ * swipe starting a finger's-width from the edge still reads as an edge
+ * swipe, but the OS leaves it to us.
  */
 (function () {
-    var EDGE_ZONE = 28;
+    var EDGE_ZONE = 96;
     var TRIP = 8;
     var FLICK_V = 0.45;
 
@@ -25,6 +31,16 @@
         try { Alpine.store('ui').showSidebar = open; } catch (e) {}
     }
 
+    // never hijack a swipe meant for a genuinely horizontally-scrollable area
+    // (code blocks, the coder editor) sitting inside the edge band
+    function inHScroller(node) {
+        for (var el = node; el && el !== document.body; el = el.parentElement) {
+            if (el.scrollWidth - el.clientWidth > 4 &&
+                /(auto|scroll)/.test(getComputedStyle(el).overflowX)) return true;
+        }
+        return false;
+    }
+
     document.addEventListener('touchstart', function (e) {
         g = null;
         var t = e.touches && e.touches[0];
@@ -35,6 +51,7 @@
         else if (t.clientX >= window.innerWidth - EDGE_ZONE && isOpen()) dir = -1;
         if (!dir) return;
         if (dir > 0 && t.target && t.target.closest && t.target.closest('#sidebar')) return;
+        if (inHScroller(t.target)) return;
 
         g = { dir: dir, sx: t.clientX, sy: t.clientY,
               lx: t.clientX, lt: e.timeStamp, vx: 0 };

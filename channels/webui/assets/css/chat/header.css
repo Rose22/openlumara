@@ -116,3 +116,41 @@ header {
 body:not(.header-empty) header {
     min-height: 32px;
 }
+
+/* ==========================================================================
+ *  Mobile floating sidebar opener (#sidebar-fab, index.html): fixed at the
+ *  viewport's top-left, since the mobile layout has no header bar
+ *  ========================================================================== */
+
+#sidebar-fab {
+    position: fixed;
+    left: 12px;
+    top: calc(env(safe-area-inset-top, 0px) + 10px);
+    z-index: 45;
+
+    width: 46px;
+    height: 46px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    cursor: pointer;
+
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    box-shadow: var(--shadow-strong);
+    transition: all 0.2s ease;
+
+    svg {
+        width: 22px;
+        height: 22px;
+    }
+
+    &:active {
+        transform: scale(0.94);
+        color: var(--text-primary);
+        border-color: var(--accent);
+    }
+}

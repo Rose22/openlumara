@@ -1,11 +1,13 @@
 <header>
     <div class="left">
-        <template class="menu-btn" title="Toggle sidebar (Ctrl+B)" @click="$store.ui.toggleSidebar()"
-                x-if="$store.ui.isMobile || !$store.ui.showSidebar" x-cloak>
+        <!-- real button (a template's @click can never receive events: x-if
+             renders its content as siblings) - mobile uses #sidebar-fab instead -->
+        <button class="menu-btn" title="Toggle sidebar (Ctrl+B)" @click="$store.ui.toggleSidebar()"
+                x-show="!$store.ui.isMobile && !$store.ui.showSidebar" x-cloak>
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
             </svg>
-        </template>
+        </button>
         <!-- extension slot: modules fill this via a left() macro in <module>/chat/header.html -->
         {{ extension_slot("left") }}
     </div>

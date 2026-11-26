@@ -153,6 +153,10 @@ class Webui(core.channel.Channel, ui_extensions.UiExtensionsMixin):
             "description": "Whether to enable the sidebar at the left of the screen. Without it, you can\'t switch chats the graphical way, but you can still use commands like `/chat`!",
             "default": True
         },
+        "enable_floating_sidebar_button": {
+            "description": "Whether to show the floating button on phones and tablets, that opens the sidebar",
+            "default": True
+        },
         "show_unsafe_settings": {
             "description": "Whether to show unsafe settings. This setting has to be manually toggled via `/config` or by editing the config file, because if you want access to the unsafe features, you hopefully know what you're doing!",
             "default": False,

@@ -17,6 +17,8 @@
 }
 
 html, body {
+    /* no horizontal overscroll: stops Chrome's swipe-to-navigate-back */
+    overscroll-behavior-x: none;
     height: 100%;
     width: 100%;
     font-family: var(--font-family);
