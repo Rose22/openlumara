@@ -212,39 +212,38 @@
 
                     button {
                         padding: 7px 20px;
-                        border: 1px solid var(--border-color);
-                        border-radius: var(--radius-sm);
-                        background: var(--button-bg);
-                        color: var(--text-primary);
                         font-size: 14px;
-                        font-weight: 500;
                         font-family: var(--font-primary);
                         cursor: pointer;
                         transition: all 0.15s ease;
+                        border: 1px solid var(--border-color);
+                        border-radius: var(--radius-sm);
 
-                        &:hover:not(:disabled) {
-                            border-color: var(--accent);
-                            box-shadow: var(--shadow-soft);
-                        }
-
-                        &:active:not(:disabled) {
-                            transform: translateY(0);
-                        }
-
-                        &:disabled {
-                            opacity: 0.4;
-                            cursor: not-allowed;
-                        }
-
-                        &:nth-child(2) {
+                        &.save-btn {
                             background: var(--accent);
-                            border-color: var(--accent);
                             color: var(--bg-primary);
                             font-weight: 600;
 
                             &:hover:not(:disabled) {
                                 box-shadow: 0 0 16px var(--accent-glow);
                             }
+                        }
+
+                        &.cancel-btn {
+                            background: var(--button-bg);
+                            color: var(--text-primary);
+                            font-weight: 500;
+
+                            &:hover:not(:disabled) {
+                                box-shadow: none;
+                                border-color: var(--accent);
+                            }
+                        }
+
+
+                        &:disabled {
+                            opacity: 0.4;
+                            cursor: not-allowed;
                         }
                     }
                 }

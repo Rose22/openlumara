@@ -39,8 +39,8 @@
     <div class="flex fullwidth editing">
         <textarea x-model="$store.chat.editContent" rows="3"></textarea>
         <div class="edit-actions">
-            <button @click="$store.chat.saveEdit($store.chat.editingMessageIndex)">Save</button>
-            <button @click="$store.chat.cancelEdit()">Cancel</button>
+            <button class="save-btn" @click="$store.chat.saveEdit($store.chat.editingMessageIndex)">Save</button>
+            <button class="cancel-btn" @click="$store.chat.cancelEdit()">Cancel</button>
         </div>
     </div>
 </template>

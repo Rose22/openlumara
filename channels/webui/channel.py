@@ -430,6 +430,22 @@ Edit the config file for this, or use /config
         })
 
     async def on_stream(self, stream):
+        # each on_stream invocation gets its own lane id. the root (depth-1)
+        # stream is the real answer turn; nested invocations (context compaction,
+        # foreground subagents) run awaited inside it and must NOT merge their
+        # steps into it, or they clobber it by step number. is_root lets only the
+        # root drive stream state, user-message confirm, context pill, and the
+        # turn's final bubble.
+        stream_id, parent_id, attach_step = self.websocket_manager.begin_stream()
+        is_root = parent_id is None
+
+        # lane metadata carried on every step/final event so the client can
+        # render a nested stream inline under the step that spawned it
+        lane = {"stream_id": stream_id}
+        if not is_root:
+            lane["parent_id"] = parent_id
+            lane["attach_step"] = attach_step
+
         user_message_confirmed = False
         index = self._ws_stream_index
 
@@ -448,143 +464,164 @@ Edit the config file for this, or use /config
                 if not restart_grouping:
                     return
 
-        async for event in grouped_events():
-            payload = utils.serialize_for_json(event)
+        try:
+            async for event in grouped_events():
+                payload = utils.serialize_for_json(event)
 
-            if event.get("type") == "token":
-                token = event.get("content")
-                token_type = token.get("type")
-                match token_type:
-                    case "user_message":
-                        await self.websocket_manager.set_stream_state("message_sending")
-                        try:
-                            user_msg_payload = token.copy()
-                            user_msg_payload['index'] = index
+                if event.get("type") == "token":
+                    # nested streams render purely via their tagged step events;
+                    # never forward raw tokens, drive stream state, or touch the
+                    # context pill from a nested lane
+                    if not is_root:
+                        continue
+
+                    token = event.get("content")
+                    token_type = token.get("type")
+                    match token_type:
+                        case "user_message":
+                            await self.websocket_manager.set_stream_state("message_sending")
+                            try:
+                                user_msg_payload = token.copy()
+                                user_msg_payload['index'] = index
+                                await self.websocket_manager.broadcast({
+                                    "type": "user_message_added",
+                                    "message": user_msg_payload,
+                                })
+                            except Exception as e:
+                                self.log(self.name, f"error sending user message: {core.detail_error(e)}")
+                                return
+                        case "queue_flushed":
                             await self.websocket_manager.broadcast({
-                                "type": "user_message_added",
-                                "message": user_msg_payload,
+                                "type": "queue_flushed",
+                                "messages": token.get("content") or [],
+                                "end_of_chain": bool(token.get("end_of_chain", False))
                             })
-                        except Exception as e:
-                            self.log(self.name, f"error sending user message: {core.detail_error(e)}")
-                            return
-                    case "queue_flushed":
-                        await self.websocket_manager.broadcast({
-                            "type": "queue_flushed",
-                            "messages": token.get("content") or [],
-                            "end_of_chain": bool(token.get("end_of_chain", False))
-                        })
 
-                        if token.get("end_of_chain"):
-                            restart_grouping = True
-                    case "error":
-                        # an error ends the turn: go straight back to idle
-                        await self.websocket_manager.set_stream_state("idle")
+                            if token.get("end_of_chain"):
+                                restart_grouping = True
+                        case "error":
+                            # an error ends the turn: go straight back to idle
+                            await self.websocket_manager.set_stream_state("idle")
 
-                        await self.websocket_manager.broadcast({
-                            "type": "user_message_confirmed",
-                            "index": index
-                        })
-
-                        # pass the raw token on so this case can be handled seperately
-                        await self.websocket_manager.broadcast({
-                            "type": "token",
-                            "content": token
-                        })
-
-                        # force a chat reload so that it shows up (core/channel takes care of adding it to context)
-                        await self.websocket_manager.broadcast({
-                            "type": "sync"
-                        })
-                        return
-                    case _:
-                        if not user_message_confirmed:
-                            user_message_confirmed = True
                             await self.websocket_manager.broadcast({
                                 "type": "user_message_confirmed",
                                 "index": index
                             })
-                            await self.websocket_manager.set_stream_state("message_received")
 
-                        # track stream state backend-side based on tokens
-                        push_context_size = False
-                        match token_type:
-                            case "reasoning":
-                                await self.websocket_manager.set_stream_state("thinking")
-                            case "content":
-                                await self.websocket_manager.set_stream_state("streaming")
-                            case "prompt_progress":
-                                # prompt eval between tool rounds
-                                if self.websocket_manager.stream_state != "processing_tools":
-                                    await self.websocket_manager.set_stream_state("processing")
-                            case "model_load_progress":
-                                await self.websocket_manager.set_stream_state("processing")
-                            case "tool":
-                                await self.websocket_manager.set_stream_state("processing_tools")
-                            case "tool_call_delta":
-                                await self.websocket_manager.set_stream_state("calling_tools")
-                            case "tool_calls":
-                                await self.websocket_manager.set_stream_state("calling_tools")
-                            case "token_usage":
-                                push_context_size = True
+                            # pass the raw token on so this case can be handled seperately
+                            await self.websocket_manager.broadcast({
+                                "type": "token",
+                                "content": token
+                            })
 
-                        await self.websocket_manager.broadcast({
-                            "type": "token",
-                            "content": token
-                        })
-
-                        if push_context_size:
-                            try:
-                                size = utils.serialize_for_json(await self.context.get_size())
+                            # force a chat reload so that it shows up (core/channel takes care of adding it to context)
+                            await self.websocket_manager.broadcast({
+                                "type": "sync"
+                            })
+                            return
+                        case _:
+                            if not user_message_confirmed:
+                                user_message_confirmed = True
                                 await self.websocket_manager.broadcast({
-                                    "type": "context_size",
-                                    "content": size,
+                                    "type": "user_message_confirmed",
+                                    "index": index
                                 })
-                            except Exception as e:
-                                self.log(self.name, f"error sending context size: {core.detail_error(e)}")
+                                await self.websocket_manager.set_stream_state("message_received")
 
-            elif event.get("type") == "step":
-                step = payload.get("content")
-                if step is None:
-                    continue
+                            # track stream state backend-side based on tokens
+                            push_context_size = False
+                            match token_type:
+                                case "reasoning":
+                                    await self.websocket_manager.set_stream_state("thinking")
+                                case "content":
+                                    await self.websocket_manager.set_stream_state("streaming")
+                                case "prompt_progress":
+                                    # prompt eval between tool rounds
+                                    if self.websocket_manager.stream_state != "processing_tools":
+                                        await self.websocket_manager.set_stream_state("processing")
+                                case "model_load_progress":
+                                    await self.websocket_manager.set_stream_state("processing")
+                                case "tool":
+                                    await self.websocket_manager.set_stream_state("processing_tools")
+                                case "tool_call_delta":
+                                    await self.websocket_manager.set_stream_state("calling_tools")
+                                case "tool_calls":
+                                    await self.websocket_manager.set_stream_state("calling_tools")
+                                case "token_usage":
+                                    push_context_size = True
 
-                self.websocket_manager.record_step_snapshot(step)
+                            await self.websocket_manager.broadcast({
+                                "type": "token",
+                                "content": token
+                            })
 
+                            if push_context_size:
+                                try:
+                                    size = utils.serialize_for_json(await self.context.get_size())
+                                    await self.websocket_manager.broadcast({
+                                        "type": "context_size",
+                                        "content": size,
+                                    })
+                                except Exception as e:
+                                    self.log(self.name, f"error sending context size: {core.detail_error(e)}")
+
+                elif event.get("type") == "step":
+                    step = payload.get("content")
+                    if step is None:
+                        continue
+
+                    self.websocket_manager.record_step_snapshot(stream_id, step)
+
+                    await self.websocket_manager.broadcast({
+                        "type": "turn_step",
+                        "step": step,
+                        **lane
+                    })
+
+                elif event.get("type") == "final":
+                    messages = payload.get("content") or []
+                    self.websocket_manager.record_final_snapshot(stream_id, messages)
+
+                    await self.websocket_manager.broadcast({
+                        "type": "turn_final",
+                        "messages": messages,
+                        **lane
+                    })
+
+                elif event.get("type") == "step_delta":
+                    delta = payload.get("content")
+                    if delta is None:
+                        continue
+
+                    self.websocket_manager.apply_step_delta(stream_id, delta)
+
+                    await self.websocket_manager.broadcast({
+                        "type": "turn_step_delta",
+                        "delta": delta,
+                        **lane
+                    })
+
+                elif event.get("type") == "final_delta":
+                    delta = payload.get("content")
+                    if delta is None:
+                        continue
+
+                    self.websocket_manager.apply_final_delta(stream_id, delta)
+
+                    await self.websocket_manager.broadcast({
+                        "type": "turn_final_delta",
+                        "delta": delta,
+                        **lane
+                    })
+        finally:
+            self.websocket_manager.end_stream(stream_id)
+
+            # a nested lane ending is not the end of the answer turn: tell the
+            # client to settle+collapse just this inline chain, keep the root live
+            if not is_root:
                 await self.websocket_manager.broadcast({
-                    "type": "turn_step",
-                    "step": step
-                })
-
-            elif event.get("type") == "final":
-                messages = payload.get("content") or []
-                self.websocket_manager.record_final_snapshot(messages)
-
-                await self.websocket_manager.broadcast({
-                    "type": "turn_final",
-                    "messages": messages
-                })
-
-            elif event.get("type") == "step_delta":
-                delta = payload.get("content")
-                if delta is None:
-                    continue
-
-                self.websocket_manager.apply_step_delta(delta)
-
-                await self.websocket_manager.broadcast({
-                    "type": "turn_step_delta",
-                    "delta": delta
-                })
-
-            elif event.get("type") == "final_delta":
-                delta = payload.get("content")
-                if delta is None:
-                    continue
-
-                self.websocket_manager.apply_final_delta(delta)
-
-                await self.websocket_manager.broadcast({
-                    "type": "turn_final_delta",
-                    "delta": delta
+                    "type": "turn_lane_end",
+                    "stream_id": stream_id,
                 })
 
     def on_log(self, category, message):

@@ -300,3 +300,23 @@
     color: var(--text-primary);
     font-size: var(--font-size-base);
 }
+
+/* nested agentchain (compaction / subagent) rendered inline under the step
+   that spawned it: NO box, padding or border here - the timeline's node dots
+   anchor -1.27em left of the combined block, so the nested chain only lines
+   up when its geometry is pixel-identical to the main chain. The
+   "Sub-process" header is the only distinguishing marker. */
+.agent-chain.is-nested {
+    margin: 0.25rem 0 0.1rem;
+    width: 100%;
+    box-sizing: border-box;
+
+    .agent-chain-header .label {
+        font-weight: 600;
+    }
+
+    .agent-chain-header {
+        color: var(--text-secondary);
+        opacity: 0.85;
+    }
+}

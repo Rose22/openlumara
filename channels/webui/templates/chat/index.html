@@ -81,7 +81,10 @@
                              collapsed: true,
                              {% endif %}
                              get processing() { return $store.stream.state !== 'idle' },
-                             get hasChain() { return (turn.steps ?? []).length > 0 },
+                             get hasChain() {
+                                 return (turn.steps ?? []).length > 0
+                                     || Object.values($store.stream.nestedChains).some(c => c.parent_id === turn.stream_id);
+                             },
                              get lastLabel() {
                                  const finals = turn.final_messages ?? [];
                                  const steps = turn.steps ?? [];
@@ -104,12 +107,21 @@
                                     </div>
                                     <template x-if="!collapsed">
                                         <div class="agent-chain-body">
+                                            {# nested chains spawned before the first step (e.g. compaction while processing the user message) #}
+                                            {% with nest_depth = 1, attach_expr = "0" %}
+                                                {% include 'chat/turns/nested_chain.html' %}
+                                            {% endwith %}
+
                                             <template x-for="(step, stepIndex) in turn.steps" :key="stepIndex">
                                                 <div class="chain-station">
                                                     <div class="chain-rail"><div class="chain-dot"></div></div>
                                                     <div class="chain-content">
                                                         {% set combined_stream = True %}
                                                         {% include 'chat/combined_block.html' %}
+                                                        {# nested agentchains (compaction / subagent) inline under the step that spawned them #}
+                                                        {% with nest_depth = 1 %}
+                                                            {% include 'chat/turns/nested_chain.html' %}
+                                                        {% endwith %}
                                                     </div>
                                                 </div>
                                             </template>

@@ -19,21 +19,61 @@ class WebSocketManager:
         self.active_stream_task = None
         self.webui_ready = False
         self.stream_state = "idle"
-        self.turn_steps = {}
-        self.turn_final = []
+        # one buffer per live on_stream invocation (the root answer turn plus
+        # any nested compaction/subagent streams), keyed by stream id. sharing
+        # one buffer let a nested stream clobber the main chain's steps/final
+        # because both number their steps from 1.
+        self.streams = {}        # id -> {"steps": {}, "final": [], "parent": id|None, "attach_step": n}
+        self.stream_order = []   # stream ids in creation order, for replay
+        self._next_stream_id = 0
+        self.stack = []          # currently-open stream ids, root at index 0
 
-    def record_step_snapshot(self, step: dict):
+    def begin_stream(self):
+        """open a lane for one on_stream invocation; returns (id, parent_id, attach_step).
+        parent_id is None for the root turn; attach_step is the parent's current
+        top step so a nested chain renders inline under the step that spawned it."""
+        self._next_stream_id += 1
+        stream_id = self._next_stream_id
+        parent = self.stack[-1] if self.stack else None
+
+        attach_step = 0
+        if parent is not None:
+            parent_steps = self.streams.get(parent, {}).get("steps", {})
+            if parent_steps:
+                attach_step = max(parent_steps.keys())
+
+        self.streams[stream_id] = {"steps": {}, "final": [], "parent": parent, "attach_step": attach_step}
+        self.stream_order.append(stream_id)
+        self.stack.append(stream_id)
+        return stream_id, parent, attach_step
+
+    def end_stream(self, stream_id):
+        if stream_id in self.stack:
+            self.stack.remove(stream_id)
+
+    def reset_streams(self):
+        self.streams = {}
+        self.stream_order = []
+        self._next_stream_id = 0
+        self.stack = []
+
+    def _buffer(self, stream_id):
+        return self.streams.setdefault(
+            stream_id, {"steps": {}, "final": [], "parent": None, "attach_step": 0}
+        )
+
+    def record_step_snapshot(self, stream_id, step: dict):
         """track the newest snapshot of one streaming step (upsert by number)"""
-        self.turn_steps[step.get("step")] = step
+        self._buffer(stream_id)["steps"][step.get("step")] = step
 
-    def record_final_snapshot(self, messages: list):
+    def record_final_snapshot(self, stream_id, messages: list):
         """track the newest final-bubble snapshot"""
-        self.turn_final = messages
+        self._buffer(stream_id)["final"] = messages
 
-    def apply_step_delta(self, delta: dict):
+    def apply_step_delta(self, stream_id, delta: dict):
         """fold a streaming append into the stored step snapshot, so a
         mid-stream reconnect replay stays current between checkpoints"""
-        step = self.turn_steps.get(delta.get("step"))
+        step = self._buffer(stream_id)["steps"].get(delta.get("step"))
         if step is None:
             return
 
@@ -47,10 +87,11 @@ class WebSocketManager:
                         meta["response"] = (meta.get("response") or "") + append["text"]
                         break
 
-    def apply_final_delta(self, delta: dict):
-        if not self.turn_final:
+    def apply_final_delta(self, stream_id, delta: dict):
+        final = self._buffer(stream_id)["final"]
+        if not final:
             return
-        last = self.turn_final[-1]
+        last = final[-1]
         last["content"] = (last.get("content") or "") + delta["text"]
 
     async def push_context_update(self, connection=None):
@@ -78,9 +119,8 @@ class WebSocketManager:
         self.stream_state = state
 
         if state in ("message_sending", "idle"):
-            # reset the buffers
-            self.turn_steps = {}
-            self.turn_final = []
+            # reset every lane's buffers
+            self.reset_streams()
 
         await self.broadcast({"type": "stream_state", "state": state})
 
@@ -101,17 +141,29 @@ class WebSocketManager:
             "state": self.stream_state
         })
 
-        # when reconnecting mid-stream, replay every step so far to the client
-        if self.stream_state != "idle" and (self.turn_steps or self.turn_final):
-            for step_num in sorted(self.turn_steps):
+        # when reconnecting mid-stream, replay every lane so far, in creation
+        # order, tagged with its stream id / parent / attach_step so nested
+        # chains rebuild inline under the step that spawned them
+        if self.stream_state != "idle" and self.stream_order:
+            for stream_id in sorted(self.stream_order):
+                buf = self.streams.get(stream_id)
+                if not buf:
+                    continue
+                lane = {"stream_id": stream_id}
+                if buf.get("parent") is not None:
+                    lane["parent_id"] = buf["parent"]
+                    lane["attach_step"] = buf.get("attach_step", 0)
+                for step_num in sorted(buf["steps"]):
+                    await websocket.send_json({
+                        "type": "turn_step",
+                        "step": buf["steps"][step_num],
+                        **lane,
+                    })
                 await websocket.send_json({
-                    "type": "turn_step",
-                    "step": self.turn_steps[step_num]
+                    "type": "turn_final",
+                    "messages": buf["final"],
+                    **lane,
                 })
-            await websocket.send_json({
-                "type": "turn_final",
-                "messages": self.turn_final
-            })
 
         await self.push_context_update(connection=websocket)
 

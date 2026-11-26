@@ -132,6 +132,84 @@ async function stopActiveStream() {
     return sent;
 }
 
+// upsert a step snapshot into a turn's steps array (sorted by step number).
+// returns true if content grew (used to gate sounds).
+function applyStep(turn, step) {
+    const steps = turn.steps ?? (turn.steps = []);
+    const stepIdx = steps.findIndex(s => s.step === step.step);
+    let grew = false;
+    if (stepIdx >= 0) {
+        const prev = steps[stepIdx];
+        grew = (step.reasoning_content || '').length !== (prev.reasoning_content || '').length
+            || (step.content || '').length !== (prev.content || '').length;
+        Object.assign(prev, step);
+    } else {
+        steps.push(step);
+        steps.sort((a, b) => a.step - b.step);
+        grew = true;
+    }
+    return grew;
+}
+
+function applyFinal(turn, messages) {
+    turn.final_messages = messages || [];
+    return turn.final_messages.length > 0;
+}
+
+// resolve which turn a lane-tagged event targets. Root events target the live
+// turn (created here); nested events (parent_id set) target their own inline
+// chain in stream.nestedChains, created on first sight so they never merge
+// into the parent's step numbering.
+function ensureRootLiveTurn(stream, chat, rootStreamId) {
+    const isLive = (t) => t && t.live === true;
+    if (!isLive(stream.turn)) {
+        const last = chat.turnHistory[chat.turnHistory.length - 1];
+        if (isLive(last) && ((last.steps ?? []).length > 0 ||
+            Object.values(stream.nestedChains).some(c => c.parent_id === last.stream_id))) {
+            stream.turn = last;
+        } else {
+            while (chat.turnHistory.length > 0 &&
+                   chat.turnHistory[chat.turnHistory.length - 1].role === 'assistant' &&
+                   !isLive(chat.turnHistory[chat.turnHistory.length - 1])) {
+                chat.turnHistory.pop();
+            }
+            stream.turn = { role: "assistant", live: true, steps: [], final_messages: [] };
+            chat.turnHistory.push(stream.turn);
+        }
+    } else if (!chat.turnHistory.includes(stream.turn)) {
+        chat.turnHistory.push(stream.turn);
+    }
+    // stamp the root lane id so nestedChildren(turn.stream_id, ...) can find children
+    if (rootStreamId != null) stream.turn.stream_id = rootStreamId;
+    return stream.turn;
+}
+
+function ensureLaneTurn(stream, chat, data) {
+    const streamId = data.stream_id;
+    const isNested = data.parent_id != null && streamId != null;
+
+    if (isNested) {
+        // make sure a host root turn exists so the inline chain has somewhere
+        // to render even if the answer turn hasn't emitted a step yet (e.g. a
+        // compaction that fired while the user message was still being processed)
+        ensureRootLiveTurn(stream, chat, data.parent_id);
+
+        let chain = stream.nestedChains[streamId];
+        if (!chain) {
+            chain = {
+                role: "assistant", live: true, steps: [], final_messages: [],
+                stream_id: streamId, parent_id: data.parent_id,
+                attach_step: data.attach_step ?? 0, nested: [],
+            };
+            stream.nestedChains[streamId] = chain;
+        }
+        if (data.attach_step != null) chain.attach_step = data.attach_step;
+        return { turn: chain, nested: true };
+    }
+
+    return { turn: ensureRootLiveTurn(stream, chat, streamId), nested: false };
+}
+
 function releaseLiveTurn() {
     const stream = Alpine.store('stream');
     const chat = Alpine.store('chat');
@@ -194,85 +272,57 @@ async function handleWebSocketMessage(data) {
 
         case "turn_step":
         case "turn_final": {
-            const isLive = (t) => t && t.live === true;
+            const { turn, nested } = ensureLaneTurn(stream, chat, data);
 
-            if (!isLive(stream.turn)) {
-                const last = chat.turnHistory[chat.turnHistory.length - 1];
-
-                if (isLive(last) && (last.steps ?? []).length > 0) {
-                    stream.turn = last;
-                }
-                else {
-                    while (chat.turnHistory.length > 0 &&
-                           chat.turnHistory[chat.turnHistory.length - 1].role === 'assistant' &&
-                           !isLive(chat.turnHistory[chat.turnHistory.length - 1])) {
-                        chat.turnHistory.pop();
-                    }
-
-                    stream.turn = {role: "assistant", live: true, steps: [], final_messages: []};
-                    chat.turnHistory.push(stream.turn);
-                }
-            }
-            else if (!chat.turnHistory.includes(stream.turn)) {
-                chat.turnHistory.push(stream.turn);
-            }
-
+            let grew = false;
             if (data_type === "turn_step") {
-                const step = data.step;
-                const steps = stream.turn.steps;
-                const stepIdx = steps.findIndex(s => s.step === step.step);
-
-                let grew = false;
-                if (stepIdx >= 0) {
-                    const prev = steps[stepIdx];
-                    grew = (step.reasoning_content || '').length !== (prev.reasoning_content || '').length
-                        || (step.content || '').length !== (prev.content || '').length;
-                    Object.assign(prev, step);
-                } else {
-                    steps.push(step);
-                    steps.sort((a, b) => a.step - b.step);
-                    grew = true;
-                }
-
-                if (grew) {
-                    stream.processing = {};
-                    stream.modelLoad = null;
-                    AudioManager.stopProcessingSound();
-                    AudioManager.play("token");
-                    if (!responseSoundPlayed) {
-                        AudioManager.play("response_start");
-                        responseSoundPlayed = true;
-                    }
-                }
-
-                if (step.is_cmd) {
+                grew = applyStep(turn, data.step);
+                if (data.step.is_cmd) {
                     await chat.reloadChats();
                     await chat.reloadCategories();
                 }
             } else {
                 // authoritative final snapshot: replace wholesale, the
                 // empty list is a retract (content slid back into the chain)
-                stream.turn.final_messages = data.messages || [];
-
-                if (stream.turn.final_messages.length > 0) {
-                    stream.processing = {};
-                    stream.modelLoad = null;
-                    AudioManager.stopProcessingSound();
-                    AudioManager.play("token");
-                    if (!responseSoundPlayed) {
-                        AudioManager.play("response_start");
-                        responseSoundPlayed = true;
-                    }
-                }
-
-                if (stream.turn.final_messages.some(m => m.is_cmd)) {
+                grew = applyFinal(turn, data.messages);
+                if ((turn.final_messages ?? []).some(m => m.is_cmd)) {
                     await chat.reloadChats();
                     await chat.reloadCategories();
                 }
             }
 
+            if (grew) {
+                stream.processing = {};
+                stream.modelLoad = null;
+                AudioManager.stopProcessingSound();
+                AudioManager.play("token");
+                if (!responseSoundPlayed) {
+                    AudioManager.play("response_start");
+                    responseSoundPlayed = true;
+                }
+            }
+
             // scroll
             await ui.scrollToBottom();
+            break;
+        }
+
+        // a nested lane (compaction/subagent) finished: settle just that inline
+        // chain so it collapses like any other finished agentchain, and drop it
+        // from the live registry. the parent chain and root stay untouched.
+        case "turn_lane_end": {
+            const chain = stream.nestedChains[data.stream_id];
+            if (chain) {
+                (chain.steps ?? []).forEach(s => {
+                    s.reasoning_live = false;
+                    s.is_tail = false;
+                    if (s.status === 'thinking' && (!s.tool_calls || s.tool_calls.length === 0)) {
+                        s.status = 'thoughts';
+                    }
+                    if (s.label === 'Thinking..') s.label = 'Thoughts';
+                });
+                chain.live = false;
+            }
             break;
         }
 
@@ -288,9 +338,17 @@ async function handleWebSocketMessage(data) {
             // this is required for the stream not to bog down,
             // and it saves tremendously on network use
             const delta = data.delta;
-            if (!delta || !stream.turn.steps) break;
+            // route the delta to its lane; a delta always trails a turn_step
+            // that already created the lane, so skip if the lane is unknown
+            let laneTurn;
+            if (data.parent_id != null && data.stream_id != null) {
+                laneTurn = stream.nestedChains[data.stream_id];
+            } else {
+                laneTurn = stream.turn;
+            }
+            if (!delta || !laneTurn || !laneTurn.steps) break;
 
-            const step = stream.turn.steps.find(s => s.step === delta.step);
+            const step = laneTurn.steps.find(s => s.step === delta.step);
             if (!step) break;
 
             for (const a of delta.append || []) {
@@ -320,9 +378,16 @@ async function handleWebSocketMessage(data) {
 
         case "turn_final_delta": {
             const delta = data.delta;
-            if (!delta || !stream.turn.final_messages) break;
+            // resolve the delta's lane (nested chain vs root turn) before folding
+            let laneTurn;
+            if (data.parent_id != null && data.stream_id != null) {
+                laneTurn = stream.nestedChains[data.stream_id];
+            } else {
+                laneTurn = stream.turn;
+            }
+            if (!delta || !laneTurn || !laneTurn.final_messages) break;
 
-            const finals = stream.turn.final_messages;
+            const finals = laneTurn.final_messages;
             const last = finals && finals[finals.length - 1];
             if (!last) break;
 
