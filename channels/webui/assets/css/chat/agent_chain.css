@@ -306,10 +306,27 @@
    anchor -1.27em left of the combined block, so the nested chain only lines
    up when its geometry is pixel-identical to the main chain. The
    "Sub-process" header is the only distinguishing marker. */
+/* the sub-chain container: faint panel with an accent edge. the wrapper
+   station's own indent column is folded away (gap 0, rail hidden) so this
+   padding is the only indent - alignment inside stays immune because the
+   rail, spine and dots all derive from the chain box itself */
+.chain-station.nested-station {
+    gap: 0;
+}
+
+.chain-station.nested-station > .chain-rail {
+    display: none;
+}
+
 .agent-chain.is-nested {
-    margin: 0.25rem 0 0.1rem;
+    margin: 0.35rem 0 0.2rem;
+    padding: 0.45rem 0.6rem;
     width: 100%;
     box-sizing: border-box;
+    border-left: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+    /* square on the accent edge, rounded on the right */
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    background: rgba(128, 128, 128, 0.05);
 
     .agent-chain-header .label {
         font-weight: 600;
@@ -319,4 +336,41 @@
         color: var(--text-secondary);
         opacity: 0.85;
     }
+}
+
+/* the nested wrapper station exists only to provide indent; its own rail
+   draws nothing (its dot rules already hide the node, this kills the
+   stub line that :last-child was painting next to the sub-chain header) */
+.chain-station.nested-station > .chain-rail::before {
+    content: none;
+}
+
+/* nested rails always span their full station: the :first/:last-child
+   heuristics misfire here (Alpine x-for keeps re-inserting new last
+   children, which seems to leave pseudo stub geometry stuck), and a
+   sub-chain wants one continuous spine regardless */
+.agent-chain.is-nested .agent-chain-body .chain-station .chain-rail::before {
+    top: 0;
+    bottom: 0;
+    height: auto;
+}
+
+/* anchor nested node dots to the STATION instead of the combined block:
+   dot center = spine center by construction (spine sits at 0.5em - 0.5px
+   from the rail/station edge, dots are 0.6em wide), so no offset can
+   drift in along the block path. --dot-fudge allows a final optical
+   tweak without re-deriving the math */
+.agent-chain.is-nested .chain-station {
+    position: relative;
+}
+
+.agent-chain.is-nested .combined-block {
+    position: static;
+}
+
+.agent-chain.is-nested .combined-block > .node-dot {
+    /* fudge re-zeroed 2026-11-26: adding the container box moved the chain
+       to a different subpixel grid position, which flipped the old +1px
+       rounding bias - re-tune via --dot-fudge if the layout shifts again */
+    left: calc(0.2em - 0.25px + var(--dot-fudge, 0px));
 }
