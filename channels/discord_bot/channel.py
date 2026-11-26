@@ -1,11 +1,83 @@
 import core
 import discord
 import asyncio
+import re
 import time
 import datetime
 import json_repair
 
 CHUNK_SIZE = 1500
+
+
+# -------------------------
+#   SMART SPLIT HELPERS
+# -------------------------
+
+def _fence_open(text: str) -> bool:
+    """True if `text` contains an unterminated ``` code fence."""
+    return text.count("```") % 2 == 1
+
+
+def _split_oversized(text: str, limit: int) -> list:
+    """Last-resort split of a single oversized paragraph: break on lines,
+    then hard-slice any single line that itself exceeds the limit."""
+    out = []
+    cur = ""
+    for line in text.split("\n"):
+        cand = (cur + "\n" + line) if cur else line
+        if len(cand) <= limit:
+            cur = cand
+            continue
+        if cur:
+            out.append(cur)
+            cur = ""
+        while len(line) > limit:
+            out.append(line[:limit])
+            line = line[limit:]
+        cur = line
+    if cur:
+        out.append(cur)
+    return out
+
+
+def _smart_split(text: str, limit: int = CHUNK_SIZE) -> list:
+    """Split text into chunks of at most `limit` chars, preferring paragraph
+    (blank-line) boundaries and never splitting inside an open code fence.
+    If a break is unavoidable mid-fence, the fence is closed and reopened."""
+    if len(text) <= limit:
+        return [text]
+
+    chunks = []
+    cur = ""
+    for p in re.split(r"\n\n+", text):
+        sep = "\n\n" if cur else ""
+        if len(cur) + len(sep) + len(p) <= limit:
+            cur += sep + p
+            continue
+
+        # we must break here - if a fence is open, close/reopen it
+        if _fence_open(cur):
+            cur += "\n```"
+            p = "```\n" + p
+
+        if cur:
+            chunks.append(cur)
+        cur = ""
+
+        if len(p) <= limit:
+            cur = p
+        else:
+            chunks.extend(_split_oversized(p, limit))
+
+    if cur:
+        chunks.append(cur)
+    return chunks
+
+
+def _can_break_stream(chunk: str, limit: int = CHUNK_SIZE) -> bool:
+    """For live streaming: only finalize a chunk when it has passed the size
+    limit AND sits at a paragraph boundary with no open code fence."""
+    return len(chunk) >= limit and chunk.endswith("\n\n") and not _fence_open(chunk)
 
 # we have to create a special class here so that we can override methods and make methods like on_message work
 class DiscordClient(discord.Client):
@@ -170,11 +242,8 @@ class DiscordClient(discord.Client):
             if len(response) < CHUNK_SIZE:
                 await self.send_to_main(response, message=message)
             else:
-                offset = 0
-                while offset < len(response):
-                    chunk = response[offset:(offset+CHUNK_SIZE)]
+                for chunk in _smart_split(response):
                     await self.send_to_main(chunk, message=message)
-                    offset += CHUNK_SIZE
 
     async def render_stream(self, stream, source_message=None):
         """renders any stream object into discord using edit-based streaming.
@@ -279,7 +348,8 @@ class DiscordClient(discord.Client):
                         response_content += token_content
 
                         # if response content length exceeds chunk size, start a new chunk message
-                        if len(chunk_content) >= CHUNK_SIZE:
+                        # (only break at a paragraph boundary with no open code fence)
+                        if _can_break_stream(chunk_content):
                             # finalize current message
                             msg = await msg.edit(content=chunk_content)
 
@@ -321,15 +391,11 @@ class DiscordClient(discord.Client):
                 elif len(response_content) < CHUNK_SIZE:
                     msg = await msg.edit(content=response_content)
                 else:
-                    offset = 0
-                    while offset < len(response_content):
-                        chunk = response_content[offset:(offset+CHUNK_SIZE)]
-                        if offset == 0:
+                    for i, chunk in enumerate(_smart_split(response_content)):
+                        if i == 0:
                             msg = await msg.edit(content=chunk)
                         else:
                             await self.send_to_main(chunk, message=source_message)
-
-                        offset += CHUNK_SIZE
 
 
 # the openlumara channel that sends to/from the actual discord client
@@ -450,11 +516,8 @@ class DiscordBot(core.channel.Channel):
         if len(content) < CHUNK_SIZE:
             await self.bot.send_to_main(content)
         else:
-            offset = 0
-            while offset < len(content):
-                chunk = content[offset:(offset+CHUNK_SIZE)]
+            for chunk in _smart_split(content):
                 await self.bot.send_to_main(chunk)
-                offset += CHUNK_SIZE
 
     async def on_stream(self, stream):
         bot = self.bot
