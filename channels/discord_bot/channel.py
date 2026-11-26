@@ -7,6 +7,9 @@ import datetime
 import json_repair
 
 CHUNK_SIZE = 1500
+# absolute ceiling for a streamed chunk: discord hard-fails edits past 2000
+# chars, so force a break here even without a clean paragraph boundary
+HARD_SPLIT_LIMIT = 1900
 
 
 # -------------------------
@@ -20,23 +23,44 @@ def _fence_open(text: str) -> bool:
 
 def _split_oversized(text: str, limit: int) -> list:
     """Last-resort split of a single oversized paragraph: break on lines,
-    then hard-slice any single line that itself exceeds the limit."""
+    then hard-slice any single line that itself exceeds the limit. Code
+    fences are closed before each cut and reopened after the break so
+    rendering stays valid."""
     out = []
     cur = ""
+    reopen = False
+
+    def flush():
+        nonlocal cur, reopen
+        if not cur:
+            return
+        if _fence_open(cur):
+            cur += "\n```"
+            reopen = True
+        out.append(cur)
+        cur = ""
+
     for line in text.split("\n"):
+        if reopen:
+            line = "```\n" + line
+            reopen = False
         cand = (cur + "\n" + line) if cur else line
         if len(cand) <= limit:
             cur = cand
             continue
-        if cur:
-            out.append(cur)
-            cur = ""
+        flush()
+        if reopen:
+            line = "```\n" + line
+            reopen = False
         while len(line) > limit:
             out.append(line[:limit])
             line = line[limit:]
+            # a hard slice can itself land mid-fence - close/reopen around it
+            if _fence_open(out[-1]):
+                out[-1] += "\n```"
+                line = "```\n" + line
         cur = line
-    if cur:
-        out.append(cur)
+    flush()
     return out
 
 
@@ -348,13 +372,20 @@ class DiscordClient(discord.Client):
                         response_content += token_content
 
                         # if response content length exceeds chunk size, start a new chunk message
-                        # (only break at a paragraph boundary with no open code fence)
-                        if _can_break_stream(chunk_content):
+                        # (prefer a paragraph boundary with no open code fence, but force a
+                        # break at the hard limit so we never exceed discord's 2000-char cap)
+                        if _can_break_stream(chunk_content) or len(chunk_content) >= HARD_SPLIT_LIMIT:
+                            # forced break mid-fence: close it here, reopen in the next chunk
+                            reopen = ""
+                            if _fence_open(chunk_content):
+                                chunk_content += "\n```"
+                                reopen = "```\n"
+
                             # finalize current message
                             msg = await msg.edit(content=chunk_content)
 
                             msg = await self.send_to_main("...")
-                            chunk_content = ""
+                            chunk_content = reopen
 
                     # this checks if the timer has elapsed
                     if (time.time() - timer) >= edit_interval:
