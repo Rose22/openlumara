@@ -879,32 +879,44 @@ class APIClient():
                 if chunk.get("choices"):
                     streamed_token = chunk["choices"][0].get("delta") or {}
 
-                    content_yield = None
+                    # FIX (2026-11-23): some routers merge the tail of a
+                    # reasoning run with the first content token into ONE
+                    # delta ({"reasoning_content": "...", "content": "The"}).
+                    # the old code overwrote content_yield with the reasoning
+                    # token, silently DROPPING the content half. yield them
+                    # as separate tokens instead, reasoning first so the
+                    # stream order stays intact.
+                    reason_part = streamed_token.get("reasoning_content") or streamed_token.get("reasoning")
 
-                    # handle content token streaming
+                    reasoning_yield = None
+                    if reason_part:
+                        reasoning_yield = {"type": "reasoning", "content": reason_part}
+
+                    content_yield = None
                     if streamed_token.get("content"):
                         content_yield = {"type": "content", "content": streamed_token["content"]}
 
-                    # handle reasoning content streaming
-                    reason_part = streamed_token.get("reasoning_content") or streamed_token.get("reasoning")
-
-                    if reason_part:
-                        content_yield = {"type": "reasoning", "content": reason_part}
-
-                    # add timing data to the yielded token
-                    if streamed_token.get("content") or reason_part:
+                    # add timing data to the yielded token (attach to the
+                    # last token of this chunk so a merged delta doesn't
+                    # double-count the speed calc)
+                    timing_token = content_yield if content_yield is not None else reasoning_yield
+                    if timing_token is not None:
                         # Send timing data: Use native if available, otherwise calculate
                         native_timings = chunk.get("timings")
                         if native_timings:
-                            content_yield["timings"] = native_timings
+                            timing_token["timings"] = native_timings
 
                         else:
                             # Fallback: Calculate tokens/s based on time between chunks
                             if delta_ms > 1: # Only yield if significant time passed
-                                content_yield["timings"] = {
+                                timing_token["timings"] = {
                                     "predicted_ms": delta_ms,
                                     "predicted_n": 1
                                 }
+
+                    # yield reasoning first (preserves ordering), then content
+                    if reasoning_yield:
+                        yield reasoning_yield
 
                     # and finally, yield the content token
                     if content_yield:
