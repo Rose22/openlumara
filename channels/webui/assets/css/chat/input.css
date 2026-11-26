@@ -67,6 +67,11 @@
             #send, #stop {
                 border-radius: 0;
             }
+
+            .input-actions {
+                border-radius: 0;
+                margin: 0;
+            }
         }
 
 
@@ -125,7 +130,7 @@
             color: var(--text-primary);
             font-size: 1rem;
             outline: none;
-            transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+            transition: none;
             max-height: 200px;
             font-family: inherit;
             line-height: 1.5;
@@ -185,6 +190,53 @@
             }
         }
 
+        /* Extra controls to the right of the textarea. When the input grows
+           multiline, .is-multiline is added to the wrapper and these controls
+           collapse to only the visible send/stop button. */
+        .input-actions {
+            display: flex;
+            align-items: stretch;
+            align-self: stretch;
+            overflow: visible;
+            flex-shrink: 0;
+            min-width: 0;
+        }
+
+        .input-wrapper.is-multiline {
+            align-items: flex-end;
+        }
+
+        .input-wrapper.is-multiline .input-actions {
+            align-items: flex-end;
+            margin: 0;
+        }
+
+        .input-wrapper.is-multiline .input-actions > * {
+            border-radius: 0;
+        }
+
+        .input-wrapper.is-multiline #upload {
+            height: 48px;
+        }
+
+        .input-wrapper.is-multiline .input-actions > *:not(#send):not(#stop) {
+            display: none;
+        }
+
+        /* The hidden send/stop keeps Alpine's inline display:none, so this
+           cannot accidentally reveal both buttons. */
+        .input-wrapper.is-multiline .input-actions > #send,
+        .input-wrapper.is-multiline .input-actions > #stop {
+            display: flex;
+            height: 48px;
+        }
+
+        /* Keeps the rounded wrapper corner on whichever action is visible. */
+        .input-actions .action-last {
+            border-top-right-radius: var(--radius-sm);
+            border-bottom-right-radius: var(--radius-sm);
+        }
+
         .model-switcher {
             display: flex;
             align-items: center;
@@ -234,7 +286,7 @@
             padding: 0 14px;
             margin-left: 6px;
             height: auto;
-            border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+            border-radius: 0;
             border: none;
             font-size: 0.95rem;
             font-weight: 600;

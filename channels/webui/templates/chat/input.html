@@ -41,10 +41,14 @@
         }
     "
     @focus="if ($store.chat.user_input) $autosize($el)"
-    @blur="$el.style.height = '48px'"
+    @blur="$autosize($el)"
 ></textarea>
 
 {{ extension_slot("after_input") }}
+
+{# extra controls beside the textarea: upload and send stay when the input
+   grows multiline, the rest collapse away - see .input-wrapper.is-multiline #}
+<div class="input-actions">
 
 {% if config.get("enable_model_switcher") and config.get("enable_admin_settings") %}
 <div class="model-switcher" x-data="modelQuickSwitch()" x-show="!$store.ui.isMobile" x-cloak>
@@ -72,17 +76,17 @@
 {% include 'chat/context_pill.html' %}
 {% endif %}
 
-<button id="send" aria-label="Send message" x-show="$store.stream.state === 'idle'"
+<button id="send" aria-label="Send message" :class="{ 'action-last': $store.stream.state === 'idle' }" x-show="$store.stream.state === 'idle'"
     @click="
         $event.preventDefault();
         if (!$store.chat.user_input) { return; }
 
         await $store.chat.send($store.chat.user_input);
-        $el.style.height = '48px';
+        if ($refs['user-input']) $refs['user-input'].style.height = '48px';
     "
 >{% include 'svg/send.svg' %}</button>
 
-<button id="stop" aria-label="Stop generation" x-show="$store.stream.state != 'idle'" x-cloak @click="
+<button id="stop" aria-label="Stop generation" :class="{ 'action-last': $store.stream.state != 'idle' }" x-show="$store.stream.state != 'idle'" x-cloak @click="
 await stopActiveStream()
 ">
     {% include 'svg/stop.svg' %}
@@ -109,3 +113,5 @@ await stopActiveStream()
     </span>
     -->
 </button>
+
+</div><!-- /.input-actions -->
